@@ -1,6 +1,6 @@
 ---
 title: "Plugin system"
-description: "Extending AI Protocol Studio with protocol adapters and custom checks."
+description: "Extending Protolens with protocol adapters and custom checks."
 ---
 
 ::: v-pre
@@ -10,7 +10,7 @@ description: "Extending AI Protocol Studio with protocol adapters and custom che
 ## Protocol adapters
 
 ```ts
-import { registerProtocol, type ProtocolAdapter } from '@aps/core';
+import { registerProtocol, type ProtocolAdapter } from '@protolens/core';
 
 registerProtocol({
   id: 'grpc',
@@ -26,7 +26,7 @@ HTTP, GraphQL, MCP and WebSocket are registered this way. Adapters are independe
 ## Custom checks
 
 ```ts
-import { registerCheck } from '@aps/core';
+import { registerCheck } from '@protolens/core';
 registerCheck('is-uuid', (cfg, ctx) => ({
   type: 'is-uuid', name: 'is uuid', source: 'deterministic',
   passed: /^[0-9a-f-]{36}$/.test(String(ctx.body)), message: '…',

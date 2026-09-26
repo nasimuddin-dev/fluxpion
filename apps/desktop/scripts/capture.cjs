@@ -1,5 +1,5 @@
 // Captures documentation screenshots of the real app:
-//   npm run screenshots -w @aps/desktop
+//   npm run screenshots -w @protolens/desktop
 // Starts the demo servers, copies the example workspace into a temporary profile,
 // launches Electron in capture mode and writes docs/public/images/*.jpg.
 const { spawn, spawnSync } = require('node:child_process');
@@ -24,7 +24,7 @@ setTimeout(() => {
   const r = spawnSync(electron, ['.'], {
     cwd: resolve(__dirname, '..'),
     stdio: 'inherit',
-    env: { ...process.env, APS_HOME: home, APS_CAPTURE_SCRIPT: join(__dirname, 'capture-steps.cjs'), APS_CAPTURE_DIR: join(root, 'docs', 'public', 'images') },
+    env: { ...process.env, PROTOLENS_HOME: home, PROTOLENS_CAPTURE_SCRIPT: join(__dirname, 'capture-steps.cjs'), PROTOLENS_CAPTURE_DIR: join(root, 'docs', 'public', 'images') },
   });
   servers.kill();
   rmSync(home, { recursive: true, force: true });

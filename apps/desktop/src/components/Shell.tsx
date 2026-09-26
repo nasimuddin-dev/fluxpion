@@ -189,7 +189,7 @@ export function TopBar() {
     <header className="h-10 shrink-0 border-b border-line flex items-center gap-2 px-2 bg-bg" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
       <div className="flex items-center gap-2 pl-1 pr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <img src={logoUrl} alt="" className="h-6 w-6" />
-        <span className="font-semibold text-sm hidden md:inline">AI Protocol Studio</span>
+        <span className="font-semibold text-sm hidden md:inline">Protolens</span>
       </div>
       <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <WorkspaceMenu />
@@ -542,6 +542,44 @@ export function Toaster() {
           {t.text}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Renders the pending `ask()` dialog, if any. */
+export function DialogHost() {
+  const d = useApp((s) => s.dialog);
+  if (!d) return null;
+  return (
+    <Modal
+      title={d.title}
+      onClose={() => d.resolve(d.cancelId)}
+      width={520}
+      footer={d.buttons.map((b) => (
+        <Button key={b.id} variant={b.variant ?? 'default'} autoFocus={b.variant === 'primary'} onClick={() => d.resolve(b.id)}>
+          {b.label}
+        </Button>
+      ))}
+    >
+      <p className="text-sm font-medium">{d.message}</p>
+      {d.detail && <p className="text-sm text-muted whitespace-pre-line mt-3 max-h-72 overflow-auto">{d.detail}</p>}
+    </Modal>
+  );
+}
+
+/** Blocking progress overlay (updates). */
+export function ProgressHost() {
+  const p = useApp((s) => s.progress);
+  if (!p) return null;
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/40 grid place-items-center" role="alertdialog" aria-label={p.title}>
+      <div className="w-[420px] rounded-lg border border-line bg-bg p-5 shadow-2xl">
+        <div className="font-semibold">{p.title}</div>
+        <div className="text-sm text-muted mt-1">{p.message}</div>
+        <div className="mt-4 h-2 rounded bg-panel2 relative overflow-hidden">
+          {p.fraction === null ? <div className="absolute inset-0 indeterminate" /> : <div className="h-full bg-accent transition-all" style={{ width: `${Math.round(p.fraction * 100)}%` }} />}
+        </div>
+      </div>
     </div>
   );
 }

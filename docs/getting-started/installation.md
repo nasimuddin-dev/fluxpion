@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install the AI Protocol Studio desktop app on Windows, macOS or Linux, or the aipstudio CLI."
+description: "Install the Protolens desktop app on Windows, macOS or Linux, or the protolens CLI."
 ---
 
 # Installation
@@ -15,7 +15,7 @@ Download the installer for your system from the [download page](/download), then
 
 ## Command-line runner
 
-For CI servers and scripts, install the [`aipstudio` CLI](/installation/cli).
+For CI servers and scripts, install the [`protolens` CLI](/installation/cli).
 
 ## Try it with the demo servers
 
@@ -33,5 +33,5 @@ Open the `examples/veterinary-workspace` folder from the workspace menu (**Open 
 
 | Item | Location |
 |---|---|
-| Settings, logs, encrypted secrets | `~/.aipstudio/` (override with `APS_HOME`) |
-| Workspaces | `~/.aipstudio/workspaces/<name>/`, or any folder you open (for example inside a git repo) |
+| Settings, logs, encrypted secrets | `~/.protolens/` (override with `PROTOLENS_HOME`) |
+| Workspaces | `~/.protolens/workspaces/<name>/`, or any folder you open (for example inside a git repo) |

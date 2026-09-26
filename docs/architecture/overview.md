@@ -1,6 +1,6 @@
 ---
 title: "Architecture overview"
-description: "How AI Protocol Studio is structured: core engine, desktop app, CLI, storage and security."
+description: "How Protolens is structured: core engine, desktop app, CLI, storage and security."
 ---
 
 ::: v-pre
@@ -8,7 +8,7 @@ description: "How AI Protocol Studio is structured: core engine, desktop app, CL
 # Architecture
 
 ```text
-apps/desktop  (Electron + React + Monaco)      packages/cli  (aipstudio)
+apps/desktop  (Electron + React + Monaco)      packages/cli  (protolens)
       │  IPC (contextIsolation, sandboxed renderer)     │
       ▼                                                 ▼
              packages/core — the single execution engine

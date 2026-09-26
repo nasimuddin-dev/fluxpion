@@ -34,7 +34,7 @@ import {
   type TestCase,
   type TestResult,
   type McpServerConfig,
-} from '@aps/core';
+} from '@protolens/core';
 
 /** Exit codes (spec §37). */
 export const EXIT = { SUCCESS: 0, TEST_FAILURE: 1, CONFIG_ERROR: 2, EXECUTION_ERROR: 3 } as const;
@@ -172,7 +172,7 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
 
   const name = label ?? suite?.name ?? (paths.length ? paths.map((p) => relative(process.cwd(), resolve(p)) || '.').join(', ') : store.workspace.name);
   if (!o.quiet) {
-    console.log(bold(`AI Protocol Studio — ${name}`));
+    console.log(bold(`Protolens — ${name}`));
     console.log(dim(`workspace: ${ephemeral ? '(ephemeral)' : store.root}${environment ? ` · environment: ${environment}` : ''} · run: ${runId}`));
   }
 
@@ -247,7 +247,7 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
     if (summary.tokens.totalTokens) console.log(dim(`tokens ${summary.tokens.inputTokens} in / ${summary.tokens.outputTokens} out${summary.costUsd ? ` · est. cost $${summary.costUsd}` : ''}`));
     for (const [k, v] of Object.entries(summary.scores)) console.log(dim(`score ${k}: ${v.mean} (${v.count})`));
     for (const [f, p] of Object.entries(paths2)) console.log(dim(`${f} report: ${p}`));
-    if (summary.cancelled) console.log(yellow(`Run cancelled. Resume with: aipstudio test ${paths.join(' ')} --resume ${runId}`));
+    if (summary.cancelled) console.log(yellow(`Run cancelled. Resume with: protolens test ${paths.join(' ')} --resume ${runId}`));
   }
   store.close();
   if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
@@ -289,8 +289,8 @@ function runOptions(cmd: Command): Command {
 export function buildProgram(): Command {
   const program = new Command();
   program
-    .name('aipstudio')
-    .description('AI Protocol Studio CLI — run REST, GraphQL, MCP and AI tests locally and in CI/CD.\n\nExit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error')
+    .name('protolens')
+    .description('Protolens CLI — run REST, GraphQL, MCP and AI tests locally and in CI/CD.\n\nExit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error')
     .version('0.1.0');
 
   runOptions(program.command('test').description('run tests from files, directories, globs or a *.suite.yaml').argument('[paths...]', 'test files/dirs/globs')).action(async (paths: string[], o: RunCliOptions) => {

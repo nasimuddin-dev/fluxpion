@@ -1,15 +1,15 @@
 # Installers for Windows, macOS and Linux (electron-builder).
 # Asset names are stable so the website and README can link to them:
-#   AIProtocolStudio-<version>-windows-x64-setup.exe     Windows installer (NSIS)
-#   AIProtocolStudio-<version>-windows-x64-portable.exe  Windows portable (no install)
-#   AIProtocolStudio-<version>-macos-arm64.dmg            Apple Silicon
-#   AIProtocolStudio-<version>-macos-x64.dmg              Intel
-#   AIProtocolStudio-<version>-linux-x86_64.AppImage
-#   AIProtocolStudio-<version>-linux-amd64.deb
-#   AIProtocolStudio-<version>-linux-x86_64.rpm
-appId: dev.nasimuddin.aiprotocolstudio
-productName: AI Protocol Studio
-copyright: Copyright © 2026 AI Protocol Studio contributors
+#   Protolens-<version>-windows-x64-setup.exe     Windows installer (NSIS)
+#   Protolens-<version>-windows-x64-portable.exe  Windows portable (no install)
+#   Protolens-<version>-macos-arm64.dmg            Apple Silicon
+#   Protolens-<version>-macos-x64.dmg              Intel
+#   Protolens-<version>-linux-x86_64.AppImage
+#   Protolens-<version>-linux-amd64.deb
+#   Protolens-<version>-linux-x86_64.rpm
+appId: dev.nasimuddin.protolens
+productName: Protolens
+copyright: Copyright © 2026 Protolens contributors
 electronVersion: 44.4.5
 directories:
   output: release
@@ -23,10 +23,17 @@ files:
   - package.json
 asar: true
 npmRebuild: false
+# Auto-update source (electron-updater). Builds use --publish never; the release workflow uploads
+# the installers plus latest.yml / latest-linux.yml and the .blockmap files to the GitHub Release.
+publish:
+  - provider: github
+    owner: nasimuddin-dev
+    repo: protolens
+    releaseType: release
 extraMetadata:
   main: dist-electron/main.cjs
-  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "AI Protocol Studio"
-  name: ai-protocol-studio
+  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "Protolens"
+  name: protolens
 
 win:
   target:
@@ -41,10 +48,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: AI Protocol Studio
-  artifactName: AIProtocolStudio-${version}-windows-${arch}-setup.${ext}
+  shortcutName: Protolens
+  artifactName: Protolens-${version}-windows-${arch}-setup.${ext}
 portable:
-  artifactName: AIProtocolStudio-${version}-windows-${arch}-portable.${ext}
+  artifactName: Protolens-${version}-windows-${arch}-portable.${ext}
 
 mac:
   target:
@@ -55,9 +62,9 @@ mac:
   # Unsigned builds are ad-hoc signed so they run on Apple Silicon; notarization needs an Apple ID.
   identity: "-"
   hardenedRuntime: false
-  artifactName: AIProtocolStudio-${version}-macos-${arch}.${ext}
+  artifactName: Protolens-${version}-macos-${arch}.${ext}
 dmg:
-  title: AI Protocol Studio ${version}
+  title: Protolens ${version}
 
 linux:
   target:
@@ -68,14 +75,14 @@ linux:
     - target: rpm
       arch: [x64]
   category: Development
-  executableName: ai-protocol-studio
+  executableName: protolens
   icon: build/icon.png
-  maintainer: AI Protocol Studio contributors <noreply@github.com>
+  maintainer: Protolens contributors <noreply@github.com>
   synopsis: Test and debug REST, GraphQL, MCP and AI systems
   description: Local-first desktop app for testing, debugging and evaluating REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents.
 appImage:
-  artifactName: AIProtocolStudio-${version}-linux-x86_64.${ext}
+  artifactName: Protolens-${version}-linux-x86_64.${ext}
 deb:
-  artifactName: AIProtocolStudio-${version}-linux-amd64.${ext}
+  artifactName: Protolens-${version}-linux-amd64.${ext}
 rpm:
-  artifactName: AIProtocolStudio-${version}-linux-x86_64.${ext}
+  artifactName: Protolens-${version}-linux-x86_64.${ext}

@@ -1,12 +1,12 @@
-# AI Protocol Studio
+# Protolens
 
 **A local-first desktop app and CLI for testing, debugging and evaluating REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents.**
 
-AI Protocol Studio brings together an API client, a GraphQL playground, an MCP inspector, an LLM playground and evaluation lab, a scalable test runner and a trace viewer. All of them run on one execution engine, which the `aipstudio` CLI also uses in CI.
+Protolens brings together an API client, a GraphQL playground, an MCP inspector, an LLM playground and evaluation lab, a scalable test runner and a trace viewer. All of them run on one execution engine, which the `protolens` CLI also uses in CI.
 
 **Website and docs:** https://nasimuddin-dev.github.io/protolens/ · **Download:** [Windows, macOS, Linux](https://nasimuddin-dev.github.io/protolens/download)
 
-![AI Protocol Studio sending a REST request from a collection, with the JSON response and passing assertions](docs/public/images/rest.jpg)
+![Protolens sending a REST request from a collection, with the JSON response and passing assertions](docs/public/images/rest.jpg)
 
 ## Features
 
@@ -28,8 +28,8 @@ Download the installer for your system from the [download page](https://nasimudd
 
 | System | Files |
 | --- | --- |
-| Windows 10/11 x64 | `AIProtocolStudio-<version>-windows-x64-setup.exe` (installer) or `-portable.exe` |
-| macOS 12+ | `AIProtocolStudio-<version>-macos-arm64.dmg` (Apple Silicon) or `-macos-x64.dmg` (Intel) |
+| Windows 10/11 x64 | `Protolens-<version>-windows-x64-setup.exe` (installer) or `-portable.exe` |
+| macOS 12+ | `Protolens-<version>-macos-arm64.dmg` (Apple Silicon) or `-macos-x64.dmg` (Intel) |
 | Linux x86_64 | `.AppImage`, `.deb` or `.rpm` |
 
 The installers aren't code-signed yet; the [installation guides](https://nasimuddin-dev.github.io/protolens/installation/windows) explain the first-launch prompts.
@@ -42,8 +42,8 @@ cd protolens
 npm install
 npm run build
 npm run dev                      # desktop app (Electron)
-npm run package -w @aps/desktop  # installers for your OS in apps/desktop/release/
-npm link -w @aps/cli             # `aipstudio` CLI
+npm run package -w @protolens/desktop  # installers for your OS in apps/desktop/release/
+npm link -w @protolens/cli             # `protolens` CLI
 ```
 
 Requires Node.js 22.13+ (Node 24+ recommended) to build.
@@ -52,7 +52,7 @@ Requires Node.js 22.13+ (Node 24+ recommended) to build.
 
 ```bash
 node examples/servers/demo-servers.mjs           # local REST, GraphQL, mock LLM and WebSocket servers
-aipstudio run -w examples/veterinary-workspace --suite regression
+protolens run -w examples/veterinary-workspace --suite regression
 ```
 
 This runs 22 tests covering REST, GraphQL, MCP, LLM, RAG, agent and safety checks, and writes reports to `examples/veterinary-workspace/runs/<runId>/`.
@@ -115,7 +115,7 @@ evaluators:
 ### CI
 
 ```bash
-aipstudio test ./tests -e Staging -r console junit html -o results
+protolens test ./tests -e Staging -r console junit html -o results
 # exit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error
 ```
 
@@ -123,7 +123,7 @@ aipstudio test ./tests -e Staging -r console junit html -o results
 
 ```text
 apps/desktop   Electron + React + Monaco (sandboxed renderer, IPC RPC bridge)
-packages/cli   aipstudio CLI
+packages/cli   protolens CLI
 packages/core  the single execution engine: protocol adapters, AI providers, agent loop,
                variables, sandboxed scripts, checks/evaluators, tracer, streaming runner,
                reports, load testing, storage (files + SQLite + secret stores), importers
@@ -141,7 +141,7 @@ Read it at **https://nasimuddin-dev.github.io/protolens/**. The Markdown sources
 
 ## Releasing
 
-Bump `version` in `package.json` and `apps/desktop/package.json`, add a `CHANGELOG.md` section, then push a matching tag (for example `v0.1.1`). `.github/workflows/release.yml` builds the Windows, macOS and Linux installers and publishes them to a GitHub Release with `SHA256SUMS.txt`. Regenerate the website screenshots with `npm run screenshots -w @aps/desktop`.
+Bump `version` in `package.json` and `apps/desktop/package.json`, add a `CHANGELOG.md` section, then push a matching tag (for example `v0.1.1`). `.github/workflows/release.yml` builds the Windows, macOS and Linux installers and publishes them to a GitHub Release with `SHA256SUMS.txt`. Regenerate the website screenshots with `npm run screenshots -w @protolens/desktop`.
 
 ## Roadmap
 

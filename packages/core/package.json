@@ -1,7 +1,7 @@
 {
-  "name": "@aps/core",
+  "name": "@protolens/core",
   "version": "0.1.0",
-  "description": "AI Protocol Studio core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
+  "description": "Protolens core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

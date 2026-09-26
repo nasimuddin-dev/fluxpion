@@ -1,9 +1,9 @@
 {
-  "name": "@aps/desktop",
-  "productName": "AI Protocol Studio",
+  "name": "@protolens/desktop",
+  "productName": "Protolens",
   "version": "0.1.0",
   "private": true,
-  "description": "AI Protocol Studio desktop application",
+  "description": "Protolens desktop application",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -17,9 +17,8 @@
     "icons": "electron scripts/make-icons.cjs",
     "screenshots": "node scripts/build-main.mjs && vite build && node scripts/capture.cjs"
   },
-  "dependencies": {},
   "devDependencies": {
-    "@aps/core": "0.1.0",
+    "@protolens/core": "0.1.0",
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.3.0",
@@ -27,6 +26,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
     "esbuild": "^0.28.2",
     "graphql": "^16.14.2",
     "graphql-language-service": "^5.7.0",
@@ -40,7 +40,7 @@
     "zustand": "^5.0.15"
   },
   "author": {
-    "name": "AI Protocol Studio contributors",
+    "name": "Protolens contributors",
     "email": "noreply@github.com",
     "url": "https://github.com/nasimuddin-dev/protolens"
   },

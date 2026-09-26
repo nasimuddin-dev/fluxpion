@@ -1,8 +1,8 @@
 {
-  "name": "ai-protocol-studio",
+  "name": "protolens",
   "private": true,
   "version": "0.1.0",
-  "description": "AI Protocol Studio — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
+  "description": "Protolens — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
   "license": "MIT",
   "type": "module",
   "workspaces": [
@@ -15,12 +15,12 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "build": "npm run build -w @aps/core && npm run build -w @aps/cli && npm run build -w @aps/desktop",
+    "build": "npm run build -w @protolens/core && npm run build -w @protolens/cli && npm run build -w @protolens/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "npm run dev -w @aps/desktop",
-    "dev:web": "npm run dev:web -w @aps/desktop",
+    "dev": "npm run dev -w @protolens/desktop",
+    "dev:web": "npm run dev:web -w @protolens/desktop",
     "bench": "node scripts/bench.mjs",
     "docs:dev": "npm run dev -w docs",
     "docs:build": "npm run build -w docs"

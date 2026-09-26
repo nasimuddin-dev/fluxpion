@@ -1,5 +1,5 @@
 /**
- * Core domain model for AI Protocol Studio.
+ * Core domain model for Protolens.
  *
  * Everything persisted to disk or exchanged between the engine, the desktop UI and
  * the CLI is described here. Types are intentionally plain JSON-serialisable data.
@@ -556,6 +556,8 @@ export interface AppSettings {
   workspacePaths: string[];
   /** Lowest-precedence variables shared by all workspaces. */
   globalVariables: KeyValue[];
+  /** Check GitHub for a newer version when the desktop app starts. */
+  checkForUpdates: boolean;
 }
 
 export const DEFAULT_REDACT_FIELDS = [
@@ -592,5 +594,6 @@ export function defaultSettings(): AppSettings {
     loadTesting: { allowRemoteHosts: false, maxVirtualUsers: 200 },
     workspacePaths: [],
     globalVariables: [],
+    checkForUpdates: true,
   };
 }

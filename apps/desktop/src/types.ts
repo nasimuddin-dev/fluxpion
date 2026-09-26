@@ -262,6 +262,7 @@ export interface AppSettings {
   assistantModel?: string;
   workspacePaths: string[];
   globalVariables: KeyValue[];
+  checkForUpdates: boolean;
 }
 
 export interface WorkspaceCurrent {

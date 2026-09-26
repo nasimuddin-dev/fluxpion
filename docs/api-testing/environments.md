@@ -17,7 +17,7 @@ description: "Variable scopes and precedence, secret variables, dynamic variable
 
 ## Secrets
 
-Mark a variable as **secret** (lock icon) and its value is encrypted in the OS credential store: Windows DPAPI, macOS Keychain or Linux Secret Service. The workspace file only records that the variable exists. In CI, supply the value as the environment variable `APS_SECRET_ENV_<ENVID>_<KEY>`, for example `APS_SECRET_ENV_STAGING_ACCESSTOKEN`.
+Mark a variable as **secret** (lock icon) and its value is encrypted in the OS credential store: Windows DPAPI, macOS Keychain or Linux Secret Service. The workspace file only records that the variable exists. In CI, supply the value as the environment variable `PROTOLENS_SECRET_ENV_<ENVID>_<KEY>`, for example `PROTOLENS_SECRET_ENV_STAGING_ACCESSTOKEN`.
 
 ## Production
 

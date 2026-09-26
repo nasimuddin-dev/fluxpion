@@ -144,7 +144,7 @@ export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOp
   for (const h of spec.headers ?? []) if (h.enabled !== false && h.key) headers.append(h.key, h.value);
   const cookies = (spec.cookies ?? []).filter((c) => c.enabled !== false && c.key).map((c) => `${c.key}=${c.value}`);
   if (cookies.length) headers.set('cookie', [headers.get('cookie'), ...cookies].filter(Boolean).join('; '));
-  if (!headers.has('user-agent')) headers.set('user-agent', 'AIProtocolStudio/0.1');
+  if (!headers.has('user-agent')) headers.set('user-agent', 'Protolens/0.1');
   if (!headers.has('accept')) headers.set('accept', '*/*');
   await applyAuth(spec.auth, headers, url, opts);
   const { body, preview } = await buildBody(spec.body, headers);

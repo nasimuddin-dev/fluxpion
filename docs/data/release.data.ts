@@ -46,17 +46,17 @@ export default {
       date,
       releaseUrl: `${REPO}/releases/tag/v${version}`,
       windows: [
-        make('Installer (x64)', `AIProtocolStudio-${version}-windows-x64-setup.exe`, 'Recommended. Adds Start menu and desktop shortcuts; install for yourself or for all users.'),
-        make('Portable (x64)', `AIProtocolStudio-${version}-windows-x64-portable.exe`, 'Runs without installing — for locked-down PCs or USB sticks.'),
+        make('Installer (x64)', `Protolens-${version}-windows-x64-setup.exe`, 'Recommended. Adds Start menu and desktop shortcuts; install for yourself or for all users.'),
+        make('Portable (x64)', `Protolens-${version}-windows-x64-portable.exe`, 'Runs without installing — for locked-down PCs or USB sticks.'),
       ],
       macos: [
-        make('Apple Silicon (M1 and later)', `AIProtocolStudio-${version}-macos-arm64.dmg`, 'Disk image for Macs with Apple chips.'),
-        make('Intel', `AIProtocolStudio-${version}-macos-x64.dmg`, 'Disk image for Macs with Intel processors.'),
+        make('Apple Silicon (M1 and later)', `Protolens-${version}-macos-arm64.dmg`, 'Disk image for Macs with Apple chips.'),
+        make('Intel', `Protolens-${version}-macos-x64.dmg`, 'Disk image for Macs with Intel processors.'),
       ],
       linux: [
-        make('AppImage (x86_64)', `AIProtocolStudio-${version}-linux-x86_64.AppImage`, 'Runs on most distributions without installation.'),
-        make('.deb (amd64)', `AIProtocolStudio-${version}-linux-amd64.deb`, 'Ubuntu, Debian, Linux Mint, Pop!_OS.'),
-        make('.rpm (x86_64)', `AIProtocolStudio-${version}-linux-x86_64.rpm`, 'Fedora, RHEL, Rocky Linux, openSUSE.'),
+        make('AppImage (x86_64)', `Protolens-${version}-linux-x86_64.AppImage`, 'Runs on most distributions without installation.'),
+        make('.deb (amd64)', `Protolens-${version}-linux-amd64.deb`, 'Ubuntu, Debian, Linux Mint, Pop!_OS.'),
+        make('.rpm (x86_64)', `Protolens-${version}-linux-x86_64.rpm`, 'Fedora, RHEL, Rocky Linux, openSUSE.'),
       ],
     };
   },

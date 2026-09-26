@@ -25,7 +25,7 @@ declare global {
 }
 
 function webBridge(): Bridge {
-  const cfg = String(import.meta.env.VITE_APS_BRIDGE ?? '');
+  const cfg = String(import.meta.env.VITE_PROTOLENS_BRIDGE ?? '');
   const token = cfg.split('|')[1] ?? '';
   const listeners = new Map<string, Set<(p: unknown) => void>>();
   let es: EventSource | undefined;

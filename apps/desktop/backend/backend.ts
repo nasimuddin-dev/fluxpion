@@ -1,7 +1,7 @@
 /**
  * Desktop backend: every capability of the UI is exposed as an RPC method here.
  * It runs in the Electron main process (via IPC) or, for browser-based development,
- * behind a local HTTP bridge. All protocol execution happens in @aps/core — the same
+ * behind a local HTTP bridge. All protocol execution happens in @protolens/core — the same
  * engine the CLI uses — so the UI thread never performs network or test execution.
  */
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -76,7 +76,7 @@ import {
   type TestResult,
   type WorkspaceBundle,
   type ModelRef,
-} from '@aps/core';
+} from '@protolens/core';
 
 export interface BackendHost {
   appDir: string;
@@ -327,7 +327,7 @@ export class Backend {
       'http.cancel': ({ id }: { id: string }) => this.controllers.get(id)?.abort(),
       'http.curl': async ({ request, environment }: { request: HttpRequestSpec; environment?: string }) => {
         const ctx = this.context({ environment });
-        const { prepareHttpRequest } = await import('@aps/core');
+        const { prepareHttpRequest } = await import('@protolens/core');
         const spec = ctx.vars.resolveDeep(request);
         const p = await prepareHttpRequest(spec, {});
         return toCurl({ method: p.method, url: p.url.toString(), headers: [...p.headers.entries()], bodyPreview: p.bodyPreview });
@@ -385,7 +385,7 @@ export class Backend {
         try {
           const r = await s.callTool(tool, args);
           span.end({ status: r.isError ? 'error' : 'ok', output: r.raw });
-          const { mcpResultBody } = await import('@aps/core');
+          const { mcpResultBody } = await import('@protolens/core');
           const { body, text } = mcpResultBody(r);
           const checks = await runChecks(assertions, { testType: 'mcp', body, text, isError: r.isError, latencyMs: r.durationMs });
           const trace = tracer.finish();
@@ -733,8 +733,8 @@ export class Backend {
       'explain-error':
         'Explain what went wrong in plain language, the most likely cause, and concrete troubleshooting steps. Be concise. Use short headings: What happened, Why, How to fix.',
       'generate-assertions':
-        'Propose assertions for this response as a YAML list using the AI Protocol Studio check types (status, exists, equals, contains, regex, json-schema, type, length, latency, header). Output only YAML.',
-      'generate-test': 'Write an AI Protocol Studio YAML test for the described scenario. Output only YAML.',
+        'Propose assertions for this response as a YAML list using the Protolens check types (status, exists, equals, contains, regex, json-schema, type, length, latency, header). Output only YAML.',
+      'generate-test': 'Write an Protolens YAML test for the described scenario. Output only YAML.',
       'generate-query': 'Write a GraphQL operation for the request using the given schema. Output only the GraphQL document.',
       'generate-args': 'Produce example JSON arguments that satisfy this JSON Schema. Output only JSON.',
       'generate-mock-data': 'Generate realistic mock data matching the description or schema. Output only JSON.',
@@ -747,7 +747,7 @@ export class Backend {
       temperature: 0.2,
       maxTokens: 1200,
       messages: [
-        { role: 'system', content: `You are the AI assistant inside AI Protocol Studio, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free}` },
+        { role: 'system', content: `You are the AI assistant inside Protolens, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free}` },
         { role: 'user', content: `${p.question ? `Question: ${p.question}\n\n` : ''}Context:\n${context}` },
       ],
     });
@@ -876,7 +876,7 @@ export class Backend {
       maxVirtualUsers: this.settings.loadTesting.maxVirtualUsers,
     };
     // validate safeguards synchronously so the UI gets an immediate error
-    const { checkLoadSafeguards, buildUrl } = await import('@aps/core');
+    const { checkLoadSafeguards, buildUrl } = await import('@protolens/core');
     checkLoadSafeguards(cfg, cfg.target.kind === 'http' ? buildUrl(cfg.target.request.url, cfg.target.request.params).toString() : undefined);
     void runLoadTest(cfg, { providers: ctx.services.providers, pricing: this.settings.pricing, redactor: ctx.redactor, signal: ctrl.signal, onSnapshot: (s) => this.host.emit('load.snapshot', { id, snapshot: s }) })
       .catch((e) => this.host.emit('load.error', { id, error: normalizeError(e) }))

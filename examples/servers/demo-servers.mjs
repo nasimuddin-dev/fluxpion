@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Local demo servers for AI Protocol Studio examples, docs and integration tests.
+ * Local demo servers for Protolens examples, docs and integration tests.
  * Nothing here talks to the internet.
  *
  *   node examples/servers/demo-servers.mjs

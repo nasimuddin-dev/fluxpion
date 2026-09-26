@@ -8,7 +8,7 @@ description: "How to run the performance benchmark suite and interpret its resul
 # Benchmarks
 
 ```bash
-npm run build -w @aps/core
+npm run build -w @protolens/core
 npm run bench                               # 10,000 HTTP tests, 100 workers
 npm run bench -- --tests 100000 --workers 200 --records 1000000
 ```

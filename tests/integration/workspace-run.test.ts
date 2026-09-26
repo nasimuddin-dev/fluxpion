@@ -93,17 +93,17 @@ describe('example workspace (end-to-end)', () => {
     }
   });
 
-  it('CLI: `aipstudio run` exits 0 and writes all report formats', async () => {
-    const cli = resolve('packages/cli/bin/aipstudio.js');
+  it('CLI: `protolens run` exits 0 and writes all report formats', async () => {
+    const cli = resolve('packages/cli/bin/protolens.js');
     const out = join(dir, 'cli-out');
-    const r = await run([cli, 'run', '-w', ws.root, '--suite', 'smoke', '-o', out, '-q'], { ...process.env, APS_HOME: join(dir, 'home') });
+    const r = await run([cli, 'run', '-w', ws.root, '--suite', 'smoke', '-o', out, '-q'], { ...process.env, PROTOLENS_HOME: join(dir, 'home') });
     expect(r.stderr).toBe('');
     expect(r.status).toBe(0);
     expect(readFileSync(join(out, 'junit.xml'), 'utf8')).toContain('tests="4"');
     expect(JSON.parse(readFileSync(join(out, 'report.json'), 'utf8')).summary.passed).toBe(4);
     expect(readFileSync(join(out, 'report.md'), 'utf8')).toContain('Smoke');
     expect(readFileSync(join(out, 'report.html'), 'utf8')).toContain('PASSED');
-    const bad = await run([cli, 'test', join(dir, 'does-not-exist')], { ...process.env, APS_HOME: join(dir, 'home') });
+    const bad = await run([cli, 'test', join(dir, 'does-not-exist')], { ...process.env, PROTOLENS_HOME: join(dir, 'home') });
     expect(bad.status).toBe(2);
   });
 });

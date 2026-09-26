@@ -1,11 +1,11 @@
 {
-  "name": "@aps/cli",
+  "name": "@protolens/cli",
   "version": "0.1.0",
-  "description": "AI Protocol Studio command-line runner for local and CI/CD test execution.",
+  "description": "Protolens command-line runner for local and CI/CD test execution.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "aipstudio": "./bin/aipstudio.js"
+    "protolens": "./bin/protolens.js"
   },
   "files": [
     "bin",
@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@aps/core": "0.1.0",
+    "@protolens/core": "0.1.0",
     "commander": "^15.0.0"
   }
 }

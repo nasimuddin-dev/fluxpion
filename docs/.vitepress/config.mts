@@ -25,7 +25,7 @@ function structuredData(relativePath: string, title: string, description: string
       {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'AI Protocol Studio',
+        name: 'Protolens',
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Windows 10, Windows 11, macOS 12 or later, Linux',
         softwareVersion: app.version,
@@ -34,7 +34,7 @@ function structuredData(relativePath: string, title: string, description: string
         downloadUrl: `${REPO}/releases/latest`,
         screenshot: SOCIAL_IMAGE,
       },
-      { '@context': 'https://schema.org', '@type': 'WebSite', name: 'AI Protocol Studio', url: SITE },
+      { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Protolens', url: SITE },
     ];
   }
   const parts = relativePath.replace(/(^|\/)index\.md$/, '').replace(/\.md$/, '').split('/').filter(Boolean);
@@ -148,9 +148,9 @@ const DOC_SECTIONS = ['getting-started', 'installation', 'api-testing', 'graphql
 
 export default defineConfig({
   lang: 'en-US',
-  title: 'AI Protocol Studio',
-  titleTemplate: ':title | AI Protocol Studio',
-  description: 'AI Protocol Studio is a local-first desktop app and CLI for testing and debugging REST, GraphQL and MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.',
+  title: 'Protolens',
+  titleTemplate: ':title | Protolens',
+  description: 'Protolens is a local-first desktop app and CLI for testing and debugging REST, GraphQL and MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.',
   base: BASE,
   cleanUrls: true,
   lastUpdated: true,
@@ -160,10 +160,10 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}logo.svg` }],
     ['meta', { name: 'theme-color', content: '#1d4ed8' }],
-    ['meta', { property: 'og:site_name', content: 'AI Protocol Studio' }],
+    ['meta', { property: 'og:site_name', content: 'Protolens' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:image', content: SOCIAL_IMAGE }],
-    ['meta', { property: 'og:image:alt', content: 'AI Protocol Studio sending a REST request from a collection, with the JSON response and passing assertions' }],
+    ['meta', { property: 'og:image:alt', content: 'Protolens sending a REST request from a collection, with the JSON response and passing assertions' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
     ['meta', { name: 'twitter:image', content: SOCIAL_IMAGE }],
   ],
@@ -183,7 +183,7 @@ export default defineConfig({
   },
   themeConfig: {
     logo: { src: '/logo.svg', alt: '' },
-    siteTitle: 'AI Protocol Studio',
+    siteTitle: 'Protolens',
     nav: [
       { text: 'Download', link: '/download' },
       { text: 'Features', link: '/features' },
@@ -200,12 +200,12 @@ export default defineConfig({
       },
     ],
     sidebar: Object.fromEntries(DOC_SECTIONS.map((s) => [`/${s}/`, docsSidebar])),
-    socialLinks: [{ icon: 'github', link: REPO, ariaLabel: 'AI Protocol Studio on GitHub' }],
+    socialLinks: [{ icon: 'github', link: REPO, ariaLabel: 'Protolens on GitHub' }],
     editLink: { pattern: `${REPO}/edit/main/docs/:path`, text: 'Edit this page on GitHub' },
     search: { provider: 'local' },
     outline: { level: [2, 3] },
     footer: {
-      message: `AI Protocol Studio ${app.version} · MIT License · <a href="${REPO}">GitHub</a> · <a href="${REPO}/issues">Issues</a> · <a href="${REPO}/releases">Releases</a>`,
+      message: `Protolens ${app.version} · MIT License · <a href="${REPO}">GitHub</a> · <a href="${REPO}/issues">Issues</a> · <a href="${REPO}/releases">Releases</a>`,
     },
   },
 });

@@ -1,6 +1,6 @@
 /**
- * @aps/core — the AI Protocol Studio execution engine.
- * Shared by the desktop application and the `aipstudio` CLI.
+ * @protolens/core — the Protolens execution engine.
+ * Shared by the desktop application and the `protolens` CLI.
  */
 export * from './model/types.js';
 export * from './errors.js';

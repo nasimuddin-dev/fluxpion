@@ -30,6 +30,28 @@ export interface AssistantRequest {
   question?: string;
 }
 
+export interface DialogButton {
+  id: string;
+  label: string;
+  variant?: 'primary' | 'default' | 'danger';
+}
+
+export interface DialogRequest {
+  title: string;
+  message: string;
+  detail?: string;
+  buttons: DialogButton[];
+  cancelId: string;
+  resolve(id: string): void;
+}
+
+export interface ProgressState {
+  title: string;
+  message: string;
+  /** 0..1, or null for indeterminate. */
+  fraction: number | null;
+}
+
 /** Cross-view "open this thing" requests (e.g. history → REST tab, search → test file). */
 export interface Intent {
   view: ViewId;
@@ -43,7 +65,7 @@ interface AppState {
   workspace?: WorkspaceCurrent;
   environment?: string;
   settings?: AppSettings;
-  info?: { version: string; secretBackend: string; metaBackend?: string; platform: string; checkTypes: string[]; electron?: string; node?: string };
+  info?: { version: string; appVersion?: string; packaged?: boolean; canUpdateInPlace?: boolean; secretBackend: string; metaBackend?: string; platform: string; checkTypes: string[]; electron?: string; node?: string };
   paletteOpen: boolean;
   searchOpen: boolean;
   logsOpen: boolean;
@@ -52,6 +74,8 @@ interface AppState {
   activity: Record<string, string>;
   intent?: Intent;
   mcpConnected: number;
+  dialog?: DialogRequest;
+  progress?: ProgressState | null;
   set(p: Partial<AppState>): void;
   toast(text: string, kind?: Toast['kind']): void;
   setActivity(key: string, label?: string): void;
@@ -127,4 +151,19 @@ export function persisted<T>(key: string, fallback: T): { load(): T; save(v: T):
       }
     },
   };
+}
+
+/** Modal question with custom buttons; resolves with the chosen button id (or cancelId on Escape). */
+export function ask(req: Omit<DialogRequest, 'resolve'>): Promise<string> {
+  return new Promise((resolve) =>
+    useApp.getState().set({
+      dialog: {
+        ...req,
+        resolve: (id) => {
+          useApp.getState().set({ dialog: undefined });
+          resolve(id);
+        },
+      },
+    }),
+  );
 }

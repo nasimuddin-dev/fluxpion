@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { call } from '../api';
 import { useApp } from '../store';
 import type { AppSettings, PriceEntry, ProviderConfig } from '../types';
+import { checkForUpdates } from '../updates';
 import { Badge, Button, Field, IconButton, Input, Select, Tabs, Toggle } from '../components/ui';
 
 type Tab = 'appearance' | 'requests' | 'privacy' | 'pricing' | 'load' | 'assistant' | 'about';
@@ -87,7 +88,7 @@ export function SettingsView() {
               <div className="rounded-md border border-line p-3 text-sm flex flex-col gap-1">
                 <div className="font-medium">Telemetry</div>
                 <p className="text-muted">
-                  Telemetry is <b>disabled</b> and not implemented in this build. AI Protocol Studio never transmits request bodies, prompts, responses or credentials anywhere except to the endpoints and providers you
+                  Telemetry is <b>disabled</b> and not implemented in this build. Protolens never transmits request bodies, prompts, responses or credentials anywhere except to the endpoints and providers you
                   explicitly call.
                 </p>
               </div>
@@ -183,7 +184,19 @@ export function SettingsView() {
           )}
           {tab === 'about' && (
             <div className="text-sm flex flex-col gap-2">
-              <div className="text-lg font-semibold">AI Protocol Studio</div>
+              <div className="text-lg font-semibold">Protolens {info?.appVersion}</div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <Toggle checked={s.checkForUpdates !== false} onChange={(checkForUpdates) => set({ checkForUpdates })} label="Check for updates when the app starts" />
+                <Button size="sm" onClick={() => void checkForUpdates({ manual: true })}>
+                  Check now
+                </Button>
+              </div>
+              <p className="text-xs text-muted">
+                {info?.canUpdateInPlace
+                  ? 'Updates are downloaded from GitHub, verified and installed in place; the app restarts.'
+                  : 'New versions are announced at startup and link to the download page (in-place updates need the Windows installer or the Linux AppImage).'}{' '}
+                Remember to save settings after changing the toggle.
+              </p>
               <div>
                 Engine <Badge>{info?.version}</Badge> {info?.electron && <Badge>Electron {info.electron}</Badge>} {info?.node && <Badge>Node {info.node}</Badge>}
               </div>

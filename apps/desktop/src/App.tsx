@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
-import { AssistantPanel, CommandPalette, LogsPanel, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
+import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
+import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { Spinner } from './components/ui';
 import { RestView } from './views/RestView';
 import { GraphQLView } from './views/GraphQLView';
@@ -68,9 +69,14 @@ export default function App() {
       useApp.getState().set({ info, settings });
       await useApp.getState().refreshWorkspace();
       setReady(true);
+      scheduleUpdateCheck();
     })();
     const off = on('run.error', (p: { error: { message: string } }) => useApp.getState().toast(`Run failed: ${p.error.message}`, 'error'));
-    return off;
+    const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
+    return () => {
+      off();
+      offUpdate();
+    };
   }, []);
 
   useEffect(() => setVisited((v) => (v.has(view) ? v : new Set([...v, view]))), [view]);
@@ -119,6 +125,7 @@ export default function App() {
       { id: 'load', label: 'New Load Test', run: () => s.setView('load') },
       { id: 'compare', label: 'Compare Models', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'compare' }) },
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
+      { id: 'update', label: 'Check for Updates', hint: 'Help', run: () => void checkForUpdates({ manual: true }) },
     ];
     for (const n of NAV) cmds.push({ id: `go-${n.id}`, label: `Go to ${n.label}`, run: () => s.setView(n.id) });
     for (const e of workspace?.environments ?? []) cmds.push({ id: `env-${e.id}`, label: `Switch Environment: ${e.name}`, run: () => s.setEnvironment(e.name) });
@@ -156,6 +163,8 @@ export default function App() {
       {paletteOpen && <CommandPalette commands={commands} />}
       {searchOpen && <SearchDialog />}
       <Toaster />
+      <DialogHost />
+      <ProgressHost />
     </div>
   );
 }

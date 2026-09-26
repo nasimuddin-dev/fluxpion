@@ -1,16 +1,16 @@
 ---
 layout: home
-title: AI Protocol Studio
+title: Protolens
 titleTemplate: API, MCP and AI Testing Tool
-description: AI Protocol Studio is a free, local-first desktop app and CLI for testing and debugging REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.
+description: Protolens is a free, local-first desktop app and CLI for testing and debugging REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.
 
 hero:
-  name: AI Protocol Studio
+  name: Protolens
   text: Test and debug APIs, MCP servers and AI systems in one place
   tagline: REST, GraphQL, WebSocket, MCP, LLMs, RAG and agents — with a test runner, evaluation lab and trace viewer. Local-first, private, and the same engine in your CI.
   image:
     src: /logo.svg
-    alt: AI Protocol Studio logo
+    alt: Protolens logo
   actions:
     - theme: brand
       text: Download
@@ -40,7 +40,7 @@ features:
     link: /ai-testing/evaluations
     linkText: Evaluation guide
   - title: Test runner & CI
-    details: YAML test suites with parallel workers, retries, dependencies and resumable runs. JUnit, JSON, HTML and Markdown reports, and an aipstudio CLI for any CI system.
+    details: YAML test suites with parallel workers, retries, dependencies and resumable runs. JUnit, JSON, HTML and Markdown reports, and an protolens CLI for any CI system.
     link: /test-runner/overview
     linkText: Test runner
   - title: Local-first and private
@@ -56,7 +56,7 @@ import { data as release } from "./data/release.data";
 ## See it in action
 
 <figure class="aps-screenshot">
-  <img src="/images/rest.jpg" alt="AI Protocol Studio sending a GET request from the Veterinary API collection, showing a 200 response as a JSON tree and three passing assertions" width="1440" height="900">
+  <img src="/images/rest.jpg" alt="Protolens sending a GET request from the Veterinary API collection, showing a 200 response as a JSON tree and three passing assertions" width="1440" height="900">
   <figcaption>A REST request from a collection, with the JSON response and passing assertions.</figcaption>
 </figure>
 
@@ -83,7 +83,7 @@ import { data as release } from "./data/release.data";
 
 ## Runs on your operating system
 
-AI Protocol Studio is a desktop app for Windows, macOS and Linux, and every release has installers for each:
+Protolens is a desktop app for Windows, macOS and Linux, and every release has installers for each:
 
 | System | Installers |
 | --- | --- |
@@ -91,9 +91,9 @@ AI Protocol Studio is a desktop app for Windows, macOS and Linux, and every rele
 | **macOS** 12+ | `.dmg` for Apple Silicon and for Intel |
 | **Linux** x86_64 | AppImage, `.deb` and `.rpm` |
 
-The `aipstudio` command-line runner uses the same engine and runs anywhere Node.js 22+ runs — see [installing the CLI](/installation/cli).
+The `protolens` command-line runner uses the same engine and runs anywhere Node.js 22+ runs — see [installing the CLI](/installation/cli).
 
-[Download AI Protocol Studio](/download) · [Installation guides](/installation/windows)
+[Download Protolens](/download) · [Installation guides](/installation/windows)
 
 ## Local-first by design
 
@@ -106,7 +106,7 @@ Read the [privacy notes](/security/privacy).
 
 ## Latest release
 
-**AI Protocol Studio {{ release.version }}**<span v-if="release.date">, released {{ release.date }}</span>. See [what's new](/changelog) or <a :href="release.releaseUrl">all release files on GitHub</a>.
+**Protolens {{ release.version }}**<span v-if="release.date">, released {{ release.date }}</span>. See [what's new](/changelog) or <a :href="release.releaseUrl">all release files on GitHub</a>.
 
 ## Developed in public on GitHub
 

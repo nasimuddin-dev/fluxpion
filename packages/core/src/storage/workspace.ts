@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import type { AppSettings, Collection, Environment, McpServerConfig, ProviderConfig, Trace, Workspace } from '../model/types.js';
@@ -51,8 +51,8 @@ export function migrateWorkspace(ws: Record<string, unknown>, root = '', migrati
   let version = String(ws.schemaVersion ?? '0.9');
   const applied: string[] = [];
   if (cmpVersion(version, target) > 0)
-    throw new ApsError('ConfigurationError', `Workspace format ${version} is newer than this version of AI Protocol Studio supports (${target})`, {
-      suggestions: ['Upgrade AI Protocol Studio to open this workspace.'],
+    throw new ApsError('ConfigurationError', `Workspace format ${version} is newer than this version of Protolens supports (${target})`, {
+      suggestions: ['Upgrade Protolens to open this workspace.'],
     });
   while (cmpVersion(version, target) < 0) {
     const m = migrations.find((x) => x.from === version);
@@ -316,7 +316,7 @@ export class WorkspaceStore {
     };
     walk(this.testTree());
     return {
-      format: 'ai-protocol-studio-workspace',
+      format: 'protolens-workspace',
       schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       workspace: { ...this.ws, variables: this.ws.variables.map((v) => ((v as { secret?: boolean }).secret ? { ...v, value: '' } : v)) },
@@ -334,7 +334,7 @@ export class WorkspaceStore {
 }
 
 export interface WorkspaceBundle {
-  format: 'ai-protocol-studio-workspace';
+  format: 'protolens-workspace';
   schemaVersion: string;
   exportedAt: string;
   workspace: Workspace;
@@ -355,7 +355,19 @@ export interface WorkspaceInfo {
 }
 
 export function defaultAppDir(): string {
-  return process.env.APS_HOME || join(homedir(), '.aipstudio');
+  const explicit = process.env.PROTOLENS_HOME || process.env.APS_HOME; // APS_HOME: name before the Protolens rename
+  if (explicit) return explicit;
+  const dir = join(homedir(), '.protolens');
+  // one-time move of the data folder used by 0.1.x (named "AI Protocol Studio" then)
+  const legacy = join(homedir(), '.aipstudio');
+  if (!existsSync(dir) && existsSync(legacy)) {
+    try {
+      renameSync(legacy, dir);
+    } catch {
+      return legacy; // in use or not permitted: keep using it rather than losing data
+    }
+  }
+  return dir;
 }
 
 /** Manages the list of workspaces and global settings under the app directory. */
@@ -462,7 +474,7 @@ export class WorkspaceManager {
   }
 
   importBundle(bundle: WorkspaceBundle, name?: string): WorkspaceStore {
-    if (bundle?.format !== 'ai-protocol-studio-workspace') throw new ApsError('ValidationError', 'Not an AI Protocol Studio workspace export');
+    if (bundle?.format !== 'protolens-workspace') throw new ApsError('ValidationError', 'Not an Protolens workspace export');
     const { ws } = migrateWorkspace({ ...(bundle.workspace as unknown as Record<string, unknown>), schemaVersion: bundle.schemaVersion });
     const store = this.create(name ?? `${(ws as unknown as Workspace).name} (imported)`);
     store.updateWorkspace({ variables: (ws as unknown as Workspace).variables, description: (ws as unknown as Workspace).description });

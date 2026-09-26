@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-description: What's planned for AI Protocol Studio — more protocols, mock servers, signed installers and optional team features.
+description: What's planned for Protolens — more protocols, mock servers, signed installers and optional team features.
 ---
 
 # Roadmap

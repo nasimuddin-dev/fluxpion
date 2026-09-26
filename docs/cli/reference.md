@@ -1,6 +1,6 @@
 ---
 title: "CLI reference"
-description: "Reference for the aipstudio command-line interface."
+description: "Reference for the protolens command-line interface."
 ---
 
 ::: v-pre
@@ -8,13 +8,13 @@ description: "Reference for the aipstudio command-line interface."
 # CLI reference
 
 ```text
-aipstudio test [paths...]      Run test files, directories, globs or a *.suite.yaml
-aipstudio run --suite <name>   Run tests/<name>.suite.yaml from a workspace
-aipstudio load <url>           Safeguarded load test
-aipstudio import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
-aipstudio workspace list|create|export
-aipstudio mcp [--url|--sse] [-- command...]   Inspect an MCP server
-aipstudio report <results.jsonl>              Re-generate reports
+protolens test [paths...]      Run test files, directories, globs or a *.suite.yaml
+protolens run --suite <name>   Run tests/<name>.suite.yaml from a workspace
+protolens load <url>           Safeguarded load test
+protolens import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
+protolens workspace list|create|export
+protolens mcp [--url|--sse] [-- command...]   Inspect an MCP server
+protolens report <results.jsonl>              Re-generate reports
 ```
 
 ## `test` / `run` options

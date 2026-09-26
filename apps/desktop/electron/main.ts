@@ -2,16 +2,17 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell, nativeTh
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { Backend } from '../backend/backend.js';
-import { defaultAppDir } from '@aps/core';
+import { canInstallInPlace, createUpdater } from './updater.js';
+import { defaultAppDir } from '@protolens/core';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 let win: BrowserWindow | null = null;
 let backend: Backend | null = null;
 
 // Documentation screenshot mode (scripts/capture.cjs): isolated profile, fixed size, dark theme.
-const capture = process.env.APS_CAPTURE_SCRIPT;
+const capture = process.env.PROTOLENS_CAPTURE_SCRIPT;
 if (capture) {
-  app.setPath('userData', join(process.env.APS_HOME!, 'electron-profile'));
+  app.setPath('userData', join(process.env.PROTOLENS_HOME!, 'electron-profile'));
   nativeTheme.themeSource = 'dark';
 }
 
@@ -34,7 +35,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 960,
     minHeight: 600,
-    title: 'AI Protocol Studio',
+    title: 'Protolens',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     show: false,
     webPreferences: {
@@ -87,9 +88,9 @@ app.whenReady().then(() => {
     start();
   } catch (e) {
     // never fail silently with no window: show what went wrong
-    dialog.showErrorBox('AI Protocol Studio failed to start', `${(e as Error).message}
+    dialog.showErrorBox('Protolens failed to start', `${(e as Error).message}
 
-Data directory: ${process.env.APS_HOME || defaultAppDir()}`);
+Data directory: ${process.env.PROTOLENS_HOME || defaultAppDir()}`);
     app.quit();
   }
 });
@@ -97,7 +98,7 @@ Data directory: ${process.env.APS_HOME || defaultAppDir()}`);
 function start(): void {
   const t0 = Date.now();
   backend = new Backend({
-    appDir: process.env.APS_HOME || defaultAppDir(),
+    appDir: process.env.PROTOLENS_HOME || defaultAppDir(),
     cipher: {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
       encrypt: (s) => safeStorage.encryptString(s),
@@ -114,6 +115,13 @@ function start(): void {
       return r.canceled ? undefined : r.filePaths[0];
     },
   });
+
+  // updates live in the Electron process (not the shared backend, which also serves the browser bridge)
+  const updater = createUpdater(emit);
+  const baseInfo = backend.handlers['app.info']!;
+  backend.handlers['app.info'] = async (p) => ({ ...((await baseInfo(p)) as object), appVersion: app.getVersion(), packaged: app.isPackaged, canUpdateInPlace: canInstallInPlace() });
+  backend.handlers['update.check'] = () => updater.check();
+  backend.handlers['update.install'] = () => updater.install();
 
   ipcMain.handle('aps:rpc', async (_e, method: string, params: unknown) => {
     try {
@@ -134,7 +142,16 @@ function start(): void {
         submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }],
       },
       { role: 'windowMenu' },
-      { role: 'help', submenu: [{ label: 'Documentation', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/protolens#readme') }] },
+      {
+        role: 'help',
+        submenu: [
+          { label: 'Check for Updates…', click: () => emit('update.checkManual', {}) },
+          { type: 'separator' },
+          { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/protolens/') },
+          { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/protolens/changelog') },
+          { label: 'Report an Issue', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/protolens/issues') },
+        ],
+      },
     ]),
   );
   createWindow();

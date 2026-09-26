@@ -1,11 +1,11 @@
 ---
 title: Features
-description: Everything AI Protocol Studio does — REST, GraphQL, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
+description: Everything Protolens does — REST, GraphQL, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
 ---
 
 # Features
 
-AI Protocol Studio combines an API client, a GraphQL playground, an MCP inspector, an LLM playground, an evaluation lab, a test runner, a load tester and a trace viewer. They all share one execution engine, which the [`aipstudio` CLI](/cli/reference) also uses.
+Protolens combines an API client, a GraphQL playground, an MCP inspector, an LLM playground, an evaluation lab, a test runner, a load tester and a trace viewer. They all share one execution engine, which the [`protolens` CLI](/cli/reference) also uses.
 
 ## REST and HTTP
 

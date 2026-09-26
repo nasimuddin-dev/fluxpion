@@ -5,13 +5,13 @@ name: Release
 # to rebuild an existing release.
 #
 # Asset names are stable so the website's download page can link to them:
-#   AIProtocolStudio-<version>-windows-x64-setup.exe
-#   AIProtocolStudio-<version>-windows-x64-portable.exe
-#   AIProtocolStudio-<version>-macos-arm64.dmg
-#   AIProtocolStudio-<version>-macos-x64.dmg
-#   AIProtocolStudio-<version>-linux-x86_64.AppImage
-#   AIProtocolStudio-<version>-linux-amd64.deb
-#   AIProtocolStudio-<version>-linux-x86_64.rpm
+#   Protolens-<version>-windows-x64-setup.exe
+#   Protolens-<version>-windows-x64-portable.exe
+#   Protolens-<version>-macos-arm64.dmg
+#   Protolens-<version>-macos-x64.dmg
+#   Protolens-<version>-linux-x86_64.AppImage
+#   Protolens-<version>-linux-amd64.deb
+#   Protolens-<version>-linux-x86_64.rpm
 #   SHA256SUMS.txt
 on:
   push:
@@ -63,8 +63,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run build -w @aps/core
-      - run: npm run build -w @aps/desktop
+      - run: npm run build -w @protolens/core
+      - run: npm run build -w @protolens/desktop
       - name: Package
         working-directory: apps/desktop
         shell: bash
@@ -76,8 +76,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          cp apps/desktop/release/AIProtocolStudio-* out/
-          rm -f out/*.blockmap
+          cp apps/desktop/release/Protolens-* out/
+          # update manifests for in-place updates: latest.yml (Windows installer), latest-linux.yml (AppImage)
+          for f in latest.yml latest-linux.yml; do
+            [ -f "apps/desktop/release/$f" ] && cp "apps/desktop/release/$f" out/
+          done
+          # blockmaps are only used for differential Windows/AppImage updates
+          find out -name '*.blockmap' ! -name '*-setup.exe.blockmap' ! -name '*.AppImage.blockmap' -delete
           ls -l out
       - uses: actions/upload-artifact@v4
         with:
@@ -100,7 +105,7 @@ jobs:
           merge-multiple: true
       - name: Checksums
         working-directory: out
-        run: sha256sum AIProtocolStudio-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: ls Protolens-* | grep -v '.blockmap$' | xargs sha256sum > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Release notes from CHANGELOG.md
         shell: bash
         run: |
@@ -119,8 +124,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          ls -l out
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" out/* --clobber
           else
-            gh release create "$TAG" out/* --title "AI Protocol Studio ${TAG#v}" --notes-file notes.md
+            gh release create "$TAG" out/* --title "Protolens ${TAG#v}" --notes-file notes.md
           fi

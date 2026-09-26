@@ -159,7 +159,7 @@ export function EnvironmentsView() {
                 <div className="text-xs text-muted flex items-start gap-2 bg-panel rounded-md p-2">
                   <KeyRound size={13} className="mt-0.5 shrink-0" />
                   <span>
-                    Secret variables are encrypted with the OS credential store and are never written to workspace files, exports, logs, traces or reports. In CI, provide them as environment variables named <span className="mono">APS_SECRET_ENV_{'<ENV_ID>'}_{'<KEY>'}</span> or reference{' '}
+                    Secret variables are encrypted with the OS credential store and are never written to workspace files, exports, logs, traces or reports. In CI, provide them as environment variables named <span className="mono">PROTOLENS_SECRET_ENV_{'<ENV_ID>'}_{'<KEY>'}</span> or reference{' '}
                     <span className="mono">{'{{$env.NAME}}'}</span>.
                   </span>
                 </div>

@@ -1,9 +1,9 @@
 ---
 title: Install on Linux
-description: Install AI Protocol Studio on Linux with the AppImage, .deb or .rpm package, plus the Secret Service requirement for storing secrets.
+description: Install Protolens on Linux with the AppImage, .deb or .rpm package, plus the Secret Service requirement for storing secrets.
 ---
 
-# Install AI Protocol Studio on Linux
+# Install Protolens on Linux
 
 ## Requirements
 
@@ -17,8 +17,8 @@ description: Install AI Protocol Studio on Linux with the AppImage, .deb or .rpm
 ## AppImage (any distribution)
 
 ```bash
-chmod +x AIProtocolStudio-*-linux-x86_64.AppImage
-./AIProtocolStudio-*-linux-x86_64.AppImage
+chmod +x Protolens-*-linux-x86_64.AppImage
+./Protolens-*-linux-x86_64.AppImage
 ```
 
 On Ubuntu 22.04 and later, AppImages need FUSE 2: `sudo apt install libfuse2` (on Ubuntu 24.04: `libfuse2t64`).
@@ -26,34 +26,34 @@ On Ubuntu 22.04 and later, AppImages need FUSE 2: `sudo apt install libfuse2` (o
 ## Debian, Ubuntu and derivatives (.deb)
 
 ```bash
-sudo apt install ./AIProtocolStudio-*-linux-amd64.deb
+sudo apt install ./Protolens-*-linux-amd64.deb
 ```
 
 ## Fedora, RHEL and openSUSE (.rpm)
 
 ```bash
-sudo dnf install ./AIProtocolStudio-*-linux-x86_64.rpm     # Fedora, RHEL, Rocky
-sudo zypper install ./AIProtocolStudio-*-linux-x86_64.rpm  # openSUSE
+sudo dnf install ./Protolens-*-linux-x86_64.rpm     # Fedora, RHEL, Rocky
+sudo zypper install ./Protolens-*-linux-x86_64.rpm  # openSUSE
 ```
 
-The packages add **AI Protocol Studio** to your application menu.
+The packages add **Protolens** to your application menu.
 
 Continue with [your first request](/getting-started/first-request).
 
 ## Updating
 
-Install the newer package the same way, or replace the AppImage. Your workspaces and settings in `~/.aipstudio` are kept.
+Install the newer package the same way, or replace the AppImage. Your workspaces and settings in `~/.protolens` are kept.
 
 ## Uninstall
 
 ```bash
-sudo apt remove ai-protocol-studio     # .deb
-sudo dnf remove ai-protocol-studio     # .rpm
+sudo apt remove protolens     # .deb
+sudo dnf remove protolens     # .rpm
 ```
 
-To remove your data too, delete `~/.aipstudio` and `~/.config/AI Protocol Studio`.
+To remove your data too, delete `~/.protolens` and `~/.config/Protolens`.
 
 ## Troubleshooting
 
 - **The window is blank or the app crashes on start** (some virtual machines and older GPUs): start it with `--disable-gpu`.
-- **"Secure storage is not available"** when saving a secret: install and unlock `gnome-keyring` (or KWallet), or supply the secret as an `APS_SECRET_*` environment variable.
+- **"Secure storage is not available"** when saving a secret: install and unlock `gnome-keyring` (or KWallet), or supply the secret as a `PROTOLENS_SECRET_*` environment variable.
