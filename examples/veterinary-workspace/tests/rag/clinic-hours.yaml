@@ -1,0 +1,21 @@
+name: Clinic opening hours (RAG)
+type: rag
+question: What time does the clinic open on weekdays?
+contexts:
+  - id: doc-1
+    text: Happy Paws Clinic opens at 8am and closes at 6pm on weekdays.
+    score: 0.92
+  - id: doc-2
+    text: Parking is available behind the building.
+    score: 0.41
+expected: The clinic opens at 8am on weekdays.
+model: { provider: mock-llm, name: mock-gpt, temperature: 0 }
+evaluators:
+  - type: context-precision
+    threshold: 0.5
+  - type: context-recall
+  - type: groundedness
+  - type: citation
+  - type: similarity
+    expected: The clinic opens at 8am on weekdays.
+    threshold: 0.4

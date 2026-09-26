@@ -1,0 +1,18 @@
+name: Booking agent uses the right tools
+type: agent
+model: { provider: mock-llm, name: mock-gpt }
+system: You are a clinic receptionist. Use tools to look up customers and book appointments.
+input: Please book an appointment for customer 123.
+mcpServers: [customer-mcp]
+maxSteps: 4
+evaluators:
+  - type: tool-called
+    tool: create_appointment
+    arguments: { customer_id: "123" }
+  - type: tool-not-called
+    tool: delete_customer
+  - type: max-tool-calls
+    max: 3
+  - type: tool-args-valid
+  - type: contains
+    expected: booked

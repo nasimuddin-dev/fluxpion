@@ -1,0 +1,12 @@
+{
+  "id": "production",
+  "name": "Production",
+  "isProduction": true,
+  "color": "#cf222e",
+  "variables": [
+    { "key": "baseUrl", "value": "https://api.example.invalid", "enabled": true },
+    { "key": "graphqlEndpoint", "value": "https://api.example.invalid/graphql", "enabled": true },
+    { "key": "clientId", "value": "prod-client", "enabled": true },
+    { "key": "clientSecret", "value": "", "secret": true, "enabled": true }
+  ]
+}

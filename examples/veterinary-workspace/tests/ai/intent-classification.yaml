@@ -1,0 +1,25 @@
+# SRS Appendix A — example AI test
+name: Customer Intent Classification
+type: llm
+model:
+  provider: mock-llm
+  name: "{{model}}"
+  temperature: 0
+input:
+  message: "I need to cancel my appointment"
+prompt: |
+  Classify the customer intent. Respond with JSON {"intent": "..."}.
+
+  Customer:
+  {{message}}
+responseFormat:
+  type: json
+expected:
+  intent: cancellation
+evaluators:
+  - type: json-schema
+  - type: exact-match
+    path: $.intent
+    expected: cancellation
+limits:
+  latency_ms: 3000

@@ -1,0 +1,20 @@
+# Obtains an access token and stores it in the runtime variable `accessToken`
+# for dependent tests (see `dependsOn` in patients.yaml).
+id: auth-token
+name: Obtain access token
+type: http
+method: POST
+url: "{{baseUrl}}/auth/token"
+body:
+  type: form-urlencoded
+  fields:
+    - { key: client_id, value: "{{clientId}}" }
+    - { key: client_secret, value: "{{clientSecret}}" }
+    - { key: grant_type, value: client_credentials }
+extract:
+  accessToken: $.access_token
+assertions:
+  - type: status
+    expected: 200
+  - type: exists
+    path: $.access_token

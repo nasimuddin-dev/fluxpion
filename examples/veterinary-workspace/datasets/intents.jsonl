@@ -1,0 +1,5 @@
+{"id":"cancel-1","message":"Cancel my appointment","expected":"cancellation"}
+{"id":"cancel-2","message":"I cannot make it on Friday, please cancel","expected":"cancellation"}
+{"id":"refill-1","message":"I need a refill of Rex's prescription","expected":"refill"}
+{"id":"book-1","message":"Can I book an appointment for next week?","expected":"booking"}
+{"id":"other-1","message":"What colour is your logo?","expected":"other"}

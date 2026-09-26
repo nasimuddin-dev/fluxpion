@@ -1,0 +1,13 @@
+name: Regression
+description: Full regression suite across REST, GraphQL, MCP and AI tests.
+tests:
+  - rest
+  - graphql
+  - mcp
+  - ai
+  - rag
+  - agent
+  - safety
+concurrency: 4
+retries: 1
+environment: Development

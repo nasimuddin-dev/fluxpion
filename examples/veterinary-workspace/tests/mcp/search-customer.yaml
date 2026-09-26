@@ -1,0 +1,17 @@
+# SRS Appendix B — example MCP test
+name: Search Customer MCP Tool
+type: mcp
+server:
+  name: customer-mcp
+tool:
+  name: search_customer
+arguments:
+  customer_id: "123"
+assertions:
+  - type: status
+    expected: success
+  - type: exists
+    path: $.customer.id
+  - type: equals
+    path: $.customer.id
+    expected: "123"

@@ -1,0 +1,161 @@
+import type { AuthConfig } from '../types';
+import { Field, Input, Select } from './ui';
+import { KeyValueEditor } from './KeyValueEditor';
+
+const TYPES: Array<{ id: AuthConfig['type']; label: string }> = [
+  { id: 'inherit', label: 'Inherit from collection' },
+  { id: 'none', label: 'No auth' },
+  { id: 'bearer', label: 'Bearer token' },
+  { id: 'basic', label: 'Basic auth' },
+  { id: 'apiKey', label: 'API key' },
+  { id: 'oauth2', label: 'OAuth 2.0' },
+  { id: 'jwt', label: 'JWT (HMAC signed)' },
+  { id: 'headers', label: 'Custom headers' },
+];
+
+function defaults(type: AuthConfig['type']): AuthConfig {
+  switch (type) {
+    case 'bearer':
+      return { type, token: '{{accessToken}}' };
+    case 'basic':
+      return { type, username: '', password: '' };
+    case 'apiKey':
+      return { type, key: 'X-Api-Key', value: '{{apiKey}}', in: 'header' };
+    case 'oauth2':
+      return { type, grantType: 'client_credentials', tokenUrl: '', clientId: '{{clientId}}', clientSecret: '{{clientSecret}}', usePkce: true };
+    case 'jwt':
+      return { type, secret: '{{jwtSecret}}', algorithm: 'HS256', payload: '{\n  "sub": "user-123"\n}', expiresInSec: 3600 };
+    case 'headers':
+      return { type, headers: [] };
+    default:
+      return { type } as AuthConfig;
+  }
+}
+
+/** Auth configuration; values support {{variables}} so credentials can live in secret environment variables. */
+export function AuthEditor({ auth, onChange, allowInherit = true }: { auth?: AuthConfig; onChange(a: AuthConfig): void; allowInherit?: boolean }) {
+  const a = auth ?? { type: allowInherit ? 'inherit' : 'none' };
+  const set = (patch: Record<string, unknown>) => onChange({ ...a, ...patch } as AuthConfig);
+  return (
+    <div className="p-3 flex flex-col gap-3 max-w-2xl">
+      <Field label="Type">
+        <Select value={a.type} onChange={(e) => onChange(defaults(e.target.value as AuthConfig['type']))}>
+          {TYPES.filter((t) => allowInherit || t.id !== 'inherit').map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      {a.type === 'inherit' && <p className="text-sm text-muted">Uses the auth configured on the parent folder or collection.</p>}
+      {a.type === 'bearer' && (
+        <>
+          <Field label="Token" hint="Tip: reference a secret environment variable, e.g. {{accessToken}}">
+            <Input className="mono" value={a.token} onChange={(e) => set({ token: e.target.value })} />
+          </Field>
+          <Field label="Prefix">
+            <Input value={a.prefix ?? 'Bearer'} onChange={(e) => set({ prefix: e.target.value })} />
+          </Field>
+        </>
+      )}
+      {a.type === 'basic' && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Username">
+            <Input value={a.username} onChange={(e) => set({ username: e.target.value })} />
+          </Field>
+          <Field label="Password">
+            <Input type="password" value={a.password} onChange={(e) => set({ password: e.target.value })} />
+          </Field>
+        </div>
+      )}
+      {a.type === 'apiKey' && (
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Key">
+            <Input value={a.key} onChange={(e) => set({ key: e.target.value })} />
+          </Field>
+          <Field label="Value">
+            <Input className="mono" value={a.value} onChange={(e) => set({ value: e.target.value })} />
+          </Field>
+          <Field label="Add to">
+            <Select value={a.in} onChange={(e) => set({ in: e.target.value })}>
+              <option value="header">Header</option>
+              <option value="query">Query params</option>
+            </Select>
+          </Field>
+        </div>
+      )}
+      {a.type === 'jwt' && (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Secret">
+              <Input type="password" value={a.secret} onChange={(e) => set({ secret: e.target.value })} />
+            </Field>
+            <Field label="Algorithm">
+              <Select value={a.algorithm ?? 'HS256'} onChange={(e) => set({ algorithm: e.target.value })}>
+                <option>HS256</option>
+                <option>HS384</option>
+                <option>HS512</option>
+              </Select>
+            </Field>
+            <Field label="Expires in (s)">
+              <Input type="number" value={a.expiresInSec ?? ''} onChange={(e) => set({ expiresInSec: e.target.value ? Number(e.target.value) : undefined })} />
+            </Field>
+          </div>
+          <Field label="Payload (JSON)">
+            <textarea className="field mono min-h-24" value={a.payload} onChange={(e) => set({ payload: e.target.value })} />
+          </Field>
+        </>
+      )}
+      {a.type === 'oauth2' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Grant type">
+              <Select value={a.grantType} onChange={(e) => set({ grantType: e.target.value })}>
+                <option value="client_credentials">Client credentials</option>
+                <option value="password">Password</option>
+                <option value="authorization_code">Authorization code (+PKCE)</option>
+              </Select>
+            </Field>
+            <Field label="Token URL">
+              <Input className="mono" value={a.tokenUrl} onChange={(e) => set({ tokenUrl: e.target.value })} />
+            </Field>
+            {a.grantType === 'authorization_code' && (
+              <Field label="Authorization URL" hint="Opens your browser; the redirect is captured on 127.0.0.1.">
+                <Input className="mono" value={a.authUrl ?? ''} onChange={(e) => set({ authUrl: e.target.value })} />
+              </Field>
+            )}
+            <Field label="Client ID">
+              <Input className="mono" value={a.clientId} onChange={(e) => set({ clientId: e.target.value })} />
+            </Field>
+            <Field label="Client secret">
+              <Input className="mono" type="password" value={a.clientSecret ?? ''} onChange={(e) => set({ clientSecret: e.target.value })} />
+            </Field>
+            <Field label="Scope">
+              <Input value={a.scope ?? ''} onChange={(e) => set({ scope: e.target.value })} />
+            </Field>
+            <Field label="Audience">
+              <Input value={a.audience ?? ''} onChange={(e) => set({ audience: e.target.value })} />
+            </Field>
+            {a.grantType === 'password' && (
+              <>
+                <Field label="Username">
+                  <Input value={a.username ?? ''} onChange={(e) => set({ username: e.target.value })} />
+                </Field>
+                <Field label="Password">
+                  <Input type="password" value={a.password ?? ''} onChange={(e) => set({ password: e.target.value })} />
+                </Field>
+              </>
+            )}
+          </div>
+          {a.grantType === 'authorization_code' && (
+            <label className="text-sm flex items-center gap-2">
+              <input type="checkbox" checked={a.usePkce !== false} onChange={(e) => set({ usePkce: e.target.checked })} /> Use PKCE (S256)
+            </label>
+          )}
+          <p className="text-xs text-muted">Tokens are cached in memory until they expire and are redacted from history, traces and reports.</p>
+        </>
+      )}
+      {a.type === 'headers' && <KeyValueEditor rows={a.headers} onChange={(headers) => set({ headers })} keyPlaceholder="Header" />}
+    </div>
+  );
+}

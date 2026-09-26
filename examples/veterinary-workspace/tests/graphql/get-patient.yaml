@@ -1,0 +1,22 @@
+# SRS Appendix C — example GraphQL test
+name: Get Patient
+type: graphql
+endpoint: "{{graphqlEndpoint}}"
+query: |
+  query GetPatient($id: ID!) {
+    patient(id: $id) {
+      id
+      name
+      species
+    }
+  }
+variables:
+  id: "123"
+assertions:
+  - type: http-status
+    expected: 200
+  - type: graphql-no-errors
+  - type: exists
+    path: $.data.patient
+  - type: exists
+    path: $.data.patient.id

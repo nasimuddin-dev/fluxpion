@@ -1,0 +1,7 @@
+name: Unknown field produces a GraphQL error
+type: graphql
+endpoint: "{{graphqlEndpoint}}"
+query: '{ patient(id: "123") { id nickname } }'
+assertions:
+  - type: graphql-errors
+    expected: Cannot query field

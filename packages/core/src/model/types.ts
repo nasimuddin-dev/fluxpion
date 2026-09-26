@@ -1,0 +1,596 @@
+/**
+ * Core domain model for AI Protocol Studio.
+ *
+ * Everything persisted to disk or exchanged between the engine, the desktop UI and
+ * the CLI is described here. Types are intentionally plain JSON-serialisable data.
+ */
+
+export const SCHEMA_VERSION = '1.0';
+
+export interface KeyValue {
+  key: string;
+  value: string;
+  enabled?: boolean;
+  description?: string;
+}
+
+/* ------------------------------------------------------------------ auth */
+
+export type AuthConfig =
+  | { type: 'none' }
+  | { type: 'inherit' }
+  | { type: 'apiKey'; key: string; value: string; in: 'header' | 'query' }
+  | { type: 'basic'; username: string; password: string }
+  | { type: 'bearer'; token: string; prefix?: string }
+  | {
+      type: 'jwt';
+      secret: string;
+      algorithm?: 'HS256' | 'HS384' | 'HS512';
+      /** JSON payload (templated). `iat`/`exp` are added when `expiresInSec` is set. */
+      payload: string;
+      expiresInSec?: number;
+      prefix?: string;
+    }
+  | {
+      type: 'oauth2';
+      grantType: 'client_credentials' | 'password' | 'authorization_code';
+      tokenUrl: string;
+      authUrl?: string;
+      clientId: string;
+      clientSecret?: string;
+      scope?: string;
+      audience?: string;
+      username?: string;
+      password?: string;
+      usePkce?: boolean;
+      redirectPort?: number;
+    }
+  | { type: 'headers'; headers: KeyValue[] };
+
+/* ------------------------------------------------------------------ http */
+
+export type BodyConfig =
+  | { type: 'none' }
+  | { type: 'json' | 'xml' | 'text' | 'html'; content: string }
+  | { type: 'form-urlencoded'; fields: KeyValue[] }
+  | { type: 'multipart'; fields: Array<KeyValue & { kind?: 'text' | 'file'; contentType?: string }> }
+  | { type: 'binary'; filePath: string; contentType?: string };
+
+export interface HttpSettings {
+  timeoutMs?: number;
+  followRedirects?: boolean;
+  maxRedirects?: number;
+  /** Disable TLS verification (development only). */
+  insecure?: boolean;
+  proxy?: string;
+  clientCert?: { certPath: string; keyPath: string; caPath?: string; passphrase?: string };
+  /** Maximum number of body bytes kept in memory for preview. The full body is streamed to disk. */
+  maxPreviewBytes?: number;
+}
+
+export interface HttpRequestSpec {
+  method: string;
+  url: string;
+  params?: KeyValue[];
+  headers?: KeyValue[];
+  cookies?: KeyValue[];
+  auth?: AuthConfig;
+  body?: BodyConfig;
+  settings?: HttpSettings;
+}
+
+export interface TimelinePhase {
+  name: string;
+  startMs: number;
+  durationMs: number;
+}
+
+export interface HttpResponseData {
+  status: number;
+  statusText: string;
+  headers: Array<[string, string]>;
+  cookies: Array<{ name: string; value: string; attributes: Record<string, string> }>;
+  /** Body preview (UTF-8 decoded, possibly truncated). */
+  bodyPreview: string;
+  truncated: boolean;
+  /** Total body size in bytes. */
+  size: number;
+  contentType: string;
+  /** Path on disk of the full payload when persisted. */
+  payloadPath?: string;
+  durationMs: number;
+  timeline: TimelinePhase[];
+  /** Final URL (after redirects) with secrets redacted. */
+  url: string;
+  redirected: boolean;
+  /** Parsed JSON body when the preview is complete and parses. */
+  json?: unknown;
+}
+
+/* ------------------------------------------------------------------ graphql */
+
+export interface GraphQLRequestSpec {
+  endpoint: string;
+  query: string;
+  variables?: string | Record<string, unknown>;
+  operationName?: string;
+  headers?: KeyValue[];
+  auth?: AuthConfig;
+  settings?: HttpSettings;
+}
+
+/* ------------------------------------------------------------------ mcp */
+
+export type McpTransportConfig =
+  | { transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
+  | { transport: 'streamable-http'; url: string; headers?: KeyValue[] }
+  | { transport: 'sse'; url: string; headers?: KeyValue[] };
+
+export type McpServerConfig = { id: string; name: string } & McpTransportConfig;
+
+/* ------------------------------------------------------------------ ai */
+
+export type ProviderKind = 'openai-compatible' | 'azure-openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
+
+export interface RateLimitConfig {
+  requestsPerSecond?: number;
+  requestsPerMinute?: number;
+  tokensPerMinute?: number;
+  concurrency?: number;
+}
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  kind: ProviderKind;
+  baseUrl: string;
+  /** Template or secret reference, e.g. `{{$secret.provider.openai.apiKey}}` or `{{$env.OPENAI_API_KEY}}`. Never a literal key on disk. */
+  apiKey?: string;
+  defaultModel?: string;
+  embeddingModel?: string;
+  /** Azure OpenAI api-version, Anthropic version header, etc. */
+  apiVersion?: string;
+  headers?: KeyValue[];
+  rateLimit?: RateLimitConfig;
+  timeoutMs?: number;
+}
+
+export interface ModelRef {
+  /** Provider id, provider name, or provider kind. */
+  provider: string;
+  name?: string;
+  temperature?: number;
+  topP?: number;
+  maxTokens?: number;
+  seed?: number;
+}
+
+export interface PriceEntry {
+  /** Provider kind or id; `*` matches any. */
+  provider: string;
+  /** Exact model name or a glob with `*`. */
+  model: string;
+  inputPerMillion: number;
+  outputPerMillion: number;
+  currency?: string;
+  /** Version / effective date so reports record which price table was used. */
+  version: string;
+}
+
+/* ------------------------------------------------------------------ checks */
+
+/**
+ * A check is an assertion (deterministic) or an evaluator (heuristic, semantic or AI judge).
+ * Every check result records its `source` so AI-generated judgements are never confused
+ * with deterministic results.
+ */
+export interface CheckConfig {
+  type: string;
+  name?: string;
+  path?: string;
+  expected?: unknown;
+  [option: string]: unknown;
+}
+
+export type CheckSource = 'deterministic' | 'heuristic' | 'semantic' | 'ai-judge';
+
+export interface CheckResult {
+  type: string;
+  name: string;
+  passed: boolean;
+  source: CheckSource;
+  score?: number;
+  message: string;
+  expected?: unknown;
+  actual?: unknown;
+  explanation?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/* ------------------------------------------------------------------ tests */
+
+export type TestType = 'http' | 'graphql' | 'mcp' | 'llm' | 'rag' | 'agent';
+
+export interface TestBase {
+  id?: string;
+  name: string;
+  type: TestType;
+  description?: string;
+  tags?: string[];
+  skip?: boolean;
+  timeoutMs?: number;
+  retries?: number;
+  dependsOn?: string[];
+  variables?: Record<string, unknown>;
+  preRequestScript?: string;
+  testScript?: string;
+  /** Extract values from the result body into runtime variables: `{ token: "$.access_token" }`. */
+  extract?: Record<string, string>;
+  assertions?: CheckConfig[];
+  evaluators?: CheckConfig[];
+  /** Source file this test was loaded from (set by the loader). */
+  file?: string;
+}
+
+export interface HttpTest extends TestBase {
+  type: 'http';
+  request: HttpRequestSpec;
+}
+
+export interface GraphQLTest extends TestBase {
+  type: 'graphql';
+  endpoint: string;
+  query: string;
+  graphqlVariables?: Record<string, unknown> | string;
+  operationName?: string;
+  headers?: KeyValue[];
+  auth?: AuthConfig;
+}
+
+export interface McpTest extends TestBase {
+  type: 'mcp';
+  server: string | McpServerConfig;
+  tool?: string;
+  arguments?: Record<string, unknown>;
+  resource?: string;
+  prompt?: { name: string; arguments?: Record<string, string> };
+}
+
+export interface ResponseFormat {
+  type: 'text' | 'json' | 'json_schema';
+  name?: string;
+  schema?: Record<string, unknown>;
+}
+
+export interface LlmTest extends TestBase {
+  type: 'llm';
+  model: ModelRef;
+  system?: string;
+  prompt: string | { template: string; system?: string };
+  input?: Record<string, unknown>;
+  expected?: unknown;
+  responseFormat?: ResponseFormat;
+  limits?: { latency_ms?: number; tokens?: number; output_tokens?: number; cost?: number };
+}
+
+export interface RetrievedDoc {
+  id: string;
+  text: string;
+  score?: number;
+  source?: string;
+}
+
+export interface RagTest extends TestBase {
+  type: 'rag';
+  question: string;
+  contexts: RetrievedDoc[];
+  expected?: string;
+  /** Pre-computed answer from the system under test. When omitted, `model` generates one. */
+  answer?: string;
+  model?: ModelRef;
+  prompt?: string;
+}
+
+export interface MockTool {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+  /** Static result returned when the agent calls the tool (templated with `{{args.x}}`). */
+  result?: unknown;
+}
+
+export interface AgentTest extends TestBase {
+  type: 'agent';
+  model: ModelRef;
+  system?: string;
+  input: string;
+  tools?: MockTool[];
+  /** MCP server names/ids whose tools are exposed to the agent. */
+  mcpServers?: string[];
+  maxSteps?: number;
+}
+
+export type TestCase = HttpTest | GraphQLTest | McpTest | LlmTest | RagTest | AgentTest;
+
+export interface SuiteConfig {
+  name: string;
+  description?: string;
+  /** Paths or globs (relative to suite file) of test files/directories. */
+  tests: string[];
+  setup?: string[];
+  teardown?: string[];
+  concurrency?: number;
+  retries?: number;
+  timeoutMs?: number;
+  environment?: string;
+  tags?: string[];
+  file?: string;
+}
+
+/* ------------------------------------------------------------------ results */
+
+export type TestStatus = 'passed' | 'failed' | 'skipped' | 'error';
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+export interface TestResult {
+  id: string;
+  name: string;
+  type: TestType;
+  status: TestStatus;
+  file?: string;
+  startedAt: string;
+  durationMs: number;
+  attempts: number;
+  checks: CheckResult[];
+  error?: NormalizedError;
+  latencyMs?: number;
+  tokens?: TokenUsage;
+  costUsd?: number;
+  model?: string;
+  traceId?: string;
+  /** Small, redacted summary of the output (for reports). */
+  output?: string;
+  input?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LatencyStats {
+  count: number;
+  min: number;
+  max: number;
+  mean: number;
+  p50: number;
+  p90: number;
+  p95: number;
+  p99: number;
+}
+
+export interface RunSummary {
+  runId: string;
+  name: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  errors: number;
+  latency: LatencyStats;
+  tokens: TokenUsage;
+  costUsd: number;
+  cancelled: boolean;
+  environment?: string;
+  /** Averages of scored checks by type, e.g. `{ "llm-judge": 0.87 }`. */
+  scores: Record<string, { mean: number; count: number }>;
+  reproducibility: Record<string, unknown>;
+}
+
+/* ------------------------------------------------------------------ errors */
+
+export type ErrorKind =
+  | 'NetworkError'
+  | 'TimeoutError'
+  | 'AuthenticationError'
+  | 'AuthorizationError'
+  | 'ValidationError'
+  | 'RateLimitError'
+  | 'ServerError'
+  | 'ProtocolError'
+  | 'SchemaError'
+  | 'EvaluationError'
+  | 'ConfigurationError'
+  | 'CancelledError'
+  | 'ScriptError';
+
+export interface NormalizedError {
+  kind: ErrorKind;
+  message: string;
+  /** What happened. */
+  what: string;
+  /** Why it (probably) happened. */
+  why: string;
+  suggestions: string[];
+  details?: Record<string, unknown>;
+}
+
+/* ------------------------------------------------------------------ trace */
+
+export type SpanKind = 'http' | 'graphql' | 'llm' | 'tool' | 'mcp' | 'evaluation' | 'script' | 'test' | 'internal';
+
+export interface Span {
+  traceId: string;
+  spanId: string;
+  parentSpanId?: string;
+  name: string;
+  kind: SpanKind;
+  startTime: number;
+  endTime?: number;
+  durationMs?: number;
+  status: 'ok' | 'error' | 'unset';
+  attributes: Record<string, unknown>;
+  input?: unknown;
+  output?: unknown;
+  error?: string;
+  events?: Array<{ time: number; name: string; attributes?: Record<string, unknown> }>;
+}
+
+export interface Trace {
+  traceId: string;
+  name: string;
+  startTime: number;
+  endTime?: number;
+  status: 'ok' | 'error' | 'unset';
+  spans: Span[];
+}
+
+/* ------------------------------------------------------------------ workspace */
+
+export interface Workspace {
+  schemaVersion: string;
+  id: string;
+  name: string;
+  description?: string;
+  variables: KeyValue[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EnvironmentVariable {
+  key: string;
+  /** For secret variables this is empty on disk; the value lives in the secret store. */
+  value: string;
+  secret?: boolean;
+  enabled?: boolean;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  variables: EnvironmentVariable[];
+  /** Marks the environment as production; load testing is blocked unless explicitly allowed. */
+  isProduction?: boolean;
+  color?: string;
+}
+
+export interface SavedHttpRequest {
+  kind: 'http';
+  id: string;
+  name: string;
+  request: HttpRequestSpec;
+  preRequestScript?: string;
+  testScript?: string;
+  assertions?: CheckConfig[];
+}
+
+export interface SavedGraphQLRequest {
+  kind: 'graphql';
+  id: string;
+  name: string;
+  request: GraphQLRequestSpec;
+  assertions?: CheckConfig[];
+}
+
+export interface CollectionFolder {
+  kind: 'folder';
+  id: string;
+  name: string;
+  items: CollectionNode[];
+  auth?: AuthConfig;
+  variables?: KeyValue[];
+}
+
+export type CollectionNode = CollectionFolder | SavedHttpRequest | SavedGraphQLRequest;
+
+export interface Collection {
+  schemaVersion: string;
+  id: string;
+  name: string;
+  description?: string;
+  version: number;
+  variables: KeyValue[];
+  auth?: AuthConfig;
+  preRequestScript?: string;
+  testScript?: string;
+  items: CollectionNode[];
+  updatedAt: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  timestamp: string;
+  kind: 'http' | 'graphql' | 'mcp' | 'llm' | 'websocket';
+  name: string;
+  method?: string;
+  url?: string;
+  status?: number | string;
+  durationMs?: number;
+  size?: number;
+  request?: unknown;
+  responseMeta?: unknown;
+  payloadPath?: string;
+  traceId?: string;
+}
+
+export interface AppSettings {
+  schemaVersion: string;
+  theme: 'system' | 'light' | 'dark';
+  fontSize: number;
+  reducedMotion: boolean;
+  logLevel: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
+  /** Field names always redacted in logs, traces, reports and exports. */
+  redactFields: string[];
+  pricing: PriceEntry[];
+  maxPreviewBytes: number;
+  defaultTimeoutMs: number;
+  telemetry: false;
+  loadTesting: { allowRemoteHosts: boolean; maxVirtualUsers: number };
+  lastWorkspace?: string;
+  assistantProvider?: string;
+  assistantModel?: string;
+  workspacePaths: string[];
+  /** Lowest-precedence variables shared by all workspaces. */
+  globalVariables: KeyValue[];
+}
+
+export const DEFAULT_REDACT_FIELDS = [
+  'password',
+  'token',
+  'access_token',
+  'refresh_token',
+  'apiKey',
+  'api_key',
+  'x-api-key',
+  'api-key',
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'secret',
+  'client_secret',
+  'ssn',
+  'creditCard',
+];
+
+export function defaultSettings(): AppSettings {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    theme: 'system',
+    fontSize: 13,
+    reducedMotion: false,
+    logLevel: 'INFO',
+    redactFields: [...DEFAULT_REDACT_FIELDS],
+    pricing: [],
+    maxPreviewBytes: 2 * 1024 * 1024,
+    defaultTimeoutMs: 30_000,
+    telemetry: false,
+    loadTesting: { allowRemoteHosts: false, maxVirtualUsers: 200 },
+    workspacePaths: [],
+    globalVariables: [],
+  };
+}

@@ -1,0 +1,36 @@
+{
+  "name": "ai-protocol-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI Protocol Studio — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "packages/cli",
+    "apps/desktop",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "npm run build -w @aps/core && npm run build -w @aps/cli && npm run build -w @aps/desktop",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "npm run dev -w @aps/desktop",
+    "dev:web": "npm run dev:web -w @aps/desktop",
+    "bench": "node scripts/bench.mjs",
+    "docs:dev": "npm run dev -w docs",
+    "docs:build": "npm run build -w docs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.2",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  }
+}

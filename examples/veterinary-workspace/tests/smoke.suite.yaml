@@ -1,0 +1,8 @@
+name: Smoke
+tests:
+  - rest/auth.yaml
+  - graphql/get-patient.yaml
+  - mcp/search-customer.yaml
+  - ai/intent-classification.yaml
+concurrency: 4
+environment: Development

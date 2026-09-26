@@ -1,0 +1,53 @@
+{
+  "name": "@aps/desktop",
+  "productName": "AI Protocol Studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Protocol Studio desktop application",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "node scripts/dev.mjs --web",
+    "build": "vite build && node scripts/build-main.mjs",
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "npm run build && electron-builder --config electron-builder.yml --publish never",
+    "package:dir": "npm run build && electron-builder --config electron-builder.yml --dir --publish never",
+    "icons": "electron scripts/make-icons.cjs",
+    "screenshots": "node scripts/build-main.mjs && vite build && node scripts/capture.cjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@aps/core": "0.1.0",
+    "@monaco-editor/react": "^4.7.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "graphql": "^16.14.2",
+    "graphql-language-service": "^5.7.0",
+    "lucide-react": "^1.48.0",
+    "monaco-editor": "^0.57.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.1",
+    "yaml": "^2.9.1",
+    "zustand": "^5.0.15"
+  },
+  "author": {
+    "name": "AI Protocol Studio contributors",
+    "email": "noreply@github.com",
+    "url": "https://github.com/nasimuddin-dev/protolens"
+  },
+  "homepage": "https://nasimuddin-dev.github.io/protolens/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nasimuddin-dev/protolens.git"
+  },
+  "license": "MIT"
+}

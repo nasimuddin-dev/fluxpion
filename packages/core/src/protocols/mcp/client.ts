@@ -1,0 +1,376 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServerConfig } from '../../model/types.js';
+import { ApsError } from '../../errors.js';
+import type { Redactor } from '../../util/redact.js';
+import { shortId } from '../../util/ids.js';
+
+/** One protocol-level event in an MCP session (spec §12.4). */
+export interface McpTraceEvent {
+  id: string;
+  timestamp: number;
+  direction: 'outgoing' | 'incoming' | 'local';
+  /** JSON-RPC method, or `response` for replies. */
+  method: string;
+  kind: 'request' | 'response' | 'notification' | 'error' | 'lifecycle' | 'stderr';
+  rpcId?: string | number;
+  request?: unknown;
+  response?: unknown;
+  error?: unknown;
+  /** For responses: time since the matching request. */
+  durationMs?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export type McpEventListener = (e: McpTraceEvent) => void;
+
+/**
+ * Transport decorator that observes every JSON-RPC message without changing behaviour.
+ * Keeps transport handling isolated from the MCP domain model.
+ */
+class TracingTransport implements Transport {
+  private pending = new Map<string | number, { method: string; t: number; params: unknown }>();
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: Transport['onmessage'];
+
+  constructor(
+    private inner: Transport,
+    private emit: McpEventListener,
+    private redactor?: Redactor,
+  ) {
+    inner.onclose = () => {
+      this.emit({ id: shortId(), timestamp: Date.now(), direction: 'local', method: 'connection/closed', kind: 'lifecycle' });
+      this.onclose?.();
+    };
+    inner.onerror = (err) => {
+      this.emit({ id: shortId(), timestamp: Date.now(), direction: 'local', method: 'transport/error', kind: 'error', error: err.message });
+      this.onerror?.(err);
+    };
+    inner.onmessage = (msg, extra) => {
+      this.observe('incoming', msg);
+      this.onmessage?.(msg, extra);
+    };
+  }
+
+  get sessionId(): string | undefined {
+    return (this.inner as { sessionId?: string }).sessionId;
+  }
+
+  async start(): Promise<void> {
+    await this.inner.start();
+  }
+
+  async send(message: JSONRPCMessage, options?: Parameters<Transport['send']>[1]): Promise<void> {
+    this.observe('outgoing', message);
+    await this.inner.send(message, options);
+  }
+
+  async close(): Promise<void> {
+    await this.inner.close();
+  }
+
+  setProtocolVersion(v: string): void {
+    (this.inner as { setProtocolVersion?: (v: string) => void }).setProtocolVersion?.(v);
+  }
+
+  private clean(v: unknown): unknown {
+    return this.redactor ? this.redactor.redact(v) : v;
+  }
+
+  private observe(direction: 'outgoing' | 'incoming', msg: JSONRPCMessage): void {
+    const m = msg as { id?: string | number; method?: string; params?: unknown; result?: unknown; error?: unknown };
+    const now = Date.now();
+    if (m.method && m.id !== undefined) {
+      this.pending.set(`${direction}:${m.id}`, { method: m.method, t: now, params: m.params });
+      this.emit({ id: shortId(), timestamp: now, direction, method: m.method, kind: 'request', rpcId: m.id, request: this.clean(m.params) });
+    } else if (m.method) {
+      this.emit({ id: shortId(), timestamp: now, direction, method: m.method, kind: 'notification', request: this.clean(m.params) });
+    } else if (m.id !== undefined) {
+      const reqDir = direction === 'incoming' ? 'outgoing' : 'incoming';
+      const p = this.pending.get(`${reqDir}:${m.id}`);
+      this.pending.delete(`${reqDir}:${m.id}`);
+      this.emit({
+        id: shortId(),
+        timestamp: now,
+        direction,
+        method: p?.method ?? 'response',
+        kind: m.error ? 'error' : 'response',
+        rpcId: m.id,
+        request: p ? this.clean(p.params) : undefined,
+        response: m.result !== undefined ? this.clean(m.result) : undefined,
+        error: m.error ? this.clean(m.error) : undefined,
+        durationMs: p ? now - p.t : undefined,
+      });
+    }
+  }
+}
+
+export interface McpToolInfo {
+  name: string;
+  title?: string;
+  description?: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
+}
+
+export interface McpDiscovery {
+  serverInfo?: { name: string; version: string; title?: string };
+  protocolVersion?: string;
+  capabilities?: Record<string, unknown>;
+  instructions?: string;
+  tools: McpToolInfo[];
+  resources: Array<{ uri: string; name: string; description?: string; mimeType?: string }>;
+  resourceTemplates: Array<{ uriTemplate: string; name: string; description?: string; mimeType?: string }>;
+  prompts: Array<{ name: string; description?: string; arguments?: Array<{ name: string; description?: string; required?: boolean }> }>;
+}
+
+export interface McpCallResult {
+  isError: boolean;
+  content: unknown[];
+  structuredContent?: unknown;
+  durationMs: number;
+  raw: unknown;
+}
+
+/** A live connection to one MCP server. */
+export class McpSession {
+  private client: Client;
+  private transport?: TracingTransport;
+  private listeners: McpEventListener[] = [];
+  readonly events: McpTraceEvent[] = [];
+  private maxEvents = 5000;
+  connected = false;
+
+  constructor(
+    readonly config: McpServerConfig,
+    private redactor?: Redactor,
+  ) {
+    this.client = new Client({ name: 'ai-protocol-studio', version: '0.1.0' }, { capabilities: {} });
+  }
+
+  onEvent(l: McpEventListener): () => void {
+    this.listeners.push(l);
+    return () => (this.listeners = this.listeners.filter((x) => x !== l));
+  }
+
+  private emit = (e: McpTraceEvent) => {
+    this.events.push(e);
+    if (this.events.length > this.maxEvents) this.events.splice(0, this.events.length - this.maxEvents);
+    for (const l of this.listeners) l(e);
+  };
+
+  private createTransport(): Transport {
+    const c = this.config;
+    const headersOf = (kv?: Array<{ key: string; value: string; enabled?: boolean }>) => {
+      const h: Record<string, string> = {};
+      for (const x of kv ?? []) if (x.enabled !== false && x.key) h[x.key] = x.value;
+      return h;
+    };
+    switch (c.transport) {
+      case 'stdio': {
+        const t = new StdioClientTransport({
+          command: c.command,
+          args: c.args ?? [],
+          env: { ...getDefaultEnvironment(), ...(c.env ?? {}) },
+          cwd: c.cwd || undefined,
+          stderr: 'pipe',
+        });
+        t.stderr?.on('data', (buf: Buffer) => {
+          const text = buf.toString('utf8');
+          this.emit({ id: shortId(), timestamp: Date.now(), direction: 'incoming', method: 'stderr', kind: 'stderr', response: this.redactor?.redactString(text) ?? text });
+        });
+        return t;
+      }
+      case 'streamable-http':
+        return new StreamableHTTPClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) } });
+      case 'sse':
+        return new SSEClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) } });
+    }
+  }
+
+  async connect(timeoutMs = 30_000): Promise<void> {
+    const t0 = Date.now();
+    this.emit({
+      id: shortId(),
+      timestamp: t0,
+      direction: 'local',
+      method: 'connection/open',
+      kind: 'lifecycle',
+      metadata: this.redactor?.redact({ ...this.config }) ?? { ...this.config },
+    });
+    this.transport = new TracingTransport(this.createTransport(), this.emit, this.redactor);
+    this.client.setNotificationHandler(LoggingMessageNotificationSchema, () => {
+      /* recorded by the tracing transport */
+    });
+    try {
+      await this.client.connect(this.transport, { timeout: timeoutMs });
+    } catch (e) {
+      this.emit({ id: shortId(), timestamp: Date.now(), direction: 'local', method: 'connection/failed', kind: 'error', error: (e as Error).message });
+      throw new ApsError('ProtocolError', `Could not connect to MCP server "${this.config.name}": ${(e as Error).message}`, {
+        why:
+          this.config.transport === 'stdio'
+            ? 'The server process failed to start or did not complete the MCP initialize handshake.'
+            : 'The server did not accept the MCP initialize request.',
+        suggestions:
+          this.config.transport === 'stdio'
+            ? ['Check the command and arguments (on Windows, use `npx.cmd` or the full path to node).', 'Look at the stderr events in the trace for startup errors.', 'Make sure the server writes only JSON-RPC to stdout.']
+            : ['Check the URL and transport type (Streamable HTTP vs legacy SSE).', 'Check authentication headers.'],
+        cause: e,
+      });
+    }
+    this.connected = true;
+    this.emit({
+      id: shortId(),
+      timestamp: Date.now(),
+      direction: 'local',
+      method: 'connection/ready',
+      kind: 'lifecycle',
+      durationMs: Date.now() - t0,
+      metadata: { serverInfo: this.client.getServerVersion(), capabilities: this.client.getServerCapabilities(), sessionId: this.transport.sessionId },
+    });
+  }
+
+  get capabilities(): Record<string, unknown> | undefined {
+    return this.client.getServerCapabilities() as Record<string, unknown> | undefined;
+  }
+
+  async discover(): Promise<McpDiscovery> {
+    const caps = this.client.getServerCapabilities() ?? {};
+    const out: McpDiscovery = {
+      serverInfo: this.client.getServerVersion() as McpDiscovery['serverInfo'],
+      capabilities: caps as Record<string, unknown>,
+      instructions: this.client.getInstructions(),
+      tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
+    };
+    if (caps.tools) out.tools = await this.listTools();
+    if (caps.resources) {
+      out.resources = await this.paginate((cursor) => this.client.listResources(cursor ? { cursor } : undefined), 'resources');
+      out.resourceTemplates = await this.paginate<McpDiscovery['resourceTemplates'][number]>((cursor) => this.client.listResourceTemplates(cursor ? { cursor } : undefined), 'resourceTemplates').catch(() => []);
+    }
+    if (caps.prompts) out.prompts = await this.paginate((cursor) => this.client.listPrompts(cursor ? { cursor } : undefined), 'prompts');
+    return out;
+  }
+
+  async listTools(): Promise<McpToolInfo[]> {
+    return this.paginate((cursor) => this.client.listTools(cursor ? { cursor } : undefined), 'tools');
+  }
+
+  private async paginate<T>(fn: (cursor?: string) => Promise<Record<string, unknown>>, key: string): Promise<T[]> {
+    const all: T[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 1000; page++) {
+      const r = await fn(cursor);
+      all.push(...((r[key] as T[]) ?? []));
+      cursor = r.nextCursor as string | undefined;
+      if (!cursor) break;
+    }
+    return all;
+  }
+
+  async callTool(name: string, args: Record<string, unknown> = {}, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<McpCallResult> {
+    const t0 = performance.now();
+    const r = (await this.client.callTool({ name, arguments: args }, undefined, { signal: opts.signal, timeout: opts.timeoutMs ?? 60_000 })) as {
+      isError?: boolean;
+      content?: unknown[];
+      structuredContent?: unknown;
+    };
+    return {
+      isError: !!r.isError,
+      content: r.content ?? [],
+      structuredContent: r.structuredContent,
+      durationMs: Math.round(performance.now() - t0),
+      raw: r,
+    };
+  }
+
+  async readResource(uri: string, opts: { signal?: AbortSignal } = {}): Promise<{ contents: unknown[]; durationMs: number }> {
+    const t0 = performance.now();
+    const r = await this.client.readResource({ uri }, { signal: opts.signal });
+    return { contents: r.contents, durationMs: Math.round(performance.now() - t0) };
+  }
+
+  async getPrompt(name: string, args: Record<string, string> = {}, opts: { signal?: AbortSignal } = {}): Promise<{ messages: unknown[]; description?: string; durationMs: number }> {
+    const t0 = performance.now();
+    const r = await this.client.getPrompt({ name, arguments: args }, { signal: opts.signal });
+    return { messages: r.messages, description: r.description, durationMs: Math.round(performance.now() - t0) };
+  }
+
+  async ping(): Promise<number> {
+    const t0 = performance.now();
+    await this.client.ping();
+    return Math.round(performance.now() - t0);
+  }
+
+  async close(): Promise<void> {
+    if (!this.connected) return;
+    this.connected = false;
+    try {
+      await this.client.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Pools MCP sessions by server id so a test run connects once per server. */
+export class McpManager {
+  private sessions = new Map<string, Promise<McpSession>>();
+
+  constructor(
+    private resolveConfig: (ref: string | McpServerConfig) => McpServerConfig | undefined,
+    private redactor?: Redactor,
+    private onEvent?: (serverId: string, e: McpTraceEvent) => void,
+  ) {}
+
+  async get(ref: string | McpServerConfig): Promise<McpSession> {
+    const cfg = this.resolveConfig(ref);
+    if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server "${typeof ref === 'string' ? ref : ref.name}"`, {
+      suggestions: ['Define the server in the MCP view (or mcp-servers.json in the workspace).'],
+    });
+    let p = this.sessions.get(cfg.id);
+    if (!p) {
+      p = (async () => {
+        const s = new McpSession(cfg, this.redactor);
+        if (this.onEvent) s.onEvent((e) => this.onEvent!(cfg.id, e));
+        await s.connect();
+        return s;
+      })();
+      this.sessions.set(cfg.id, p);
+      p.catch(() => this.sessions.delete(cfg.id));
+    }
+    return p;
+  }
+
+  async close(id?: string): Promise<void> {
+    const entries = id ? [[id, this.sessions.get(id)] as const] : [...this.sessions.entries()];
+    for (const [key, p] of entries) {
+      this.sessions.delete(key);
+      await p?.then((s) => s.close()).catch(() => undefined);
+    }
+  }
+}
+
+/** Flatten an MCP tool result into a value suitable for assertions. */
+export function mcpResultBody(r: { structuredContent?: unknown; content: unknown[] }): { body: unknown; text: string } {
+  const texts = (r.content as Array<{ type: string; text?: string }>).filter((c) => c.type === 'text').map((c) => c.text ?? '');
+  const text = texts.join('\n');
+  if (r.structuredContent !== undefined) return { body: r.structuredContent, text };
+  if (texts.length === 1) {
+    try {
+      return { body: JSON.parse(texts[0]!), text };
+    } catch {
+      /* not json */
+    }
+  }
+  return { body: text || r.content, text };
+}

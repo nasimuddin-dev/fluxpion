@@ -1,0 +1,16 @@
+# Dataset-driven evaluation: one test per JSONL record (records are streamed).
+name: Intent dataset
+type: llm
+model: { provider: mock-llm, name: mock-gpt, temperature: 0 }
+prompt: |
+  Classify the customer intent as JSON {"intent": "..."}.
+  Customer: {{message}}
+responseFormat: { type: json }
+dataset:
+  path: ../../datasets/intents.jsonl
+evaluators:
+  - type: exact-match
+    path: $.intent
+    expected: "{{expected}}"
+  - type: tokens
+    max: 500

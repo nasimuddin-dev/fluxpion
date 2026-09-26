@@ -1,0 +1,126 @@
+name: Release
+
+# Builds the desktop installers on each OS and publishes them to the GitHub Release
+# for the tag. Push a tag like v0.1.0 to release, or run the workflow by hand with a tag
+# to rebuild an existing release.
+#
+# Asset names are stable so the website's download page can link to them:
+#   AIProtocolStudio-<version>-windows-x64-setup.exe
+#   AIProtocolStudio-<version>-windows-x64-portable.exe
+#   AIProtocolStudio-<version>-macos-arm64.dmg
+#   AIProtocolStudio-<version>-macos-x64.dmg
+#   AIProtocolStudio-<version>-linux-x86_64.AppImage
+#   AIProtocolStudio-<version>-linux-amd64.deb
+#   AIProtocolStudio-<version>-linux-x86_64.rpm
+#   SHA256SUMS.txt
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and upload to, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: --win
+          - name: macOS
+            os: macos-latest
+            target: --mac
+          # 22.04 keeps the glibc requirement low so the app runs on older distributions too.
+          - name: Linux
+            os: ubuntu-22.04
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Check the tag matches the version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          test "v$version" = "$TAG" || { echo "Tag $TAG does not match package.json version $version"; exit 1; }
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @aps/core
+      - run: npm run build -w @aps/desktop
+      - name: Package
+        working-directory: apps/desktop
+        shell: bash
+        env:
+          # no signing certificates yet: skip keychain/cert discovery (macOS builds are ad-hoc signed)
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --config electron-builder.yml ${{ matrix.target }} --publish never
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p out
+          cp apps/desktop/release/AIProtocolStudio-* out/
+          rm -f out/*.blockmap
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ runner.os }}
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          pattern: installers-*
+          merge-multiple: true
+      - name: Checksums
+        working-directory: out
+        run: sha256sum AIProtocolStudio-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          version="${TAG#v}"
+          awk -v v="$version" '$0 ~ "^## "v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "### Downloads"
+            echo
+            echo "See the [download page](https://nasimuddin-dev.github.io/protolens/download) for which file to choose and the [installation guides](https://nasimuddin-dev.github.io/protolens/installation/windows)."
+            echo
+            echo "The installers aren't code-signed yet: Windows SmartScreen and macOS Gatekeeper ask you to confirm the first launch."
+          } >> notes.md
+          cat notes.md
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber
+          else
+            gh release create "$TAG" out/* --title "AI Protocol Studio ${TAG#v}" --notes-file notes.md
+          fi

@@ -1,0 +1,579 @@
+import { FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { asError, call, on, type NormalizedError } from '../api';
+import { useApp, persisted } from '../store';
+import { useIntent, useSendShortcut } from '../hooks';
+import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, SavedHttpRequest } from '../types';
+import { uid } from '../lib/format';
+import { AssertionEditor } from '../components/AssertionEditor';
+import { AuthEditor } from '../components/AuthEditor';
+import { CodeEditor } from '../components/CodeEditor';
+import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
+import { COMMON_HEADERS, KeyValueEditor } from '../components/KeyValueEditor';
+import { ResponseViewer } from '../components/ResponseViewer';
+import { ErrorPanel } from '../components/Results';
+import { VarInput } from '../components/VarInput';
+import { Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, Toggle } from '../components/ui';
+
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+interface RestTab {
+  id: string;
+  name: string;
+  request: HttpRequestSpec;
+  preRequestScript?: string;
+  testScript?: string;
+  assertions: CheckConfig[];
+  collectionId?: string;
+  requestId?: string;
+  dirty?: boolean;
+}
+
+interface SendResult {
+  response?: HttpResponseData;
+  error?: NormalizedError;
+  checks?: CheckResult[];
+  traceId?: string;
+  scriptLogs?: string[];
+  unresolved?: string[];
+  curl?: string;
+  stream?: string;
+}
+
+const blankRequest = (): RestTab => ({
+  id: uid('tab-'),
+  name: 'Untitled request',
+  request: { method: 'GET', url: '{{baseUrl}}/', params: [], headers: [], auth: { type: 'inherit' }, body: { type: 'none' } },
+  assertions: [{ type: 'status', expected: 200 }],
+});
+
+const drafts = persisted<{ tabs: RestTab[]; active?: string }>('rest', { tabs: [] });
+
+export function RestView() {
+  const [tabs, setTabs] = useState<RestTab[]>(() => {
+    const d = drafts.load();
+    return d.tabs.length ? d.tabs : [blankRequest()];
+  });
+  const [active, setActive] = useState<string>(() => drafts.load().active ?? tabs[0]!.id);
+  const [results, setResults] = useState<Record<string, SendResult>>({});
+  const [sending, setSending] = useState<Record<string, string>>({});
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [filter, setFilter] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const env = useApp((s) => s.environment);
+  const tab = tabs.find((t) => t.id === active) ?? tabs[0]!;
+  const streams = useRef<Record<string, string>>({});
+
+  useEffect(() => drafts.save({ tabs, active }), [tabs, active]);
+  const loadCollections = useCallback(() => call<Collection[]>('col.list').then(setCollections), []);
+  useEffect(() => {
+    void loadCollections();
+  }, [loadCollections]);
+  useEffect(
+    () =>
+      on<Array<{ id: string; chunk: string }>>('http.chunks', (items) => {
+        for (const it of items) streams.current[it.id] = (streams.current[it.id] ?? '') + it.chunk;
+      }),
+    [],
+  );
+
+  const update = (patch: Partial<RestTab>) => setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, ...patch, dirty: true } : t)));
+  const setReq = (patch: Partial<HttpRequestSpec>) => update({ request: { ...tab.request, ...patch } });
+
+  const openRequest = (c: Collection, n: CollectionNode) => {
+    if (n.kind === 'graphql') return useApp.getState().openIntent('graphql', { collectionId: c.id, requestId: n.id });
+    if (n.kind !== 'http') return;
+    const existing = tabs.find((t) => t.requestId === n.id);
+    if (existing) return setActive(existing.id);
+    const t: RestTab = { id: uid('tab-'), name: n.name, request: structuredClone(n.request), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id };
+    setTabs((ts) => [...ts, t]);
+    setActive(t.id);
+  };
+
+  useIntent('rest', async (p) => {
+    if (p?.newTab) {
+      const t = blankRequest();
+      setTabs((ts) => [...ts, t]);
+      setActive(t.id);
+    } else if (p?.collectionId) {
+      const cols = await call<Collection[]>('col.list');
+      setCollections(cols);
+      const c = cols.find((x) => x.id === p.collectionId);
+      const n = c && findNode(c.items, p.requestId);
+      if (c && n) openRequest(c, n);
+    } else if (p?.request) {
+      const t: RestTab = { ...blankRequest(), name: p.name ?? 'From history', request: p.request };
+      setTabs((ts) => [...ts, t]);
+      setActive(t.id);
+    }
+  });
+
+  const send = async () => {
+    const id = uid('send-');
+    const tabId = tab.id;
+    setSending((s) => ({ ...s, [tabId]: id }));
+    streams.current[id] = '';
+    useApp.getState().setActivity(id, `Sending ${tab.request.method} ${tab.name}`);
+    try {
+      const r = await call<SendResult & { id: string }>('http.send', {
+        id,
+        name: tab.name,
+        request: tab.request,
+        environment: env,
+        collectionId: tab.collectionId,
+        requestId: tab.requestId,
+        preRequestScript: tab.preRequestScript,
+        testScript: tab.testScript,
+        assertions: tab.assertions,
+        stream: tab.request.headers?.some((h) => /accept/i.test(h.key) && /event-stream/.test(h.value)),
+      });
+      const curl = await call<string>('http.curl', { request: tab.request, environment: env }).catch(() => undefined);
+      setResults((rs) => ({ ...rs, [tabId]: { ...r, curl, stream: streams.current[id] || undefined } }));
+      if (r.unresolved?.length) useApp.getState().toast(`Unresolved variables: ${r.unresolved.join(', ')}`, 'error');
+    } catch (e) {
+      setResults((rs) => ({ ...rs, [tabId]: { error: asError(e) } }));
+    } finally {
+      delete streams.current[id];
+      useApp.getState().setActivity(id);
+      setSending((s) => {
+        const n = { ...s };
+        delete n[tabId];
+        return n;
+      });
+    }
+  };
+  const cancel = () => sending[tab.id] && call('http.cancel', { id: sending[tab.id] });
+  useSendShortcut('rest', () => (sending[tab.id] ? undefined : void send()));
+
+  const saveCollection = async (c: Collection) => {
+    await call('col.save', c);
+    await loadCollections();
+  };
+
+  const saveTab = async (collectionId: string, name: string, folderId?: string) => {
+    const cols = await call<Collection[]>('col.list');
+    const c = cols.find((x) => x.id === collectionId);
+    if (!c) return;
+    const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: tab.request, preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions };
+    const exists = tab.requestId && findNode(c.items, tab.requestId);
+    const items = exists ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, folderId, node);
+    await saveCollection({ ...c, items });
+    setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, name, collectionId, requestId: node.id, dirty: false } : t)));
+    useApp.getState().toast('Saved', 'success');
+  };
+
+  const quickSave = () => (tab.collectionId && tab.requestId ? saveTab(tab.collectionId, tab.name) : setSaving(true));
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'rest') {
+        e.preventDefault();
+        void quickSave();
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  });
+
+  const closeTab = (id: string) => {
+    const t = tabs.find((x) => x.id === id);
+    if (t?.dirty && !confirm(`Discard unsaved changes to "${t.name}"?`)) return;
+    const rest = tabs.filter((x) => x.id !== id);
+    const next = rest.length ? rest : [blankRequest()];
+    setTabs(next);
+    if (active === id) setActive(next[Math.max(0, tabs.findIndex((x) => x.id === id) - 1)]?.id ?? next[0]!.id);
+  };
+
+  const result = results[tab.id];
+  const suggest = result?.response
+    ? () =>
+        useApp.getState().set({
+          assistant: { task: 'generate-assertions', title: 'Suggested assertions', context: { request: { method: tab.request.method, url: tab.request.url }, status: result.response!.status, headers: result.response!.headers.slice(0, 20), body: result.response!.bodyPreview.slice(0, 6000) } },
+        })
+    : undefined;
+
+  return (
+    <>
+    <Split id="rest-sidebar" initial={20} min={12}>
+      <div className="h-full flex flex-col bg-panel/50 border-r border-line">
+        <SectionTitle
+          right={
+            <div className="flex">
+              <IconButton label="Import OpenAPI / Postman / HAR" onClick={() => setImporting(true)}>
+                <Upload size={14} />
+              </IconButton>
+              <IconButton
+                label="New collection"
+                onClick={async () => {
+                  const name = prompt('Collection name');
+                  if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
+                }}
+              >
+                <FolderPlus size={14} />
+              </IconButton>
+            </div>
+          }
+        >
+          Collections
+        </SectionTitle>
+        <div className="px-2 pb-2">
+          <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter requests" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        </div>
+        <div className="flex-1 overflow-auto">
+          {collections.length ? (
+            <CollectionTree
+              collections={collections}
+              filter={filter}
+              activeRequestId={tab.requestId}
+              onOpen={openRequest}
+              onChange={saveCollection}
+              onNewRequest={async (c, folderId) => {
+                const t = blankRequest();
+                const node: SavedHttpRequest = { kind: 'http', id: uid('req-'), name: 'New request', request: t.request, assertions: t.assertions };
+                await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
+                openRequest(c, node);
+              }}
+            />
+          ) : (
+            <Empty title="No collections yet">Create a collection or import an OpenAPI, Postman or HAR file.</Empty>
+          )}
+        </div>
+      </div>
+      <div className="h-full flex flex-col min-w-0">
+        <div className="flex items-end h-9 border-b border-line bg-panel/40 overflow-x-auto shrink-0" role="tablist">
+          {tabs.map((t) => (
+            <div
+              key={t.id}
+              role="tab"
+              aria-selected={t.id === tab.id}
+              onClick={() => setActive(t.id)}
+              onAuxClick={(e) => e.button === 1 && closeTab(t.id)}
+              className={cx('group flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer max-w-56 shrink-0', t.id === tab.id ? 'bg-bg' : 'text-muted hover:bg-hover')}
+            >
+              <span className={cx('mono text-[0.68rem] font-bold', `method-${t.request.method}`)}>{t.request.method}</span>
+              <span className="truncate">{t.name}</span>
+              {t.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
+              <button aria-label="Close tab" className="opacity-0 group-hover:opacity-100 hover:text-fg" onClick={(e) => (e.stopPropagation(), closeTab(t.id))}>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <IconButton
+            label="New request tab"
+            className="mx-1 mb-1"
+            onClick={() => {
+              const t = blankRequest();
+              setTabs((ts) => [...ts, t]);
+              setActive(t.id);
+            }}
+          >
+            <Plus size={14} />
+          </IconButton>
+        </div>
+        <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
+          <Select aria-label="Method" className={cx('mono font-bold w-28', `method-${tab.request.method}`)} value={METHODS.includes(tab.request.method) ? tab.request.method : 'CUSTOM'} onChange={(e) => setReq({ method: e.target.value === 'CUSTOM' ? prompt('Custom HTTP method', 'PROPFIND')?.toUpperCase() || 'GET' : e.target.value })}>
+            {METHODS.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+            {!METHODS.includes(tab.request.method) && <option value="CUSTOM">{tab.request.method}</option>}
+            <option value="CUSTOM">Custom…</option>
+          </Select>
+          <VarInput ariaLabel="Request URL" className="flex-1 h-8" value={tab.request.url} onChange={(url) => setReq({ url })} placeholder="https://api.example.com/v1/resource  or  {{baseUrl}}/path" onEnter={send} collectionId={tab.collectionId} />
+          {sending[tab.id] ? (
+            <Button variant="danger" icon={<Square size={12} />} onClick={cancel}>
+              Cancel
+            </Button>
+          ) : (
+            <Button variant="primary" icon={<Send size={13} />} onClick={send} title="Send (Ctrl+Enter)">
+              Send
+            </Button>
+          )}
+          <Button icon={<Save size={13} />} onClick={quickSave} title="Save (Ctrl+S)">
+            Save
+          </Button>
+        </div>
+        <Split id="rest-req-res" direction="vertical" initial={45}>
+          <RequestEditor tab={tab} update={update} setReq={setReq} />
+          <div className="h-full min-h-0 flex flex-col">
+            {sending[tab.id] ? (
+              <div className="h-full grid place-items-center text-muted text-sm">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="relative w-40 h-1 bg-panel2 overflow-hidden rounded indeterminate" />
+                  Sending request… <span className="text-xs">Ctrl+Enter again is disabled while sending</span>
+                </div>
+              </div>
+            ) : result?.error ? (
+              <div className="overflow-auto">
+                <ErrorPanel error={result.error} context={{ request: { method: tab.request.method, url: tab.request.url } }} />
+              </div>
+            ) : result?.response ? (
+              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} onSuggestAssertions={suggest} />
+            ) : (
+              <Empty icon={<Send size={28} />} title="Send a request to see the response">
+                Press <b>Ctrl+Enter</b> to send. Variables like <span className="var-token mono">{'{{baseUrl}}'}</span> resolve from the active environment.
+              </Empty>
+            )}
+          </div>
+        </Split>
+      </div>
+    </Split>
+      {saving && <SaveModal collections={collections} defaultName={tab.name} onClose={() => setSaving(false)} onSave={(cid, name, folder) => (setSaving(false), void saveTab(cid, name, folder))} onCreate={saveCollection} />}
+      {importing && <ImportModal onClose={() => setImporting(false)} onDone={loadCollections} />}
+    </>
+  );
+}
+
+function RequestEditor({ tab, update, setReq }: { tab: RestTab; update(p: Partial<RestTab>): void; setReq(p: Partial<HttpRequestSpec>): void }) {
+  const [sub, setSub] = useState<'params' | 'auth' | 'headers' | 'body' | 'cookies' | 'scripts' | 'tests' | 'settings'>('params');
+  const r = tab.request;
+  const count = (a?: Array<{ enabled?: boolean }>) => a?.filter((x) => x.enabled !== false).length || undefined;
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <Tabs
+        value={sub}
+        onChange={setSub}
+        tabs={[
+          { id: 'params', label: 'Params', badge: count(r.params) },
+          { id: 'auth', label: 'Authorization' },
+          { id: 'headers', label: 'Headers', badge: count(r.headers) },
+          { id: 'body', label: 'Body', badge: r.body && r.body.type !== 'none' ? r.body.type : undefined },
+          { id: 'cookies', label: 'Cookies', badge: count(r.cookies) },
+          { id: 'scripts', label: 'Scripts', badge: (tab.preRequestScript ? 1 : 0) + (tab.testScript ? 1 : 0) || undefined },
+          { id: 'tests', label: 'Tests', badge: tab.assertions.length || undefined },
+          { id: 'settings', label: 'Settings' },
+        ]}
+        right={
+          <input
+            aria-label="Request name"
+            className="bg-transparent text-sm text-muted text-right outline-none focus:text-fg w-48"
+            value={tab.name}
+            onChange={(e) => update({ name: e.target.value })}
+          />
+        }
+      />
+      <div className="flex-1 min-h-0 overflow-auto">
+        {sub === 'params' && (
+          <div className="p-2">
+            <KeyValueEditor rows={r.params ?? []} onChange={(params) => setReq({ params })} keyPlaceholder="Query parameter" />
+            <p className="text-xs text-muted px-2 pt-2">Parameters are appended to the URL (URL-encoded). Values may use {'{{variables}}'}.</p>
+          </div>
+        )}
+        {sub === 'auth' && <AuthEditor auth={r.auth} onChange={(auth) => setReq({ auth })} />}
+        {sub === 'headers' && (
+          <div className="p-2">
+            <KeyValueEditor rows={r.headers ?? []} onChange={(headers) => setReq({ headers })} keyPlaceholder="Header" suggestions={COMMON_HEADERS} />
+          </div>
+        )}
+        {sub === 'body' && <BodyEditor body={r.body ?? { type: 'none' }} onChange={(body) => setReq({ body })} />}
+        {sub === 'cookies' && (
+          <div className="p-2">
+            <KeyValueEditor rows={r.cookies ?? []} onChange={(cookies) => setReq({ cookies })} keyPlaceholder="Cookie" />
+          </div>
+        )}
+        {sub === 'scripts' && (
+          <Split id="rest-scripts" initial={50}>
+            <div className="h-full flex flex-col">
+              <div className="text-xs text-muted px-3 py-1.5 border-b border-line">Pre-request script — runs in a sandbox (no filesystem/network). Use aps.variables.set(), aps.request, aps.crypto</div>
+              <div className="flex-1 min-h-0">
+                <CodeEditor language="javascript" value={tab.preRequestScript ?? ''} onChange={(v) => update({ preRequestScript: v })} placeholder="aps.variables.set('nonce', aps.uuid());" />
+              </div>
+            </div>
+            <div className="h-full flex flex-col">
+              <div className="text-xs text-muted px-3 py-1.5 border-b border-line">Test script — aps.test(name, fn), aps.expect(), aps.response.json()</div>
+              <div className="flex-1 min-h-0">
+                <CodeEditor
+                  language="javascript"
+                  value={tab.testScript ?? ''}
+                  onChange={(v) => update({ testScript: v })}
+                  placeholder="aps.test('status is 200', () => aps.expect(aps.response.status).toBe(200));"
+                />
+              </div>
+            </div>
+          </Split>
+        )}
+        {sub === 'tests' && <AssertionEditor checks={tab.assertions} onChange={(assertions) => update({ assertions })} groups={['Response', 'Body']} />}
+        {sub === 'settings' && (
+          <div className="p-4 grid grid-cols-2 gap-4 max-w-2xl text-sm">
+            <Field label="Timeout (ms)">
+              <Input type="number" value={r.settings?.timeoutMs ?? ''} placeholder="default from Settings" onChange={(e) => setReq({ settings: { ...r.settings, timeoutMs: e.target.value ? Number(e.target.value) : undefined } })} />
+            </Field>
+            <Field label="Proxy URL">
+              <Input value={r.settings?.proxy ?? ''} placeholder="http://proxy:8080" onChange={(e) => setReq({ settings: { ...r.settings, proxy: e.target.value || undefined } })} />
+            </Field>
+            <Toggle checked={r.settings?.followRedirects !== false} onChange={(v) => setReq({ settings: { ...r.settings, followRedirects: v } })} label="Follow redirects" />
+            <Toggle checked={!!r.settings?.insecure} onChange={(v) => setReq({ settings: { ...r.settings, insecure: v } })} label="Disable TLS verification (development only)" />
+            <div className="col-span-2 font-medium pt-2">Client certificate (mTLS)</div>
+            <Field label="Certificate path (PEM)">
+              <Input className="mono" value={r.settings?.clientCert?.certPath ?? ''} onChange={(e) => setReq({ settings: { ...r.settings, clientCert: e.target.value ? { certPath: e.target.value, keyPath: r.settings?.clientCert?.keyPath ?? '' } : undefined } })} />
+            </Field>
+            <Field label="Key path (PEM)">
+              <Input className="mono" value={r.settings?.clientCert?.keyPath ?? ''} onChange={(e) => setReq({ settings: { ...r.settings, clientCert: { certPath: r.settings?.clientCert?.certPath ?? '', keyPath: e.target.value } } })} />
+            </Field>
+            <Field label="CA path (optional)">
+              <Input className="mono" value={r.settings?.clientCert?.caPath ?? ''} onChange={(e) => setReq({ settings: { ...r.settings, clientCert: { certPath: r.settings?.clientCert?.certPath ?? '', keyPath: r.settings?.clientCert?.keyPath ?? '', caPath: e.target.value } } })} />
+            </Field>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function BodyEditor({ body, onChange }: { body: BodyConfig; onChange(b: BodyConfig): void }) {
+  const types: Array<[BodyConfig['type'], string]> = [
+    ['none', 'None'],
+    ['json', 'JSON'],
+    ['xml', 'XML'],
+    ['text', 'Text'],
+    ['html', 'HTML'],
+    ['form-urlencoded', 'Form URL-encoded'],
+    ['multipart', 'Multipart form'],
+    ['binary', 'Binary file'],
+  ];
+  const setType = (t: BodyConfig['type']) => {
+    if (t === 'none') return onChange({ type: 'none' });
+    if (t === 'form-urlencoded' || t === 'multipart') return onChange({ type: t, fields: 'fields' in body ? body.fields : [] });
+    if (t === 'binary') return onChange({ type: 'binary', filePath: '' });
+    onChange({ type: t, content: 'content' in body ? body.content : t === 'json' ? '{\n  \n}' : '' });
+  };
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex gap-3 px-3 py-1.5 text-sm flex-wrap border-b border-line">
+        {types.map(([t, label]) => (
+          <label key={t} className="flex items-center gap-1 cursor-pointer">
+            <input type="radio" name="body-type" checked={body.type === t} onChange={() => setType(t)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      <div className="flex-1 min-h-0">
+        {body.type === 'none' && <div className="p-4 text-sm text-muted">This request has no body.</div>}
+        {'content' in body && <CodeEditor language={body.type === 'json' ? 'json' : body.type === 'xml' ? 'xml' : body.type === 'html' ? 'html' : 'plaintext'} value={body.content} onChange={(content) => onChange({ ...body, content })} />}
+        {(body.type === 'form-urlencoded' || body.type === 'multipart') && (
+          <div className="p-2 overflow-auto h-full">
+            <KeyValueEditor rows={body.fields} onChange={(fields) => onChange({ ...body, fields })} keyPlaceholder="Field" allowFile={body.type === 'multipart'} />
+          </div>
+        )}
+        {body.type === 'binary' && (
+          <div className="p-4 flex flex-col gap-3 max-w-xl">
+            <Field label="File path" hint="The file is streamed from disk when the request is sent.">
+              <Input className="mono" value={body.filePath} onChange={(e) => onChange({ ...body, filePath: e.target.value })} />
+            </Field>
+            <Field label="Content-Type">
+              <Input value={body.contentType ?? ''} placeholder="application/octet-stream" onChange={(e) => onChange({ ...body, contentType: e.target.value || undefined })} />
+            </Field>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { collections: Collection[]; defaultName: string; onClose(): void; onSave(collectionId: string, name: string, folderId?: string): void; onCreate(c: Collection): Promise<void> }) {
+  const [name, setName] = useState(defaultName);
+  const [cid, setCid] = useState(collections[0]?.id ?? '');
+  const [folder, setFolder] = useState('');
+  const c = collections.find((x) => x.id === cid);
+  const folders = useMemo(() => {
+    const out: Array<{ id: string; name: string }> = [];
+    const walk = (nodes: CollectionNode[], prefix: string) => {
+      for (const n of nodes) if (n.kind === 'folder') (out.push({ id: n.id, name: prefix + n.name }), walk(n.items, `${prefix}${n.name} / `));
+    };
+    if (c) walk(c.items, '');
+    return out;
+  }, [c]);
+  return (
+    <Modal
+      title="Save request"
+      onClose={onClose}
+      width={460}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!cid || !name.trim()} onClick={() => onSave(cid, name.trim(), folder || undefined)}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <Field label="Name">
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Collection">
+          <div className="flex gap-2">
+            <Select className="flex-1" value={cid} onChange={(e) => setCid(e.target.value)}>
+              {collections.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </Select>
+            <Button
+              onClick={async () => {
+                const n = prompt('New collection name');
+                if (!n) return;
+                const id = uid('col-');
+                await onCreate({ schemaVersion: '1.0', id, name: n, version: 0, variables: [], items: [], updatedAt: '' });
+                setCid(id);
+              }}
+            >
+              New
+            </Button>
+          </div>
+        </Field>
+        {folders.length > 0 && (
+          <Field label="Folder">
+            <Select value={folder} onChange={(e) => setFolder(e.target.value)}>
+              <option value="">(collection root)</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): void }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string } | null>) => {
+    setBusy(true);
+    try {
+      const r = await fn();
+      if (r) {
+        useApp.getState().toast(`Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (environment ${r.environment})` : ''}`, 'success');
+        onDone();
+        await useApp.getState().refreshWorkspace();
+        onClose();
+      }
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title="Import"
+      onClose={onClose}
+      width={640}
+      footer={
+        <>
+          <Button onClick={() => run(() => call('col.importFile'))}>Choose file…</Button>
+          <Button variant="primary" loading={busy} disabled={!text.trim()} onClick={() => run(() => call('col.import', { text }))}>
+            Import pasted content
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, or AI Protocol Studio collections.</p>
+      <textarea className="field mono w-full h-64 text-xs" placeholder="Paste a document here…" value={text} onChange={(e) => setText(e.target.value)} />
+    </Modal>
+  );
+}

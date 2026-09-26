@@ -1,0 +1,141 @@
+import * as monaco from 'monaco-editor';
+import { loader } from '@monaco-editor/react';
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
+import JsonWorker from 'monaco-editor/language/json/json.worker?worker';
+import { buildSchema, type GraphQLSchema } from 'graphql';
+import { getAutocompleteSuggestions, getDiagnostics, Position } from 'graphql-language-service';
+
+/** Bundle Monaco locally (no CDN) so the editor works offline and under a strict CSP. */
+self.MonacoEnvironment = {
+  getWorker(_id: string, label: string) {
+    if (label === 'json') return new JsonWorker();
+    return new EditorWorker();
+  },
+};
+loader.config({ monaco });
+
+monaco.editor.defineTheme('aps-dark', { base: 'vs-dark', inherit: true, rules: [], colors: { 'editor.background': '#0d1117', 'editorGutter.background': '#0d1117' } });
+monaco.editor.defineTheme('aps-light', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff' } });
+
+/* ------------------------------------------------------------------ GraphQL language */
+
+monaco.languages.register({ id: 'graphql', extensions: ['.graphql', '.gql'] });
+monaco.languages.setLanguageConfiguration('graphql', {
+  comments: { lineComment: '#' },
+  brackets: [
+    ['{', '}'],
+    ['[', ']'],
+    ['(', ')'],
+  ],
+  autoClosingPairs: [
+    { open: '{', close: '}' },
+    { open: '[', close: ']' },
+    { open: '(', close: ')' },
+    { open: '"', close: '"' },
+  ],
+});
+monaco.languages.setMonarchTokensProvider('graphql', {
+  keywords: ['query', 'mutation', 'subscription', 'fragment', 'on', 'type', 'interface', 'union', 'enum', 'input', 'scalar', 'schema', 'extend', 'directive', 'implements', 'true', 'false', 'null'],
+  tokenizer: {
+    root: [
+      [/#.*$/, 'comment'],
+      [/"""/, 'string', '@block'],
+      [/"([^"\\]|\\.)*"/, 'string'],
+      [/\$[A-Za-z_]\w*/, 'variable'],
+      [/@[A-Za-z_]\w*/, 'annotation'],
+      [/[A-Za-z_]\w*/, { cases: { '@keywords': 'keyword', '[A-Z]\\w*': 'type', '@default': 'identifier' } }],
+      [/-?\d+(\.\d+)?([eE][+-]?\d+)?/, 'number'],
+      [/[{}()[\]]/, '@brackets'],
+      [/[!:=|&.]+/, 'delimiter'],
+    ],
+    block: [
+      [/"""/, 'string', '@pop'],
+      [/./, 'string'],
+    ],
+  },
+});
+
+let currentSchema: GraphQLSchema | undefined;
+
+export function setGraphQLSchema(sdl: string | undefined): void {
+  try {
+    currentSchema = sdl ? buildSchema(sdl) : undefined;
+  } catch {
+    currentSchema = undefined;
+  }
+  for (const m of monaco.editor.getModels()) if (m.getLanguageId() === 'graphql') validateGraphQLModel(m);
+}
+
+const kindMap: Record<number, monaco.languages.CompletionItemKind> = {
+  1: monaco.languages.CompletionItemKind.Text,
+  2: monaco.languages.CompletionItemKind.Method,
+  3: monaco.languages.CompletionItemKind.Function,
+  5: monaco.languages.CompletionItemKind.Field,
+  6: monaco.languages.CompletionItemKind.Variable,
+  7: monaco.languages.CompletionItemKind.Class,
+  10: monaco.languages.CompletionItemKind.Property,
+  13: monaco.languages.CompletionItemKind.Enum,
+  14: monaco.languages.CompletionItemKind.Keyword,
+  20: monaco.languages.CompletionItemKind.EnumMember,
+  22: monaco.languages.CompletionItemKind.Struct,
+};
+
+monaco.languages.registerCompletionItemProvider('graphql', {
+  triggerCharacters: ['{', '(', ':', '@', '$', ' ', '\n'],
+  provideCompletionItems(model, position) {
+    const word = model.getWordUntilPosition(position);
+    const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn };
+    if (!currentSchema) return { suggestions: [] };
+    const items = getAutocompleteSuggestions(currentSchema, model.getValue(), new Position(position.lineNumber - 1, position.column - 1));
+    return {
+      suggestions: items.map((i) => ({
+        label: i.label,
+        kind: kindMap[i.kind ?? 5] ?? monaco.languages.CompletionItemKind.Field,
+        detail: i.detail ?? (i.type ? String(i.type) : undefined),
+        documentation: i.documentation ?? undefined,
+        insertText: i.label,
+        range,
+      })),
+    };
+  },
+});
+
+monaco.languages.registerHoverProvider('graphql', {
+  provideHover(model, position) {
+    if (!currentSchema) return null;
+    const word = model.getWordAtPosition(position);
+    if (!word) return null;
+    const t = currentSchema.getType(word.word);
+    if (t) return { contents: [{ value: `**${t.name}**${t.description ? `\n\n${t.description}` : ''}` }] };
+    return null;
+  },
+});
+
+export function validateGraphQLModel(model: monaco.editor.ITextModel): void {
+  const text = model.getValue();
+  const diags = text.trim() ? getDiagnostics(text, currentSchema) : [];
+  monaco.editor.setModelMarkers(
+    model,
+    'graphql',
+    diags.map((d) => ({
+      severity: d.severity === 1 ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+      message: typeof d.message === 'string' ? d.message : d.message.value,
+      startLineNumber: d.range.start.line + 1,
+      startColumn: d.range.start.character + 1,
+      endLineNumber: d.range.end.line + 1,
+      endColumn: d.range.end.character + 1,
+    })),
+  );
+}
+
+monaco.editor.onDidCreateModel((m) => {
+  if (m.getLanguageId() !== 'graphql') return;
+  let t: ReturnType<typeof setTimeout> | undefined;
+  m.onDidChangeContent(() => {
+    clearTimeout(t);
+    t = setTimeout(() => validateGraphQLModel(m), 250);
+  });
+  validateGraphQLModel(m);
+});
+
+export { monaco };

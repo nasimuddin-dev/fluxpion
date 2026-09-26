@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "id": "ws-veterinary-example",
+  "name": "Veterinary API (example)",
+  "description": "Example workspace covering REST, GraphQL, MCP, LLM, RAG, agent and safety tests against the local demo servers (examples/servers).",
+  "variables": [
+    { "key": "clinicName", "value": "Happy Paws Clinic", "enabled": true }
+  ],
+  "createdAt": "2026-09-26T00:00:00.000Z",
+  "updatedAt": "2026-09-26T00:00:00.000Z"
+}

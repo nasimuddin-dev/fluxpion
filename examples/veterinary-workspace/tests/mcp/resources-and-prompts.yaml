@@ -1,0 +1,21 @@
+defaults:
+  type: mcp
+  server: customer-mcp
+tests:
+  - name: Unknown customer returns a tool error
+    tool: search_customer
+    arguments: { customer_id: "999" }
+    assertions:
+      - { type: status, expected: error }
+  - name: Read clinic resource
+    resource: clinic://info
+    assertions:
+      - { type: equals, path: $.name, expected: Happy Paws Clinic }
+  - name: Read customer resource template
+    resource: customer://456
+    assertions:
+      - { type: equals, path: $.name, expected: Alan Turing }
+  - name: Get summarize prompt
+    prompt: { name: summarize_customer, arguments: { customer_id: "123" } }
+    assertions:
+      - { type: contains, path: "$.messages[0].content.text", expected: Ada Lovelace }

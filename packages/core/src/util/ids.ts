@@ -1,0 +1,31 @@
+import { randomBytes, randomUUID } from 'node:crypto';
+
+export function uuid(): string {
+  return randomUUID();
+}
+
+/** Short, URL-safe, sortable-ish id: time prefix + random suffix. */
+export function shortId(prefix = ''): string {
+  const t = Date.now().toString(36);
+  const r = randomBytes(5).toString('hex');
+  return `${prefix}${t}${r}`;
+}
+
+/** 16-hex-char span id / 32-hex-char trace id (OpenTelemetry-compatible sizes). */
+export function spanId(): string {
+  return randomBytes(8).toString('hex');
+}
+
+export function traceId(): string {
+  return randomBytes(16).toString('hex');
+}
+
+export function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64) || 'item'
+  );
+}

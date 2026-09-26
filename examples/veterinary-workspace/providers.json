@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "providers": [
+    {
+      "id": "mock-llm",
+      "name": "Mock LLM (local)",
+      "kind": "openai-compatible",
+      "baseUrl": "http://127.0.0.1:4012/v1",
+      "defaultModel": "mock-gpt",
+      "embeddingModel": "mock-embed",
+      "rateLimit": { "concurrency": 16 }
+    },
+    {
+      "id": "offline",
+      "name": "Offline mock",
+      "kind": "mock",
+      "baseUrl": "mock://local"
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "kind": "openai-compatible",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "{{$secret.provider.openai.apiKey}}",
+      "rateLimit": { "requestsPerMinute": 500, "concurrency": 8 }
+    }
+  ]
+}

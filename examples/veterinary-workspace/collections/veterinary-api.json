@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0",
+  "id": "veterinary-api",
+  "name": "Veterinary API",
+  "description": "Requests for the local demo REST server (examples/servers/demo-servers.mjs).",
+  "version": 1,
+  "variables": [],
+  "auth": { "type": "bearer", "token": "{{accessToken}}" },
+  "items": [
+    {
+      "kind": "folder",
+      "id": "fld-auth",
+      "name": "Authentication",
+      "items": [
+        {
+          "kind": "http",
+          "id": "req-token",
+          "name": "Get access token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/token",
+            "auth": { "type": "none" },
+            "body": {
+              "type": "form-urlencoded",
+              "fields": [
+                { "key": "client_id", "value": "{{clientId}}" },
+                { "key": "client_secret", "value": "{{clientSecret}}" },
+                { "key": "grant_type", "value": "client_credentials" }
+              ]
+            }
+          },
+          "testScript": "aps.variables.set('accessToken', aps.response.json().access_token);",
+          "assertions": [{ "type": "status", "expected": 200 }]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-patients",
+      "name": "Patients",
+      "items": [
+        {
+          "kind": "http",
+          "id": "req-list",
+          "name": "List patients",
+          "request": { "method": "GET", "url": "{{baseUrl}}/patients", "auth": { "type": "inherit" } },
+          "assertions": [
+            { "type": "status", "expected": 200 },
+            { "type": "exists", "path": "$.items[0].id" },
+            { "type": "latency", "max": 1000 }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "req-get",
+          "name": "Get patient",
+          "request": { "method": "GET", "url": "{{baseUrl}}/patients/1", "auth": { "type": "inherit" } },
+          "assertions": [{ "type": "status", "expected": 200 }]
+        },
+        {
+          "kind": "http",
+          "id": "req-create",
+          "name": "Create patient",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/patients",
+            "auth": { "type": "inherit" },
+            "body": { "type": "json", "content": "{\n  \"name\": \"Biscuit\",\n  \"species\": \"dog\",\n  \"ownerId\": \"123\"\n}" }
+          },
+          "assertions": [{ "type": "status", "expected": 201 }]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-diag",
+      "name": "Diagnostics",
+      "items": [
+        { "kind": "http", "id": "req-health", "name": "Health", "request": { "method": "GET", "url": "{{baseUrl}}/health", "auth": { "type": "none" } } },
+        { "kind": "http", "id": "req-events", "name": "Server-sent events", "request": { "method": "GET", "url": "{{baseUrl}}/events?count=5", "headers": [{ "key": "Accept", "value": "text/event-stream" }], "auth": { "type": "none" } } },
+        { "kind": "http", "id": "req-large", "name": "Large response (10 MB)", "request": { "method": "GET", "url": "{{baseUrl}}/large?mb=10", "auth": { "type": "none" } } }
+      ]
+    }
+  ],
+  "updatedAt": "2026-09-26T00:00:00.000Z"
+}

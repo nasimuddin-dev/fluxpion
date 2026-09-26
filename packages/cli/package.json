@@ -1,0 +1,22 @@
+{
+  "name": "@aps/cli",
+  "version": "0.1.0",
+  "description": "AI Protocol Studio command-line runner for local and CI/CD test execution.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "aipstudio": "./bin/aipstudio.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aps/core": "0.1.0",
+    "commander": "^15.0.0"
+  }
+}

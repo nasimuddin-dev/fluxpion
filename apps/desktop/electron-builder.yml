@@ -1,0 +1,81 @@
+# Installers for Windows, macOS and Linux (electron-builder).
+# Asset names are stable so the website and README can link to them:
+#   AIProtocolStudio-<version>-windows-x64-setup.exe     Windows installer (NSIS)
+#   AIProtocolStudio-<version>-windows-x64-portable.exe  Windows portable (no install)
+#   AIProtocolStudio-<version>-macos-arm64.dmg            Apple Silicon
+#   AIProtocolStudio-<version>-macos-x64.dmg              Intel
+#   AIProtocolStudio-<version>-linux-x86_64.AppImage
+#   AIProtocolStudio-<version>-linux-amd64.deb
+#   AIProtocolStudio-<version>-linux-x86_64.rpm
+appId: dev.nasimuddin.aiprotocolstudio
+productName: AI Protocol Studio
+copyright: Copyright © 2026 AI Protocol Studio contributors
+electronVersion: 44.4.5
+directories:
+  output: release
+  buildResources: build
+# The main process bundles the whole engine (esbuild), so no node_modules are shipped.
+files:
+  - dist/**
+  - dist-electron/**
+  - "!dist-electron/*.map"
+  - "!dist-electron/web-server.cjs"
+  - package.json
+asar: true
+npmRebuild: false
+extraMetadata:
+  main: dist-electron/main.cjs
+  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "AI Protocol Studio"
+  name: ai-protocol-studio
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: AI Protocol Studio
+  artifactName: AIProtocolStudio-${version}-windows-${arch}-setup.${ext}
+portable:
+  artifactName: AIProtocolStudio-${version}-windows-${arch}-portable.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.developer-tools
+  icon: build/icon.png
+  # Unsigned builds are ad-hoc signed so they run on Apple Silicon; notarization needs an Apple ID.
+  identity: "-"
+  hardenedRuntime: false
+  artifactName: AIProtocolStudio-${version}-macos-${arch}.${ext}
+dmg:
+  title: AI Protocol Studio ${version}
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+    - target: rpm
+      arch: [x64]
+  category: Development
+  executableName: ai-protocol-studio
+  icon: build/icon.png
+  maintainer: AI Protocol Studio contributors <noreply@github.com>
+  synopsis: Test and debug REST, GraphQL, MCP and AI systems
+  description: Local-first desktop app for testing, debugging and evaluating REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents.
+appImage:
+  artifactName: AIProtocolStudio-${version}-linux-x86_64.${ext}
+deb:
+  artifactName: AIProtocolStudio-${version}-linux-amd64.${ext}
+rpm:
+  artifactName: AIProtocolStudio-${version}-linux-x86_64.${ext}

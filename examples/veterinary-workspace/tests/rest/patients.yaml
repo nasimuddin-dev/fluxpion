@@ -1,0 +1,54 @@
+defaults:
+  type: http
+  dependsOn: auth-token
+tests:
+  - id: list-patients
+    name: List patients
+    method: GET
+    url: "{{baseUrl}}/patients"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    assertions:
+      - { type: status, expected: 200 }
+      - { type: greater-than, path: $.total, expected: 0 }
+      - { type: latency, max: 2000 }
+    testScript: |
+      const body = aps.response.json();
+      aps.test('every patient has a species', () => {
+        for (const p of body.items) aps.expect(p.species).toBeTruthy();
+      });
+      aps.variables.set('firstPatientId', body.items[0].id);
+
+  - id: create-patient
+    name: Create patient
+    method: POST
+    url: "{{baseUrl}}/patients"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    body: { name: "Biscuit", species: "dog", ownerId: "123" }
+    extract:
+      newPatientId: $.id
+    assertions:
+      - { type: status, expected: 201 }
+      - { type: header, header: location, expected: /patients/ }
+      - type: json-schema
+        schema:
+          type: object
+          required: [id, name, species]
+          properties: { id: { type: string }, name: { type: string }, species: { type: string } }
+
+  - id: create-patient-validation
+    name: Create patient rejects missing species
+    method: POST
+    url: "{{baseUrl}}/patients"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    body: { name: "NoSpecies" }
+    assertions:
+      - { type: status, expected: 422 }
+      - { type: equals, path: $.fields.species, expected: required }
+
+  - id: unauthorized
+    name: Patients require authentication
+    dependsOn: []
+    method: GET
+    url: "{{baseUrl}}/patients"
+    assertions:
+      - { type: status, expected: 401 }

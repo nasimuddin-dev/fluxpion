@@ -1,0 +1,463 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
+import { Command, CommanderError, Option } from 'commander';
+import {
+  ApsError,
+  ChainSecretStore,
+  EnvSecretStore,
+  Logger,
+  McpSession,
+  WorkspaceManager,
+  WorkspaceStore,
+  compareToBaseline,
+  consoleSink,
+  createBaseline,
+  createEngineContext,
+  formatBytes,
+  formatDuration,
+  importAny,
+  loadSuite,
+  normalizeError,
+  readResultsFile,
+  runLoadTest,
+  runTests,
+  shortId,
+  streamTests,
+  writeReports,
+  loadTestsFromFile,
+  isSuiteFile,
+  DEFAULT_THRESHOLDS,
+  type LoadSnapshot,
+  type ReportFormat,
+  type RunEvent,
+  type TestCase,
+  type TestResult,
+  type McpServerConfig,
+} from '@aps/core';
+
+/** Exit codes (spec §37). */
+export const EXIT = { SUCCESS: 0, TEST_FAILURE: 1, CONFIG_ERROR: 2, EXECUTION_ERROR: 3 } as const;
+
+const tty = process.stdout.isTTY && !process.env.NO_COLOR && !process.env.CI;
+const c = (code: number) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
+const green = c(32);
+const red = c(31);
+const yellow = c(33);
+const dim = c(2);
+const bold = c(1);
+const cyan = c(36);
+
+class CliError extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number,
+  ) {
+    super(message);
+  }
+}
+
+function collectVar(v: string, prev: Record<string, string> = {}): Record<string, string> {
+  const i = v.indexOf('=');
+  if (i <= 0) throw new CliError(`--var expects key=value, got "${v}"`, EXIT.CONFIG_ERROR);
+  return { ...prev, [v.slice(0, i)]: v.slice(i + 1) };
+}
+
+function findWorkspaceUp(start: string): string | undefined {
+  let dir = resolve(start);
+  for (;;) {
+    if (existsSync(join(dir, 'workspace.json'))) return dir;
+    const up = dirname(dir);
+    if (up === dir) return undefined;
+    dir = up;
+  }
+}
+
+function openWorkspace(ref: string | undefined, hintPath: string | undefined, mgr: WorkspaceManager): { store: WorkspaceStore; ephemeral?: string } {
+  if (ref) {
+    const p = mgr.resolve(ref) ?? (existsSync(join(resolve(ref), 'workspace.json')) ? resolve(ref) : undefined);
+    if (!p) throw new CliError(`Workspace "${ref}" not found. Known: ${mgr.list().map((w) => w.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+    return { store: WorkspaceStore.open(p) };
+  }
+  const found = findWorkspaceUp(hintPath ?? process.cwd());
+  if (found) return { store: WorkspaceStore.open(found) };
+  // no workspace: run in an ephemeral one (providers resolve from OPENAI_API_KEY / ANTHROPIC_API_KEY / mock)
+  const tmp = mkdtempSync(join(tmpdir(), 'aps-ephemeral-'));
+  return { store: WorkspaceStore.create(tmp, 'ephemeral'), ephemeral: tmp };
+}
+
+function printResult(r: TestResult, verbose: boolean): void {
+  const icon = r.status === 'passed' ? green('✓') : r.status === 'skipped' ? yellow('○') : red('✗');
+  const meta = [r.latencyMs !== undefined ? `${Math.round(r.latencyMs)}ms` : `${r.durationMs}ms`, r.tokens ? `${r.tokens.totalTokens} tok` : '', r.attempts > 1 ? `${r.attempts} attempts` : ''].filter(Boolean).join(', ');
+  console.log(`  ${icon} ${r.name} ${dim(`(${meta})`)}`);
+  if (r.status === 'skipped' && r.metadata?.reason) console.log(dim(`      skipped: ${r.metadata.reason}`));
+  if (r.error) {
+    console.log(red(`      ${r.error.kind}: ${r.error.message}`));
+    if (r.error.why && r.error.why !== r.error.message) console.log(dim(`      why: ${r.error.why}`));
+    for (const s of r.error.suggestions.slice(0, 3)) console.log(dim(`      → ${s}`));
+  }
+  for (const ch of r.checks) {
+    if (ch.passed && !verbose) continue;
+    const tag = ch.source === 'deterministic' ? '' : dim(` [${ch.source}]`);
+    console.log(`      ${ch.passed ? green('✓') : red('✗')} ${ch.name}${tag}: ${ch.message}${ch.score !== undefined ? dim(` score=${ch.score}`) : ''}`);
+    if (!ch.passed && ch.explanation) console.log(dim(`        ${ch.explanation.slice(0, 300)}`));
+  }
+}
+
+interface RunCliOptions {
+  workspace?: string;
+  environment?: string;
+  concurrency?: string;
+  retries?: string;
+  timeout?: string;
+  reporter: string[];
+  out?: string;
+  tags?: string;
+  grep?: string;
+  bail?: boolean;
+  resume?: string;
+  var?: Record<string, string>;
+  baseline?: string;
+  saveBaseline?: string;
+  trace: 'all' | 'failures' | 'none';
+  verbose?: boolean;
+  quiet?: boolean;
+  suite?: string;
+  failOnRegression?: boolean;
+  logLevel?: string;
+}
+
+async function executeRun(paths: string[], o: RunCliOptions, label?: string): Promise<number> {
+  const mgr = new WorkspaceManager();
+  const settings = mgr.loadSettings();
+  const firstPath = paths[0] ? resolve(paths[0]) : undefined;
+  const { store, ephemeral } = openWorkspace(o.workspace, firstPath && existsSync(firstPath) ? dirname(firstPath) : undefined, mgr);
+  const logger = new Logger((o.logLevel?.toUpperCase() as 'INFO') ?? 'WARN');
+  if (o.logLevel) logger.addSink(consoleSink());
+  const secrets = new ChainSecretStore([new EnvSecretStore()]);
+
+  let suite: Awaited<ReturnType<typeof loadSuite>> | undefined;
+  let patterns = paths;
+  let cwd = process.cwd();
+  if (o.suite) {
+    const candidates = [o.suite, join(store.path('tests'), o.suite), join(store.path('tests'), `${o.suite}.suite.yaml`), join(store.path('tests'), `${o.suite}.suite.yml`)];
+    const file = candidates.find((p) => existsSync(p) && isSuiteFile(p));
+    if (!file) throw new CliError(`Suite "${o.suite}" not found in ${store.path('tests')}`, EXIT.CONFIG_ERROR);
+    suite = await loadSuite(file);
+    patterns = suite.tests;
+    cwd = dirname(file);
+  } else if (paths.length === 1 && isSuiteFile(paths[0]!)) {
+    suite = await loadSuite(resolve(paths[0]!));
+    patterns = suite.tests;
+    cwd = dirname(resolve(paths[0]!));
+  } else if (!paths.length) {
+    patterns = [store.path('tests')];
+  }
+
+  const environment = o.environment ?? suite?.environment ?? (store.listEnvironments().length === 1 ? store.listEnvironments()[0]!.name : undefined);
+  if (o.environment && !store.getEnvironment(o.environment))
+    throw new CliError(`Environment "${o.environment}" not found. Available: ${store.listEnvironments().map((e) => e.name).join(', ')}`, EXIT.CONFIG_ERROR);
+
+  const ctx = createEngineContext({ store, secrets, settings, environment, logger, runtimeVars: o.var });
+  const runId = o.resume ?? shortId('run-');
+  const outDir = o.out ? resolve(o.out) : store.runDir(runId);
+  const resultsFile = join(outDir, 'results.jsonl');
+  if (o.resume && !existsSync(resultsFile)) throw new CliError(`Cannot resume: ${resultsFile} does not exist`, EXIT.CONFIG_ERROR);
+
+  const loadList = async (list?: string[]) => {
+    const out: TestCase[] = [];
+    for (const p of list ?? []) for await (const t of loadTestsFromFile(isAbsolute(p) ? p : resolve(cwd, p))) out.push(t);
+    return out;
+  };
+
+  const name = label ?? suite?.name ?? (paths.length ? paths.map((p) => relative(process.cwd(), resolve(p)) || '.').join(', ') : store.workspace.name);
+  if (!o.quiet) {
+    console.log(bold(`AI Protocol Studio — ${name}`));
+    console.log(dim(`workspace: ${ephemeral ? '(ephemeral)' : store.root}${environment ? ` · environment: ${environment}` : ''} · run: ${runId}`));
+  }
+
+  const concurrency = Number(o.concurrency ?? suite?.concurrency ?? 4);
+  const ctrl = new AbortController();
+  let interrupted = 0;
+  const onSigint = () => {
+    interrupted++;
+    if (interrupted > 1) process.exit(EXIT.EXECUTION_ERROR);
+    console.error(yellow('\nCancelling… (press Ctrl+C again to force quit). Resume later with --resume ' + runId));
+    ctrl.abort();
+  };
+  process.on('SIGINT', onSigint);
+
+  const onEvent = (e: RunEvent) => {
+    if (e.type === 'test-end' && !o.quiet) printResult(e.result, !!o.verbose);
+  };
+  let summary;
+  try {
+    summary = await runTests({
+      name,
+      runId,
+      tests: streamTests(patterns, cwd, { tags: o.tags?.split(',').map((t) => t.trim()).filter(Boolean), grep: o.grep }),
+      setup: await loadList(suite?.setup),
+      teardown: await loadList(suite?.teardown),
+      concurrency,
+      retries: Number(o.retries ?? suite?.retries ?? 0),
+      timeoutMs: o.timeout ? Number(o.timeout) : suite?.timeoutMs,
+      services: ctx.services,
+      signal: ctrl.signal,
+      resultsFile,
+      resume: !!o.resume,
+      traceMode: o.trace,
+      onTrace: (trace) => void store.saveTrace(trace, 'test', runId),
+      onEvent,
+      environment,
+      bail: o.bail,
+    });
+  } finally {
+    process.off('SIGINT', onSigint);
+    await ctx.dispose();
+  }
+
+  const results = () => readResults(resultsFile);
+  const formats = o.reporter.filter((r) => r !== 'console') as ReportFormat[];
+  const paths2 = formats.length ? await writeReports(outDir, summary, results, formats) : ({} as Record<string, string>);
+  writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
+  if (!ephemeral) store.meta.addRun(summary, outDir);
+
+  let regressionFailed = false;
+  if (o.baseline) {
+    const report = await compareToBaseline(store.getBaseline(o.baseline), summary, results(), DEFAULT_THRESHOLDS);
+    writeFileSync(join(outDir, 'regression.json'), JSON.stringify(report, null, 2));
+    const metricRegressions = report.summary.filter((m) => m.regressed);
+    console.log(bold(`\nRegression vs baseline "${o.baseline}": ${report.passed ? green('no regressions') : red(`${report.regressions.length + metricRegressions.length} regression(s)`)}`));
+    for (const m of metricRegressions) console.log(red(`  ✗ ${m.metric}: ${m.baseline} → ${m.current} (${m.deltaPct > 0 ? '+' : ''}${m.deltaPct}%)`));
+    for (const r of report.regressions.slice(0, 20)) console.log(red(`  ✗ ${r.id}: ${r.message}`));
+    for (const r of report.improvements.slice(0, 10)) console.log(green(`  ✓ ${r.id}: ${r.message}`));
+    regressionFailed = !report.passed;
+  }
+  if (o.saveBaseline) {
+    store.saveBaseline(await createBaseline(o.saveBaseline, summary, results()));
+    console.log(dim(`Saved baseline "${o.saveBaseline}"`));
+  }
+
+  if (!o.quiet) {
+    const ok = summary.failed + summary.errors === 0;
+    console.log(
+      `\n${ok ? green(bold('PASSED')) : red(bold('FAILED'))}  ${summary.passed} passed, ${summary.failed} failed, ${summary.errors} errors, ${summary.skipped} skipped · ${formatDuration(summary.durationMs)}`,
+    );
+    if (summary.latency.count) console.log(dim(`latency p50 ${summary.latency.p50}ms · p95 ${summary.latency.p95}ms · p99 ${summary.latency.p99}ms`));
+    if (summary.tokens.totalTokens) console.log(dim(`tokens ${summary.tokens.inputTokens} in / ${summary.tokens.outputTokens} out${summary.costUsd ? ` · est. cost $${summary.costUsd}` : ''}`));
+    for (const [k, v] of Object.entries(summary.scores)) console.log(dim(`score ${k}: ${v.mean} (${v.count})`));
+    for (const [f, p] of Object.entries(paths2)) console.log(dim(`${f} report: ${p}`));
+    if (summary.cancelled) console.log(yellow(`Run cancelled. Resume with: aipstudio test ${paths.join(' ')} --resume ${runId}`));
+  }
+  store.close();
+  if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
+  if (summary.cancelled) return EXIT.EXECUTION_ERROR;
+  if (summary.total === 0) {
+    console.error(yellow('No tests found.'));
+    return EXIT.CONFIG_ERROR;
+  }
+  return summary.failed + summary.errors > 0 || (o.failOnRegression && regressionFailed) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+}
+
+async function* readResults(file: string): AsyncGenerator<TestResult> {
+  for await (const r of await readResultsFile(file)) yield r;
+}
+
+function runOptions(cmd: Command): Command {
+  return cmd
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-e, --environment <name>', 'environment to use')
+    .option('-c, --concurrency <n>', 'parallel workers')
+    .option('--retries <n>', 'retries per failing test')
+    .option('--timeout <ms>', 'per-test timeout in ms')
+    .addOption(new Option('-r, --reporter <formats...>', 'reporters: console, junit, json, html, markdown').default(['console', 'junit', 'json', 'html', 'markdown']))
+    .option('-o, --out <dir>', 'output directory for results and reports')
+    .option('-t, --tags <tags>', 'only run tests with these tags (comma separated)')
+    .option('-g, --grep <pattern>', 'only run tests whose name/id matches')
+    .option('--bail', 'stop after the first failure')
+    .option('--resume <runId>', 'resume a cancelled/crashed run')
+    .option('--var <key=value>', 'runtime variable (repeatable)', collectVar)
+    .option('--baseline <name>', 'compare results against a saved baseline')
+    .option('--save-baseline <name>', 'save this run as a baseline')
+    .option('--fail-on-regression', 'exit 1 when the baseline comparison finds regressions')
+    .addOption(new Option('--trace <mode>', 'persist traces').choices(['all', 'failures', 'none']).default('failures'))
+    .option('-v, --verbose', 'show passing checks')
+    .option('-q, --quiet', 'only print the summary exit code')
+    .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)');
+}
+
+export function buildProgram(): Command {
+  const program = new Command();
+  program
+    .name('aipstudio')
+    .description('AI Protocol Studio CLI — run REST, GraphQL, MCP and AI tests locally and in CI/CD.\n\nExit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error')
+    .version('0.1.0');
+
+  runOptions(program.command('test').description('run tests from files, directories, globs or a *.suite.yaml').argument('[paths...]', 'test files/dirs/globs')).action(async (paths: string[], o: RunCliOptions) => {
+    process.exitCode = await executeRun(paths, o);
+  });
+
+  runOptions(program.command('run').description('run a named suite from a workspace').requiredOption('-s, --suite <name>', 'suite name (tests/<name>.suite.yaml)')).action(async (o: RunCliOptions) => {
+    process.exitCode = await executeRun([], o);
+  });
+
+  program
+    .command('load')
+    .description('run a load test against a URL (safeguarded: local hosts only unless --allow-remote)')
+    .argument('<url>', 'target URL')
+    .option('-X, --method <method>', 'HTTP method', 'GET')
+    .option('-H, --header <header...>', 'headers "Name: value"')
+    .option('-d, --data <body>', 'request body')
+    .option('-u, --vus <n>', 'virtual users', '10')
+    .option('--duration <sec>', 'duration in seconds', '10')
+    .option('--rps <n>', 'max requests per second')
+    .option('--ramp-up <sec>', 'ramp-up seconds', '0')
+    .option('--ramp-down <sec>', 'ramp-down seconds', '0')
+    .option('--allow-remote', 'allow non-local hosts (only systems you are authorised to test)')
+    .option('--json <file>', 'write final metrics as JSON')
+    .action(async (url: string, o) => {
+      const headers = ((o.header as string[]) ?? []).map((h) => {
+        const i = h.indexOf(':');
+        return { key: h.slice(0, i).trim(), value: h.slice(i + 1).trim() };
+      });
+      const settings = new WorkspaceManager().loadSettings();
+      let last = 0;
+      const snap = await runLoadTest(
+        {
+          target: { kind: 'http', request: { method: o.method, url, headers, body: o.data ? { type: /^\s*[{[]/.test(o.data) ? 'json' : 'text', content: o.data } : undefined } },
+          virtualUsers: Number(o.vus),
+          durationSec: Number(o.duration),
+          rampUpSec: Number(o.rampUp),
+          rampDownSec: Number(o.rampDown),
+          requestsPerSecond: o.rps ? Number(o.rps) : undefined,
+          allowRemoteHosts: !!o.allowRemote,
+          maxVirtualUsers: settings.loadTesting.maxVirtualUsers,
+        },
+        {
+          onSnapshot: (s) => {
+            if (s.done || Date.now() - last < 1000) return;
+            last = Date.now();
+            console.log(dim(`[${s.elapsedSec}s] vus=${s.activeVUs} rps=${s.currentRps} total=${s.requests} errors=${s.errors} p95=${s.latency.p95}ms`));
+          },
+        },
+      );
+      printLoad(snap);
+      if (o.json) writeFileSync(o.json, JSON.stringify(snap, null, 2));
+      process.exitCode = snap.errorRate > 0.05 ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+    });
+
+  program
+    .command('import')
+    .description('import OpenAPI/Swagger, Postman, HAR or collection files into a workspace')
+    .argument('<file>')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .action(async (file: string, o) => {
+      const mgr = new WorkspaceManager();
+      const { store } = openWorkspace(o.workspace, undefined, mgr);
+      const r = importAny(readFileSync(file, 'utf8'));
+      if (r.collection) store.saveCollection(r.collection);
+      if (r.environment) store.saveEnvironment(r.environment);
+      console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
+      store.close();
+    });
+
+  const ws = program.command('workspace').description('manage workspaces');
+  ws.command('list').action(() => {
+    for (const w of new WorkspaceManager().list()) console.log(`${w.name}\t${dim(w.path)}`);
+  });
+  ws.command('create')
+    .argument('<name>')
+    .option('--path <dir>', 'create in this directory (e.g. inside a git repo)')
+    .action((name: string, o) => {
+      const s = new WorkspaceManager().create(name, o.path ? resolve(o.path) : undefined);
+      console.log(green(`Created workspace "${name}" at ${s.root}`));
+      s.close();
+    });
+  ws.command('export')
+    .argument('<nameOrPath>')
+    .requiredOption('-o, --output <file>')
+    .action((ref: string, o) => {
+      const { store } = openWorkspace(ref, undefined, new WorkspaceManager());
+      writeFileSync(o.output, JSON.stringify(store.exportBundle(), null, 2));
+      console.log(green(`Exported to ${o.output} (secret values are never exported)`));
+      store.close();
+    });
+
+  program
+    .command('mcp')
+    .description('connect to an MCP server and print its tools, resources and prompts')
+    .option('--url <url>', 'Streamable HTTP endpoint')
+    .option('--sse <url>', 'legacy SSE endpoint')
+    .argument('[command...]', 'stdio command, e.g. -- node server.js')
+    .action(async (command: string[], o) => {
+      const cfg: McpServerConfig = o.url
+        ? { id: 'cli', name: o.url, transport: 'streamable-http', url: o.url }
+        : o.sse
+          ? { id: 'cli', name: o.sse, transport: 'sse', url: o.sse }
+          : command.length
+            ? { id: 'cli', name: command.join(' '), transport: 'stdio', command: command[0]!, args: command.slice(1) }
+            : (() => {
+                throw new CliError('Provide --url, --sse or a stdio command', EXIT.CONFIG_ERROR);
+              })();
+      const s = new McpSession(cfg);
+      await s.connect();
+      const d = await s.discover();
+      console.log(bold(`${d.serverInfo?.name ?? 'server'} ${d.serverInfo?.version ?? ''}`), dim(JSON.stringify(d.capabilities)));
+      if (d.instructions) console.log(dim(d.instructions));
+      console.log(cyan(`\nTools (${d.tools.length})`));
+      for (const t of d.tools) console.log(`  ${t.name} ${dim(t.description ?? '')}\n    ${dim(JSON.stringify(t.inputSchema))}`);
+      console.log(cyan(`\nResources (${d.resources.length})`));
+      for (const r of d.resources) console.log(`  ${r.uri} ${dim(r.name)}`);
+      for (const r of d.resourceTemplates) console.log(`  ${r.uriTemplate} ${dim(`${r.name} (template)`)}`);
+      console.log(cyan(`\nPrompts (${d.prompts.length})`));
+      for (const p of d.prompts) console.log(`  ${p.name} ${dim(p.description ?? '')}`);
+      await s.close();
+    });
+
+  program
+    .command('report')
+    .description('generate reports from a results.jsonl file')
+    .argument('<results>', 'results.jsonl')
+    .addOption(new Option('-f, --format <formats...>').default(['html', 'junit', 'markdown', 'json']))
+    .option('-o, --out <dir>', 'output directory')
+    .action(async (file: string, o) => {
+      const summaryPath = join(dirname(file), 'summary.json');
+      if (!existsSync(summaryPath)) throw new CliError(`summary.json not found next to ${file}`, EXIT.CONFIG_ERROR);
+      const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
+      const out = await writeReports(o.out ?? dirname(file), summary, () => readResults(file), o.format);
+      for (const [f, p] of Object.entries(out)) console.log(`${f}: ${p}`);
+    });
+
+  return program;
+}
+
+function printLoad(s: LoadSnapshot): void {
+  console.log(bold('\nLoad test results'));
+  console.log(`  requests      ${s.requests} (${s.throughput}/s)`);
+  console.log(`  errors        ${s.errors} (${(s.errorRate * 100).toFixed(2)}%) · connection failures ${s.connectionFailures}`);
+  console.log(`  latency       p50 ${s.latency.p50}ms · p90 ${s.latency.p90}ms · p95 ${s.latency.p95}ms · p99 ${s.latency.p99}ms · max ${s.latency.max}ms`);
+  console.log(`  status codes  ${Object.entries(s.statusCodes).map(([k, v]) => `${k}:${v}`).join(' ')}`);
+  console.log(`  transferred   ${formatBytes(s.bytes)}`);
+}
+
+export async function main(argv = process.argv): Promise<number> {
+  const program = buildProgram();
+  program.exitOverride();
+  try {
+    await program.parseAsync(argv);
+    return Number(process.exitCode ?? 0);
+  } catch (e) {
+    if (e instanceof CommanderError) {
+      if (e.code === 'commander.helpDisplayed' || e.code === 'commander.version' || e.code === 'commander.help') return EXIT.SUCCESS;
+      return EXIT.CONFIG_ERROR;
+    }
+    if (e instanceof CliError) {
+      console.error(red(e.message));
+      return e.exitCode;
+    }
+    const err = normalizeError(e);
+    console.error(red(`${err.kind}: ${err.message}`));
+    for (const s of err.suggestions) console.error(dim(`  → ${s}`));
+    return e instanceof ApsError && (err.kind === 'ConfigurationError' || err.kind === 'ValidationError' || err.kind === 'SchemaError') ? EXIT.CONFIG_ERROR : EXIT.EXECUTION_ERROR;
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "servers": [
+    {
+      "id": "customer-mcp",
+      "name": "customer-mcp",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["{{workspaceDir}}/../servers/mcp-server.mjs"]
+    }
+  ]
+}
