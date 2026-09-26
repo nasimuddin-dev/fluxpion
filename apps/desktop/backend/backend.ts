@@ -47,7 +47,11 @@ import {
   shortId,
   streamTests,
   summarizeSchema,
-  toCurl,
+  prepareHttpRequest,
+  parseCurl,
+  generateCode,
+  CODE_LANGUAGES,
+  type SnippetRequest,
   tryParseJson,
   validateSchema,
   writeReports,
@@ -325,13 +329,10 @@ export class Backend {
       /* ---------------------------------------------------------------- HTTP */
       'http.send': (p: HttpSendParams) => this.httpSend(p),
       'http.cancel': ({ id }: { id: string }) => this.controllers.get(id)?.abort(),
-      'http.curl': async ({ request, environment }: { request: HttpRequestSpec; environment?: string }) => {
-        const ctx = this.context({ environment });
-        const { prepareHttpRequest } = await import('@protolens/core');
-        const spec = ctx.vars.resolveDeep(request);
-        const p = await prepareHttpRequest(spec, {});
-        return toCurl({ method: p.method, url: p.url.toString(), headers: [...p.headers.entries()], bodyPreview: p.bodyPreview });
-      },
+      'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => this.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
+      'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => this.codeSnippet(p),
+      'http.codeLanguages': () => CODE_LANGUAGES,
+      'http.parseCurl': ({ text }: { text: string }) => parseCurl(text),
       'http.saveBody': async ({ payloadPath, name }: { payloadPath: string; name?: string }) => {
         if (!payloadPath || !payloadPath.startsWith(this.ws.path('payloads'))) throw new ApsError('ValidationError', 'Unknown payload');
         const dest = await this.host.saveDialog?.({ defaultPath: name ?? 'response.bin' });
@@ -613,6 +614,34 @@ export class Backend {
     } finally {
       this.controllers.delete(id);
     }
+  }
+
+  /** Code snippet for a request, with variables and auth resolved. Secrets are masked unless revealSecrets. */
+  private async codeSnippet(p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) {
+    const ctx = this.context({ environment: p.environment, collectionId: p.collectionId });
+    let request = p.request;
+    if ((!request.auth || request.auth.type === 'inherit') && ctx.collection)
+      request = { ...request, auth: p.requestId ? inheritedAuthFor(ctx.collection, p.requestId) : ctx.collection.auth };
+    const spec = ctx.vars.resolveDeep(request);
+    // OAuth would trigger a token request just to show code; show a placeholder header instead
+    const auth = spec.auth?.type === 'oauth2' ? undefined : spec.auth;
+    const prepared = await prepareHttpRequest({ ...spec, auth }, { redactor: ctx.redactor });
+    const headers = [...prepared.headers.entries()].filter(([k]) => k !== 'user-agent') as Array<[string, string]>;
+    if (spec.auth?.type === 'oauth2') headers.push(['Authorization', 'Bearer <access token from OAuth 2.0>']);
+    const body = spec.body;
+    const snippet: SnippetRequest = {
+      method: prepared.method,
+      url: prepared.url.toString(),
+      headers,
+      body: body && body.type !== 'multipart' && body.type !== 'binary' && body.type !== 'none' ? prepared.bodyPreview : body?.type === 'binary' ? `@${body.filePath}` : undefined,
+      form: body?.type === 'multipart' ? body.fields.filter((f) => f.enabled !== false && f.key).map((f) => ({ key: f.key, value: f.value, file: f.kind === 'file' })) : undefined,
+    };
+    const code = generateCode(snippet, p.language);
+    if (p.revealSecrets) return code;
+    // mask secret values and sensitive headers
+    let masked = ctx.redactor.redactString(code);
+    for (const [k, v] of headers) if (ctx.redactor.isSensitiveKey(k) && v.length >= 4) masked = masked.split(v).join('<secret>');
+    return masked.split('[REDACTED]').join('<secret>');
   }
 
   private async gqlSend(p: GqlSendParams) {

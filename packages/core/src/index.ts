@@ -44,6 +44,8 @@ export * from './storage/workspace.js';
 export * from './storage/search.js';
 
 export * from './import/importers.js';
+export * from './import/curl.js';
+export * from './codegen/codegen.js';
 export * from './engine.js';
 
 export const ENGINE_VERSION = '0.1.0';

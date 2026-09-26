@@ -49,6 +49,8 @@ export interface HttpRequestSpec {
   method: string;
   url: string;
   params?: KeyValue[];
+  pathVariables?: KeyValue[];
+  description?: string;
   headers?: KeyValue[];
   cookies?: KeyValue[];
   auth?: AuthConfig;

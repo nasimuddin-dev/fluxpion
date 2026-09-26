@@ -72,6 +72,10 @@ export interface HttpRequestSpec {
   method: string;
   url: string;
   params?: KeyValue[];
+  /** Values for `:name` segments in the URL path (Postman path variables). */
+  pathVariables?: KeyValue[];
+  /** Free-form documentation shown in collection docs. */
+  description?: string;
   headers?: KeyValue[];
   cookies?: KeyValue[];
   auth?: AuthConfig;

@@ -56,8 +56,26 @@ function defaultAgent(): Agent {
   return (_default ??= new Agent({ connections: 256, pipelining: 1, keepAliveTimeout: 10_000 }));
 }
 
-export function buildUrl(raw: string, params?: KeyValue[]): URL {
-  let s = raw.trim();
+/** Names of `:name` path segments in a URL, e.g. `/users/:id/posts/:postId` → ["id", "postId"]. */
+export function pathVariableNames(url: string): string[] {
+  const path = url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '').split(/[?#]/)[0] ?? '';
+  return [...path.matchAll(/\/:([A-Za-z_][\w-]*)/g)].map((m) => m[1]!);
+}
+
+/** Replace `/:name` path segments with their (URL-encoded) values. Unknown names are left as-is. */
+export function applyPathVariables(url: string, vars?: KeyValue[]): string {
+  if (!vars?.length) return url;
+  const map = new Map(vars.filter((v) => v.enabled !== false && v.key).map((v) => [v.key, v.value]));
+  const m = /^([a-z][a-z0-9+.-]*:\/\/[^/]*)?(.*)$/i.exec(url)!;
+  const [head = '', rest = ''] = [m[1], m[2]];
+  const q = rest.search(/[?#]/);
+  const path = q >= 0 ? rest.slice(0, q) : rest;
+  const tail = q >= 0 ? rest.slice(q) : '';
+  return head + path.replace(/\/:([A-Za-z_][\w-]*)/g, (whole, name: string) => (map.has(name) ? '/' + encodeURIComponent(map.get(name)!) : whole)) + tail;
+}
+
+export function buildUrl(raw: string, params?: KeyValue[], pathVariables?: KeyValue[]): URL {
+  let s = applyPathVariables(raw.trim(), pathVariables);
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = `http://${s}`;
   let url: URL;
   try {
@@ -139,7 +157,7 @@ function parseSetCookie(h: string): { name: string; value: string; attributes: R
  * The spec must already have variables resolved.
  */
 export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOptions = {}) {
-  const url = buildUrl(spec.url, spec.params);
+  const url = buildUrl(spec.url, spec.params, spec.pathVariables);
   const headers = new Headers();
   for (const h of spec.headers ?? []) if (h.enabled !== false && h.key) headers.append(h.key, h.value);
   const cookies = (spec.cookies ?? []).filter((c) => c.enabled !== false && c.key).map((c) => `${c.key}=${c.value}`);

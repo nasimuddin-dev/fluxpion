@@ -108,7 +108,7 @@ export async function runLoadTest(
   cfg: LoadTestConfig,
   deps: { providers?: ProviderRegistry; pricing?: PriceEntry[]; redactor?: Redactor; signal?: AbortSignal; onSnapshot?: (s: LoadSnapshot) => void },
 ): Promise<LoadSnapshot> {
-  const url = cfg.target.kind === 'http' ? buildUrl(cfg.target.request.url, cfg.target.request.params).toString() : undefined;
+  const url = cfg.target.kind === 'http' ? buildUrl(cfg.target.request.url, cfg.target.request.params, cfg.target.request.pathVariables).toString() : undefined;
   checkLoadSafeguards(cfg, url);
   if (cfg.virtualUsers < 1 || cfg.durationSec <= 0) throw new ApsError('ConfigurationError', 'virtualUsers and durationSec must be positive');
 

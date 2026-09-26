@@ -1,10 +1,14 @@
-import { FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { Code2, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { useApp, persisted } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
-import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, SavedHttpRequest } from '../types';
+import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedHttpRequest } from '../types';
+import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
+import { CodeModal } from '../components/CodeModal';
 import { uid } from '../lib/format';
+
+const isCurl = (t: string) => /^\s*curl(\.exe)?\s/i.test(t);
 import { AssertionEditor } from '../components/AssertionEditor';
 import { AuthEditor } from '../components/AuthEditor';
 import { CodeEditor } from '../components/CodeEditor';
@@ -52,7 +56,8 @@ const drafts = persisted<{ tabs: RestTab[]; active?: string }>('rest', { tabs: [
 export function RestView() {
   const [tabs, setTabs] = useState<RestTab[]>(() => {
     const d = drafts.load();
-    return d.tabs.length ? d.tabs : [blankRequest()];
+    // drafts from before the URL/params sync kept the query only in the Params table
+    return d.tabs.length ? d.tabs.map((t) => (t.request.url.includes('?') ? t : { ...t, request: fromEngineRequest(t.request) })) : [blankRequest()];
   });
   const [active, setActive] = useState<string>(() => drafts.load().active ?? tabs[0]!.id);
   const [results, setResults] = useState<Record<string, SendResult>>({});
@@ -61,6 +66,7 @@ export function RestView() {
   const [filter, setFilter] = useState('');
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [showCode, setShowCode] = useState(false);
   const env = useApp((s) => s.environment);
   const tab = tabs.find((t) => t.id === active) ?? tabs[0]!;
   const streams = useRef<Record<string, string>>({});
@@ -80,13 +86,27 @@ export function RestView() {
 
   const update = (patch: Partial<RestTab>) => setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, ...patch, dirty: true } : t)));
   const setReq = (patch: Partial<HttpRequestSpec>) => update({ request: { ...tab.request, ...patch } });
+  /** URL bar edits update the Params table and path variables (Postman behaviour). */
+  const setUrl = (url: string) => setReq({ url, params: paramsFromUrl(url, tab.request.params), pathVariables: syncPathVariables(url, tab.request.pathVariables) });
+  /** Params table edits rebuild the URL's query string. */
+  const setParams = (params: KeyValue[]) => setReq({ params, url: urlFromParams(tab.request.url, params) });
+  /** Pasting a cURL command into the URL bar imports it. */
+  const importCurl = async (text: string) => {
+    try {
+      const r = await call<HttpRequestSpec>('http.parseCurl', { text });
+      update({ request: fromEngineRequest(r) });
+      useApp.getState().toast('Imported cURL command', 'success');
+    } catch (e) {
+      useApp.getState().toast(`Couldn't import cURL: ${asError(e).message}`, 'error');
+    }
+  };
 
   const openRequest = (c: Collection, n: CollectionNode) => {
     if (n.kind === 'graphql') return useApp.getState().openIntent('graphql', { collectionId: c.id, requestId: n.id });
     if (n.kind !== 'http') return;
     const existing = tabs.find((t) => t.requestId === n.id);
     if (existing) return setActive(existing.id);
-    const t: RestTab = { id: uid('tab-'), name: n.name, request: structuredClone(n.request), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id };
+    const t: RestTab = { id: uid('tab-'), name: n.name, request: fromEngineRequest(structuredClone(n.request)), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id };
     setTabs((ts) => [...ts, t]);
     setActive(t.id);
   };
@@ -103,7 +123,7 @@ export function RestView() {
       const n = c && findNode(c.items, p.requestId);
       if (c && n) openRequest(c, n);
     } else if (p?.request) {
-      const t: RestTab = { ...blankRequest(), name: p.name ?? 'From history', request: p.request };
+      const t: RestTab = { ...blankRequest(), name: p.name ?? 'From history', request: fromEngineRequest(p.request) };
       setTabs((ts) => [...ts, t]);
       setActive(t.id);
     }
@@ -119,7 +139,7 @@ export function RestView() {
       const r = await call<SendResult & { id: string }>('http.send', {
         id,
         name: tab.name,
-        request: tab.request,
+        request: toEngineRequest(tab.request),
         environment: env,
         collectionId: tab.collectionId,
         requestId: tab.requestId,
@@ -128,7 +148,7 @@ export function RestView() {
         assertions: tab.assertions,
         stream: tab.request.headers?.some((h) => /accept/i.test(h.key) && /event-stream/.test(h.value)),
       });
-      const curl = await call<string>('http.curl', { request: tab.request, environment: env }).catch(() => undefined);
+      const curl = await call<string>('http.code', { request: toEngineRequest(tab.request), environment: env, collectionId: tab.collectionId, requestId: tab.requestId, language: 'curl' }).catch(() => undefined);
       setResults((rs) => ({ ...rs, [tabId]: { ...r, curl, stream: streams.current[id] || undefined } }));
       if (r.unresolved?.length) useApp.getState().toast(`Unresolved variables: ${r.unresolved.join(', ')}`, 'error');
     } catch (e) {
@@ -155,7 +175,7 @@ export function RestView() {
     const cols = await call<Collection[]>('col.list');
     const c = cols.find((x) => x.id === collectionId);
     if (!c) return;
-    const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: tab.request, preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions };
+    const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: toEngineRequest(tab.request), preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions };
     const exists = tab.requestId && findNode(c.items, tab.requestId);
     const items = exists ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, folderId, node);
     await saveCollection({ ...c, items });
@@ -278,7 +298,16 @@ export function RestView() {
             {!METHODS.includes(tab.request.method) && <option value="CUSTOM">{tab.request.method}</option>}
             <option value="CUSTOM">Custom…</option>
           </Select>
-          <VarInput ariaLabel="Request URL" className="flex-1 h-8" value={tab.request.url} onChange={(url) => setReq({ url })} placeholder="https://api.example.com/v1/resource  or  {{baseUrl}}/path" onEnter={send} collectionId={tab.collectionId} />
+          <VarInput
+            ariaLabel="Request URL"
+            className="flex-1 h-8"
+            value={tab.request.url}
+            onChange={setUrl}
+            onPasteText={(text) => (isCurl(text) ? (void importCurl(text), true) : false)}
+            placeholder="Enter a URL, paste a cURL command, or use {{baseUrl}}/path"
+            onEnter={send}
+            collectionId={tab.collectionId}
+          />
           {sending[tab.id] ? (
             <Button variant="danger" icon={<Square size={12} />} onClick={cancel}>
               Cancel
@@ -288,12 +317,15 @@ export function RestView() {
               Send
             </Button>
           )}
+          <IconButton label="Code snippet" onClick={() => setShowCode(true)}>
+            <Code2 size={16} />
+          </IconButton>
           <Button icon={<Save size={13} />} onClick={quickSave} title="Save (Ctrl+S)">
             Save
           </Button>
         </div>
         <Split id="rest-req-res" direction="vertical" initial={45}>
-          <RequestEditor tab={tab} update={update} setReq={setReq} />
+          <RequestEditor tab={tab} update={update} setReq={setReq} setParams={setParams} />
           <div className="h-full min-h-0 flex flex-col">
             {sending[tab.id] ? (
               <div className="h-full grid place-items-center text-muted text-sm">
@@ -319,11 +351,12 @@ export function RestView() {
     </Split>
       {saving && <SaveModal collections={collections} defaultName={tab.name} onClose={() => setSaving(false)} onSave={(cid, name, folder) => (setSaving(false), void saveTab(cid, name, folder))} onCreate={saveCollection} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onDone={loadCollections} />}
+      {showCode && <CodeModal request={toEngineRequest(tab.request)} collectionId={tab.collectionId} requestId={tab.requestId} onClose={() => setShowCode(false)} />}
     </>
   );
 }
 
-function RequestEditor({ tab, update, setReq }: { tab: RestTab; update(p: Partial<RestTab>): void; setReq(p: Partial<HttpRequestSpec>): void }) {
+function RequestEditor({ tab, update, setReq, setParams }: { tab: RestTab; update(p: Partial<RestTab>): void; setReq(p: Partial<HttpRequestSpec>): void; setParams(p: KeyValue[]): void }) {
   const [sub, setSub] = useState<'params' | 'auth' | 'headers' | 'body' | 'cookies' | 'scripts' | 'tests' | 'settings'>('params');
   const r = tab.request;
   const count = (a?: Array<{ enabled?: boolean }>) => a?.filter((x) => x.enabled !== false).length || undefined;
@@ -354,8 +387,17 @@ function RequestEditor({ tab, update, setReq }: { tab: RestTab; update(p: Partia
       <div className="flex-1 min-h-0 overflow-auto">
         {sub === 'params' && (
           <div className="p-2">
-            <KeyValueEditor rows={r.params ?? []} onChange={(params) => setReq({ params })} keyPlaceholder="Query parameter" />
-            <p className="text-xs text-muted px-2 pt-2">Parameters are appended to the URL (URL-encoded). Values may use {'{{variables}}'}.</p>
+            <div className="text-xs font-semibold text-muted px-1 pb-1">Query Params</div>
+            <KeyValueEditor rows={r.params ?? []} onChange={setParams} keyPlaceholder="Key" bulkEdit />
+            {!!r.pathVariables?.length && (
+              <>
+                <div className="text-xs font-semibold text-muted px-1 pt-4 pb-1">Path Variables</div>
+                <KeyValueEditor rows={r.pathVariables} onChange={(pathVariables) => setReq({ pathVariables: pathVariables.filter((v) => r.pathVariables!.some((x) => x.key === v.key)) })} keyPlaceholder="Key" fixedKeys />
+              </>
+            )}
+            <p className="text-xs text-muted px-2 pt-3">
+              The query string in the URL bar and this table stay in sync. Use <span className="mono">/:name</span> in the path for path variables. Values may use {'{{variables}}'}.
+            </p>
           </div>
         )}
         {sub === 'auth' && <AuthEditor auth={r.auth} onChange={(auth) => setReq({ auth })} />}
@@ -419,6 +461,33 @@ function RequestEditor({ tab, update, setReq }: { tab: RestTab; update(p: Partia
   );
 }
 
+/** Pretty-print JSON (keeping {{variables}} intact) or indent XML. */
+function beautify(text: string, type: string): string {
+  if (type === 'json') {
+    // protect unquoted {{vars}} so the JSON parses, then restore them
+    const vars: string[] = [];
+    const safe = text.replace(/\{\{[^{}]+\}\}/g, (m) => `"__VAR${vars.push(m) - 1}__"`);
+    try {
+      return JSON.stringify(JSON.parse(safe), null, 2).replace(/"__VAR(\d+)__"/g, (_, i) => vars[Number(i)]!);
+    } catch {
+      useApp.getState().toast('The body is not valid JSON', 'error');
+      return text;
+    }
+  }
+  let depth = 0;
+  return text
+    .replace(/>\s*</g, '>\n<')
+    .split('\n')
+    .map((line) => {
+      const l = line.trim();
+      if (/^<\//.test(l)) depth = Math.max(0, depth - 1);
+      const out = '  '.repeat(depth) + l;
+      if (/^<[^!?/][^>]*[^/]>$/.test(l) && !/<\/[^>]+>$/.test(l)) depth++;
+      return out;
+    })
+    .join('\n');
+}
+
 export function BodyEditor({ body, onChange }: { body: BodyConfig; onChange(b: BodyConfig): void }) {
   const types: Array<[BodyConfig['type'], string]> = [
     ['none', 'None'],
@@ -438,7 +507,12 @@ export function BodyEditor({ body, onChange }: { body: BodyConfig; onChange(b: B
   };
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex gap-3 px-3 py-1.5 text-sm flex-wrap border-b border-line">
+      <div className="flex gap-3 px-3 py-1.5 text-sm flex-wrap items-center border-b border-line">
+        {(body.type === 'json' || body.type === 'xml') && (
+          <button className="order-last ml-auto text-xs text-accent hover:underline" onClick={() => onChange({ ...body, content: beautify(body.content, body.type) })}>
+            Beautify
+          </button>
+        )}
         {types.map(([t, label]) => (
           <label key={t} className="flex items-center gap-1 cursor-pointer">
             <input type="radio" name="body-type" checked={body.type === t} onChange={() => setType(t)} />
