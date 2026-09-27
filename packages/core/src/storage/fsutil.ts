@@ -3,6 +3,20 @@ import { dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ApsError } from '../errors.js';
 
+/**
+ * End a write stream and wait until its file descriptor is closed. `end(cb)` only waits for 'finish'; the
+ * fd is closed afterwards on the thread pool, and exiting the process in between aborts Node on Windows
+ * ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)").
+ */
+export function endAndClose(stream: NodeJS.WritableStream & { closed?: boolean; once(ev: 'close' | 'error', fn: (...a: unknown[]) => void): unknown }): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (stream.closed) return resolve();
+    stream.once('close', () => resolve());
+    stream.once('error', () => resolve());
+    stream.end();
+  });
+}
+
 /** Atomic write: write a temp file, fsync, then rename over the target. A crash never leaves a half-written file. */
 export function atomicWrite(path: string, data: string | Buffer): void {
   mkdirSync(dirname(path), { recursive: true });

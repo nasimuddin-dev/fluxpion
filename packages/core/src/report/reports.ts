@@ -2,6 +2,7 @@ import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { RunSummary, TestResult } from '../model/types.js';
 import { formatDuration } from '../util/stats.js';
+import { endAndClose } from '../storage/fsutil.js';
 
 export type ReportFormat = 'json' | 'junit' | 'html' | 'markdown';
 
@@ -29,7 +30,7 @@ async function writeAll(path: string, fn: (w: (s: string) => Promise<void>) => P
     if (!out.write(s)) await new Promise<void>((r) => out.once('drain', () => r()));
   };
   await fn(w);
-  await new Promise<void>((r) => out.end(r));
+  await endAndClose(out);
 }
 
 function failureText(r: TestResult): string {

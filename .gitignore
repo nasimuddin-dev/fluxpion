@@ -22,3 +22,6 @@ examples/veterinary-workspace/collections/.keep
 # Claude Code (personal settings and the daily development routine backlog)
 .claude/settings.local.json
 .claude/dev-routine/
+
+# CLI results written outside a workspace
+protolens-results/

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
 import { Command, CommanderError, Option } from 'commander';
@@ -22,6 +22,8 @@ import {
   readResultsFile,
   runLoadTest,
   runTests,
+  runCollection,
+  readDataset,
   shortId,
   streamTests,
   writeReports,
@@ -30,6 +32,11 @@ import {
   DEFAULT_THRESHOLDS,
   type LoadSnapshot,
   type ReportFormat,
+  type RunSummary,
+  type Collection,
+  type CollectionNode,
+  type Environment,
+  type DatasetRecord,
   type RunEvent,
   type TestCase,
   type TestResult,
@@ -160,7 +167,8 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
 
   const ctx = createEngineContext({ store, secrets, settings, environment, logger, runtimeVars: o.var });
   const runId = o.resume ?? shortId('run-');
-  const outDir = o.out ? resolve(o.out) : store.runDir(runId);
+  // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
+  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('protolens-results', runId) : store.runDir(runId);
   const resultsFile = join(outDir, 'results.jsonl');
   if (o.resume && !existsSync(resultsFile)) throw new CliError(`Cannot resume: ${resultsFile} does not exist`, EXIT.CONFIG_ERROR);
 
@@ -211,11 +219,29 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
       environment,
       bail: o.bail,
     });
+  } catch (e) {
+    cleanupFailedRun({ ephemeral, outDir, explicitOut: !!o.out, store });
+    throw e;
   } finally {
     process.off('SIGINT', onSigint);
     await ctx.dispose();
   }
 
+  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, rerun: `protolens test ${paths.join(' ')} --resume ${runId}` });
+}
+
+/** Write reports, compare baselines, print the summary and work out the exit code (shared by test/run/run-collection). */
+async function finishRun(a: {
+  store: WorkspaceStore;
+  ephemeral?: string;
+  summary: RunSummary;
+  outDir: string;
+  resultsFile: string;
+  o: Pick<RunCliOptions, 'reporter' | 'baseline' | 'saveBaseline' | 'quiet' | 'failOnRegression'>;
+  rerun?: string;
+  emptyMessage?: string;
+}): Promise<number> {
+  const { store, ephemeral, summary, outDir, resultsFile, o } = a;
   const results = () => readResults(resultsFile);
   const formats = o.reporter.filter((r) => r !== 'console') as ReportFormat[];
   const paths2 = formats.length ? await writeReports(outDir, summary, results, formats) : ({} as Record<string, string>);
@@ -247,16 +273,162 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
     if (summary.tokens.totalTokens) console.log(dim(`tokens ${summary.tokens.inputTokens} in / ${summary.tokens.outputTokens} out${summary.costUsd ? ` · est. cost $${summary.costUsd}` : ''}`));
     for (const [k, v] of Object.entries(summary.scores)) console.log(dim(`score ${k}: ${v.mean} (${v.count})`));
     for (const [f, p] of Object.entries(paths2)) console.log(dim(`${f} report: ${p}`));
-    if (summary.cancelled) console.log(yellow(`Run cancelled. Resume with: protolens test ${paths.join(' ')} --resume ${runId}`));
+    if (summary.cancelled && a.rerun) console.log(yellow(`Run cancelled. Resume with: ${a.rerun}`));
   }
   store.close();
   if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
   if (summary.cancelled) return EXIT.EXECUTION_ERROR;
   if (summary.total === 0) {
-    console.error(yellow('No tests found.'));
+    console.error(yellow(a.emptyMessage ?? 'No tests found.'));
     return EXIT.CONFIG_ERROR;
   }
   return summary.failed + summary.errors > 0 || (o.failOnRegression && regressionFailed) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+}
+
+interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel'> {
+  iterationData?: string;
+  iterationCount?: string;
+  delayRequest?: string;
+  folder?: string[];
+}
+
+function readImport<K extends 'collection' | 'environment'>(file: string, want: K): NonNullable<ReturnType<typeof importAny>[K]> {
+  let r: ReturnType<typeof importAny>;
+  try {
+    r = importAny(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new CliError(`Could not read ${want} file ${file}: ${(e as Error).message}`, EXIT.CONFIG_ERROR);
+  }
+  const v = r[want];
+  if (!v) throw new CliError(`${file} is not a ${want} file (detected: ${r.format})`, EXIT.CONFIG_ERROR);
+  return v;
+}
+
+/** Map --folder names/ids to node ids (folders or requests), like Newman's --folder. */
+function resolveSelection(collection: Collection, refs: string[] | undefined): string[] | undefined {
+  if (!refs?.length) return undefined;
+  const all: CollectionNode[] = [];
+  const walk = (nodes: CollectionNode[]) => nodes.forEach((n) => (all.push(n), n.kind === 'folder' && walk(n.items)));
+  walk(collection.items);
+  return refs.map((ref) => {
+    const n = all.find((x) => x.id === ref) ?? all.find((x) => x.name === ref) ?? all.find((x) => x.name.toLowerCase() === ref.toLowerCase());
+    if (!n) throw new CliError(`No folder or request "${ref}" in collection "${collection.name}"`, EXIT.CONFIG_ERROR);
+    return n.id;
+  });
+}
+
+async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promise<number> {
+  const mgr = new WorkspaceManager();
+  const settings = mgr.loadSettings();
+  const fromFile = existsSync(ref) && statSync(ref).isFile();
+  // a collection file never touches the user's workspace: it runs in an ephemeral one unless -w is given
+  const { store, ephemeral } = openWorkspace(o.workspace, fromFile && !o.workspace ? tmpdir() : undefined, mgr);
+  const logger = new Logger((o.logLevel?.toUpperCase() as 'INFO') ?? 'WARN');
+  if (o.logLevel) logger.addSink(consoleSink());
+  const secrets = new ChainSecretStore([new EnvSecretStore()]);
+
+  let collection: Collection;
+  if (fromFile) collection = readImport(resolve(ref), 'collection');
+  else {
+    const cols = store.listCollections().filter((c) => !c.problem);
+    const found = cols.find((c) => c.id === ref) ?? cols.find((c) => c.name.toLowerCase() === ref.toLowerCase());
+    if (!found) throw new CliError(`Collection "${ref}" not found. Available: ${cols.map((c) => c.name).join(', ') || 'none'} (or pass a collection file)`, EXIT.CONFIG_ERROR);
+    collection = found;
+  }
+
+  let envFile: Environment | undefined;
+  let envName: string | undefined;
+  if (o.environment && existsSync(o.environment) && statSync(o.environment).isFile()) envFile = readImport(resolve(o.environment), 'environment');
+  else if (o.environment) {
+    if (!store.getEnvironment(o.environment)) throw new CliError(`Environment "${o.environment}" not found. Available: ${store.listEnvironments().map((e) => e.name).join(', ') || 'none'} (or pass an environment file)`, EXIT.CONFIG_ERROR);
+    envName = o.environment;
+  } else if (!fromFile && store.listEnvironments().length === 1) envName = store.listEnvironments()[0]!.name;
+
+  const selection = resolveSelection(collection, o.folder);
+  let data: DatasetRecord[] | undefined;
+  if (o.iterationData) {
+    const file = resolve(o.iterationData);
+    if (!existsSync(file)) throw new CliError(`Data file ${file} does not exist`, EXIT.CONFIG_ERROR);
+    data = [];
+    for await (const r of readDataset({ path: file, limit: 100_000 })) data.push(r);
+  }
+  const iterations = o.iterationCount ? Number(o.iterationCount) : undefined;
+  if (iterations !== undefined && !(iterations >= 1)) throw new CliError('--iteration-count must be 1 or more', EXIT.CONFIG_ERROR);
+
+  const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var });
+  if (fromFile) ctx.vars.setScope('collection', collection.variables);
+  if (envFile) ctx.vars.setScope('environment', envFile.variables);
+  const environment = envName ?? envFile?.name;
+  const runId = shortId('run-');
+  // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
+  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('protolens-results', runId) : store.runDir(runId);
+  const resultsFile = join(outDir, 'results.jsonl');
+
+  if (!o.quiet) {
+    console.log(bold(`Protolens — ${collection.name}`));
+    const bits = [ephemeral ? '' : `workspace: ${store.root}`, environment ? `environment: ${environment}` : '', data ? `data: ${data.length} rows` : '', `run: ${runId}`];
+    console.log(dim(bits.filter(Boolean).join(' · ')));
+  }
+
+  const ctrl = new AbortController();
+  let interrupted = 0;
+  const onSigint = () => {
+    if (++interrupted > 1) process.exit(EXIT.EXECUTION_ERROR);
+    console.error(yellow('\nCancelling… (press Ctrl+C again to force quit)'));
+    ctrl.abort();
+  };
+  process.on('SIGINT', onSigint);
+  let lastIteration = 0;
+  let summary: RunSummary;
+  try {
+    summary = await runCollection({
+      name: collection.name,
+      runId,
+      collection,
+      selection,
+      data,
+      iterations,
+      delayMs: o.delayRequest ? Number(o.delayRequest) : undefined,
+      timeoutMs: o.timeout ? Number(o.timeout) : undefined,
+      bail: o.bail,
+      services: ctx.services,
+      signal: ctrl.signal,
+      resultsFile,
+      traceMode: o.trace,
+      onTrace: (trace) => void store.saveTrace(trace, 'test', runId),
+      environment,
+      onEvent: (e: RunEvent) => {
+        if (e.type !== 'test-end' || o.quiet) return;
+        const it = Number(/@(\d+)/.exec(e.result.id)?.[1] ?? 1);
+        if (it !== lastIteration && (iterations ?? data?.length ?? 1) > 1) console.log(cyan(`\nIteration ${it}`));
+        lastIteration = it;
+        printResult(e.result, !!o.verbose);
+      },
+    });
+  } catch (e) {
+    cleanupFailedRun({ ephemeral, outDir, explicitOut: !!o.out, store });
+    throw e instanceof ApsError && e.kind === 'ValidationError' ? new CliError(e.message, EXIT.CONFIG_ERROR) : e;
+  } finally {
+    process.off('SIGINT', onSigint);
+    await ctx.dispose();
+  }
+  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
+}
+
+/** A run that failed to start leaves nothing behind: drop the default output folder and the ephemeral workspace. */
+function cleanupFailedRun(a: { ephemeral?: string; outDir: string; explicitOut: boolean; store: WorkspaceStore }): void {
+  if (a.ephemeral && !a.explicitOut) {
+    rmSync(a.outDir, { recursive: true, force: true });
+    try {
+      rmdirSync(dirname(a.outDir)); // ./protolens-results, only when nothing else is in it
+    } catch {
+      /* not empty */
+    }
+  }
+  if (a.ephemeral) {
+    a.store.close();
+    rmSync(a.ephemeral, { recursive: true, force: true });
+  }
 }
 
 async function* readResults(file: string): AsyncGenerator<TestResult> {
@@ -300,6 +472,35 @@ export function buildProgram(): Command {
   runOptions(program.command('run').description('run a named suite from a workspace').requiredOption('-s, --suite <name>', 'suite name (tests/<name>.suite.yaml)')).action(async (o: RunCliOptions) => {
     process.exitCode = await executeRun([], o);
   });
+
+  program
+    .command('run-collection')
+    .description(
+      'run a collection like Postman\'s Collection Runner / Newman: requests in order, pm.* scripts, iterations and data files\n' +
+        '<collection> is a collection name or id in the workspace, or a Protolens / Postman v2.1 collection file',
+    )
+    .argument('<collection>', 'collection name, id or file')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-e, --environment <nameOrFile>', 'environment name, or a Postman environment file')
+    .option('-d, --iteration-data <file>', 'CSV or JSON data file: one row per iteration (pm.iterationData, {{column}})')
+    .option('-n, --iteration-count <n>', 'number of iterations (default: data rows, or 1)')
+    .option('--delay-request <ms>', 'pause between requests')
+    .option('--folder <nameOrId...>', 'only run these folders or requests (repeatable)')
+    .option('--bail', 'stop after the first failure')
+    .option('--timeout <ms>', 'per-request timeout in ms')
+    .addOption(new Option('-r, --reporter <formats...>', 'reporters: console, junit, json, html, markdown').default(['console', 'junit', 'json', 'html', 'markdown']))
+    .option('-o, --out <dir>', 'output directory for results and reports')
+    .option('--var <key=value>', 'runtime variable (repeatable)', collectVar)
+    .option('--baseline <name>', 'compare results against a saved baseline')
+    .option('--save-baseline <name>', 'save this run as a baseline')
+    .option('--fail-on-regression', 'exit 1 when the baseline comparison finds regressions')
+    .addOption(new Option('--trace <mode>', 'persist traces').choices(['all', 'failures', 'none']).default('failures'))
+    .option('-v, --verbose', 'show passing checks')
+    .option('-q, --quiet', 'only print the summary exit code')
+    .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
+    .action(async (ref: string, o: CollectionCliOptions) => {
+      process.exitCode = await executeCollectionRun(ref, o);
+    });
 
   program
     .command('load')

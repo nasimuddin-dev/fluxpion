@@ -10,6 +10,18 @@ description: "Run Protolens tests in GitHub Actions, GitLab CI, Azure DevOps and
 ```bash
 protolens test ./tests                      # nearest workspace.json is used
 protolens run --workspace veterinary-api --environment staging --suite regression
+protolens run-collection "Veterinary API" -e Staging          # a collection, like Newman
+```
+
+### Coming from Newman
+
+`run-collection` takes Postman collection and environment files directly and uses Newman's option names, so most pipelines only need the command changed:
+
+```bash
+# before
+newman run api.postman_collection.json -e staging.postman_environment.json -d data.csv -n 2 --folder Smoke --reporters cli,junit
+# after
+protolens run-collection api.postman_collection.json -e staging.postman_environment.json -d data.csv -n 2 --folder Smoke -r console junit -o results
 ```
 
 **Exit codes:** `0` success · `1` test failure · `2` configuration error · `3` execution error (e.g. cancelled).
@@ -29,6 +41,12 @@ protolens run --workspace veterinary-api --environment staging --suite regressio
 - uses: actions/upload-artifact@v4
   if: always()
   with: { name: test-results, path: test-results }
+```
+
+To run a collection instead of test files:
+
+```yaml
+- run: npx protolens run-collection "Veterinary API" -e Staging -r console junit -o test-results
 ```
 
 ## GitLab CI

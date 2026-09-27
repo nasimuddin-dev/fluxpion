@@ -116,6 +116,8 @@ evaluators:
 
 ```bash
 protolens test ./tests -e Staging -r console junit html -o results
+# run a collection like Newman, including Postman collection/environment files and CSV data
+protolens run-collection api.postman_collection.json -e staging.postman_environment.json -d data.csv
 # exit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error
 ```
 

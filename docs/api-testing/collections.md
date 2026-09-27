@@ -52,6 +52,8 @@ pm.execution.skipRequest();
 
 `postman.setNextRequest()` works too. An iteration stops after 1,000 requests, so a `setNextRequest` loop can't run forever.
 
+To run a collection from a terminal or CI, use [`protolens run-collection`](../cli/reference.md#run-collection). It runs the same way and also accepts Postman collection and environment files, like Newman.
+
 Results stream into the panel on the right, with checks, errors and a trace for each request. Earlier runs are listed under **Previous runs**, and every run is saved with its HTML, Markdown, JUnit and JSON reports. With more than one iteration, each result is prefixed with its iteration number, for example `#2 Patients / List patients`.
 
 :::

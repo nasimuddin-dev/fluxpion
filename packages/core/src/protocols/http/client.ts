@@ -1,5 +1,6 @@
 import { createWriteStream, openAsBlob, readFileSync, mkdirSync, type WriteStream } from 'node:fs';
 import { basename, join } from 'node:path';
+import { endAndClose } from '../../storage/fsutil.js';
 import { Agent, ProxyAgent, fetch as undiciFetch, FormData as UndiciFormData, type Dispatcher } from 'undici';
 import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelinePhase } from '../../model/types.js';
 import { ApsError } from '../../errors.js';
@@ -235,7 +236,7 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
       }
     } finally {
       reader.releaseLock();
-      if (file) await new Promise<void>((r) => file!.end(r));
+      if (file) await endAndClose(file);
     }
   }
   mark('download', tDown);

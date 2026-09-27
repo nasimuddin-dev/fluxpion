@@ -8,6 +8,7 @@ import { LatencyRecorder, round } from '../util/stats.js';
 import { Semaphore, sleep } from '../util/concurrency.js';
 import { shortId } from '../util/ids.js';
 import { executeTest, type ExecServices } from './execute.js';
+import { endAndClose } from '../storage/fsutil.js';
 
 export type RunEvent =
   | { type: 'run-start'; runId: string; name: string; startedAt: string }
@@ -311,7 +312,7 @@ export async function runTests(opts: RunOptions): Promise<RunSummary> {
       await exec({ ...t, name: `[teardown] ${t.name}` }).catch(() => undefined);
     }
     opts.signal?.removeEventListener('abort', onAbort);
-    if (out) await new Promise<void>((r) => out!.end(r));
+    if (out) await endAndClose(out);
   }
 
   const summary = agg.summary({

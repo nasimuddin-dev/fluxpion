@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -105,5 +105,51 @@ describe('example workspace (end-to-end)', () => {
     expect(readFileSync(join(out, 'report.html'), 'utf8')).toContain('PASSED');
     const bad = await run([cli, 'test', join(dir, 'does-not-exist')], { ...process.env, PROTOLENS_HOME: join(dir, 'home') });
     expect(bad.status).toBe(2);
+  });
+
+  it('CLI: `protolens run-collection` runs workspace collections and Postman files (Newman-style)', async () => {
+    const cli = resolve('packages/cli/bin/protolens.js');
+    const env = { ...process.env, PROTOLENS_HOME: join(dir, 'home') };
+
+    // workspace collection, one folder, two iterations: the token script feeds the next requests
+    const out = join(dir, 'col-out');
+    const r = await run([cli, 'run-collection', 'Veterinary API', '-w', ws.root, '-e', 'Development', '--folder', 'Authentication', 'Patients', '-n', '2', '-o', out, '-q'], env);
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(out, 'summary.json'), 'utf8'))).toMatchObject({ total: 8, passed: 8 });
+
+    // without the token request the patients endpoints refuse: exit 1, and no crash on exit
+    const failing = await run([cli, 'run-collection', 'Veterinary API', '-w', ws.root, '-e', 'Development', '--folder', 'Patients', '-o', join(dir, 'col-fail'), '-q'], env);
+    expect(failing.stderr).toBe('');
+    expect(failing.status).toBe(1);
+
+    // a Postman collection + environment + CSV data outside any workspace
+    writeFileSync(
+      join(dir, 'smoke.postman_collection.json'),
+      JSON.stringify({
+        info: { name: 'Smoke', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+        item: [
+          {
+            name: 'Health',
+            request: { method: 'GET', url: '{{baseUrl}}/health' },
+            event: [{ listen: 'test', script: { exec: ["pm.test('ok', () => pm.response.to.have.status(200));", "pm.environment.set('seen', pm.iterationData.get('n'));"] } }],
+          },
+          {
+            name: 'Again',
+            request: { method: 'GET', url: '{{baseUrl}}/health?n={{n}}' },
+            event: [{ listen: 'test', script: { exec: ["pm.test('carries', () => pm.expect(String(pm.environment.get('seen'))).to.equal(String(pm.iterationData.get('n'))));"] } }],
+          },
+        ],
+      }),
+    );
+    writeFileSync(join(dir, 'local.postman_environment.json'), JSON.stringify({ name: 'Local', values: [{ key: 'baseUrl', value: 'http://localhost:4010', enabled: true }] }));
+    writeFileSync(join(dir, 'rows.csv'), 'n\n1\n2\n3\n');
+    const pm = await run([cli, 'run-collection', join(dir, 'smoke.postman_collection.json'), '-e', join(dir, 'local.postman_environment.json'), '-d', join(dir, 'rows.csv'), '-o', join(dir, 'pm-out'), '-r', 'junit', '-q'], env);
+    expect(pm.stderr).toBe('');
+    expect(pm.status).toBe(0);
+    expect(readFileSync(join(dir, 'pm-out', 'junit.xml'), 'utf8')).toContain('tests="6"');
+
+    const missing = await run([cli, 'run-collection', join(dir, 'smoke.postman_collection.json'), '--folder', 'Nope'], env);
+    expect(missing.status).toBe(2);
   });
 });
