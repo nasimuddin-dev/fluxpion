@@ -21,7 +21,7 @@ window.__cap = {
     el.click();
   },
   nav(label) {
-    const el = document.querySelector('nav [title="' + label + '"]');
+    const el = document.querySelector('nav [aria-label="' + label + '"]');
     if (!el) throw new Error('nav not found: ' + label);
     el.click();
   },

@@ -391,7 +391,9 @@ export class WorkspaceManager {
       // readJson preserved the corrupted file as settings.json.corrupt-<ts>; start from defaults
       this.settingsProblem = (e as Error).message;
     }
-    return { ...defaultSettings(), ...s };
+    // revision 2 (redesigned UI): the default font size went from 13 to 14px — move people still on the old default
+    if ((s.settingsRevision ?? 1) < 2 && s.fontSize === 13) s.fontSize = 14;
+    return { ...defaultSettings(), ...s, settingsRevision: 2 };
   }
 
   saveSettings(s: AppSettings): AppSettings {

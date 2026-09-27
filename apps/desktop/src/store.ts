@@ -1,3 +1,4 @@
+import { toast as sonner } from 'sonner';
 import { create } from 'zustand';
 import type { AppSettings, WorkspaceCurrent } from './types';
 import { call } from './api';
@@ -106,6 +107,7 @@ export const useApp = create<AppState>((set, get) => ({
     const id = ++toastId;
     set({ toasts: [...get().toasts, { id, kind, text }] });
     setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), kind === 'error' ? 7000 : 3500);
+    (kind === 'error' ? sonner.error : kind === 'success' ? sonner.success : sonner)(text, { duration: kind === 'error' ? 7000 : 3500 });
   },
   setActivity: (key, label) => {
     const a = { ...get().activity };

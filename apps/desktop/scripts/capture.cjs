@@ -1,5 +1,5 @@
 // Captures documentation screenshots of the real app:
-//   npm run screenshots -w @protolens/desktop
+//   npm run screenshots -w @protolens/desktop   (PROTOLENS_CAPTURE_OUT=<dir> writes elsewhere)
 // Starts the demo servers, copies the example workspace into a temporary profile,
 // launches Electron in capture mode and writes docs/public/images/*.jpg.
 const { spawn, spawnSync } = require('node:child_process');
@@ -16,7 +16,7 @@ writeFileSync(
   join(ws, 'mcp-servers.json'),
   JSON.stringify({ schemaVersion: '1.0', servers: [{ id: 'customer-mcp', name: 'customer-mcp', transport: 'stdio', command: 'node', args: [join(root, 'examples', 'servers', 'mcp-server.mjs')] }] }, null, 2),
 );
-writeFileSync(join(home, 'settings.json'), JSON.stringify({ lastWorkspace: ws, workspacePaths: [ws], theme: 'dark' }, null, 2));
+writeFileSync(join(home, 'settings.json'), JSON.stringify({ lastWorkspace: ws, workspacePaths: [ws], theme: process.env.PROTOLENS_CAPTURE_THEME ?? 'dark' }, null, 2));
 
 const servers = spawn(process.execPath, [join(root, 'examples', 'servers', 'demo-servers.mjs')], { stdio: 'ignore' });
 setTimeout(() => {
@@ -24,7 +24,7 @@ setTimeout(() => {
   const r = spawnSync(electron, ['.'], {
     cwd: resolve(__dirname, '..'),
     stdio: 'inherit',
-    env: { ...process.env, PROTOLENS_HOME: home, PROTOLENS_CAPTURE_SCRIPT: join(__dirname, 'capture-steps.cjs'), PROTOLENS_CAPTURE_DIR: join(root, 'docs', 'public', 'images') },
+    env: { ...process.env, PROTOLENS_HOME: home, PROTOLENS_CAPTURE_SCRIPT: join(__dirname, 'capture-steps.cjs'), PROTOLENS_CAPTURE_DIR: process.env.PROTOLENS_CAPTURE_OUT ?? join(root, 'docs', 'public', 'images') },
   });
   servers.kill();
   rmSync(home, { recursive: true, force: true });

@@ -30,49 +30,52 @@ import { call, asError, modKey, on } from '../api';
 import logoUrl from '../../build/logo.svg';
 import { promptText, useApp, type ViewId, type DialogRequest } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
-import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner } from './ui';
+import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
+import { Toaster as SonnerToaster } from 'sonner';
 
 export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: string }> = [
-  { id: 'rest', label: 'REST', icon: <Network size={17} />, group: 'Protocols' },
-  { id: 'graphql', label: 'GraphQL', icon: <GitBranch size={17} />, group: 'Protocols' },
-  { id: 'websocket', label: 'WebSocket', icon: <Radio size={17} />, group: 'Protocols' },
-  { id: 'mcp', label: 'MCP', icon: <Plug size={17} />, group: 'Protocols' },
-  { id: 'ai', label: 'AI Lab', icon: <Sparkles size={17} />, group: 'AI' },
-  { id: 'evaluations', label: 'Evaluations', icon: <FlaskConical size={17} />, group: 'AI' },
-  { id: 'tests', label: 'Tests', icon: <ShieldCheck size={17} />, group: 'Automation' },
-  { id: 'load', label: 'Load', icon: <Gauge size={17} />, group: 'Automation' },
-  { id: 'traces', label: 'Traces', icon: <Activity size={17} />, group: 'Observe' },
-  { id: 'collections', label: 'Collections', icon: <FolderTree size={17} />, group: 'Workspace' },
-  { id: 'history', label: 'History', icon: <History size={17} />, group: 'Workspace' },
-  { id: 'environments', label: 'Envs', icon: <KeyRound size={17} />, group: 'Workspace' },
+  { id: 'rest', label: 'REST', icon: <Network size={18} />, group: 'Protocols' },
+  { id: 'graphql', label: 'GraphQL', icon: <GitBranch size={18} />, group: 'Protocols' },
+  { id: 'websocket', label: 'WebSocket', icon: <Radio size={18} />, group: 'Protocols' },
+  { id: 'mcp', label: 'MCP', icon: <Plug size={18} />, group: 'Protocols' },
+  { id: 'ai', label: 'AI Lab', icon: <Sparkles size={18} />, group: 'AI' },
+  { id: 'evaluations', label: 'Evaluations', icon: <FlaskConical size={18} />, group: 'AI' },
+  { id: 'tests', label: 'Tests', icon: <ShieldCheck size={18} />, group: 'Automation' },
+  { id: 'load', label: 'Load', icon: <Gauge size={18} />, group: 'Automation' },
+  { id: 'traces', label: 'Traces', icon: <Activity size={18} />, group: 'Observe' },
+  { id: 'collections', label: 'Collections', icon: <FolderTree size={18} />, group: 'Workspace' },
+  { id: 'history', label: 'History', icon: <History size={18} />, group: 'Workspace' },
+  { id: 'environments', label: 'Envs', icon: <KeyRound size={18} />, group: 'Workspace' },
 ];
 
 export function Sidebar() {
   const view = useApp((s) => s.view);
   const setView = useApp((s) => s.setView);
+  const item = (id: ViewId, label: string, icon: ReactNode, shortcut?: string) => (
+    <Tooltip content={shortcut ? `${label}  ·  ${shortcut}` : label} side="right">
+      <button
+        onClick={() => setView(id)}
+        aria-current={view === id ? 'page' : undefined}
+        aria-label={label}
+        className={cx(
+          'group w-full flex flex-col items-center gap-1 py-2 rounded-lg text-[0.74rem] font-medium transition-colors duration-150',
+          view === id ? 'bg-accent-soft text-accent' : 'text-muted hover:text-fg hover:bg-hover',
+        )}
+      >
+        <span className="transition-transform duration-150 group-active:scale-90">{icon}</span>
+        <span className="w-full truncate px-0.5 text-center leading-tight">{label}</span>
+      </button>
+    </Tooltip>
+  );
   return (
-    <nav aria-label="Main navigation" className="w-[76px] shrink-0 border-r border-line bg-panel flex flex-col items-stretch py-1 overflow-y-auto overflow-x-hidden">
+    <nav aria-label="Main navigation" className="w-[84px] shrink-0 border-r border-line bg-panel flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden">
       {NAV.map((n, i) => (
         <div key={n.id}>
-          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-3 my-1 border-t border-line" />}
-          <button
-            onClick={() => setView(n.id)}
-            aria-current={view === n.id ? 'page' : undefined}
-            title={n.label}
-            className={cx('w-full flex flex-col items-center gap-0.5 py-1.5 text-[0.66rem] relative', view === n.id ? 'text-accent' : 'text-muted hover:text-fg')}
-          >
-            {view === n.id && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent" />}
-            {n.icon}
-            <span className="w-full truncate px-0.5 text-center">{n.label}</span>
-          </button>
+          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-2 my-1.5 border-t border-line" />}
+          {item(n.id, n.label, n.icon, i < 9 ? `${modKey}+Alt+${i + 1}` : undefined)}
         </div>
       ))}
-      <div className="mt-auto">
-        <button onClick={() => setView('settings')} className={cx('w-full flex flex-col items-center gap-0.5 py-2 text-[0.68rem]', view === 'settings' ? 'text-accent' : 'text-muted hover:text-fg')}>
-          <Settings size={17} />
-          Settings
-        </button>
-      </div>
+      <div className="mt-auto pt-2">{item('settings', 'Settings', <Settings size={18} />, `${modKey}+,`)}</div>
     </nav>
   );
 }
@@ -99,7 +102,7 @@ function WorkspaceMenu() {
   };
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 h-7 px-2 rounded-md hover:bg-hover text-sm font-medium max-w-64" aria-haspopup="menu">
+      <button onClick={() => setOpen(!open)} className={cx('flex items-center gap-1.5 h-8 px-2.5 rounded-md hover:bg-hover text-sm font-medium max-w-64 transition-colors', open && 'bg-hover')} aria-haspopup="menu" aria-expanded={open}>
         <Layers size={14} className="text-muted" />
         <span className="truncate">{ws?.name ?? 'No workspace'}</span>
         <ChevronDown size={13} className="text-muted" />
@@ -107,10 +110,10 @@ function WorkspaceMenu() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute left-0 top-8 z-40 w-72 rounded-lg border border-line bg-bg shadow-xl p-1 text-sm">
+          <div role="menu" className="absolute left-0 top-9 z-40 w-72 rounded-lg border border-line bg-bg shadow-lg p-1 text-sm animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150">
             <div className="px-2 py-1 text-[0.7rem] uppercase tracking-wider text-muted">Workspaces</div>
             {list.map((w) => (
-              <button key={w.id} className="w-full text-left px-2 py-1.5 rounded hover:bg-hover flex items-center gap-2" onClick={() => act(() => call('ws.open', { ref: w.path }))}>
+              <button key={w.id} className="w-full text-left px-2 h-8 rounded-md hover:bg-hover transition-colors flex items-center gap-2" onClick={() => act(() => call('ws.open', { ref: w.path }))}>
                 <span className="w-3.5">{w.path === ws?.path && <Check size={13} className="text-accent" />}</span>
                 <span className="truncate">{w.name}</span>
               </button>
@@ -145,7 +148,7 @@ function WorkspaceMenu() {
                 },
               ],
             ].map(([label, fn]) => (
-              <button key={label as string} className="w-full text-left px-2 py-1.5 rounded hover:bg-hover pl-7" onClick={fn as () => void}>
+              <button key={label as string} className="w-full text-left px-2 h-8 rounded-md hover:bg-hover transition-colors pl-7" onClick={fn as () => void}>
                 {label as string}
               </button>
             ))}
@@ -183,37 +186,70 @@ function WorkspaceMenu() {
   );
 }
 
+/** Postman-style environment switcher with a coloured dot (red for production). */
+export function EnvironmentPicker() {
+  const ws = useApp((s) => s.workspace);
+  const env = useApp((s) => s.environment);
+  const envObj = ws?.environments.find((e) => e.name === env);
+  const dot = envObj ? (envObj.color ?? (envObj.isProduction ? 'var(--bad)' : 'var(--ok)')) : 'var(--line-strong)';
+  return (
+    <Tooltip content="Active environment">
+      <label className={cx('relative flex items-center h-8 rounded-md border bg-bg shadow-sm transition-colors', envObj?.isProduction ? 'border-bad/50' : 'border-line-strong hover:border-muted/50')}>
+        <span className="absolute left-2.5 w-2 h-2 rounded-full pointer-events-none" style={{ background: dot }} />
+        <select
+          aria-label="Environment"
+          className="appearance-none bg-transparent outline-none h-full pl-6 pr-7 text-sm cursor-pointer max-w-52 truncate"
+          style={{ backgroundImage: 'var(--select-chevron)', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+          value={env ?? ''}
+          onChange={(e) => useApp.getState().setEnvironment(e.target.value || undefined)}
+        >
+          <option value="">No environment</option>
+          {ws?.environments.map((e) => (
+            <option key={e.id} value={e.name}>
+              {e.name}
+              {e.isProduction ? ' (production)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+    </Tooltip>
+  );
+}
+
 export function TopBar() {
   const set = useApp((s) => s.set);
+  const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
   return (
-    <header className="h-10 shrink-0 border-b border-line flex items-center gap-2 px-2 bg-bg" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-      <div className="flex items-center gap-2 pl-1 pr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        <img src={logoUrl} alt="" className="h-6 w-6" />
-        <span className="font-semibold text-sm hidden md:inline">Protolens</span>
+    <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-bg" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <div className="flex items-center gap-2 pr-1" style={noDrag}>
+        <img src={logoUrl} alt="" className="h-7 w-7" />
+        <span className="font-semibold tracking-tight hidden md:inline">Protolens</span>
       </div>
-      <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <span className="h-5 w-px bg-line hidden md:block" />
+      <div style={noDrag}>
         <WorkspaceMenu />
       </div>
       <button
         onClick={() => set({ searchOpen: true })}
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        className="mx-auto flex items-center gap-2 h-7 w-[min(440px,40vw)] rounded-md border border-line bg-panel px-2.5 text-sm text-muted hover:border-accent/50"
+        style={noDrag}
+        className="mx-auto flex items-center gap-2 h-8 w-[min(460px,38vw)] rounded-lg border border-line bg-panel px-3 text-sm text-muted transition-colors hover:border-line-strong hover:bg-hover"
       >
-        <Search size={14} />
-        <span>Search requests, tests, tools, traces…</span>
-        <span className="ml-auto">
+        <Search size={15} />
+        <span className="truncate">Search requests, tests, tools, traces…</span>
+        <span className="ml-auto hidden sm:inline">
           <Kbd>{modKey}+Shift+F</Kbd>
         </span>
       </button>
-      <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        <Button size="sm" variant="ghost" onClick={() => set({ paletteOpen: true })} icon={<TerminalSquare size={14} />}>
+      <div className="flex items-center gap-1.5" style={noDrag}>
+        <EnvironmentPicker />
+        <Button size="md" variant="ghost" onClick={() => set({ paletteOpen: true })} icon={<TerminalSquare size={15} />}>
           <span className="hidden lg:inline">Commands</span> <Kbd>{modKey}+K</Kbd>
         </Button>
         <IconButton label="AI assistant" onClick={() => set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } })}>
-          <Bot size={16} />
+          <Bot size={17} />
         </IconButton>
         <IconButton label="Settings" onClick={() => useApp.getState().setView('settings')}>
-          <Settings size={16} />
+          <Settings size={17} />
         </IconButton>
       </div>
     </header>
@@ -230,25 +266,12 @@ export function StatusBar() {
   const envObj = ws?.environments.find((e) => e.name === env);
   const acts = Object.values(activity);
   return (
-    <footer className="h-7 shrink-0 border-t border-line bg-panel flex items-center gap-4 px-3 text-xs text-muted">
-      <label className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full" style={{ background: envObj?.color ?? (envObj?.isProduction ? 'var(--bad)' : 'var(--ok)') }} />
-        <select
-          aria-label="Environment"
-          className="bg-transparent outline-none hover:text-fg cursor-pointer"
-          value={env ?? ''}
-          onChange={(e) => useApp.getState().setEnvironment(e.target.value || undefined)}
-        >
-          <option value="">No environment</option>
-          {ws?.environments.map((e) => (
-            <option key={e.id} value={e.name}>
-              {e.name}
-              {e.isProduction ? ' (production)' : ''}
-            </option>
-          ))}
-        </select>
+    <footer className="h-7 shrink-0 border-t border-line bg-panel flex items-center gap-4 px-3 text-[0.75rem] text-muted">
+      <span className="flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full" style={{ background: envObj ? (envObj.color ?? (envObj.isProduction ? 'var(--bad)' : 'var(--ok)')) : 'var(--line-strong)' }} />
+        {env ?? 'No environment'}
         {envObj?.isProduction && <Badge tone="bad">PRODUCTION</Badge>}
-      </label>
+      </span>
       <span className="flex items-center gap-1" title="Connected MCP servers">
         <Plug size={12} /> {mcp} connected
       </span>
@@ -526,23 +549,16 @@ export function AssistantPanel() {
 }
 
 export function Toaster() {
-  const toasts = useApp((s) => s.toasts);
+  const theme = useApp((s) => s.settings?.theme ?? 'system');
   return (
-    <div className="fixed bottom-10 right-4 z-[60] flex flex-col gap-2" role="status" aria-live="polite">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={cx(
-            'rounded-md border px-3 py-2 text-sm shadow-lg max-w-sm bg-bg',
-            t.kind === 'error' && 'border-bad/50 text-bad',
-            t.kind === 'success' && 'border-ok/50',
-            t.kind === 'info' && 'border-line',
-          )}
-        >
-          {t.text}
-        </div>
-      ))}
-    </div>
+    <SonnerToaster
+      position="bottom-right"
+      offset={40}
+      theme={theme}
+      richColors
+      closeButton
+      toastOptions={{ className: 'font-sans', style: { fontSize: '0.9rem' } }}
+    />
   );
 }
 

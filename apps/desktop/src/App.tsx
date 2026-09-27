@@ -3,7 +3,7 @@ import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
-import { Spinner } from './components/ui';
+import { Spinner, TooltipProvider } from './components/ui';
 import { RestView } from './views/RestView';
 import { GraphQLView } from './views/GraphQLView';
 import { WebSocketView } from './views/WebSocketView';
@@ -42,7 +42,7 @@ function useThemeEffect() {
       const dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.dataset.reducedMotion = String(!!settings?.reducedMotion);
-      document.documentElement.style.setProperty('--font-size', `${settings?.fontSize ?? 13}px`);
+      document.documentElement.style.setProperty('--font-size', `${settings?.fontSize ?? 14}px`);
     };
     apply();
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -140,6 +140,7 @@ export default function App() {
     );
 
   return (
+    <TooltipProvider delayDuration={350} skipDelayDuration={150}>
     <div className="h-full flex flex-col">
       <TopBar />
       <div className="flex-1 flex min-h-0">
@@ -166,5 +167,6 @@ export default function App() {
       <DialogHost />
       <ProgressHost />
     </div>
+    </TooltipProvider>
   );
 }

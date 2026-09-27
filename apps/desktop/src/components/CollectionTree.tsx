@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, FilePlus2, Folder, FolderPlus, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode } from '../types';
-import { cx } from './ui';
+import { cx, Menu, type MenuItem } from './ui';
 import { promptText } from '../store';
 import { uid } from '../lib/format';
 
@@ -73,7 +73,7 @@ export function CollectionTree({
         const isOpen = open[n.id] ?? !!f;
         return (
           <div key={n.id}>
-            <div className="group flex items-center h-7 text-sm hover:bg-hover pr-1" style={pad}>
+            <div className="group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors" style={pad}>
               <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
@@ -100,7 +100,7 @@ export function CollectionTree({
       }
       const method = n.kind === 'http' ? n.request.method : 'GQL';
       return (
-        <div key={n.id} className={cx('group flex items-center h-7 text-sm pr-1 hover:bg-hover', activeRequestId === n.id && 'bg-accent/10')} style={pad}>
+        <div key={n.id} className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover')} style={pad}>
           <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)}>
             <span className={cx('mono text-[0.7rem] font-bold w-9 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
@@ -123,7 +123,7 @@ export function CollectionTree({
         const isOpen = open[c.id] ?? true;
         return (
           <div key={c.id}>
-            <div className="group flex items-center h-7 hover:bg-hover pr-1 pl-1.5">
+            <div className="group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors">
               <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
@@ -168,42 +168,22 @@ function NodeMenu({
   onRun?(): void;
   runLabel?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const items: Array<[string, React.ReactNode, (() => void) | undefined]> = [
-    [runLabel, <Play size={13} />, onRun],
-    ['New request', <FilePlus2 size={13} />, onNewRequest],
-    ['New folder', <FolderPlus size={13} />, onNewFolder],
-    ['Rename', <Pencil size={13} />, onRename],
-    ['Duplicate', <FilePlus2 size={13} />, onDuplicate],
-    ['Delete', <Trash2 size={13} />, onDelete],
-  ];
+  const items: MenuItem[] = [];
+  const add = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}) => fn && items.push({ label, icon, onSelect: fn, ...extra });
+  add(runLabel, <Play size={14} />, onRun);
+  add('New request', <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
+  add('New folder', <FolderPlus size={14} />, onNewFolder);
+  add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });
+  add('Duplicate', <Copy size={14} />, onDuplicate);
+  add('Delete', <Trash2 size={14} />, onDelete, { danger: true, separator: true });
   return (
-    <div className="relative">
-      <button aria-label="More actions" className="p-1 rounded text-muted opacity-0 group-hover:opacity-100 hover:bg-panel2 focus:opacity-100" onClick={() => setOpen(!open)}>
-        <MoreHorizontal size={14} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-6 z-40 w-40 rounded-md border border-line bg-bg shadow-lg p-1">
-            {items
-              .filter(([, , fn]) => fn)
-              .map(([label, icon, fn]) => (
-                <button
-                  key={label}
-                  className={cx('w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-hover', label === 'Delete' && 'text-bad')}
-                  onClick={() => {
-                    setOpen(false);
-                    fn!();
-                  }}
-                >
-                  {icon}
-                  {label}
-                </button>
-              ))}
-          </div>
-        </>
-      )}
-    </div>
+    <Menu
+      items={items}
+      trigger={
+        <button aria-label="More actions" className="p-1 rounded-md text-muted opacity-0 group-hover:opacity-100 hover:bg-panel2 hover:text-fg focus:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-panel2 transition-opacity">
+          <MoreHorizontal size={15} />
+        </button>
+      }
+    />
   );
 }

@@ -1,42 +1,60 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
+/* Design tokens (shadcn/ui-style zinc + indigo). Components use the Tailwind colours mapped below. */
 :root {
-  --font-size: 13px;
+  --font-size: 14px;
+  --radius: 8px;
   --bg: #ffffff;
-  --panel: #f6f8fa;
-  --panel-2: #eef1f4;
-  --hover: #eaeef2;
-  --line: #d8dee4;
-  --fg: #1f2328;
-  --muted: #656d76;
-  --accent: #0969da;
+  --panel: #f8f8fa;
+  --panel-2: #f1f1f4;
+  --hover: #ededf1;
+  --line: #e4e4e9;
+  --line-strong: #d4d4db;
+  --fg: #18181b;
+  --muted: #6b6b76;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef0ff;
   --accent-fg: #ffffff;
-  --ok: #1a7f37;
-  --bad: #cf222e;
-  --warn: #9a6700;
-  --judge: #8250df;
-  --focus: #0969da;
-  --code-bg: #f6f8fa;
+  --ok: #15803d;
+  --bad: #dc2626;
+  --warn: #b45309;
+  --judge: #9333ea;
+  --focus: #6366f1;
+  --code-bg: #fafafb;
+  --overlay: rgb(9 9 11 / 0.45);
+  --elev-sm: 0 1px 2px rgb(16 16 24 / 0.06);
+  --elev-md: 0 4px 12px -2px rgb(16 16 24 / 0.1), 0 2px 4px -2px rgb(16 16 24 / 0.06);
+  --elev-lg: 0 18px 40px -12px rgb(16 16 24 / 0.28), 0 4px 12px -4px rgb(16 16 24 / 0.1);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 [data-theme='dark'] {
-  --bg: #0d1117;
-  --panel: #151b23;
-  --panel-2: #1c2330;
-  --hover: #212a36;
-  --line: #2d3540;
-  --fg: #e6edf3;
-  --muted: #8d96a0;
-  --accent: #4493f8;
+  --bg: #111114;
+  --panel: #17171b;
+  --panel-2: #1f1f24;
+  --hover: #26262d;
+  --line: #2a2a31;
+  --line-strong: #3a3a43;
+  --fg: #ededf0;
+  --muted: #9b9ba7;
+  --accent: #6d6ff5;
+  --accent-hover: #7f81f7;
+  --accent-soft: #23233d;
   --accent-fg: #ffffff;
-  --ok: #3fb950;
-  --bad: #f85149;
-  --warn: #d29922;
-  --judge: #a371f7;
-  --focus: #4493f8;
-  --code-bg: #0d1117;
+  --ok: #34d399;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --judge: #c084fc;
+  --focus: #818cf8;
+  --code-bg: #111114;
+  --overlay: rgb(0 0 0 / 0.6);
+  --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-md: 0 6px 16px -4px rgb(0 0 0 / 0.55);
+  --elev-lg: 0 24px 48px -12px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
 }
 
 @theme inline {
@@ -45,15 +63,30 @@
   --color-panel2: var(--panel-2);
   --color-hover: var(--hover);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
   --color-bad: var(--bad);
   --color-warn: var(--warn);
   --color-judge: var(--judge);
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  /* a slightly larger small-text scale: dense tool UIs were too small at text-xs = 0.75rem */
+  --text-xs: 0.8rem;
+  --text-xs--line-height: 1.1rem;
+  --text-sm: 0.9rem;
+  --text-sm--line-height: 1.3rem;
+  --radius-sm: 5px;
+  --radius-md: var(--radius);
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
 }
 
 html {
@@ -70,16 +103,42 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* scrollbars: thin, rounded, only visible where needed */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: var(--line-strong) transparent;
 }
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 [data-reduced-motion='true'] *,
 [data-reduced-motion='true'] *::before,
@@ -93,31 +152,63 @@ body {
     animation: none !important;
   }
 }
-input,
-select,
-textarea,
-button {
-  font: inherit;
-  color: inherit;
-}
+/* Form controls inherit font and colour via Tailwind's preflight (in the base layer). Don't restate it here:
+   unlayered rules beat layered utilities, which silently disabled text-* classes on every button. */
+/* Component classes live in the components layer so Tailwind utilities on the same element win. */
+@layer components {
 .mono {
   font-family: var(--font-mono);
   font-size: 0.95em;
 }
 .field {
   background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 4px 8px;
-  min-height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  min-height: 32px;
   outline: none;
+  box-shadow: var(--elev-sm);
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+.field:hover:not(:disabled):not(:focus) {
+  border-color: color-mix(in srgb, var(--muted) 45%, var(--line-strong));
 }
 .field:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.field::placeholder {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
 }
 .field:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+select.field {
+  appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+select.field option {
+  background: var(--bg);
+  color: var(--fg);
+}
+textarea.field {
+  padding: 8px 10px;
+  line-height: 1.5;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+input[type='range'] {
+  accent-color: var(--accent);
 }
 .cell-input {
   background: transparent;
@@ -129,19 +220,20 @@ button {
 }
 .cell-input:focus {
   background: var(--bg);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  border-radius: 4px;
 }
-.method-GET { color: #1a7f37; }
-.method-POST { color: #bf8700; }
-.method-PUT { color: #0969da; }
-.method-PATCH { color: #8250df; }
-.method-DELETE { color: #cf222e; }
+.method-GET { color: #15803d; }
+.method-POST { color: #c2410c; }
+.method-PUT { color: #1d4ed8; }
+.method-PATCH { color: #7c3aed; }
+.method-DELETE { color: #dc2626; }
 .method-HEAD, .method-OPTIONS { color: var(--muted); }
-[data-theme='dark'] .method-GET { color: #3fb950; }
-[data-theme='dark'] .method-POST { color: #d29922; }
-[data-theme='dark'] .method-PUT { color: #4493f8; }
-[data-theme='dark'] .method-PATCH { color: #a371f7; }
-[data-theme='dark'] .method-DELETE { color: #f85149; }
+[data-theme='dark'] .method-GET { color: #4ade80; }
+[data-theme='dark'] .method-POST { color: #fb923c; }
+[data-theme='dark'] .method-PUT { color: #60a5fa; }
+[data-theme='dark'] .method-PATCH { color: #a78bfa; }
+[data-theme='dark'] .method-DELETE { color: #f87171; }
 .var-token {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -160,17 +252,8 @@ button {
   background: #fb8f44;
   color: #000;
 }
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 .spin {
   animation: spin 0.8s linear infinite;
-}
-@keyframes pulse-bar {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(300%); }
 }
 .indeterminate::after {
   content: '';
@@ -179,4 +262,36 @@ button {
   width: 33%;
   background: var(--accent);
   animation: pulse-bar 1.2s ease-in-out infinite;
+}
+
+/* smooth surfaces */
+.surface {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: var(--elev-sm);
+}
+.fade-in {
+  animation: fade-in 0.18s ease-out;
+}
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

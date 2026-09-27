@@ -30,7 +30,7 @@ export function CodeEditor({
   placeholder?: string;
 }) {
   const theme = useEditorTheme();
-  const fontSize = useApp((s) => s.settings?.fontSize ?? 13);
+  const fontSize = useApp((s) => s.settings?.fontSize ?? 14);
   return (
     <div className="h-full w-full min-h-0 relative">
       {!value && placeholder && <div className="absolute left-14 top-1 text-muted text-sm pointer-events-none z-10 mono">{placeholder}</div>}

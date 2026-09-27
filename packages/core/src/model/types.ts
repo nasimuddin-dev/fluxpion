@@ -562,6 +562,8 @@ export interface AppSettings {
   globalVariables: KeyValue[];
   /** Check GitHub for a newer version when the desktop app starts. */
   checkForUpdates: boolean;
+  /** Settings layout revision, used for one-time migrations of defaults. */
+  settingsRevision?: number;
 }
 
 export const DEFAULT_REDACT_FIELDS = [
@@ -587,7 +589,7 @@ export function defaultSettings(): AppSettings {
   return {
     schemaVersion: SCHEMA_VERSION,
     theme: 'system',
-    fontSize: 13,
+    fontSize: 14,
     reducedMotion: false,
     logLevel: 'INFO',
     redactFields: [...DEFAULT_REDACT_FIELDS],
@@ -598,6 +600,7 @@ export function defaultSettings(): AppSettings {
     loadTesting: { allowRemoteHosts: false, maxVirtualUsers: 200 },
     workspacePaths: [],
     globalVariables: [],
+    settingsRevision: 2,
     checkForUpdates: true,
   };
 }

@@ -1,24 +1,33 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import * as MenuPrimitive from '@radix-ui/react-dropdown-menu';
+import * as SwitchPrimitive from '@radix-ui/react-switch';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { Loader2, X } from 'lucide-react';
 
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ');
 }
 
-type Variant = 'primary' | 'default' | 'ghost' | 'danger';
+type Variant = 'primary' | 'default' | 'ghost' | 'danger' | 'soft';
 
-export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md'; loading?: boolean; icon?: ReactNode }>(
+export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; loading?: boolean; icon?: ReactNode }>(
   ({ variant = 'default', size = 'md', loading, icon, className, children, disabled, ...p }, ref) => (
     <button
       ref={ref}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-md border font-medium whitespace-nowrap select-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-        size === 'sm' ? 'h-6 px-2 text-xs' : 'h-7 px-3 text-[0.95rem]',
-        variant === 'primary' && 'bg-accent border-accent text-white hover:brightness-110',
-        variant === 'default' && 'bg-panel border-line hover:bg-hover',
-        variant === 'ghost' && 'border-transparent hover:bg-hover',
-        variant === 'danger' && 'bg-bad border-bad text-white hover:brightness-110',
+        'inline-flex items-center justify-center gap-1.5 rounded-md border font-medium whitespace-nowrap select-none',
+        'transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:scale-[0.97]',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+        size === 'sm' && 'h-7 px-2.5 text-xs',
+        size === 'md' && 'h-8 px-3 text-sm',
+        size === 'lg' && 'h-9 px-4 text-sm',
+        variant === 'primary' && 'bg-accent border-accent text-white shadow-sm hover:bg-accent-hover hover:border-accent-hover',
+        variant === 'default' && 'bg-bg border-line-strong shadow-sm hover:bg-hover',
+        variant === 'soft' && 'bg-accent-soft border-transparent text-accent hover:brightness-95',
+        variant === 'ghost' && 'border-transparent text-muted hover:text-fg hover:bg-hover',
+        variant === 'danger' && 'bg-bad border-bad text-white shadow-sm hover:brightness-110',
         className,
       )}
       {...p}
@@ -28,20 +37,57 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
     </button>
   ),
 );
+Button.displayName = 'Button';
 
-export function IconButton({ label, children, className, active, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
+/* ------------------------------------------------------------------ tooltip */
+export const TooltipProvider = TooltipPrimitive.Provider;
+
+/** Hover/focus tooltip. Renders the child alone when there's no content. */
+export function Tooltip({ content, children, side = 'bottom' }: { content?: ReactNode; children: ReactNode; side?: 'top' | 'bottom' | 'left' | 'right' }) {
+  if (!content) return <>{children}</>;
   return (
-    <button aria-label={label} title={label} className={cx('inline-flex items-center justify-center rounded-md h-7 w-7 text-muted hover:text-fg hover:bg-hover disabled:opacity-40', active && 'bg-hover text-fg', className)} {...p}>
-      {children}
-    </button>
+    <TooltipPrimitive.Root>
+      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+          side={side}
+          sideOffset={6}
+          className="z-[80] rounded-md bg-fg text-bg px-2 py-1 text-xs font-medium shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+        >
+          {content}
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
   );
 }
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, ...p }, ref) => <input ref={ref} className={cx('field', className)} {...p} />);
+export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean; tooltipSide?: 'top' | 'bottom' | 'left' | 'right' }>(
+  ({ label, children, className, active, tooltipSide, title: _title, ...p }, ref) => (
+    <Tooltip content={label} side={tooltipSide}>
+      <button
+        ref={ref}
+        aria-label={label}
+        className={cx(
+          'inline-flex items-center justify-center rounded-md h-8 w-8 text-muted transition-colors duration-150 hover:text-fg hover:bg-hover active:scale-95 disabled:opacity-40 disabled:pointer-events-none',
+          active && 'bg-hover text-fg',
+          className,
+        )}
+        {...p}
+      >
+        {children}
+      </button>
+    </Tooltip>
+  ),
+);
+IconButton.displayName = 'IconButton';
 
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, ...p }, ref) => <input ref={ref} className={cx('field', className)} {...p} />);
+Input.displayName = 'Input';
+
+/** Native select (keyboard- and screen-reader-friendly), styled to match the inputs. */
 export function Select({ className, children, ...p }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cx('field pr-6', className)} {...p}>
+    <select className={cx('field', className)} {...p}>
       {children}
     </select>
   );
@@ -49,26 +95,24 @@ export function Select({ className, children, ...p }: SelectHTMLAttributes<HTMLS
 
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <label className={cx('flex flex-col gap-1 text-xs', className)}>
-      <span className="text-muted font-medium">{label}</span>
+    <label className={cx('flex flex-col gap-1.5 text-xs', className)}>
+      <span className="text-fg/80 font-medium">{label}</span>
       {children}
-      {hint && <span className="text-muted">{hint}</span>}
+      {hint && <span className="text-muted leading-snug">{hint}</span>}
     </label>
   );
 }
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange(v: boolean): void; label?: string }) {
   return (
-    <label className="inline-flex items-center gap-2 cursor-pointer select-none text-sm">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cx('relative h-4 w-7 rounded-full transition-colors', checked ? 'bg-accent' : 'bg-line')}
+    <label className="inline-flex items-center gap-2.5 cursor-pointer select-none text-sm">
+      <SwitchPrimitive.Root
+        checked={checked}
+        onCheckedChange={onChange}
+        className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full shadow-sm transition-colors duration-200 data-[state=checked]:bg-accent data-[state=unchecked]:bg-line-strong"
       >
-        <span className={cx('absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all', checked ? 'left-3.5' : 'left-0.5')} />
-      </button>
+        <SwitchPrimitive.Thumb className="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-200 data-[state=checked]:translate-x-[18px] data-[state=unchecked]:translate-x-0.5" />
+      </SwitchPrimitive.Root>
       {label}
     </label>
   );
@@ -76,20 +120,26 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 
 export function Tabs<T extends string>({ tabs, value, onChange, className, right }: { tabs: Array<{ id: NoInfer<T>; label: ReactNode; badge?: ReactNode }>; value: T; onChange(v: NoInfer<T>): void; className?: string; right?: ReactNode }) {
   return (
-    <div role="tablist" className={cx('flex items-center gap-0.5 border-b border-line px-2 min-h-8 shrink-0 overflow-x-auto', className)}>
+    <div role="tablist" className={cx('flex items-center gap-1 border-b border-line px-2 min-h-10 shrink-0 overflow-x-auto', className)}>
       {tabs.map((t) => (
         <button
           key={t.id}
           role="tab"
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
-          className={cx('px-2.5 h-8 text-[0.92rem] border-b-2 -mb-px whitespace-nowrap flex items-center gap-1.5', value === t.id ? 'border-accent text-fg font-medium' : 'border-transparent text-muted hover:text-fg')}
+          className={cx(
+            'relative px-2.5 h-10 text-sm whitespace-nowrap flex items-center gap-1.5 transition-colors duration-150',
+            'after:absolute after:left-2 after:right-2 after:bottom-0 after:h-0.5 after:rounded-full after:transition-colors after:duration-200',
+            value === t.id ? 'text-fg font-medium after:bg-accent' : 'text-muted hover:text-fg after:bg-transparent',
+          )}
         >
           {t.label}
-          {t.badge !== undefined && t.badge !== null && t.badge !== 0 && <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted">{t.badge}</span>}
+          {t.badge !== undefined && t.badge !== null && t.badge !== 0 && (
+            <span className={cx('text-[0.7rem] leading-4 px-1.5 rounded-full tabular-nums', value === t.id ? 'bg-accent-soft text-accent' : 'bg-panel2 text-muted')}>{t.badge}</span>
+          )}
         </button>
       ))}
-      {right && <div className="ml-auto flex items-center gap-1">{right}</div>}
+      {right && <div className="ml-auto flex items-center gap-1 pl-2">{right}</div>}
     </div>
   );
 }
@@ -97,14 +147,14 @@ export function Tabs<T extends string>({ tabs, value, onChange, className, right
 export function Badge({ children, tone = 'default', title }: { children: ReactNode; tone?: 'default' | 'ok' | 'bad' | 'warn' | 'accent' | 'judge'; title?: string }) {
   const tones = {
     default: 'bg-panel2 text-muted border-line',
-    ok: 'text-ok border-ok/40 bg-ok/10',
-    bad: 'text-bad border-bad/40 bg-bad/10',
-    warn: 'text-warn border-warn/40 bg-warn/10',
-    accent: 'text-accent border-accent/40 bg-accent/10',
-    judge: 'text-judge border-judge/40 bg-judge/10',
+    ok: 'text-ok border-ok/25 bg-ok/10',
+    bad: 'text-bad border-bad/25 bg-bad/10',
+    warn: 'text-warn border-warn/25 bg-warn/10',
+    accent: 'text-accent border-accent/25 bg-accent/10',
+    judge: 'text-judge border-judge/25 bg-judge/10',
   };
   return (
-    <span title={title} className={cx('inline-flex items-center gap-1 rounded px-1.5 text-[0.72rem] leading-5 border font-medium whitespace-nowrap', tones[tone])}>
+    <span title={title} className={cx('inline-flex items-center gap-1 rounded-md px-1.5 text-[0.75rem] leading-5 border font-medium whitespace-nowrap tabular-nums', tones[tone])}>
       {children}
     </span>
   );
@@ -118,12 +168,13 @@ export function statusTone(status?: number | string): 'ok' | 'bad' | 'warn' | 'd
   return 'default';
 }
 
-export function Empty({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
+export function Empty({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center text-center gap-2 p-8 text-muted">
-      {icon && <div className="opacity-60">{icon}</div>}
-      <div className="text-fg font-medium">{title}</div>
-      {children && <div className="text-sm max-w-md">{children}</div>}
+    <div className="h-full w-full flex flex-col items-center justify-center text-center gap-2 p-8 text-muted fade-in">
+      {icon && <div className="mb-1 grid place-items-center h-12 w-12 rounded-xl bg-panel2 border border-line text-muted">{icon}</div>}
+      <div className="text-fg font-semibold text-[1.05rem]">{title}</div>
+      {children && <div className="text-sm max-w-md leading-relaxed">{children}</div>}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }
@@ -132,25 +183,78 @@ export function Spinner({ size = 14 }: { size?: number }) {
   return <Loader2 size={size} className="spin text-muted" />;
 }
 
+/** Accessible dialog (focus trap, Escape, click outside) with an open animation. Mount it to show it. */
 export function Modal({ title, onClose, children, footer, width = 560 }: { title: ReactNode; onClose(): void; children: ReactNode; footer?: ReactNode; width?: number }) {
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" className="bg-bg border border-line rounded-lg shadow-2xl max-h-[80vh] flex flex-col" style={{ width, maxWidth: '92vw' }}>
-        <div className="flex items-center justify-between px-4 h-11 border-b border-line shrink-0">
-          <div className="font-semibold">{title}</div>
-          <IconButton label="Close" onClick={onClose}>
-            <X size={16} />
-          </IconButton>
-        </div>
-        <div className="p-4 overflow-auto">{children}</div>
-        {footer && <div className="px-4 py-3 border-t border-line flex justify-end gap-2 shrink-0">{footer}</div>}
-      </div>
-    </div>
+    <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-[2px] animate-in fade-in-0 duration-200" />
+        <DialogPrimitive.Content
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-[9vh] z-50 -translate-x-1/2 bg-bg border border-line rounded-xl shadow-lg max-h-[82vh] flex flex-col outline-none animate-in fade-in-0 zoom-in-[0.97] slide-in-from-top-2 duration-200"
+          style={{ width, maxWidth: '94vw' }}
+        >
+          <div className="flex items-center justify-between gap-3 pl-5 pr-3 h-14 shrink-0">
+            <DialogPrimitive.Title className="font-semibold text-[1.05rem] truncate">{title}</DialogPrimitive.Title>
+            <DialogPrimitive.Close asChild>
+              <button aria-label="Close" className="inline-flex items-center justify-center rounded-md h-8 w-8 text-muted hover:text-fg hover:bg-hover transition-colors">
+                <X size={16} />
+              </button>
+            </DialogPrimitive.Close>
+          </div>
+          <div className="px-5 pb-5 pt-1 overflow-auto">{children}</div>
+          {footer && <div className="px-5 py-3.5 border-t border-line bg-panel/60 rounded-b-xl flex justify-end gap-2 shrink-0">{footer}</div>}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+/* ------------------------------------------------------------------ menu */
+export interface MenuItem {
+  label: string;
+  icon?: ReactNode;
+  onSelect(): void;
+  danger?: boolean;
+  shortcut?: string;
+  disabled?: boolean;
+  /** Draw a separator above this item. */
+  separator?: boolean;
+}
+
+/** Dropdown menu (keyboard navigable, animated). `trigger` must be a single focusable element. */
+export function Menu({ trigger, items, align = 'end', width = 200 }: { trigger: ReactNode; items: MenuItem[]; align?: 'start' | 'center' | 'end'; width?: number }) {
+  return (
+    <MenuPrimitive.Root modal={false}>
+      <MenuPrimitive.Trigger asChild>{trigger}</MenuPrimitive.Trigger>
+      <MenuPrimitive.Portal>
+        <MenuPrimitive.Content
+          align={align}
+          sideOffset={4}
+          style={{ minWidth: width }}
+          className="z-[70] rounded-lg border border-line bg-bg p-1 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
+        >
+          {items.map((it, i) => (
+            <div key={it.label}>
+              {it.separator && i > 0 && <MenuPrimitive.Separator className="my-1 h-px bg-line" />}
+              <MenuPrimitive.Item
+                disabled={it.disabled}
+                onSelect={it.onSelect}
+                className={cx(
+                  'flex items-center gap-2.5 rounded-md px-2 h-8 text-sm cursor-default select-none outline-none transition-colors',
+                  'data-[highlighted]:bg-hover data-[disabled]:opacity-50 data-[disabled]:pointer-events-none',
+                  it.danger ? 'text-bad data-[highlighted]:bg-bad/10' : 'text-fg',
+                )}
+              >
+                {it.icon && <span className={cx('shrink-0', it.danger ? 'text-bad' : 'text-muted')}>{it.icon}</span>}
+                <span className="flex-1 truncate">{it.label}</span>
+                {it.shortcut && <span className="text-xs text-muted">{it.shortcut}</span>}
+              </MenuPrimitive.Item>
+            </div>
+          ))}
+        </MenuPrimitive.Content>
+      </MenuPrimitive.Portal>
+    </MenuPrimitive.Root>
   );
 }
 
@@ -190,7 +294,10 @@ export function Split({ id, direction = 'horizontal', initial = 50, min = 15, ch
         role="separator"
         aria-orientation={h ? 'vertical' : 'horizontal'}
         onPointerDown={onDown}
-        className={cx('shrink-0 bg-line hover:bg-accent transition-colors', h ? 'w-px cursor-col-resize hover:w-0.5' : 'h-px cursor-row-resize hover:h-0.5')}
+        className={cx(
+          'relative shrink-0 bg-line transition-colors duration-150 hover:bg-accent active:bg-accent',
+          h ? 'w-px cursor-col-resize before:absolute before:inset-y-0 before:-left-1 before:-right-1' : 'h-px cursor-row-resize before:absolute before:inset-x-0 before:-top-1 before:-bottom-1',
+        )}
       />
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden flex flex-col">{children[1]}</div>
     </div>
@@ -252,12 +359,12 @@ export function VirtualList<T>({
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="text-[0.7rem] px-1.5 py-0.5 rounded border border-line bg-panel text-muted font-mono">{children}</kbd>;
+  return <kbd className="text-[0.7rem] leading-none px-1.5 py-1 rounded-md border border-line border-b-2 bg-panel text-muted font-sans font-medium">{children}</kbd>;
 }
 
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between h-8 px-3 text-[0.72rem] uppercase tracking-wider text-muted font-semibold shrink-0">
+    <div className="flex items-center justify-between h-10 px-3 text-[0.72rem] uppercase tracking-[0.08em] text-muted font-semibold shrink-0">
       <span>{children}</span>
       {right}
     </div>
@@ -266,9 +373,9 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
 
 export function Metric({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: 'ok' | 'bad' | 'warn'; sub?: ReactNode }) {
   return (
-    <div className="rounded-md border border-line bg-panel px-3 py-2 min-w-[110px]">
-      <div className="text-[0.72rem] text-muted">{label}</div>
-      <div className={cx('text-lg font-semibold tabular-nums', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad', tone === 'warn' && 'text-warn')}>{value}</div>
+    <div className="rounded-lg border border-line bg-bg shadow-sm px-3.5 py-2.5 min-w-[120px]">
+      <div className="text-xs text-muted font-medium">{label}</div>
+      <div className={cx('text-xl font-semibold tabular-nums tracking-tight mt-0.5', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad', tone === 'warn' && 'text-warn')}>{value}</div>
       {sub && <div className="text-[0.72rem] text-muted">{sub}</div>}
     </div>
   );
