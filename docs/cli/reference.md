@@ -56,9 +56,11 @@ protolens run-collection api.postman_collection.json -e staging.postman_environm
 | `--delay-request <ms>` | Pause between requests. |
 | `--folder <name...>` | Only run these folders or requests, by name or id (repeatable). |
 | `--bail`, `--timeout` | Stop after the first failure; per-request timeout in ms. |
+| `--cookie-jar <file>` | Start with the cookies in this JSON file (Protolens format or a Newman cookie jar). |
+| `--export-cookie-jar <file>` | Write the run's cookie jar to this JSON file afterwards (plain text: keep it out of git). |
 | `-w`, `-r`, `-o`, `--var`, `--trace`, `--baseline` … | Same as `test`. |
 
-Variables set by scripts carry over to later requests and iterations. `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./protolens-results/<runId>` unless you pass `-o`.
+Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./protolens-results/<runId>` unless you pass `-o`.
 
 Exit codes: `0` success, `1` test failure, `2` configuration error, `3` execution error.
 

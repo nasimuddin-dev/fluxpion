@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+Postman parity work since 0.1.0:
+
+- **Cookie jar and cookie manager.** Each workspace has a cookie jar. Cookies from `Set-Cookie` responses are stored, including those set during redirects (login flows), and sent with later matching requests, following RFC 6265 domain, path, `Secure` and expiry rules. A request's own Cookies tab still wins for the same name. A **Cookies** dialog (cookie button next to Send) lists cookies by domain and lets you add, edit, delete and clear them. The jar is kept on this machine only, encrypted with the OS credential store, and is never written to workspace files. Scripts get `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), and `pm.cookies` now includes jar cookies in runs too. The HTTP and GraphQL requests of a run share one jar.
+- **`protolens run-collection`** (Newman equivalent). Runs a workspace collection, or a Protolens or Postman v2.1 collection file, with Newman's option names: `-e` (environment name or Postman environment file), `-d`/`--iteration-data`, `-n`/`--iteration-count`, `--delay-request`, `--folder`, `--bail`, plus reporters, baselines and traces. `--cookie-jar` and `--export-cookie-jar` load and save cookies as JSON, and Newman's cookie jar files are accepted. Fixed a Windows crash of the CLI at exit.
+- **Collection Runner.** Runs a collection or folder in order, with iterations, CSV/JSON data files (`pm.iterationData`), a delay, a request checklist, "Keep variable values" and "Stop on first failure". Supports `pm.execution.setNextRequest`, `postman.setNextRequest` and `pm.execution.skipRequest()`. Collection-level scripts run before each request's scripts.
+- **Postman `pm.*` scripting API** in the sandbox: `pm.test`, chai-style `pm.expect`, `pm.response`, `pm.request`, variable scopes, `pm.iterationData`, `pm.info`, `pm.cookies`, CryptoJS, `btoa`/`atob` and the legacy `tests[]` / `postman.*` globals. Pre-request scripts can change the outgoing request. Values set by scripts are kept as local "current values" (sensitive ones encrypted), never in workspace files. A Scripts panel with snippets and `pm` typings.
+- **Request builder.** Paste a cURL command into the URL bar to import it. Code snippets in 15 languages and tools, with secrets masked by default. Path variables (`/users/:id`), a query string that stays in sync with the Params table, bulk edit for key/value tables, variable autocomplete and a Beautify button for JSON and XML bodies.
+- **UI.** The desktop app was redesigned on Radix UI and Tailwind (accessible dialogs, menus, tooltips and toasts, refreshed light and dark themes). Name prompts use an in-app dialog, which fixes saving requests when a workspace has no collections.
+
 ## 0.1.0 — 2026-09-26
 
 First implementation of the Protolens SRS (Phases 0–8, local-first):

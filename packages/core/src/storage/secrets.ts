@@ -164,4 +164,6 @@ export const secretKeys = {
   envVar: (envId: string, key: string) => `env.${envId}.${key}`,
   workspaceVar: (wsId: string, key: string) => `ws.${wsId}.${key}`,
   provider: (providerId: string) => `provider.${providerId}.apiKey`,
+  /** The workspace cookie jar (JSON list of cookies). */
+  cookies: (wsId: string) => `cookies.${wsId}`,
 };

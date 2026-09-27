@@ -65,6 +65,28 @@ export function createRestServer() {
         return json(res, 200, { access_token: DEMO_TOKEN, token_type: 'Bearer', expires_in: 3600 });
       return json(res, 401, { error: 'invalid_client', message: 'Unknown client credentials' });
     }
+    // cookie session: POST /session/login sets a session cookie and redirects to /session/me
+    if (p === '/session/login' && req.method === 'POST') {
+      const body = await readBody(req);
+      let creds = {};
+      try {
+        creds = JSON.parse(body);
+      } catch {
+        creds = Object.fromEntries(new URLSearchParams(body));
+      }
+      if (creds.username !== 'vet' || creds.password !== 'paws') return json(res, 401, { error: 'invalid_credentials' });
+      res.writeHead(303, { location: '/session/me', 'set-cookie': ['vet_session=s-7f3a9; Path=/session; HttpOnly; SameSite=Lax', 'clinic=north; Path=/'] });
+      return res.end();
+    }
+    if (p === '/session/me') {
+      const cookies = Object.fromEntries((req.headers.cookie ?? '').split(/;\s*/).filter(Boolean).map((c) => [c.slice(0, c.indexOf('=')), c.slice(c.indexOf('=') + 1)]));
+      if (cookies.vet_session !== 's-7f3a9') return json(res, 401, { error: 'not_logged_in' });
+      return json(res, 200, { user: 'vet', clinic: cookies.clinic ?? null });
+    }
+    if (p === '/session/logout') {
+      res.writeHead(204, { 'set-cookie': ['vet_session=; Path=/session; Max-Age=0'] });
+      return res.end();
+    }
     if (p === '/echo') {
       const body = await readBody(req);
       return json(res, 200, { method: req.method, path: p, query: Object.fromEntries(url.searchParams), headers: req.headers, body }, { 'set-cookie': ['session=abc123; Path=/; HttpOnly', 'theme=dark; Path=/'] });

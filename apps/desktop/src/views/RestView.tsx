@@ -1,4 +1,4 @@
-import { Code2, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { Code2, Cookie, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -6,6 +6,7 @@ import { useIntent, useSendShortcut } from '../hooks';
 import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedHttpRequest } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
 import { CodeModal } from '../components/CodeModal';
+import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { uid } from '../lib/format';
 
@@ -68,6 +69,7 @@ export function RestView() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showCode, setShowCode] = useState(false);
+  const [showCookies, setShowCookies] = useState(false);
   const env = useApp((s) => s.environment);
   const tab = tabs.find((t) => t.id === active) ?? tabs[0]!;
   const streams = useRef<Record<string, string>>({});
@@ -326,6 +328,9 @@ export function RestView() {
           <IconButton label="Code snippet" onClick={() => setShowCode(true)}>
             <Code2 size={16} />
           </IconButton>
+          <IconButton label="Cookies" onClick={() => setShowCookies(true)}>
+            <Cookie size={16} />
+          </IconButton>
           <Button icon={<Save size={13} />} onClick={quickSave} title="Save (Ctrl+S)">
             Save
           </Button>
@@ -357,6 +362,7 @@ export function RestView() {
     </Split>
       {saving && <SaveModal collections={collections} defaultName={tab.name} onClose={() => setSaving(false)} onSave={(cid, name, folder) => (setSaving(false), void saveTab(cid, name, folder))} onCreate={saveCollection} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onDone={loadCollections} />}
+      {showCookies && <CookiesModal initialDomain={hostOf(tab.request.url) || undefined} onClose={() => setShowCookies(false)} />}
       {showCode && <CodeModal request={toEngineRequest(tab.request)} collectionId={tab.collectionId} requestId={tab.requestId} onClose={() => setShowCode(false)} />}
     </>
   );
@@ -416,6 +422,9 @@ function RequestEditor({ tab, update, setReq, setParams }: { tab: RestTab; updat
         {sub === 'cookies' && (
           <div className="p-2">
             <KeyValueEditor rows={r.cookies ?? []} onChange={(cookies) => setReq({ cookies })} keyPlaceholder="Cookie" />
+            <p className="text-xs text-muted px-1 pt-2">
+              Matching cookies from the workspace cookie jar are added automatically; cookies here win when the name is the same. Use the cookie button next to Send to see or edit the jar.
+            </p>
           </div>
         )}
         {sub === 'scripts' && <ScriptsPanel pre={tab.preRequestScript ?? ''} post={tab.testScript ?? ''} onPre={(v) => update({ preRequestScript: v })} onPost={(v) => update({ testScript: v })} />}

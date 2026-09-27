@@ -27,6 +27,8 @@ export interface CheckContext {
   error?: NormalizedError;
   /** MCP tool result `isError`. */
   isError?: boolean;
+  /** HTTP: cookies for `pm.cookies` (name → value). */
+  cookies?: Record<string, string>;
   graphqlErrors?: unknown[];
   toolCalls?: Array<{ name: string; arguments: Record<string, unknown> }>;
   toolSchemas?: Record<string, Record<string, unknown>>;

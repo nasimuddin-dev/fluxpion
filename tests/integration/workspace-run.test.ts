@@ -152,4 +152,40 @@ describe('example workspace (end-to-end)', () => {
     const missing = await run([cli, 'run-collection', join(dir, 'smoke.postman_collection.json'), '--folder', 'Nope'], env);
     expect(missing.status).toBe(2);
   });
+
+  it('CLI: run-collection keeps cookies across requests and exports / imports the cookie jar', async () => {
+    const cli = resolve('packages/cli/bin/protolens.js');
+    const env = { ...process.env, PROTOLENS_HOME: join(dir, 'home') };
+    const collection = (items: unknown[]) => JSON.stringify({ info: { name: 'Cookies', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' }, item: items });
+    const me = {
+      name: 'Me',
+      request: { method: 'GET', url: 'http://localhost:4010/session/me' },
+      event: [{ listen: 'test', script: { exec: ["pm.test('logged in', () => pm.response.to.have.status(200));"] } }],
+    };
+    writeFileSync(
+      join(dir, 'login.postman_collection.json'),
+      collection([
+        { name: 'Login', request: { method: 'POST', url: 'http://localhost:4010/session/login', header: [{ key: 'Content-Type', value: 'application/json' }], body: { mode: 'raw', raw: '{"username":"vet","password":"paws"}' } } },
+        me,
+      ]),
+    );
+    writeFileSync(join(dir, 'me.postman_collection.json'), collection([me]));
+    const jar = join(dir, 'jar.json');
+    const login = await run([cli, 'run-collection', join(dir, 'login.postman_collection.json'), '--export-cookie-jar', jar, '-o', join(dir, 'ck1'), '-r', 'json', '-q'], env);
+    expect(login.stderr).toBe('');
+    expect(login.status).toBe(0);
+    expect(JSON.parse(readFileSync(jar, 'utf8')).cookies.map((c: { name: string }) => c.name).sort()).toEqual(['clinic', 'vet_session']);
+
+    // a fresh run has no session; with the exported jar it does
+    expect((await run([cli, 'run-collection', join(dir, 'me.postman_collection.json'), '-o', join(dir, 'ck2'), '-r', 'json', '-q'], env)).status).toBe(1);
+    const reuse = await run([cli, 'run-collection', join(dir, 'me.postman_collection.json'), '--cookie-jar', jar, '-o', join(dir, 'ck3'), '-r', 'json', '-q'], env);
+    expect(reuse.stderr).toBe('');
+    expect(reuse.status).toBe(0);
+
+    // the example workspace's "Cookie session" folder: login → me (pm.cookies, pm.cookies.jar()) → logout
+    const example = await run([cli, 'run-collection', 'Veterinary API', '-w', ws.root, '-e', 'Development', '--folder', 'Cookie session', '-o', join(dir, 'ck4'), '-r', 'json', '-q'], env);
+    expect(example.stderr).toBe('');
+    expect(example.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(dir, 'ck4', 'summary.json'), 'utf8'))).toMatchObject({ total: 3, passed: 3 });
+  });
 });

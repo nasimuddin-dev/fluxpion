@@ -7,6 +7,7 @@ import { ApsError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
 import type { Redactor } from '../../util/redact.js';
 import { shortId } from '../../util/ids.js';
+import type { CookieJar } from '../../cookies/cookie-jar.js';
 
 export const DEFAULT_MAX_PREVIEW = 2 * 1024 * 1024;
 
@@ -20,6 +21,8 @@ export interface HttpExecOptions extends AuthContext {
   redactor?: Redactor;
   /** Skip body preview decoding entirely (load testing). */
   discardBody?: boolean;
+  /** Workspace cookie jar: matching cookies are sent and Set-Cookie responses stored (also across redirects). */
+  cookieJar?: CookieJar;
 }
 
 export interface PreparedRequest {
@@ -163,13 +166,25 @@ export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOp
   for (const h of spec.headers ?? []) if (h.enabled !== false && h.key) headers.append(h.key, h.value);
   const cookies = (spec.cookies ?? []).filter((c) => c.enabled !== false && c.key).map((c) => `${c.key}=${c.value}`);
   if (cookies.length) headers.set('cookie', [headers.get('cookie'), ...cookies].filter(Boolean).join('; '));
+  // the request's own cookies win over jar cookies with the same name
+  const explicitCookie = headers.get('cookie') ?? undefined;
+  if (opts.cookieJar) setJarCookies(headers, opts.cookieJar, url, explicitCookie);
   if (!headers.has('user-agent')) headers.set('user-agent', 'Protolens/0.1');
   if (!headers.has('accept')) headers.set('accept', '*/*');
   await applyAuth(spec.auth, headers, url, opts);
   const { body, preview } = await buildBody(spec.body, headers);
   const method = (spec.method || 'GET').toUpperCase();
-  return { url, headers, body: method === 'GET' || method === 'HEAD' ? undefined : body, bodyPreview: preview, method };
+  return { url, headers, body: method === 'GET' || method === 'HEAD' ? undefined : body, bodyPreview: preview, method, explicitCookie };
 }
+
+function setJarCookies(headers: Headers, jar: CookieJar, url: URL, explicitCookie: string | undefined): void {
+  const own = new Set((explicitCookie ?? '').split(/;\s*/).map((p) => p.slice(0, Math.max(0, p.indexOf('='))).trim()).filter(Boolean));
+  const value = [explicitCookie, jar.headerFor(url, own)].filter(Boolean).join('; ');
+  if (value) headers.set('cookie', value);
+  else headers.delete('cookie');
+}
+
+const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
 
 /** Execute an HTTP request, streaming the response with bounded memory. */
 export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions = {}): Promise<{ response: HttpResponseData; prepared: PreparedRequest }> {
@@ -177,7 +192,7 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
   const timeline: TimelinePhase[] = [];
   const mark = (name: string, start: number) => timeline.push({ name, startMs: round(start - t0), durationMs: round(performance.now() - start) });
 
-  const { url, headers, body, bodyPreview, method } = await prepareHttpRequest(spec, opts);
+  const { url, headers, body, bodyPreview, method, explicitCookie } = await prepareHttpRequest(spec, opts);
   mark('prepare', t0);
   const redact = (s: string) => opts.redactor?.redactUrl(s) ?? s;
   const prepared: PreparedRequest = {
@@ -189,17 +204,44 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
   if (opts.redactor) prepared.headers = opts.redactor.redact(prepared.headers);
 
   const s = spec.settings ?? {};
+  const jar = opts.cookieJar;
+  const follow = s.followRedirects !== false;
   const tSend = performance.now();
-  const res = await undiciFetch(url, {
-    method,
-    headers: headers as unknown as Record<string, string>,
-    body: body as never,
-    redirect: s.followRedirects === false ? 'manual' : 'follow',
-    signal: opts.signal,
-    dispatcher: dispatcherFor(spec),
-    // duplex is required by undici for streamed (Blob/FormData) bodies
-    ...({ duplex: 'half' } as object),
-  });
+  // With a cookie jar, redirects are followed here so cookies set by each hop (login flows) are kept.
+  let current = url;
+  let curMethod = method;
+  let curBody = body;
+  let hops = 0;
+  let res;
+  for (;;) {
+    res = await undiciFetch(current, {
+      method: curMethod,
+      headers: headers as unknown as Record<string, string>,
+      body: curBody as never,
+      redirect: follow && !jar ? 'follow' : 'manual',
+      signal: opts.signal,
+      dispatcher: dispatcherFor(spec),
+      // duplex is required by undici for streamed (Blob/FormData) bodies
+      ...({ duplex: 'half' } as object),
+    });
+    if (!jar) break;
+    jar.storeFromResponse(current, res.headers.getSetCookie());
+    const location = res.headers.get('location');
+    if (!follow || !REDIRECT_CODES.has(res.status) || !location || hops >= (s.maxRedirects ?? 20)) break;
+    await res.body?.cancel().catch(() => undefined);
+    const next = new URL(location, current);
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && curMethod === 'POST')) {
+      curMethod = curMethod === 'HEAD' ? 'HEAD' : 'GET';
+      curBody = undefined;
+      headers.delete('content-type');
+      headers.delete('content-length');
+    }
+    // never forward credentials to another origin
+    if (next.origin !== current.origin) headers.delete('authorization');
+    current = next;
+    hops++;
+    setJarCookies(headers, jar, current, explicitCookie);
+  }
   mark('waiting (TTFB)', tSend);
 
   const tDown = performance.now();
@@ -275,8 +317,8 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
     payloadPath,
     durationMs,
     timeline,
-    url: redact(res.url || url.toString()),
-    redirected: res.redirected,
+    url: redact(hops ? current.toString() : res.url || url.toString()),
+    redirected: hops > 0 || res.redirected,
     json,
   };
   return { response, prepared };

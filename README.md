@@ -10,7 +10,7 @@ Protolens brings together an API client, a GraphQL playground, an MCP inspector,
 
 ## Features
 
-- **REST / HTTP.** Any method; JSON, XML, text, HTML, form, multipart and binary bodies; cookies; API key, Basic, Bearer, JWT, OAuth 2.0 (client credentials, password, auth code with PKCE) and mTLS. Large responses stream to disk while a virtualised viewer shows the preview. Responses include a timeline, sandboxed pre-request and test scripts, and SSE streaming.
+- **REST / HTTP.** Any method; JSON, XML, text, HTML, form, multipart and binary bodies; a per-workspace cookie jar with a Cookies manager (encrypted, never in workspace files); API key, Basic, Bearer, JWT, OAuth 2.0 (client credentials, password, auth code with PKCE) and mTLS. Large responses stream to disk while a virtualised viewer shows the preview. Responses include a timeline, sandboxed pre-request and test scripts, and SSE streaming.
 - **GraphQL.** Introspection, a schema explorer, and a Monaco editor with schema-aware autocomplete, validation and formatting. GraphQL-specific assertions.
 - **MCP.** stdio, Streamable HTTP and SSE transports. Discovery of tools, resources, templates and prompts. Forms generated from each tool's JSON Schema, save-as-test, and a full JSON-RPC protocol trace with latency.
 - **WebSocket.** Connect, send and inspect messages.
@@ -118,6 +118,8 @@ evaluators:
 protolens test ./tests -e Staging -r console junit html -o results
 # run a collection like Newman, including Postman collection/environment files and CSV data
 protolens run-collection api.postman_collection.json -e staging.postman_environment.json -d data.csv
+# keep cookies between runs (a Newman cookie jar file works too)
+protolens run-collection api.postman_collection.json --cookie-jar cookies.json --export-cookie-jar cookies.json
 # exit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error
 ```
 

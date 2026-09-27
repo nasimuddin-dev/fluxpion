@@ -8,6 +8,7 @@ import { McpManager, type McpTraceEvent } from './protocols/mcp/client.js';
 import type { ExecServices } from './runner/execute.js';
 import type { WorkspaceStore } from './storage/workspace.js';
 import { secretKeys, type SecretStore } from './storage/secrets.js';
+import { CookieJar } from './cookies/cookie-jar.js';
 
 export interface ContextOptions {
   store: WorkspaceStore;
@@ -21,6 +22,8 @@ export interface ContextOptions {
   onMcpEvent?: (serverId: string, e: McpTraceEvent) => void;
   /** Extra runtime variables (CLI `--var k=v`). */
   runtimeVars?: Record<string, unknown>;
+  /** Cookie jar to use (desktop: the persistent workspace jar). Defaults to an empty jar for this context. */
+  cookieJar?: CookieJar | false;
 }
 
 export interface EngineContext {
@@ -91,6 +94,7 @@ export function createEngineContext(opts: ContextOptions): EngineContext {
     maxPreviewBytes: settings.maxPreviewBytes,
     inheritedAuth: collection?.auth,
     openExternal: opts.openExternal,
+    cookieJar: opts.cookieJar === false ? undefined : (opts.cookieJar ?? new CookieJar()),
   };
   return { services, vars, redactor, environment, collection, dispose: () => mcp.close() };
 }

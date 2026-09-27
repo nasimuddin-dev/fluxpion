@@ -17,6 +17,8 @@ import {
   formatBytes,
   formatDuration,
   importAny,
+  CookieJar,
+  cookiesFromJson,
   loadSuite,
   normalizeError,
   readResultsFile,
@@ -290,6 +292,8 @@ interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'enviro
   iterationCount?: string;
   delayRequest?: string;
   folder?: string[];
+  cookieJar?: string;
+  exportCookieJar?: string;
 }
 
 function readImport<K extends 'collection' | 'environment'>(file: string, want: K): NonNullable<ReturnType<typeof importAny>[K]> {
@@ -355,7 +359,15 @@ async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promi
   const iterations = o.iterationCount ? Number(o.iterationCount) : undefined;
   if (iterations !== undefined && !(iterations >= 1)) throw new CliError('--iteration-count must be 1 or more', EXIT.CONFIG_ERROR);
 
-  const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var });
+  let cookieJar = new CookieJar();
+  if (o.cookieJar) {
+    try {
+      cookieJar = new CookieJar(cookiesFromJson(JSON.parse(readFileSync(resolve(o.cookieJar), 'utf8'))));
+    } catch (e) {
+      throw new CliError(`Could not read cookie jar ${o.cookieJar}: ${(e as Error).message}`, EXIT.CONFIG_ERROR);
+    }
+  }
+  const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var, cookieJar });
   if (fromFile) ctx.vars.setScope('collection', collection.variables);
   if (envFile) ctx.vars.setScope('environment', envFile.variables);
   const environment = envName ?? envFile?.name;
@@ -411,6 +423,11 @@ async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promi
   } finally {
     process.off('SIGINT', onSigint);
     await ctx.dispose();
+  }
+  if (o.exportCookieJar) {
+    const file = resolve(o.exportCookieJar);
+    writeFileSync(file, JSON.stringify({ cookies: cookieJar.toJSON() }, null, 2) + '\n', { mode: 0o600 });
+    if (!o.quiet) console.log(dim(`Cookie jar written to ${file} (${cookieJar.toJSON().length} cookies; values are in plain text, keep it out of git)`));
   }
   return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
 }
@@ -488,6 +505,8 @@ export function buildProgram(): Command {
     .option('--folder <nameOrId...>', 'only run these folders or requests (repeatable)')
     .option('--bail', 'stop after the first failure')
     .option('--timeout <ms>', 'per-request timeout in ms')
+    .option('--cookie-jar <file>', 'start with the cookies in this JSON file (Protolens or Newman cookie jar)')
+    .option('--export-cookie-jar <file>', 'write the cookie jar to this JSON file after the run')
     .addOption(new Option('-r, --reporter <formats...>', 'reporters: console, junit, json, html, markdown').default(['console', 'junit', 'json', 'html', 'markdown']))
     .option('-o, --out <dir>', 'output directory for results and reports')
     .option('--var <key=value>', 'runtime variable (repeatable)', collectVar)

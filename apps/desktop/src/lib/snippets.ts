@@ -22,6 +22,10 @@ export const SNIPPETS: Snippet[] = [
   { kind: 'both', label: 'Set a global variable', code: `pm.globals.set("variable_key", "variable_value");` },
   { kind: 'both', label: 'Get a variable (any scope)', code: `pm.variables.get("variable_key");` },
   { kind: 'both', label: 'Clear an environment variable', code: `pm.environment.unset("variable_key");` },
+  { kind: 'test', label: 'Cookies: Cookie is present', code: `pm.test("Session cookie is set", function () {\n  pm.expect(pm.cookies.has("session")).to.be.true;\n});` },
+  { kind: 'both', label: 'Cookies: Read from the cookie jar', code: `const jar = pm.cookies.jar();\njar.get(pm.request.url.toString(), "session", (error, value) => {\n  pm.variables.set("session", value);\n});` },
+  { kind: 'both', label: 'Cookies: Set a cookie in the jar', code: `pm.cookies.jar().set(pm.request.url.toString(), "cookie_name", "cookie_value");` },
+  { kind: 'both', label: 'Cookies: Clear the jar for this domain', code: `pm.cookies.jar().clear(pm.request.url.toString());` },
   { kind: 'pre', label: 'Add a request header', code: `pm.request.headers.upsert({ key: "X-Request-Id", value: pm.uuid() });` },
   { kind: 'pre', label: 'Timestamp variable', code: `pm.variables.set("timestamp", new Date().toISOString());` },
   { kind: 'pre', label: 'HMAC signature header', code: `const body = pm.request.body.toString();\nconst signature = CryptoJS.HmacSHA256(body, pm.environment.get("secret")).toString(CryptoJS.enc.Base64);\npm.request.headers.upsert({ key: "X-Signature", value: signature });` },
@@ -47,6 +51,14 @@ interface PmResponseAssert {
   readonly ok: PmResponseAssert; readonly success: PmResponseAssert; readonly error: PmResponseAssert; readonly clientError: PmResponseAssert; readonly serverError: PmResponseAssert; readonly json: PmResponseAssert;
   readonly notFound: PmResponseAssert; readonly unauthorized: PmResponseAssert; readonly forbidden: PmResponseAssert; readonly badRequest: PmResponseAssert;
 }
+/** Workspace cookie jar. Callbacks run immediately; the value is also returned. */
+interface PmCookieJar {
+  get(url: string, name: string, cb?: (err: null, value: string | undefined) => void): string | undefined;
+  getAll(url: string, cb?: (err: null, cookies: Array<{ name: string; value: string; domain: string; path: string; expires?: string; secure: boolean; httpOnly: boolean }>) => void): Array<{ name: string; value: string; domain: string; path: string }>;
+  set(url: string, name: string, value: string, cb?: (err: null, cookie: object) => void): object;
+  unset(url: string, name: string, cb?: (err: null) => void): void;
+  clear(url: string, cb?: (err: null) => void): void;
+}
 declare const pm: {
   /** Define a named test; it passes unless the function throws. */
   test(name: string, fn: () => void): void;
@@ -57,7 +69,7 @@ declare const pm: {
   request: { method: string; url: { toString(): string; update(url: string): void }; headers: PmHeaderList; body: { toString(): string; update(body: string | object): void } };
   response: { code: number; status: string; responseTime: number; responseSize: number; headers: PmHeaderList; json(): any; text(): string; to: PmResponseAssert };
   info: { requestName: string; requestId: string; iteration: number; iterationCount: number; eventName: 'prerequest' | 'test' };
-  cookies: { get(name: string): string | undefined; has(name: string): boolean; toObject(): Record<string, string> };
+  cookies: { get(name: string): string | undefined; has(name: string): boolean; toObject(): Record<string, string>; jar(): PmCookieJar };
   execution: { setNextRequest(name: string | null): void; skipRequest(): void };
   uuid(): string;
 };

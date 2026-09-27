@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { newQuickJSWASMModuleFromVariant, shouldInterruptAfterDeadline, type QuickJSWASMModule } from 'quickjs-emscripten-core';
 import variant from '@jitl/quickjs-singlefile-mjs-release-sync';
 import { EPILOGUE, PRELUDE } from './prelude.js';
+import type { CookieJarOp, StoredCookie } from '../cookies/cookie-jar.js';
 
 /**
  * User scripts run inside QuickJS compiled to WebAssembly — a separate JS engine with its
@@ -24,6 +25,8 @@ export interface ScriptInput {
   request?: { method: string; url: string; headers: Array<{ key: string; value: string; enabled?: boolean }>; body?: string };
   response?: { status?: number; headers?: Array<[string, string]>; body?: string; time?: number };
   cookies?: Record<string, string>;
+  /** Snapshot of the workspace cookie jar for `pm.cookies.jar()`. */
+  jar?: StoredCookie[];
   info?: { requestName?: string; requestId?: string; iteration?: number; iterationCount?: number };
   /** Arbitrary extra data exposed as `pm.data` (e.g. LLM output, MCP result). */
   data?: unknown;
@@ -42,6 +45,8 @@ export interface ScriptOutput {
   /** `postman.setNextRequest(name)`: undefined = not called, null = stop the run. */
   nextRequest?: string | null;
   skipRequest?: boolean;
+  /** Changes made through `pm.cookies.jar()` (apply with `applyCookieJarOps`). */
+  jarOps?: CookieJarOp[];
   error?: string;
   durationMs: number;
 }

@@ -73,6 +73,39 @@
     },
     {
       "kind": "folder",
+      "id": "fld-session",
+      "name": "Cookie session",
+      "items": [
+        {
+          "kind": "http",
+          "id": "req-session-login",
+          "name": "Log in (sets a cookie)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/session/login",
+            "auth": { "type": "none" },
+            "body": { "type": "json", "content": "{\n  \"username\": \"vet\",\n  \"password\": \"paws\"\n}" }
+          },
+          "testScript": "pm.test('Redirected to the profile', () => pm.response.to.have.status(200));\npm.test('Session cookie is in the jar', () => pm.expect(pm.cookies.has('vet_session')).to.be.true);"
+        },
+        {
+          "kind": "http",
+          "id": "req-session-me",
+          "name": "Who am I (uses the cookie)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/session/me", "auth": { "type": "none" } },
+          "testScript": "pm.test('Logged in by cookie', () => pm.expect(pm.response.json().user).to.equal('vet'));\npm.cookies.jar().get(pm.request.url.toString(), 'clinic', (err, clinic) => pm.test('Clinic cookie', () => pm.expect(clinic).to.equal('north')));"
+        },
+        {
+          "kind": "http",
+          "id": "req-session-logout",
+          "name": "Log out (expires the cookie)",
+          "request": { "method": "POST", "url": "{{baseUrl}}/session/logout", "auth": { "type": "none" } },
+          "assertions": [{ "type": "status", "expected": 204 }]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
       "id": "fld-diag",
       "name": "Diagnostics",
       "items": [

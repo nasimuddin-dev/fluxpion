@@ -19,6 +19,7 @@ export * from './protocols/graphql/graphql.js';
 export * from './protocols/mcp/client.js';
 export * from './protocols/websocket/websocket.js';
 export * from './protocols/registry.js';
+export * from './cookies/cookie-jar.js';
 
 export * from './ai/index.js';
 export * from './ai/agent.js';

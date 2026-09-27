@@ -13,7 +13,7 @@ const __out = {
   vars: {}, unset: [], tests: [], logs: [], request: __in.request || null, error: null,
   scopeSets: { environment: {}, globals: {}, collectionVariables: {} },
   scopeUnsets: { environment: [], globals: [], collectionVariables: [] },
-  nextRequest: undefined,
+  nextRequest: undefined, jarOps: [],
 };
 const __fmt = (v) => { try { return v === undefined ? 'undefined' : JSON.stringify(v); } catch (e) { return String(v); } };
 const __deepEq = (a, b) => {
@@ -235,6 +235,43 @@ if (__in.response) {
   };
 }
 
+/* ---------------- cookie jar ---------------- */
+// pm.cookies.jar(): a copy of the workspace jar; changes are recorded in __out.jarOps and applied by the host.
+// Postman's jar methods are callback based; the callback runs synchronously here and the value is also returned.
+const __jar = (__in.jar || []).map((c) => Object.assign({}, c));
+const __hostOf = (u) => { const m = /^(?:[a-z][a-z0-9+.-]*:\/\/)?([^/:?#]+)/i.exec(String(u)); return m ? m[1].toLowerCase() : ''; };
+const __jarMatch = (host, c) => (c.hostOnly ? host === c.domain : host === c.domain || host.endsWith('.' + c.domain));
+const __cb = (cb, err, v) => { if (typeof cb === 'function') cb(err, v); return v; };
+const __cookieView = (c) => ({ name: c.name, value: c.value, domain: c.domain, path: c.path, expires: c.expires, secure: !!c.secure, httpOnly: !!c.httpOnly });
+function __cookieJar() {
+  return {
+    get(url, name, cb) { const h = __hostOf(url); const c = __jar.find((x) => x.name === name && __jarMatch(h, x)); return __cb(cb, null, c ? c.value : undefined); },
+    getAll(url, cb) { const h = __hostOf(url); return __cb(cb, null, __jar.filter((x) => __jarMatch(h, x)).map(__cookieView)); },
+    set(url, name, value, cb) {
+      if (name && typeof name === 'object') { cb = value; value = name.value; name = name.name; }
+      if (typeof value === 'function') { cb = value; value = ''; }
+      const h = __hostOf(url);
+      const c = { name: String(name), value: String(value == null ? '' : value), domain: h, path: '/', hostOnly: true };
+      const i = __jar.findIndex((x) => x.name === c.name && x.domain === h && x.path === '/');
+      if (i >= 0) __jar[i] = c; else __jar.push(c);
+      __out.jarOps.push({ op: 'set', url: String(url), name: c.name, value: c.value });
+      return __cb(cb, null, __cookieView(c));
+    },
+    unset(url, name, cb) {
+      const h = __hostOf(url);
+      for (let i = __jar.length - 1; i >= 0; i--) if (__jar[i].name === name && __jar[i].domain === h) __jar.splice(i, 1);
+      __out.jarOps.push({ op: 'unset', url: String(url), name: String(name) });
+      return __cb(cb, null);
+    },
+    clear(url, cb) {
+      const h = __hostOf(url);
+      for (let i = __jar.length - 1; i >= 0; i--) if (__jar[i].domain === h) __jar.splice(i, 1);
+      __out.jarOps.push({ op: 'clear', url: String(url) });
+      return __cb(cb, null);
+    },
+  };
+}
+
 /* ---------------- libraries ---------------- */
 const __word = (hex) => ({ __hex: hex, toString: (enc) => (enc && enc.__b64 ? __host_hex2b64(hex) : hex), sigBytes: hex.length / 2 });
 const CryptoJS = {
@@ -274,7 +311,7 @@ const pm = {
   request: __request,
   response: __response,
   info: Object.assign({ eventName: __in.response ? 'test' : 'prerequest', iteration: 0, iterationCount: 1, requestName: '', requestId: '' }, __in.info || {}),
-  cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}) },
+  cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}), jar: __cookieJar },
   sendRequest() { throw new Error('pm.sendRequest is not supported in the Protolens sandbox yet; use a separate request with dependsOn/extract instead.'); },
   execution: { setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); }, skipRequest: () => { __out.skipRequest = true; } },
   uuid: () => __host_uuid(),

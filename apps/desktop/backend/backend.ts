@@ -45,6 +45,10 @@ import {
   scriptScopes,
   applyScriptOutput,
   CurrentValues,
+  CookieJarStore,
+  responseCookies,
+  applyCookieJarOps,
+  type CookieInput,
   runTests,
   runCollection,
   collectionRequests,
@@ -115,6 +119,7 @@ export class Backend {
   private settings: AppSettings;
   private store?: WorkspaceStore;
   private currentValues?: CurrentValues;
+  private cookieStore?: CookieJarStore;
   private search?: WorkspaceSearch;
   private secrets: SecretStore;
   private logger: Logger;
@@ -168,9 +173,16 @@ export class Backend {
     this.mcpSessions.clear();
     this.store = WorkspaceStore.open(path);
     this.currentValues = new CurrentValues(join(this.host.appDir, 'current-values', `${this.store.id}.json`), this.secrets, this.store.id);
+    void this.cookieStore?.flush().catch(() => undefined);
+    this.cookieStore = new CookieJarStore(this.secrets, this.store.id);
     this.search = new WorkspaceSearch(this.store);
     this.settings = this.manager.saveSettings({ ...this.settings, lastWorkspace: this.store.root });
     this.logger.info(`Opened workspace ${this.store.workspace.name}`, { migrations: this.store.migrationsApplied });
+  }
+
+  private jar() {
+    if (!this.cookieStore) throw new ApsError('ConfigurationError', 'No workspace is open');
+    return this.cookieStore.jar;
   }
 
   private get ws(): WorkspaceStore {
@@ -202,6 +214,7 @@ export class Backend {
       collectionId: opts.collectionId,
       logger: this.logger,
       openExternal: this.host.openExternal?.bind(this.host),
+      cookieJar: this.cookieStore?.jar,
     });
     // Postman-style current values: set by scripts, kept on this machine, override stored values
     const cv = this.currentValues;
@@ -327,6 +340,16 @@ export class Backend {
         return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, this.logger.redactor.isSensitiveKey(k) ? '••••••' : v]));
       },
       'currentValues.reset': ({ scope, owner }: { scope?: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => this.currentValues?.reset(scope, owner),
+
+      /* ---------------------------------------------------------------- cookies (kept on this machine, encrypted) */
+      'cookies.list': () => ({ cookies: this.cookieStore?.jar.list() ?? [], persistent: this.cookieStore?.persistent ?? false }),
+      'cookies.set': ({ cookie, replace }: { cookie: CookieInput; replace?: { name: string; domain: string; path?: string } }) => {
+        const jar = this.jar();
+        if (replace) jar.remove(replace.domain, replace.name, replace.path);
+        return jar.set(cookie);
+      },
+      'cookies.delete': ({ domain, name, path }: { domain: string; name: string; path?: string }) => this.jar().remove(domain, name, path),
+      'cookies.clear': ({ domain }: { domain?: string }) => this.jar().clear(domain),
       'env.secretStatus': ({ envId, keys }: { envId: string; keys: string[] }) => Object.fromEntries(keys.map((k) => [k, !!this.secrets.get(secretKeys.envVar(envId, k))])),
       'vars.inspect': ({ environment, collectionId, template }: { environment?: string; collectionId?: string; template?: string }) => {
         const ctx = this.context({ environment, collectionId });
@@ -593,10 +616,12 @@ export class Backend {
         const out = await runScript(script, {
           ...scriptScopes(ctx.vars),
           request: { method: request.method, url: request.url, headers: request.headers ?? [], body: bodyText },
+          jar: ctx.services.cookieJar?.list(),
           info: { requestName: p.name, requestId: p.requestId },
         });
         scriptLogs.push(...out.logs);
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
+        if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
         if (out.error) throw new ApsError('ScriptError', `Pre-request script failed: ${out.error}`);
         if (out.request) {
           request = { ...request, method: out.request.method, url: out.request.url, headers: out.request.headers };
@@ -614,6 +639,7 @@ export class Backend {
           maxPreviewBytes: this.settings.maxPreviewBytes,
           redactor: ctx.redactor,
           openExternal: this.host.openExternal?.bind(this.host),
+          cookieJar: ctx.services.cookieJar,
           onChunk: /event-stream|stream/i.test(JSON.stringify(spec.headers ?? '')) || p.stream ? (c) => chunks.push({ id, chunk: c }) : undefined,
         });
       } finally {
@@ -631,12 +657,15 @@ export class Backend {
         if (!script?.trim()) continue;
         const out = await runScript(script, {
           ...scriptScopes(ctx.vars),
+          request: { method: spec.method, url: spec.url, headers: spec.headers ?? [] },
           response: { status: response.status, headers: response.headers, body: response.bodyPreview, time: response.durationMs },
-          cookies: Object.fromEntries(response.cookies.map((c) => [c.name, c.value])),
+          cookies: responseCookies(response.cookies, ctx.services.cookieJar, response.url),
+          jar: ctx.services.cookieJar?.list(),
           info: { requestName: p.name, requestId: p.requestId },
         });
         scriptLogs.push(...out.logs);
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
+        if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
         for (const t of out.tests) checks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
         if (out.error) checks.push({ type: 'script', name: 'test script', passed: false, source: 'deterministic', message: out.error });
       }
@@ -707,7 +736,7 @@ export class Backend {
     const span = tracer.start('graphql', 'graphql', { input: { query: p.request.query, variables: p.request.variables } });
     try {
       const spec = ctx.vars.resolveDeep(p.request);
-      const r = await executeGraphQL(spec, { signal: ctrl.signal, redactor: ctx.redactor, maxPreviewBytes: this.settings.maxPreviewBytes, payloadDir: this.ws.path('payloads') });
+      const r = await executeGraphQL(spec, { signal: ctrl.signal, redactor: ctx.redactor, maxPreviewBytes: this.settings.maxPreviewBytes, payloadDir: this.ws.path('payloads'), cookieJar: ctx.services.cookieJar });
       span.end({ status: r.errors?.length ? 'error' : 'ok', output: r.response.json });
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), {
         testType: 'graphql',
@@ -1007,6 +1036,7 @@ export class Backend {
     for (const r of this.runs.values()) r.ctrl.abort();
     for (const s of this.mcpSessions.values()) await s.close();
     for (const s of this.wsSessions.values()) s.close();
+    await this.cookieStore?.flush().catch(() => undefined);
     this.store?.close();
   }
 }

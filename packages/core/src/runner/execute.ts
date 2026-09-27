@@ -32,6 +32,7 @@ import { runScript } from '../scripts/sandbox.js';
 import { applyScriptOutput, scriptScopes, type PersistVariable } from '../scripts/bridge.js';
 import { query, tryParseJson } from '../util/jsonpath.js';
 import { withTimeout } from '../util/concurrency.js';
+import { applyCookieJarOps, type CookieJar } from '../cookies/cookie-jar.js';
 
 export interface ExecServices {
   vars: VariableScope;
@@ -48,6 +49,8 @@ export interface ExecServices {
   openExternal?: (url: string) => void | Promise<void>;
   /** Persist values set by scripts via pm.environment/globals/collectionVariables (desktop "current values"). */
   persistVariable?: PersistVariable;
+  /** Cookie jar shared by the HTTP/GraphQL requests of a run (Postman's cookie jar). */
+  cookieJar?: CookieJar;
 }
 
 export interface ExecutionOutcome {
@@ -94,8 +97,9 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
         test.type === 'http'
           ? { method: test.request.method, url: test.request.url, headers: [...(test.request.headers ?? [])], body: test.request.body && 'content' in test.request.body ? test.request.body.content : undefined }
           : undefined;
-      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, info: { requestName: test.name, requestId: test.id } });
+      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id } });
       root.event('pre-request script', { logs: s.logs, error: s.error });
+      if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
       applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
       if (s.error) throw new ApsError('ScriptError', `Pre-request script failed: ${s.error}`);
       if (s.logs.length) metadata.preRequestLogs = s.logs.slice(0, 100);
@@ -147,10 +151,14 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
   if (test.testScript) {
     const s = await runScript(test.testScript, {
       ...scriptScopes(scope, test.variables),
+      request: test.type === 'http' ? { method: test.request.method, url: scope.resolve(test.request.url), headers: scope.resolveDeep([...(test.request.headers ?? [])]) } : undefined,
       response: { status: ctx.status, headers: ctx.headers, body: ctx.text, time: ctx.latencyMs },
+      cookies: ctx.cookies,
+      jar: svc.cookieJar?.list(),
       info: { requestName: test.name, requestId: test.id },
       data: { body: ctx.body, toolCalls: ctx.toolCalls, tokens: ctx.tokens, error: ctx.error },
     });
+    if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
     applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
     if (s.nextRequest !== undefined) metadata.nextRequest = s.nextRequest;
     for (const t of s.tests) scriptChecks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
@@ -227,6 +235,14 @@ function implicitChecks(test: TestCase, ctx: CheckContext): CheckConfig[] {
   return out;
 }
 
+/** `pm.cookies`: the jar's cookies for the response URL, overlaid with the response's own Set-Cookie values. */
+export function responseCookies(set: Array<{ name: string; value: string }>, jar: CookieJar | undefined, url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (jar) for (const c of jar.cookiesFor(url).reverse()) out[c.name] = c.value;
+  for (const c of set) if (c.name) out[c.name] = c.value;
+  return out;
+}
+
 type Runner = Promise<{ ctx: CheckContext; partial: Partial<ExecutionOutcome>; metadata?: Record<string, unknown> }>;
 
 async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {
@@ -234,12 +250,20 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
   if (spec.auth?.type === 'inherit' || !spec.auth) spec.auth = svc.inheritedAuth ? scope.resolveDeep(svc.inheritedAuth) : spec.auth;
   const s = span.child(`${spec.method} ${svc.redactor.redactUrl(spec.url)}`, 'http', { attributes: { method: spec.method } });
   try {
-    const { response, prepared } = await executeHttp(spec, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, openExternal: svc.openExternal });
+    const { response, prepared } = await executeHttp(spec, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, openExternal: svc.openExternal, cookieJar: svc.cookieJar });
     s.setAttributes({ url: prepared.url, status: response.status, size: response.size, durationMs: response.durationMs });
     s.span.input = { headers: prepared.headers, body: prepared.bodyPreview };
     s.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers, body: summarize(response.bodyPreview, 16_000) } });
     return {
-      ctx: { testType: 'http', status: response.status, headers: response.headers, body: response.json ?? response.bodyPreview, text: response.bodyPreview, latencyMs: response.durationMs },
+      ctx: {
+        testType: 'http',
+        status: response.status,
+        headers: response.headers,
+        body: response.json ?? response.bodyPreview,
+        text: response.bodyPreview,
+        latencyMs: response.durationMs,
+        cookies: responseCookies(response.cookies, svc.cookieJar, response.url),
+      },
       partial: { input: `${prepared.method} ${prepared.url}`, output: summarize(svc.redactor.redact(response.json ?? response.bodyPreview)) },
       metadata: { url: prepared.url, method: prepared.method, size: response.size, truncated: response.truncated },
     };
@@ -254,7 +278,7 @@ async function runGraphQL(test: GraphQLTest, scope: VariableScope, svc: ExecServ
   const auth = !r.auth || r.auth.type === 'inherit' ? (svc.inheritedAuth ? scope.resolveDeep(svc.inheritedAuth) : undefined) : r.auth;
   const s = span.child(`graphql ${test.operationName ?? ''}`.trim(), 'graphql', { input: { query: r.query, variables: r.variables } });
   try {
-    const out = await executeGraphQL({ ...r, auth }, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024 });
+    const out = await executeGraphQL({ ...r, auth }, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, cookieJar: svc.cookieJar });
     s.setAttributes({ endpoint: svc.redactor.redactUrl(r.endpoint), status: out.response.status, operationType: out.operationType, errors: out.errors?.length ?? 0 });
     s.end({ status: out.errors?.length || out.response.status >= 400 ? 'error' : 'ok', output: summarize(out.response.json ?? out.response.bodyPreview, 16_000) });
     return {
