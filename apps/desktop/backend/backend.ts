@@ -48,6 +48,10 @@ import {
   CookieJarStore,
   responseCookies,
   exampleFromResponse,
+  startMockServer,
+  collectMockRoutes,
+  type MockRoute,
+  type MockServer,
   withRequestExamples,
   type SavedExample,
   applyCookieJarOps,
@@ -131,6 +135,8 @@ export class Backend {
   private runs = new Map<string, RunState>();
   private mcpSessions = new Map<string, McpSession>();
   private wsSessions = new Map<string, WebSocketSession>();
+  /** Running mock servers by collection id. */
+  private mocks = new Map<string, MockServer>();
   readonly handlers: Record<string, Handler>;
 
   constructor(host: BackendHost) {
@@ -174,6 +180,8 @@ export class Backend {
     this.store?.close();
     for (const s of this.mcpSessions.values()) void s.close();
     this.mcpSessions.clear();
+    for (const m of this.mocks.values()) void m.close();
+    this.mocks.clear();
     this.store = WorkspaceStore.open(path);
     this.currentValues = new CurrentValues(join(this.host.appDir, 'current-values', `${this.store.id}.json`), this.secrets, this.store.id);
     void this.cookieStore?.flush().catch(() => undefined);
@@ -186,6 +194,31 @@ export class Backend {
   private jar() {
     if (!this.cookieStore) throw new ApsError('ConfigurationError', 'No workspace is open');
     return this.cookieStore.jar;
+  }
+
+  /** A running mock server follows its collection: new or edited examples are served straight away. */
+  private refreshMock(collectionId: string): void {
+    const m = this.mocks.get(collectionId);
+    if (!m) return;
+    try {
+      m.update(this.ws.getCollection(collectionId));
+    } catch {
+      /* collection deleted: keep the last routes until the server is stopped */
+    }
+  }
+
+  /** Status of a collection's mock server; when stopped, the routes it would serve. */
+  private mockInfo(collectionId: string) {
+    const m = this.mocks.get(collectionId);
+    const view = (routes: MockRoute[]) => routes.map((r) => ({ method: r.method, path: r.path, status: r.example.status, example: r.example.name, request: r.requestName, requestId: r.requestId }));
+    if (m) return { running: true, url: m.url, port: m.port, routes: view(m.routes) };
+    let routes: MockRoute[] = [];
+    try {
+      routes = collectMockRoutes(this.ws.getCollection(collectionId));
+    } catch {
+      /* unknown collection */
+    }
+    return { running: false, routes: view(routes) };
   }
 
   private get ws(): WorkspaceStore {
@@ -365,19 +398,45 @@ export class Backend {
 
       /* ---------------------------------------------------------------- collections */
       'col.list': () => this.ws.listCollections(),
-      'col.save': (c: Collection) => this.ws.saveCollection(c),
-      'col.delete': ({ id }: { id: string }) => this.ws.deleteCollection(id),
+      'col.save': (c: Collection) => {
+        const r = this.ws.saveCollection(c);
+        this.refreshMock(c.id);
+        return r;
+      },
+
+      /* ---------------------------------------------------------------- mock servers (saved examples on localhost) */
+      'mock.start': async ({ collectionId, port, delayMs }: { collectionId: string; port?: number; delayMs?: number }) => {
+        await this.mocks.get(collectionId)?.close();
+        this.mocks.delete(collectionId);
+        const c = this.ws.getCollection(collectionId);
+        const m = await startMockServer(c, { port: port ?? 0, delayMs, onRequest: (e) => this.host.emit('mock.request', { collectionId, ...e, time: new Date().toISOString() }) });
+        this.mocks.set(collectionId, m);
+        this.logger.info(`Mock server for ${c.name} listening on ${m.url}`, { routes: m.routes.length });
+        return this.mockInfo(collectionId);
+      },
+      'mock.stop': async ({ collectionId }: { collectionId: string }) => {
+        await this.mocks.get(collectionId)?.close();
+        this.mocks.delete(collectionId);
+      },
+      'mock.status': ({ collectionId }: { collectionId: string }) => this.mockInfo(collectionId),
+      'col.delete': ({ id }: { id: string }) => {
+        void this.mocks.get(id)?.close();
+        this.mocks.delete(id);
+        return this.ws.deleteCollection(id);
+      },
       /** Save a response as an example of a saved request (sensitive headers and values are masked). */
       'col.addExample': (p: { collectionId: string; requestId: string; name: string; environment?: string; response: Parameters<typeof exampleFromResponse>[0]; request?: SavedExample['request'] }) => {
         const ctx = this.context({ environment: p.environment, collectionId: p.collectionId });
         const example = exampleFromResponse(p.response, { name: p.name, redactor: ctx.redactor, request: p.request });
         const c = withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, (list) => [...list, example]);
         this.ws.saveCollection(c);
+        this.refreshMock(p.collectionId);
         return example;
       },
       /** Replace a saved request's examples (rename, edit, delete). */
       'col.setExamples': (p: { collectionId: string; requestId: string; examples: SavedExample[] }) => {
         this.ws.saveCollection(withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, () => p.examples));
+        this.refreshMock(p.collectionId);
         return p.examples;
       },
       'col.import': ({ text }: { text: string }) => {
@@ -1052,6 +1111,7 @@ export class Backend {
     for (const r of this.runs.values()) r.ctrl.abort();
     for (const s of this.mcpSessions.values()) await s.close();
     for (const s of this.wsSessions.values()) s.close();
+    for (const m of this.mocks.values()) await m.close();
     await this.cookieStore?.flush().catch(() => undefined);
     this.store?.close();
   }

@@ -11,6 +11,7 @@ description: "Reference for the protolens command-line interface."
 protolens test [paths...]      Run test files, directories, globs or a *.suite.yaml
 protolens run --suite <name>   Run tests/<name>.suite.yaml from a workspace
 protolens run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
+protolens mock <collection>    Serve a collection's saved examples on localhost
 protolens load <url>           Safeguarded load test
 protolens import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
 protolens workspace list|create|export
@@ -63,5 +64,21 @@ protolens run-collection api.postman_collection.json -e staging.postman_environm
 Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./protolens-results/<runId>` unless you pass `-o`.
 
 Exit codes: `0` success, `1` test failure, `2` configuration error, `3` execution error.
+
+## `mock`
+
+Serves the [saved examples](/api-testing/collections#examples) of a collection on `127.0.0.1` until you press Ctrl+C. See [Mock servers](/api-testing/mock-servers) for how requests are matched to examples.
+
+```bash
+protolens mock "Veterinary API" -p 4545
+protolens mock api.postman_collection.json      # Postman saved responses work too
+```
+
+| Option | Description |
+|---|---|
+| `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
+| `-p, --port <port>` | Port to listen on (default: any free port; the URL is printed). |
+| `--delay <ms>` | Delay every response. |
+| `-q, --quiet` | Don't log requests. |
 
 :::

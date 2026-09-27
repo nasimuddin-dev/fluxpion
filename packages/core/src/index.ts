@@ -39,6 +39,7 @@ export * from './report/reports.js';
 export * from './report/regression.js';
 
 export * from './load/load.js';
+export * from './mock/mock-server.js';
 
 export * from './storage/fsutil.js';
 export * from './storage/secrets.js';

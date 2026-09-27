@@ -1,0 +1,205 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import type { Collection, CollectionNode, SavedExample, SavedHttpRequest } from '../model/types.js';
+import { ApsError } from '../errors.js';
+
+/** One example the mock server can answer with. */
+export interface MockRoute {
+  method: string;
+  /** Path pattern, e.g. `/patients/:id` (`:name` and `{{var}}` segments match anything). */
+  path: string;
+  /** Query parameters the example was saved with (used to pick between examples). */
+  query: Record<string, string>;
+  requestId: string;
+  requestName: string;
+  example: SavedExample;
+}
+
+const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+
+/**
+ * The path part of a saved request URL: `{{baseUrl}}/patients/1?x=1` → `/patients/1` and `{x: '1'}`.
+ * A leading scheme+host or `{{variable}}` host is dropped.
+ */
+export function mockPathOf(url: string): { path: string; query: Record<string, string> } {
+  let rest = url.trim();
+  rest = rest.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i, '');
+  rest = rest.replace(/^\{\{[^}]+\}\}/, '');
+  if (!rest.startsWith('/') && !rest.startsWith('?')) rest = rest.replace(/^[^/?#]*/, '');
+  const [p, q = ''] = rest.split('#')[0]!.split('?');
+  const query: Record<string, string> = {};
+  for (const part of q.split('&').filter(Boolean)) {
+    const i = part.indexOf('=');
+    const k = decodeURIComponent(i < 0 ? part : part.slice(0, i));
+    query[k] = i < 0 ? '' : decodeURIComponent(part.slice(i + 1).replace(/\+/g, ' '));
+  }
+  const path = '/' + (p ?? '').split('/').filter(Boolean).join('/');
+  return { path, query };
+}
+
+/** Every saved example of a collection, as routes (requests without examples are skipped). */
+export function collectMockRoutes(collection: Collection): MockRoute[] {
+  const out: MockRoute[] = [];
+  const walk = (nodes: CollectionNode[]) => {
+    for (const n of nodes) {
+      if (n.kind === 'folder') walk(n.items);
+      else if (n.kind === 'http' && n.examples?.length) for (const ex of n.examples) out.push(route(n, ex));
+    }
+  };
+  walk(collection.items);
+  return out;
+}
+
+function route(n: SavedHttpRequest, ex: SavedExample): MockRoute {
+  const { path, query } = mockPathOf(ex.request?.url ?? n.request.url);
+  return { method: (ex.request?.method ?? n.request.method ?? 'GET').toUpperCase(), path, query, requestId: n.id, requestName: n.name, example: ex };
+}
+
+const isWild = (seg: string) => seg.startsWith(':') || /^\{\{[^}]+\}\}$/.test(seg) || seg === '*';
+
+/** Segments that look like ids (`42`, a UUID, a long hex string) in a saved URL. */
+const isIdLike = (seg: string) => /^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) || /^[0-9a-f]{12,}$/i.test(seg);
+
+/**
+ * Score how well a route path matches a request path: -1 = no match; higher = more literal segments.
+ * In `loose` mode, id-like literal segments in the pattern match any value (without scoring).
+ */
+function pathScore(pattern: string, actual: string, loose = false): number {
+  const a = pattern.split('/').filter(Boolean);
+  const b = actual.split('/').filter(Boolean);
+  if (a.length !== b.length) return -1;
+  let score = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (isWild(a[i]!)) continue;
+    if (decodeURIComponent(a[i]!).toLowerCase() === decodeURIComponent(b[i]!).toLowerCase()) score += 10;
+    else if (!(loose && isIdLike(a[i]!))) return -1;
+  }
+  return score;
+}
+
+/**
+ * Pick the example for a request, like Postman's mock servers:
+ * 1. method and path must match (`:id` / `{{var}}` segments match anything; literal segments score higher);
+ * 2. `x-mock-response-name` or `x-mock-response-code` headers select an example;
+ * 3. otherwise matching query parameters score higher, and 2xx examples win ties.
+ */
+export function matchMockRoute(routes: MockRoute[], req: { method: string; path: string; query?: Record<string, string>; headers?: Record<string, string | string[] | undefined> }): MockRoute | undefined {
+  // exact paths first; then saved ids (`/patients/1`) also answer other ids (`/patients/7`)
+  return pick(routes, req, false) ?? pick(routes, req, true);
+}
+
+function pick(routes: MockRoute[], req: Parameters<typeof matchMockRoute>[1], loose: boolean): MockRoute | undefined {
+  const method = req.method.toUpperCase();
+  const h = (k: string) => {
+    const v = req.headers?.[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const wantName = h('x-mock-response-name');
+  const wantCode = h('x-mock-response-code');
+  let best: { r: MockRoute; score: number } | undefined;
+  for (const r of routes) {
+    if (r.method !== method && !(method === 'HEAD' && r.method === 'GET')) continue;
+    let score = pathScore(r.path, req.path, loose);
+    if (score < 0) continue;
+    if (wantName !== undefined) {
+      if (r.example.name.toLowerCase() !== wantName.toLowerCase()) continue;
+    } else if (wantCode !== undefined) {
+      if (String(r.example.status) !== wantCode) continue;
+    }
+    const q = req.query ?? {};
+    for (const [k, v] of Object.entries(r.query)) score += q[k] === v ? 3 : k in q ? 1 : -1;
+    if (r.example.status >= 200 && r.example.status < 300) score += 1;
+    if (!best || score > best.score) best = { r, score };
+  }
+  return best?.r;
+}
+
+export interface MockServerOptions {
+  port?: number;
+  /** Only loopback addresses are allowed: a mock server is a development tool. */
+  host?: string;
+  /** Extra delay before every response, in ms. */
+  delayMs?: number;
+  onRequest?: (e: { method: string; path: string; status: number; example?: string; request?: string }) => void;
+}
+
+export interface MockServer {
+  url: string;
+  port: number;
+  routes: MockRoute[];
+  /** Replace the routes (after the collection's examples change). */
+  update(collection: Collection): void;
+  close(): Promise<void>;
+}
+
+const HOP_HEADERS = /^(content-length|transfer-encoding|connection|keep-alive|content-encoding)$/i;
+
+/** Serve a collection's saved examples over HTTP on localhost. */
+export async function startMockServer(collection: Collection, opts: MockServerOptions = {}): Promise<MockServer> {
+  const host = opts.host ?? '127.0.0.1';
+  if (!LOCAL_HOSTS.has(host)) throw new ApsError('ConfigurationError', `The mock server only listens on localhost, not ${host}`);
+  let routes = collectMockRoutes(collection);
+
+  const handle = async (req: IncomingMessage, res: ServerResponse) => {
+    const u = new URL(req.url ?? '/', 'http://mock');
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' };
+    if (req.method === 'OPTIONS' && req.headers['access-control-request-method']) {
+      res.writeHead(204, cors);
+      return res.end();
+    }
+    const query = Object.fromEntries(u.searchParams);
+    const r = matchMockRoute(routes, { method: req.method ?? 'GET', path: u.pathname, query, headers: req.headers });
+    req.resume();
+    if (opts.delayMs) await new Promise((ok) => setTimeout(ok, opts.delayMs));
+    if (!r) {
+      const body = JSON.stringify(
+        {
+          error: 'no_matching_example',
+          message: `No saved example matches ${req.method} ${u.pathname}`,
+          available: routes.map((x) => `${x.method} ${x.path} → ${x.example.status} ${x.example.name}`),
+        },
+        null,
+        2,
+      );
+      res.writeHead(404, { ...cors, 'content-type': 'application/json', 'x-mock-match': 'none' });
+      res.end(body);
+      opts.onRequest?.({ method: req.method ?? 'GET', path: u.pathname, status: 404 });
+      return;
+    }
+    const headers: Record<string, string> = { ...cors, 'x-mock-example': encodeURIComponent(r.example.name) };
+    for (const { key, value } of r.example.headers) if (key && !HOP_HEADERS.test(key)) headers[key.toLowerCase()] = value;
+    res.writeHead(r.example.status, r.example.statusText || undefined, headers);
+    res.end(req.method === 'HEAD' ? undefined : r.example.body);
+    opts.onRequest?.({ method: req.method ?? 'GET', path: u.pathname, status: r.example.status, example: r.example.name, request: r.requestName });
+  };
+
+  const server: Server = createServer((req, res) => {
+    handle(req, res).catch(() => {
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', (e: NodeJS.ErrnoException) =>
+      reject(e.code === 'EADDRINUSE' ? new ApsError('ConfigurationError', `Port ${opts.port} is already in use`, { suggestions: ['Pick another port, or 0 for any free port.'] }) : e),
+    );
+    server.listen(opts.port ?? 0, host, () => resolve());
+  });
+  const port = (server.address() as AddressInfo).port;
+  const mock: MockServer = {
+    url: `http://${host.includes(':') ? `[${host}]` : host}:${port}`,
+    port,
+    get routes() {
+      return routes;
+    },
+    update(c) {
+      routes = collectMockRoutes(c);
+    },
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+  };
+  return mock;
+}

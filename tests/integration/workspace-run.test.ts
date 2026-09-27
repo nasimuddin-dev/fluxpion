@@ -188,4 +188,30 @@ describe('example workspace (end-to-end)', () => {
     expect(example.status).toBe(0);
     expect(JSON.parse(readFileSync(join(dir, 'ck4', 'summary.json'), 'utf8'))).toMatchObject({ total: 3, passed: 3 });
   });
+
+  it('CLI: `protolens mock` serves the saved examples of a collection', async () => {
+    const cli = resolve('packages/cli/bin/protolens.js');
+    const p = spawn(process.execPath, [cli, 'mock', 'Veterinary API', '-w', ws.root, '-q'], { env: { ...process.env, PROTOLENS_HOME: join(dir, 'home') } });
+    try {
+      const url = await new Promise<string>((ok, fail) => {
+        let out = '';
+        const t = setTimeout(() => fail(new Error(`mock server did not start: ${out}`)), 15_000);
+        p.stdout.on('data', (d) => {
+          out += d;
+          const m = /(http:\/\/127\.0\.0\.1:\d+)/.exec(out);
+          if (m) {
+            clearTimeout(t);
+            ok(m[1]!);
+          }
+        });
+      });
+      const found = await fetch(`${url}/patients/42`);
+      expect(found.status).toBe(200);
+      expect(await found.json()).toMatchObject({ name: 'Rex' });
+      expect((await fetch(`${url}/patients/999`)).status).toBe(404);
+      expect((await fetch(`${url}/patients/1`, { headers: { 'x-mock-response-name': 'Patient not found' } })).status).toBe(404);
+    } finally {
+      p.kill();
+    }
+  });
 });

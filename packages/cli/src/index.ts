@@ -19,6 +19,8 @@ import {
   importAny,
   CookieJar,
   cookiesFromJson,
+  startMockServer,
+  type MockServer,
   loadSuite,
   normalizeError,
   readResultsFile,
@@ -432,6 +434,55 @@ async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promi
   return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
 }
 
+/** `protolens mock`: serve saved examples until interrupted. */
+async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }): Promise<number> {
+  let collection: Collection;
+  if (existsSync(ref) && statSync(ref).isFile()) collection = readImport(resolve(ref), 'collection');
+  else {
+    const { store, ephemeral } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+    try {
+      const cols = store.listCollections().filter((c) => !c.problem);
+      const found = cols.find((c) => c.id === ref) ?? cols.find((c) => c.name.toLowerCase() === ref.toLowerCase());
+      if (!found) throw new CliError(`Collection "${ref}" not found. Available: ${cols.map((c) => c.name).join(', ') || 'none'} (or pass a collection file)`, EXIT.CONFIG_ERROR);
+      collection = found;
+    } finally {
+      store.close();
+      if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
+    }
+  }
+  const port = o.port ? Number(o.port) : 0;
+  if (!(port >= 0 && port < 65536)) throw new CliError('--port must be between 0 and 65535', EXIT.CONFIG_ERROR);
+  let mock: MockServer;
+  try {
+    mock = await startMockServer(collection, {
+      port,
+      delayMs: o.delay ? Number(o.delay) : undefined,
+      onRequest: (e) => {
+        if (o.quiet) return;
+        const status = e.status < 400 ? green(String(e.status)) : e.example ? yellow(String(e.status)) : red(String(e.status));
+        console.log(`${dim(new Date().toLocaleTimeString())} ${e.method} ${e.path} ${status} ${e.example ? dim(e.example) : red('no matching example')}`);
+      },
+    });
+  } catch (e) {
+    throw e instanceof ApsError && e.kind === 'ConfigurationError' ? new CliError(e.message, EXIT.CONFIG_ERROR) : e;
+  }
+  if (!mock.routes.length) console.log(yellow(`"${collection.name}" has no saved examples yet: every request will get a 404.`));
+  console.log(bold(`Mock server for ${collection.name}: ${mock.url}`));
+  for (const r of mock.routes) console.log(dim(`  ${r.method.padEnd(7)} ${r.path} → ${r.example.status} ${r.example.name}`));
+  console.log(dim('Press Ctrl+C to stop.'));
+  await new Promise<void>((done) => {
+    const stop = () => {
+      process.off('SIGINT', stop);
+      process.off('SIGTERM', stop);
+      done();
+    };
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
+  });
+  await mock.close();
+  return EXIT.SUCCESS;
+}
+
 /** A run that failed to start leaves nothing behind: drop the default output folder and the ephemeral workspace. */
 function cleanupFailedRun(a: { ephemeral?: string; outDir: string; explicitOut: boolean; store: WorkspaceStore }): void {
   if (a.ephemeral && !a.explicitOut) {
@@ -519,6 +570,18 @@ export function buildProgram(): Command {
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
     .action(async (ref: string, o: CollectionCliOptions) => {
       process.exitCode = await executeCollectionRun(ref, o);
+    });
+
+  program
+    .command('mock')
+    .description("serve a collection's saved examples on localhost (like a Postman mock server) until Ctrl+C\n<collection> is a collection name or id in the workspace, or a Protolens / Postman v2.1 collection file")
+    .argument('<collection>', 'collection name, id or file')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-p, --port <port>', 'port to listen on (default: any free port)')
+    .option('--delay <ms>', 'delay every response by this many ms')
+    .option('-q, --quiet', 'do not log requests')
+    .action(async (ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }) => {
+      process.exitCode = await executeMock(ref, o);
     });
 
   program

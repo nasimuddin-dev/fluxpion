@@ -8,6 +8,7 @@ import { download, timeAgo, uid } from '../lib/format';
 import { AuthEditor } from '../components/AuthEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { CollectionRunner } from '../components/CollectionRunner';
+import { MockPanel } from '../components/MockPanel';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, Input, SectionTitle, Split, Tabs } from '../components/ui';
@@ -17,7 +18,7 @@ export function CollectionsView() {
   const [cols, setCols] = useState<Collection[]>([]);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Collection>();
-  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'overview' | 'run'>('requests');
+  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'overview' | 'run' | 'mock'>('requests');
   const [runFolder, setRunFolder] = useState<string>();
   const [importing, setImporting] = useState(false);
   const load = useCallback(async () => {
@@ -35,6 +36,7 @@ export function CollectionsView() {
       setTab('run');
       setRunFolder(p.folderId);
     }
+    if (p?.mock) setTab('mock');
   });
   const save = async (c: Collection) => {
     await call('col.save', c);
@@ -135,9 +137,11 @@ export function CollectionsView() {
                 { id: 'scripts', label: 'Scripts' },
                 { id: 'overview', label: 'Overview' },
                 { id: 'run', label: 'Run' },
+                { id: 'mock', label: 'Mock' },
               ]}
             />
             <div className={cx('flex-1 min-h-0', tab !== 'run' && 'overflow-auto')}>
+              {tab === 'mock' && <MockPanel collectionId={draft.id} onOpenRequest={(requestId) => useApp.getState().openIntent('rest', { collectionId: draft.id, requestId })} />}
               {tab === 'run' && <CollectionRunner collection={draft} folderId={runFolder} onFolderChange={setRunFolder} />}
               {tab === 'requests' && (
                 <div className="p-2">

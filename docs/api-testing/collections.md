@@ -24,7 +24,7 @@ The CLI can import too: `protolens import openapi.yaml -w my-workspace`.
 
 ## Examples
 
-An example is a saved response of a request, like Postman's examples. Examples show what an endpoint returns without sending the request, for instance a success and an error case.
+An example is a saved response of a request, like Postman's examples. Examples show what an endpoint returns without sending the request, for instance a success and an error case. A [mock server](/api-testing/mock-servers) serves them over HTTP.
 
 - **Save a response:** send a saved request, then click **Save as example** above the response and give it a name. The request must be in a collection. A new request opens the Save dialog first.
 - **Browse:** the request's **Examples** tab lists its examples with their status. Select one to see its headers and body. Rename or delete it with the buttons at the top.

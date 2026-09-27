@@ -77,6 +77,7 @@ const docsSidebar = [
       { text: 'Authentication', link: '/api-testing/authentication' },
       { text: 'Environments & Variables', link: '/api-testing/environments' },
       { text: 'Cookies', link: '/api-testing/cookies' },
+      { text: 'Mock Servers', link: '/api-testing/mock-servers' },
       { text: 'Collections & Import', link: '/api-testing/collections' },
     ],
   },
