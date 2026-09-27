@@ -4,6 +4,7 @@
 
 Postman parity work since 0.1.0:
 
+- **AI help in the request builder.** **Describe a request** turns plain words into a request in a new tab, using variable names but never values. **Generate tests** appends AI-written `pm.test` checks, labelled as AI-generated, to the Post-response script. **Explain** on 4xx/5xx responses opens the assistant with the likely cause and fix. Model output is parsed and validated, and nothing runs until you choose to.
 - **For AI agents.** `protolens mcp-server` serves a workspace to AI agents (Claude Code, IDE assistants …) over MCP with seven tools: list collections, requests and environments, read a request or the collection docs, send a request (saved or ad hoc) and run a collection. Output is redacted, variable values are never listed, production environments need `--allow-production`, and `--read-only` removes sending. The docs site publishes `llms.txt`.
 - **Postman-like sidebar.** The REST view's sidebar has Collections, Environments (click to activate, edit, create) and History (grouped by day, click to open) panes, and friendlier empty states.
 - **Home and environment quick look.** A new **Home** view, which the app opens on the first time, has quick actions (new request, GraphQL, import, new collection, MCP, AI, assistant, docs), recent requests, collections (with run) and environments (click to activate), plus keyboard shortcuts. An eye button next to the environment selector shows the active environment's and the global variables with initial and current values, secrets masked.

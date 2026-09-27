@@ -20,6 +20,8 @@ export function ResponseViewer({
   scriptLogs,
   onSuggestAssertions,
   onSaveExample,
+  onGenerateTests,
+  onExplain,
 }: {
   response: HttpResponseData;
   checks?: CheckResult[];
@@ -30,6 +32,10 @@ export function ResponseViewer({
   onSuggestAssertions?(): void;
   /** Save this response as an example of the request. */
   onSaveExample?(): void;
+  /** Ask the AI assistant for pm tests for this response. */
+  onGenerateTests?(): void;
+  /** Ask the AI assistant to explain this (error) response. */
+  onExplain?(): void;
 }) {
   const [tab, setTab] = useState<Tab>(() => (checks?.some((c) => !c.passed) ? 'tests' : 'body'));
   const [mode, setMode] = useState<'pretty' | 'raw' | 'preview'>('pretty');
@@ -60,6 +66,16 @@ export function ResponseViewer({
         )}
         {checks && checks.length > 0 && <Badge tone={failed ? 'bad' : 'ok'}>{failed ? `${failed} failed` : `${checks.length} passed`}</Badge>}
         <div className="ml-auto flex items-center gap-1">
+          {onExplain && response.status >= 400 && (
+            <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onExplain} title="Ask the AI assistant what this error means and how to fix it">
+              Explain
+            </Button>
+          )}
+          {onGenerateTests && (
+            <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onGenerateTests} title="Write pm tests for this response with the AI assistant (added to the Post-response script)">
+              Generate tests
+            </Button>
+          )}
           {onSuggestAssertions && (
             <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onSuggestAssertions}>
               Suggest assertions

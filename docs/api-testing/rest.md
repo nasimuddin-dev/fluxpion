@@ -85,6 +85,17 @@ pm.environment.set('patientId', pm.response.json().items[0].id);
 
 **Current values:** values set with `pm.environment.set`, `pm.collectionVariables.set` or `pm.globals.set` are kept on this machine as *current values* and override the stored values. They're never written to workspace files. Sensitive ones (tokens, passwords, secret variables) are encrypted. You can see and reset them under **Environments**.
 
+## AI help
+
+With an assistant model set in **Settings → AI Assistant** (a local model works offline), the request builder can draft work for you. Everything the AI produces is labelled and shown to you first. Nothing is sent or run on its own.
+
+- **Describe a request** (sparkles button next to Send): write what you want in plain words, for example *create a patient named Biscuit, a dog, owned by customer 123*. A new tab opens with the method, URL, headers and body filled in. The assistant only sees the **names** of your variables, so it writes `{{baseUrl}}` and `{{accessToken}}` instead of real values.
+- **Generate tests** (above a response): the assistant writes `pm.test(...)` checks for the response's status, fields, types and timing and appends them to the Post-response script, headed by an *AI-generated* comment. Send again to run them. Imports the sandbox doesn't support are removed.
+- **Explain** (above a 4xx or 5xx response): opens the assistant with what the error means, the likely cause and how to fix the request.
+- **Suggest assertions** proposes Protolens checks (YAML) for the response.
+
+Context sent to the model is redacted first (sensitive headers, fields and secret values are masked) and trimmed to the first few thousand characters of the body.
+
 ## Console
 
 The **Console** is Postman's console: a log of every request with its script output. Open it with **Console** in the status bar or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (<kbd>⌘</kbd>+<kbd>⌥</kbd>+<kbd>C</kbd> on macOS). It shares the bottom panel with the application **Logs**.

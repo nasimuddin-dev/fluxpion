@@ -15,6 +15,7 @@ Protolens brings together an API client, a GraphQL playground, an MCP inspector,
 - **MCP.** stdio, Streamable HTTP and SSE transports. Discovery of tools, resources, templates and prompts. Forms generated from each tool's JSON Schema, save-as-test, and a full JSON-RPC protocol trace with latency.
 - **WebSocket.** Connect, send and inspect messages.
 - **AI / LLM.** OpenAI-compatible, Azure OpenAI, Anthropic, Gemini, Ollama and an offline mock provider. Prompt templates, structured-output validation, streaming with time-to-first-token, token and cost tracking (prices are configurable and versioned), side-by-side model comparison, and rate limits with backoff.
+- **AI help.** Describe a request in plain words, generate `pm.test` checks for a response, and explain failed responses (always labelled, never run automatically).
 - **For AI agents.** `protolens mcp-server` lets Claude and other agents browse your collections, send requests and run collections over MCP, with secrets redacted and production environments protected. The docs site publishes `llms.txt`.
 - **Evaluation.** Deterministic, heuristic, embedding and LLM-as-judge evaluators, with AI-judge results always labelled. RAG metrics, agent tool-use checks and safety checks (prompt injection, data leakage, tool misuse). Streamed datasets (JSONL, CSV, JSON, Markdown, URL) and regression baselines.
 - **Test runner.** YAML suites with parallel workers, backpressure, retries, timeouts, dependencies, setup/teardown, cancellation and resumable runs. JUnit, JSON, HTML and Markdown reports.

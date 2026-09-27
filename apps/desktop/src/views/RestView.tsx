@@ -1,4 +1,4 @@
-import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -303,6 +303,55 @@ export function RestView() {
     }
   };
 
+  /** Natural language → a new request tab (nothing is sent until the user clicks Send). */
+  const describeRequest = async () => {
+    const description = await promptText('Describe a request', {
+      message: 'Describe the request in plain words. The AI assistant fills in method, URL, headers and body; you review it before sending.',
+      placeholder: 'Create a patient named Biscuit, a dog, owned by customer 123',
+      okLabel: 'Generate',
+    });
+    if (!description?.trim()) return;
+    const actId = uid('ai-');
+    useApp.getState().setActivity(actId, 'Generating a request with AI');
+    try {
+      const r = await call<{ name?: string; request: HttpRequestSpec; model: string }>('ai.generateRequest', { description, environment: env });
+      const t: RestTab = { ...blankRequest(), name: r.name ?? 'AI request', request: fromEngineRequest(r.request), dirty: true };
+      setTabs((ts) => [...ts, t]);
+      setActive(t.id);
+      useApp.getState().toast(`Request drafted by ${r.model}: review it before sending`, 'info');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      useApp.getState().setActivity(actId);
+    }
+  };
+  const generateTests = result?.response
+    ? async () => {
+        const res = result.response!;
+        const actId = uid('ai-');
+        useApp.getState().setActivity(actId, 'Generating tests with AI');
+        try {
+          const r = await call<{ script: string; model: string }>('ai.generateTests', {
+            environment: env,
+            request: { method: tab.request.method, url: tab.request.url },
+            response: { status: res.status, headers: res.headers.slice(0, 20), body: res.bodyPreview.slice(0, 6000), timeMs: res.durationMs },
+          });
+          update({ testScript: tab.testScript?.trim() ? `${tab.testScript.trimEnd()}\n\n${r.script}` : r.script });
+          useApp.getState().toast(`Added tests by ${r.model} to the Post-response script (Scripts tab). Send again to run them.`, 'success');
+        } catch (e) {
+          useApp.getState().toast(asError(e).message, 'error');
+        } finally {
+          useApp.getState().setActivity(actId);
+        }
+      }
+    : undefined;
+  const explain = result?.response
+    ? () =>
+        useApp.getState().set({
+          assistant: { task: 'explain-response', title: 'Explain this response', context: { request: { method: tab.request.method, url: tab.request.url }, status: result.response!.status, headers: result.response!.headers.slice(0, 20), body: result.response!.bodyPreview.slice(0, 6000) } },
+        })
+    : undefined;
+
   const suggest = result?.response
     ? () =>
         useApp.getState().set({
@@ -447,6 +496,9 @@ export function RestView() {
           <IconButton label="Code snippet" onClick={() => setShowCode(true)}>
             <Code2 size={16} />
           </IconButton>
+          <IconButton label="Describe a request with AI" onClick={() => void describeRequest()}>
+            <Sparkles size={16} />
+          </IconButton>
           <IconButton label="Cookies" onClick={() => setShowCookies(true)}>
             <Cookie size={16} />
           </IconButton>
@@ -469,7 +521,7 @@ export function RestView() {
                 <ErrorPanel error={result.error} context={{ request: { method: tab.request.method, url: tab.request.url } }} />
               </div>
             ) : result?.response ? (
-              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} onSuggestAssertions={suggest} onSaveExample={() => void saveExample()} />
+              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} onSuggestAssertions={suggest} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
             ) : (
               <Empty icon={<Send size={28} />} title="Send a request to see the response">
                 Press <b>Ctrl+Enter</b> to send. Variables like <span className="var-token mono">{'{{baseUrl}}'}</span> resolve from the active environment.

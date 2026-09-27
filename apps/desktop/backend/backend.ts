@@ -51,6 +51,8 @@ import {
   startMockServer,
   collectMockRoutes,
   collectionMarkdown,
+  parseGeneratedRequest,
+  generatedTestScript,
   exportPostmanCollection,
   exportPostmanEnvironment,
   type MockRoute,
@@ -753,6 +755,16 @@ export class Backend {
 
       /* ---------------------------------------------------------------- AI assistant */
       'assistant.ask': (p: { task: string; context: unknown; question?: string; environment?: string }) => this.assistant(p),
+      /** Natural language → an HTTP request (shown to the user before anything is sent). */
+      'ai.generateRequest': async ({ description, environment }: { description: string; environment?: string }) => {
+        const r = await this.assistant({ task: 'generate-request', context: {}, question: description, environment });
+        return { ...parseGeneratedRequest(r.text), model: `${r.provider}/${r.model}` };
+      },
+      /** pm tests for a response, labelled as AI-generated. */
+      'ai.generateTests': async ({ request, response, environment }: { request: unknown; response: unknown; environment?: string }) => {
+        const r = await this.assistant({ task: 'generate-pm-tests', context: { request, response }, environment });
+        return { script: generatedTestScript(r.text, `${r.provider}/${r.model}`), model: `${r.provider}/${r.model}` };
+      },
 
       /* ---------------------------------------------------------------- misc */
       'schema.validate': ({ schema, data }: { schema: unknown; data: unknown }) => validateSchema(schema, data),
@@ -1083,9 +1095,17 @@ export class Backend {
       'generate-args': 'Produce example JSON arguments that satisfy this JSON Schema. Output only JSON.',
       'generate-mock-data': 'Generate realistic mock data matching the description or schema. Output only JSON.',
       analyze: 'Analyse the results: identify patterns, regressions, bottlenecks and likely causes. Be specific and concise.',
+      'explain-response':
+        'Explain this HTTP response for the request: what the status and body mean, the most likely cause if it is an error, and how to fix the request. Be concise. Use short headings: What happened, Why, How to fix.',
+      'generate-request':
+        'Turn the description into one HTTP request. Output only a JSON object: {"name": short name, "method": HTTP method, "url": full URL, "headers": [{"key": ..., "value": ...}], "body": JSON value or string or null}. Use {{variable}} references for values available in context.variables (for example {{baseUrl}} for the host when the description does not name one). Never invent secrets: use {{variables}} for tokens and keys.',
+      'generate-pm-tests':
+        'Write a Postman test script for this response using pm.test and pm.expect (chai style, e.g. pm.response.to.have.status(200), pm.expect(json.id).to.be.a("number")). Check the status, important fields and their types, and response time. Output only JavaScript, no explanations.',
       free: 'Answer the developer question about their API/protocol/AI testing work.',
     };
-    const context = JSON.stringify(ctx.redactor.redact(p.context), null, 2).slice(0, 24_000);
+    // request generation may use the names (never the values) of the variables in scope
+    const extra = p.task === 'generate-request' ? { variables: Object.keys(ctx.vars.toObject()).filter((k) => !k.startsWith('$')).slice(0, 200) } : {};
+    const context = JSON.stringify(ctx.redactor.redact({ ...(p.context as object), ...extra }), null, 2).slice(0, 24_000);
     const r = await provider.chat({
       model,
       temperature: 0.2,
