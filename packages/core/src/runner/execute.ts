@@ -103,7 +103,11 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
         const body = test.request.body && 'content' in test.request.body && s.request.body !== undefined ? { ...test.request.body, content: s.request.body } : test.request.body;
         test = { ...test, request: { ...test.request, method: s.request.method, url: s.request.url, headers: s.request.headers, body } };
       }
-      if (s.skipRequest) throw new ApsError('CancelledError', 'Request skipped by pm.execution.skipRequest()');
+      if (s.nextRequest !== undefined) metadata.nextRequest = s.nextRequest;
+      if (s.skipRequest) {
+        root.end({ status: 'ok' });
+        return { status: 'skipped', checks: [], metadata: { ...metadata, reason: 'skipped by pm.execution.skipRequest()' } };
+      }
     }
 
     const run = async (signal: AbortSignal) => {

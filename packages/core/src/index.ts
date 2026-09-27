@@ -32,6 +32,7 @@ export * from './runner/execute.js';
 export * from './runner/runner.js';
 export * from './runner/loader.js';
 export * from './runner/datasets.js';
+export * from './runner/collection-run.js';
 
 export * from './report/reports.js';
 export * from './report/regression.js';

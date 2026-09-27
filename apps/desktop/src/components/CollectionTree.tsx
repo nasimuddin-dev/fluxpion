@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode } from '../types';
 import { cx } from './ui';
@@ -37,6 +37,7 @@ export function CollectionTree({
   onOpen,
   onChange,
   onNewRequest,
+  onRun,
   filter,
 }: {
   collections: Collection[];
@@ -44,6 +45,8 @@ export function CollectionTree({
   onOpen(c: Collection, node: CollectionNode): void;
   onChange(c: Collection): void;
   onNewRequest(c: Collection, folderId?: string): void;
+  /** Open the Collection Runner for a collection or one of its folders. */
+  onRun?(c: Collection, folderId?: string): void;
   filter?: string;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
@@ -82,6 +85,8 @@ export function CollectionTree({
                 }}
                 onDelete={() => confirm(`Delete folder "${n.name}" and its requests?`) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
                 onNewRequest={() => onNewRequest(c, n.id)}
+                onRun={onRun && (() => onRun(c, n.id))}
+                runLabel="Run folder"
                 onNewFolder={() => {
                   const name = prompt('Folder name');
                   if (name) onChange({ ...c, items: addToFolder(c.items, n.id, { kind: 'folder', id: uid('fld-'), name, items: [] } as CollectionFolder) });
@@ -127,6 +132,8 @@ export function CollectionTree({
               {!c.problem && (
                 <NodeMenu
                   onNewRequest={() => onNewRequest(c)}
+                  onRun={onRun && (() => onRun(c))}
+                  runLabel="Run collection"
                   onNewFolder={() => {
                     const name = prompt('Folder name');
                     if (name) onChange({ ...c, items: [...c.items, { kind: 'folder', id: uid('fld-'), name, items: [] }] });
@@ -143,9 +150,26 @@ export function CollectionTree({
   );
 }
 
-function NodeMenu({ onRename, onDelete, onNewRequest, onNewFolder, onDuplicate }: { onRename?(): void; onDelete?(): void; onNewRequest?(): void; onNewFolder?(): void; onDuplicate?(): void }) {
+function NodeMenu({
+  onRename,
+  onDelete,
+  onNewRequest,
+  onNewFolder,
+  onDuplicate,
+  onRun,
+  runLabel = 'Run',
+}: {
+  onRename?(): void;
+  onDelete?(): void;
+  onNewRequest?(): void;
+  onNewFolder?(): void;
+  onDuplicate?(): void;
+  onRun?(): void;
+  runLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const items: Array<[string, React.ReactNode, (() => void) | undefined]> = [
+    [runLabel, <Play size={13} />, onRun],
     ['New request', <FilePlus2 size={13} />, onNewRequest],
     ['New folder', <FolderPlus size={13} />, onNewFolder],
     ['Rename', <Pencil size={13} />, onRename],

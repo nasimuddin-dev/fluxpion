@@ -18,3 +18,7 @@ examples/veterinary-workspace/payloads/
 examples/veterinary-workspace/reports/
 examples/veterinary-workspace/baselines/
 examples/veterinary-workspace/collections/.keep
+
+# Claude Code (personal settings and the daily development routine backlog)
+.claude/settings.local.json
+.claude/dev-routine/

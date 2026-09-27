@@ -242,7 +242,7 @@ export async function runTests(opts: RunOptions): Promise<RunSummary> {
         metadata: Object.keys(o.metadata).length ? o.metadata : undefined,
       };
       last = { result, trace };
-      if (o.status === 'passed') break;
+      if (o.status === 'passed' || o.status === 'skipped') break;
       if (attempt <= retries) await sleep(Math.min(5000, (opts.retryDelayMs ?? 250) * 2 ** (attempt - 1)), signal).catch(() => undefined);
     }
     return last!;

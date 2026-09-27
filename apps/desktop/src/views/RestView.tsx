@@ -248,6 +248,7 @@ export function RestView() {
               activeRequestId={tab.requestId}
               onOpen={openRequest}
               onChange={saveCollection}
+              onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
               onNewRequest={async (c, folderId) => {
                 const t = blankRequest();
                 const node: SavedHttpRequest = { kind: 'http', id: uid('req-'), name: 'New request', request: t.request, assertions: t.assertions };

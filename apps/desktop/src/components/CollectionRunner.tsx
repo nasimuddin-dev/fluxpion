@@ -1,0 +1,299 @@
+import { FileSpreadsheet, History, ListChecks, Play, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { asError, call } from '../api';
+import { useApp } from '../store';
+import type { Collection, CollectionNode } from '../types';
+import { timeAgo } from '../lib/format';
+import { RunPanel } from './RunPanel';
+import { Badge, Button, cx, Empty, Field, Input, Modal, Select, Split, Toggle } from './ui';
+
+interface RunnableRequest {
+  id: string;
+  name: string;
+  method: string;
+  path: string[];
+  kind: 'http' | 'graphql';
+}
+
+interface DataFile {
+  path: string;
+  name: string;
+  count: number;
+  columns: string[];
+  preview: Array<Record<string, unknown>>;
+}
+
+interface RunRow {
+  id: string;
+  name: string;
+  startedAt: string;
+  passed: number;
+  failed: number;
+  errors: number;
+  total: number;
+  environment?: string;
+}
+
+function flatten(nodes: CollectionNode[], path: string[] = [], scope?: string, inScope = !scope): RunnableRequest[] {
+  return nodes.flatMap((n) => {
+    if (n.kind === 'folder') return flatten(n.items, [...path, n.name], scope, inScope || n.id === scope);
+    if (!inScope && n.id !== scope) return [];
+    return [{ id: n.id, name: n.name, method: n.kind === 'http' ? n.request.method : 'GQL', path, kind: n.kind }];
+  });
+}
+
+function findName(nodes: CollectionNode[], id: string): string | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n.name;
+    if (n.kind === 'folder') {
+      const r = findName(n.items, id);
+      if (r) return r;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Postman-style Collection Runner: pick requests, iterations, a CSV/JSON data file and a delay, then run
+ * them in order. Variables set by scripts carry over between requests; `pm.execution.setNextRequest`
+ * changes the order.
+ */
+export function CollectionRunner({ collection, folderId, onFolderChange }: { collection: Collection; folderId?: string; onFolderChange(id?: string): void }) {
+  const envs = useApp((s) => s.workspace?.environments ?? []);
+  const activeEnv = useApp((s) => s.environment);
+  const [environment, setEnvironment] = useState(activeEnv ?? '');
+  const requests = useMemo(() => flatten(collection.items, [], folderId), [collection.items, folderId]);
+  const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
+  const [iterations, setIterations] = useState('');
+  const [delay, setDelay] = useState('0');
+  const [data, setData] = useState<DataFile>();
+  const [dataOpen, setDataOpen] = useState(false);
+  const [keepValues, setKeepValues] = useState(true);
+  const [bail, setBail] = useState(false);
+  const [runId, setRunId] = useState<string>();
+  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [starting, setStarting] = useState(false);
+
+  const folders = useMemo(() => {
+    const out: Array<{ id: string; label: string }> = [];
+    const walk = (nodes: CollectionNode[], depth: number) => {
+      for (const n of nodes) if (n.kind === 'folder') (out.push({ id: n.id, label: `${'  '.repeat(depth)}${n.name}` }), walk(n.items, depth + 1));
+    };
+    walk(collection.items, 0);
+    return out;
+  }, [collection.items]);
+
+  const loadRuns = useCallback(async () => {
+    const r = await call<{ items: RunRow[] }>('runs.list', { query: collection.name, limit: 30 });
+    setRuns(r.items.filter((x) => x.name === collection.name || x.name.startsWith(`${collection.name} / `)));
+  }, [collection.name]);
+  useEffect(() => {
+    void loadRuns();
+    setRunId(undefined);
+    setUnchecked(new Set());
+  }, [collection.id, loadRuns]);
+  useEffect(() => setUnchecked(new Set()), [folderId]);
+  useEffect(() => setEnvironment((e) => e || activeEnv || ''), [activeEnv]);
+
+  const selected = requests.filter((r) => !unchecked.has(r.id));
+  const iterCount = Math.max(1, Number(iterations) || data?.count || 1);
+
+  const start = async () => {
+    setStarting(true);
+    try {
+      // an unchanged selection is sent as the folder (or nothing) so the run is named after it
+      const selection = selected.length === requests.length ? (folderId ? [folderId] : undefined) : selected.map((r) => r.id);
+      const r = await call<{ runId: string }>('col.run', {
+        collectionId: collection.id,
+        selection,
+        environment: environment || undefined,
+        iterations: Number(iterations) || undefined,
+        dataPath: data?.path,
+        delayMs: Math.max(0, Number(delay) || 0),
+        bail,
+        keepVariableValues: keepValues,
+      });
+      setRunId(r.runId);
+      setTimeout(() => void loadRuns(), 500);
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const pickData = async () => {
+    try {
+      const d = await call<DataFile | null>('col.pickDataFile');
+      if (d) {
+        setData(d);
+        setIterations('');
+      }
+    } catch (e) {
+      useApp.getState().toast(`Could not read the data file: ${asError(e).message}`, 'error');
+    }
+  };
+
+  return (
+    <>
+    <Split id="collection-runner" initial={34} min={24}>
+      <div className="h-full flex flex-col min-h-0 bg-panel/40">
+        <div className="flex-1 overflow-auto p-3 flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Run">
+              <Select value={folderId ?? ''} onChange={(e) => onFolderChange(e.target.value || undefined)}>
+                <option value="">Whole collection</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Environment">
+              <Select value={environment} onChange={(e) => setEnvironment(e.target.value)}>
+                <option value="">No environment</option>
+                {envs.map((e) => (
+                  <option key={e.name} value={e.name}>
+                    {e.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Iterations" hint={data ? `Defaults to ${data.count} (one per data row)` : undefined}>
+              <Input type="number" min={1} placeholder={String(data?.count ?? 1)} value={iterations} onChange={(e) => setIterations(e.target.value)} />
+            </Field>
+            <Field label="Delay (ms)" hint="Pause between requests">
+              <Input type="number" min={0} value={delay} onChange={(e) => setDelay(e.target.value)} />
+            </Field>
+          </div>
+
+          <Field label="Data" hint="CSV or JSON. Each row becomes one iteration: use {{column}} in requests or pm.iterationData.get('column') in scripts.">
+            {data ? (
+              <div className="flex items-center gap-2 rounded-md border border-line px-2 py-1.5 text-sm">
+                <FileSpreadsheet size={14} className="text-muted shrink-0" />
+                <button className="truncate text-accent hover:underline text-left" onClick={() => setDataOpen(true)} title="Preview">
+                  {data.name}
+                </button>
+                <Badge>{data.count} rows</Badge>
+                <button aria-label="Remove data file" className="ml-auto text-muted hover:text-fg" onClick={() => setData(undefined)}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <Button icon={<FileSpreadsheet size={13} />} onClick={pickData}>
+                Select file
+              </Button>
+            )}
+          </Field>
+
+          <div className="flex flex-col gap-2">
+            <Toggle checked={keepValues} onChange={setKeepValues} label="Keep variable values" />
+            <p className="text-xs text-muted -mt-1 pl-9">Values set with pm.environment.set() etc. are saved as current values after the run.</p>
+            <Toggle checked={bail} onChange={setBail} label="Stop on first failure" />
+          </div>
+
+          <div className="flex flex-col min-h-0">
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted py-1">
+              <ListChecks size={13} />
+              Requests
+              <Badge>
+                {selected.length}/{requests.length}
+              </Badge>
+              <button className="ml-auto text-accent hover:underline font-normal" onClick={() => setUnchecked(new Set())}>
+                Select all
+              </button>
+              <button className="text-accent hover:underline font-normal" onClick={() => setUnchecked(new Set(requests.map((r) => r.id)))}>
+                Deselect all
+              </button>
+            </div>
+            <div className="rounded-md border border-line divide-y divide-line/60">
+              {requests.map((r) => (
+                <label key={r.id} className="flex items-center gap-2 px-2 h-7 text-sm cursor-pointer hover:bg-hover">
+                  <input
+                    type="checkbox"
+                    checked={!unchecked.has(r.id)}
+                    onChange={(e) => {
+                      const next = new Set(unchecked);
+                      if (e.target.checked) next.delete(r.id);
+                      else next.add(r.id);
+                      setUnchecked(next);
+                    }}
+                  />
+                  <span className={cx('mono text-[0.7rem] font-bold w-9 shrink-0', r.kind === 'http' ? `method-${r.method}` : 'text-[#e535ab]')}>{r.method.slice(0, 5)}</span>
+                  <span className="truncate">{r.name}</span>
+                  {r.path.length > 0 && <span className="ml-auto text-xs text-muted truncate max-w-[45%]">{r.path.join(' / ')}</span>}
+                </label>
+              ))}
+              {!requests.length && <div className="p-3 text-sm text-muted">No requests in this {folderId ? 'folder' : 'collection'}.</div>}
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-line p-3 flex items-center gap-2">
+          <Button variant="primary" icon={<Play size={13} />} loading={starting} disabled={!selected.length} onClick={start}>
+            Run {folderId ? findName(collection.items, folderId) : collection.name}
+          </Button>
+          <span className="text-xs text-muted">
+            {selected.length} request{selected.length === 1 ? '' : 's'} × {iterCount} iteration{iterCount === 1 ? '' : 's'}
+          </span>
+        </div>
+      </div>
+
+      <div className="h-full flex flex-col min-h-0 min-w-0">
+        <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm">
+          <History size={13} className="text-muted" />
+          <Select className="h-7 max-w-80" value={runId ?? ''} onChange={(e) => setRunId(e.target.value || undefined)} aria-label="Previous runs">
+            <option value="">{runs.length ? 'Previous runs…' : 'No runs yet'}</option>
+            {runs.map((r) => (
+              <option key={r.id} value={r.id}>
+                {timeAgo(r.startedAt)} · {r.passed}/{r.total} passed{r.environment ? ` · ${r.environment}` : ''}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex-1 min-h-0">
+          {runId ? (
+            <RunPanel key={runId} runId={runId} expectedTotal={selected.length * iterCount} />
+          ) : (
+            <Empty icon={<Play size={26} />} title="Run this collection">
+              Requests run one at a time, in order. Variables set by scripts carry over to later requests, and <span className="mono">pm.execution.setNextRequest()</span> changes the order. Results, traces and reports are saved with the run.
+            </Empty>
+          )}
+        </div>
+      </div>
+    </Split>
+
+      {dataOpen && data && (
+        <Modal title={`${data.name} — ${data.count} rows`} onClose={() => setDataOpen(false)} width={760}>
+          <div className="overflow-auto max-h-[60vh]">
+            <table className="text-xs w-full">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="px-2 py-1">Iteration</th>
+                  {data.columns.map((c) => (
+                    <th key={c} className="px-2 py-1 mono">
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.preview.map((row, i) => (
+                  <tr key={i} className="border-t border-line/60">
+                    <td className="px-2 py-1 text-muted">{i + 1}</td>
+                    {data.columns.map((c) => (
+                      <td key={c} className="px-2 py-1 mono truncate max-w-48">
+                        {typeof row[c] === 'object' ? JSON.stringify(row[c]) : String(row[c] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data.count > data.preview.length && <p className="text-xs text-muted p-2">Showing the first {data.preview.length} rows.</p>}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}

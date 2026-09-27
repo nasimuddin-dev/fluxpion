@@ -6,7 +6,7 @@
  */
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { join, dirname } from 'node:path';
+import { basename, join, dirname } from 'node:path';
 import { stringify as toYaml } from 'yaml';
 import {
   ApsError,
@@ -46,6 +46,9 @@ import {
   applyScriptOutput,
   CurrentValues,
   runTests,
+  runCollection,
+  collectionRequests,
+  readDataset,
   secretKeys,
   shortId,
   streamTests,
@@ -68,6 +71,7 @@ import {
   type CheckConfig,
   type CheckContext,
   type Collection,
+  type CollectionNode,
   type Environment,
   type GraphQLRequestSpec,
   type HttpRequestSpec,
@@ -77,6 +81,9 @@ import {
   type ProviderConfig,
   type ResponseFormat,
   type RunEvent,
+  type RunOptions,
+  type RunSummary,
+  type DatasetRecord,
   type SecretCipher,
   type SecretStore,
   type TestCase,
@@ -344,6 +351,17 @@ export class Backend {
         const f = await this.host.openDialog?.({ filters: [{ name: 'API definitions', extensions: ['json', 'yaml', 'yml', 'har'] }] });
         if (!f) return null;
         return this.handlers['col.import']!({ text: readFileSync(f, 'utf8') });
+      },
+      'col.run': (p: CollectionRunParams) => this.startCollectionRun(p),
+      /** Pick a CSV/JSON data file for a collection run; returns a preview of its rows. */
+      'col.pickDataFile': async () => {
+        const f = await this.host.openDialog?.({ filters: [{ name: 'Data files', extensions: ['csv', 'json', 'jsonl'] }] });
+        return f ? this.handlers['col.previewDataFile']!({ path: f }) : null;
+      },
+      'col.previewDataFile': async ({ path }: { path: string }) => {
+        const rows = await this.readRunData(path);
+        const columns = [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))];
+        return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
       },
       'col.export': async ({ id }: { id: string }) => {
         const c = this.ws.getCollection(id);
@@ -853,22 +871,29 @@ export class Backend {
     return { items, total };
   }
 
-  private startRun(name: string, tests: AsyncIterable<TestCase>, opts: { environment?: string; concurrency?: number; retries?: number; traceMode?: 'all' | 'failures' | 'none' }) {
+  private startRun(
+    name: string,
+    tests: AsyncIterable<TestCase>,
+    opts: { environment?: string; collectionId?: string; concurrency?: number; retries?: number; bail?: boolean; keepVariableValues?: boolean; traceMode?: 'all' | 'failures' | 'none' },
+    exec: (o: RunOptions) => Promise<RunSummary> = runTests,
+  ) {
     const runId = shortId('run-');
     const ctrl = new AbortController();
     this.runs.set(runId, { ctrl, done: false });
     const dir = this.ws.runDir(runId);
     mkdirSync(dir, { recursive: true });
     const store = this.ws;
-    const ctx = this.context({ environment: opts.environment });
+    const ctx = this.context({ environment: opts.environment, collectionId: opts.collectionId });
+    if (opts.keepVariableValues === false) ctx.services.persistVariable = undefined;
     const events = this.batched<RunEvent>('run.events', 100);
     const started = Date.now();
     void (async () => {
       try {
-        const summary = await runTests({
+        const summary = await exec({
           name,
           runId,
           tests,
+          bail: opts.bail,
           concurrency: opts.concurrency ?? 4,
           retries: opts.retries ?? 0,
           services: ctx.services,
@@ -912,6 +937,30 @@ export class Backend {
       } else yield* streamTests(p.paths.length ? p.paths : ['.'], store.path('tests'), { grep: p.grep, tags: p.tags });
     })();
     return this.startRun(p.name ?? (p.paths.join(', ') || 'All tests'), tests, p);
+  }
+
+  private async readRunData(path: string): Promise<DatasetRecord[]> {
+    const rows: DatasetRecord[] = [];
+    for await (const r of readDataset({ path, limit: 100_000 })) rows.push(r);
+    return rows;
+  }
+
+  private startCollectionRun(p: CollectionRunParams) {
+    const collection = this.ws.getCollection(p.collectionId);
+    const count = collectionRequests(collection, p.selection).length;
+    if (!count) throw new ApsError('ValidationError', 'Nothing to run: the selection has no requests');
+    const folder = p.selection?.length === 1 ? findNodeName(collection.items, p.selection[0]!) : undefined;
+    const name = p.name ?? (folder ? `${collection.name} / ${folder}` : collection.name);
+    return this.startRun(name, (async function* () {})(), { ...p, concurrency: 1, retries: 0 }, async (o) =>
+      runCollection({
+        ...o,
+        collection,
+        selection: p.selection,
+        iterations: p.iterations,
+        data: p.dataPath ? await this.readRunData(p.dataPath) : undefined,
+        delayMs: p.delayMs,
+      }),
+    );
   }
 
   private startEvalRun(p: EvalRunParams) {
@@ -960,6 +1009,32 @@ export class Backend {
     for (const s of this.wsSessions.values()) s.close();
     this.store?.close();
   }
+}
+
+export interface CollectionRunParams {
+  collectionId: string;
+  /** Folder and/or request ids; empty runs the whole collection. */
+  selection?: string[];
+  environment?: string;
+  iterations?: number;
+  /** CSV / JSON file with one row per iteration. */
+  dataPath?: string;
+  delayMs?: number;
+  bail?: boolean;
+  /** Save variables set by scripts as current values (Postman's "Keep variable values"). Default true. */
+  keepVariableValues?: boolean;
+  name?: string;
+}
+
+function findNodeName(nodes: CollectionNode[], id: string): string | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n.name;
+    if (n.kind === 'folder') {
+      const r = findNodeName(n.items, id);
+      if (r) return r;
+    }
+  }
+  return undefined;
 }
 
 export interface HttpSendParams {

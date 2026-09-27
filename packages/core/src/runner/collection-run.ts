@@ -1,0 +1,144 @@
+import type { AuthConfig, Collection, CollectionNode, RunSummary, SavedGraphQLRequest, SavedHttpRequest, TestCase, TestResult } from '../model/types.js';
+import { ApsError } from '../errors.js';
+import { sleep } from '../util/concurrency.js';
+import { runTests, type RunEvent, type RunOptions } from './runner.js';
+import type { DatasetRecord } from './datasets.js';
+
+/** A runnable request in a collection, with its folder path and effective auth. */
+export interface CollectionRequestRef {
+  id: string;
+  name: string;
+  /** Folder names from the collection root to the request. */
+  path: string[];
+  node: SavedHttpRequest | SavedGraphQLRequest;
+  auth?: AuthConfig;
+}
+
+/**
+ * Requests in collection order. `selection` holds folder and/or request ids (a folder selects everything
+ * inside it); when empty, the whole collection is returned.
+ */
+export function collectionRequests(collection: Collection, selection?: string[]): CollectionRequestRef[] {
+  const wanted = selection?.length ? new Set(selection) : undefined;
+  const out: CollectionRequestRef[] = [];
+  const walk = (nodes: CollectionNode[], path: string[], auth: AuthConfig | undefined, selected: boolean) => {
+    for (const n of nodes) {
+      if (n.kind === 'folder') {
+        walk(n.items, [...path, n.name], n.auth && n.auth.type !== 'inherit' ? n.auth : auth, selected || !!wanted?.has(n.id));
+      } else if (!wanted || selected || wanted.has(n.id)) {
+        const own = n.request.auth;
+        out.push({ id: n.id, name: n.name, path, node: n, auth: !own || own.type === 'inherit' ? auth : own });
+      }
+    }
+  };
+  walk(collection.items, [], collection.auth, false);
+  return out;
+}
+
+/** Join collection-level and request-level scripts; blocks keep their `const`s apart. */
+function joinScripts(...scripts: Array<string | undefined>): string | undefined {
+  const parts = scripts.filter((s): s is string => !!s?.trim());
+  if (!parts.length) return undefined;
+  return parts.length === 1 ? parts[0] : parts.map((s) => `{\n${s}\n}`).join('\n');
+}
+
+/** Convert a collection request into a test case the runner can execute. */
+export function collectionRequestToTest(collection: Collection, ref: CollectionRequestRef, extra: { id?: string; name?: string; data?: DatasetRecord } = {}): TestCase {
+  const base = {
+    id: extra.id ?? ref.id,
+    name: extra.name ?? [...ref.path, ref.name].join(' / '),
+    variables: extra.data,
+    assertions: ref.node.assertions,
+  };
+  if (ref.node.kind === 'graphql') {
+    const r = ref.node.request;
+    return { ...base, type: 'graphql', endpoint: r.endpoint, query: r.query, graphqlVariables: r.variables, operationName: r.operationName, headers: r.headers, auth: ref.auth ?? r.auth };
+  }
+  return {
+    ...base,
+    type: 'http',
+    request: { ...ref.node.request, auth: ref.auth ?? { type: 'none' } },
+    preRequestScript: joinScripts(collection.preRequestScript, ref.node.preRequestScript),
+    testScript: joinScripts(collection.testScript, ref.node.testScript),
+  };
+}
+
+export interface CollectionRunOptions extends Omit<RunOptions, 'tests' | 'concurrency' | 'setup' | 'teardown' | 'resume'> {
+  collection: Collection;
+  /** Folder and/or request ids; empty runs the whole collection. */
+  selection?: string[];
+  /** Defaults to the number of data rows, or 1. */
+  iterations?: number;
+  /** One row per iteration (`pm.iterationData`, and `{{column}}` in requests). Rows repeat when there are more iterations. */
+  data?: DatasetRecord[];
+  /** Pause between requests. */
+  delayMs?: number;
+  /** Safety limit on requests per iteration, so a `setNextRequest` loop can't run forever. Default 1000. */
+  maxRequestsPerIteration?: number;
+}
+
+/**
+ * Run a collection like Postman's Collection Runner: requests run one at a time in order, variables set by
+ * scripts carry over to later requests, `pm.execution.setNextRequest(name|id|null)` changes the order, and
+ * each iteration gets one data row.
+ */
+export async function runCollection(opts: CollectionRunOptions): Promise<RunSummary> {
+  const { collection, selection, data, delayMs = 0 } = opts;
+  const refs = collectionRequests(collection, selection);
+  if (!refs.length) throw new ApsError('ValidationError', 'Nothing to run: the selection has no requests');
+  const iterations = Math.max(1, opts.iterations ?? (data?.length || 1));
+  const maxSteps = opts.maxRequestsPerIteration ?? 1000;
+
+  // the generator waits for each result before choosing the next request
+  const waiters = new Map<string, (r: TestResult | undefined) => void>();
+  const onEvent = (e: RunEvent) => {
+    if (e.type === 'test-end') {
+      waiters.get(e.result.id)?.(e.result);
+      waiters.delete(e.result.id);
+    }
+    opts.onEvent?.(e);
+  };
+  opts.signal?.addEventListener('abort', () => {
+    for (const w of waiters.values()) w(undefined);
+    waiters.clear();
+  }, { once: true });
+  const waitFor = (id: string) => new Promise<TestResult | undefined>((resolve) => (opts.signal?.aborted ? resolve(undefined) : waiters.set(id, resolve)));
+  // setNextRequest takes a request id or name
+  const find = (target: string) => {
+    const byId = refs.findIndex((r) => r.id === target);
+    return byId >= 0 ? byId : refs.findIndex((r) => r.name === target);
+  };
+
+  const tests = async function* (): AsyncGenerator<TestCase> {
+    let first = true;
+    for (let it = 0; it < iterations; it++) {
+      const row = data?.length ? data[it % data.length] : undefined;
+      const seen = new Map<string, number>();
+      let i = 0;
+      let steps = 0;
+      while (i < refs.length) {
+        if (opts.signal?.aborted) return;
+        if (++steps > maxSteps) throw new ApsError('ValidationError', `Stopped iteration ${it + 1}: more than ${maxSteps} requests — check for a setNextRequest loop`);
+        if (!first && delayMs > 0) await sleep(delayMs, opts.signal).catch(() => undefined);
+        first = false;
+        const ref = refs[i]!;
+        const n = (seen.get(ref.id) ?? 0) + 1;
+        seen.set(ref.id, n);
+        const id = `${ref.id}@${it + 1}${n > 1 ? `#${n}` : ''}`;
+        const label = [...ref.path, ref.name].join(' / ');
+        const done = waitFor(id);
+        yield collectionRequestToTest(collection, ref, { id, name: iterations > 1 ? `#${it + 1} ${label}` : label, data: row });
+        const result = await done;
+        if (!result) return;
+        const next = result.metadata?.nextRequest;
+        if (next === null) break; // setNextRequest(null): end this iteration
+        if (typeof next === 'string') {
+          const j = find(next);
+          i = j >= 0 ? j : refs.length; // unknown name ends the iteration, like Postman
+        } else i++;
+      }
+    }
+  };
+
+  return runTests({ ...opts, name: opts.name, tests: tests(), concurrency: 1, onEvent });
+}

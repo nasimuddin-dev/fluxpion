@@ -19,7 +19,7 @@ Protolens brings together an API client, a GraphQL playground, an MCP inspector,
 - **Test runner.** YAML suites with parallel workers, backpressure, retries, timeouts, dependencies, setup/teardown, cancellation and resumable runs. JUnit, JSON, HTML and Markdown reports.
 - **Load testing.** Virtual users, ramp-up/down and RPS caps, reporting p50–p99, error rate and status distribution, plus AI metrics (tokens/s, TTFT, cost). Safeguards block production and remote hosts by default.
 - **Observability.** An OpenTelemetry-shaped trace for every execution, with a waterfall viewer.
-- **Workspace.** Collections with inherited auth and scripts, environments with precedence (Global → Workspace → Environment → Collection → Request → Runtime), searchable history, global search and a command palette (Ctrl/Cmd+K). Import from OpenAPI, Postman or HAR.
+- **Workspace.** Collections with inherited auth and Postman-compatible `pm.*` scripts, a Collection Runner (iterations, CSV/JSON data files, delay, `setNextRequest`), environments with precedence (Global → Workspace → Environment → Collection → Request → Runtime), searchable history, global search and a command palette (Ctrl/Cmd+K). Import from OpenAPI, Postman or HAR.
 - **Security and privacy.** Secrets are stored in the OS credential store (DPAPI, Keychain or Secret Service) and never in workspace files. Redaction covers logs, traces, reports and exports. Scripts run in a QuickJS/WASM sandbox. Telemetry is not implemented.
 
 ## Installation

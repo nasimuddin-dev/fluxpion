@@ -1,4 +1,4 @@
-import { Download, FolderPlus, FolderTree, Play, Trash2, Upload } from 'lucide-react';
+import { Download, FilePlus2, FolderPlus, FolderTree, Play, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '../api';
 import { useApp } from '../store';
@@ -7,6 +7,7 @@ import type { Collection, CollectionNode } from '../types';
 import { download, timeAgo, uid } from '../lib/format';
 import { AuthEditor } from '../components/AuthEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
+import { CollectionRunner } from '../components/CollectionRunner';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, Input, SectionTitle, Split, Tabs } from '../components/ui';
@@ -16,7 +17,8 @@ export function CollectionsView() {
   const [cols, setCols] = useState<Collection[]>([]);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Collection>();
-  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'overview'>('requests');
+  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'overview' | 'run'>('requests');
+  const [runFolder, setRunFolder] = useState<string>();
   const [importing, setImporting] = useState(false);
   const load = useCallback(async () => {
     const c = await call<Collection[]>('col.list');
@@ -27,7 +29,13 @@ export function CollectionsView() {
     void load();
   }, [load]);
   useEffect(() => setDraft(cols.find((c) => c.id === sel)), [sel, cols]);
-  useIntent('collections', (p) => p?.collectionId && setSel(p.collectionId));
+  useIntent('collections', (p) => {
+    if (p?.collectionId) setSel(p.collectionId);
+    if (p?.run) {
+      setTab('run');
+      setRunFolder(p.folderId);
+    }
+  });
   const save = async (c: Collection) => {
     await call('col.save', c);
     await load();
@@ -84,8 +92,18 @@ export function CollectionsView() {
               <Input className="font-semibold w-72" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
               <Badge>v{draft.version}</Badge>
               <div className="ml-auto flex gap-2">
-                <Button size="sm" icon={<Play size={12} />} onClick={() => useApp.getState().openIntent('rest', { newTab: true })}>
+                <Button size="sm" icon={<FilePlus2 size={12} />} onClick={() => useApp.getState().openIntent('rest', { newTab: true })}>
                   New request
+                </Button>
+                <Button
+                  size="sm"
+                  icon={<Play size={12} />}
+                  onClick={() => {
+                    setRunFolder(undefined);
+                    setTab('run');
+                  }}
+                >
+                  Run
                 </Button>
                 <Button size="sm" icon={<Download size={12} />} onClick={() => call('col.export', { id: draft.id }).then((r) => (r.collection ? download(`${draft.name}.collection.json`, JSON.stringify(r.collection, null, 2)) : useApp.getState().toast(`Exported to ${r.path}`, 'success')))}>
                   Export
@@ -116,15 +134,21 @@ export function CollectionsView() {
                 { id: 'auth', label: 'Authorization' },
                 { id: 'scripts', label: 'Scripts' },
                 { id: 'overview', label: 'Overview' },
+                { id: 'run', label: 'Run' },
               ]}
             />
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className={cx('flex-1 min-h-0', tab !== 'run' && 'overflow-auto')}>
+              {tab === 'run' && <CollectionRunner collection={draft} folderId={runFolder} onFolderChange={setRunFolder} />}
               {tab === 'requests' && (
                 <div className="p-2">
                   <CollectionTree
                     collections={[draft]}
                     onOpen={open}
                     onChange={save}
+                    onRun={(_, folderId) => {
+                      setRunFolder(folderId);
+                      setTab('run');
+                    }}
                     onNewRequest={async (c, folderId) => {
                       const node = { kind: 'http' as const, id: uid('req-'), name: 'New request', request: { method: 'GET', url: '{{baseUrl}}/' }, assertions: [{ type: 'status', expected: 200 }] };
                       await save({ ...c, items: addToFolder(c.items, folderId, node) });
