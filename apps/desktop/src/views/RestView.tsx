@@ -8,6 +8,7 @@ import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, u
 import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { ExamplesPanel } from '../components/ExamplesPanel';
+import { Markdown } from '../components/Markdown';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { uid } from '../lib/format';
 
@@ -33,6 +34,8 @@ interface RestTab {
   assertions: CheckConfig[];
   collectionId?: string;
   requestId?: string;
+  /** Markdown documentation, saved with the request. */
+  description?: string;
   /** Saved responses; persisted straight to the collection, so changing them does not make the tab dirty. */
   examples?: SavedExample[];
   dirty?: boolean;
@@ -113,7 +116,7 @@ export function RestView() {
     if (n.kind !== 'http') return;
     const existing = tabs.find((t) => t.requestId === n.id);
     if (existing) return setActive(existing.id);
-    const t: RestTab = { id: uid('tab-'), name: n.name, request: fromEngineRequest(structuredClone(n.request)), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, examples: n.examples };
+    const t: RestTab = { id: uid('tab-'), name: n.name, request: fromEngineRequest(structuredClone(n.request)), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, examples: n.examples, description: n.description };
     setTabs((ts) => [...ts, t]);
     setActive(t.id);
   };
@@ -183,9 +186,19 @@ export function RestView() {
     const c = cols.find((x) => x.id === collectionId);
     if (!c) return useApp.getState().toast('That collection no longer exists — pick another one', 'error');
     const exists = tab.requestId ? findNode(c.items, tab.requestId) : undefined;
-    // examples and docs are saved on their own, so keep what is on disk
-    const kept = exists?.kind === 'http' ? { description: exists.description, examples: exists.examples } : {};
-    const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: toEngineRequest(tab.request), preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions, ...kept };
+    // examples are saved on their own, so keep what is on disk
+    const examples = exists?.kind === 'http' ? exists.examples : undefined;
+    const node: SavedHttpRequest = {
+      kind: 'http',
+      id: tab.requestId ?? uid('req-'),
+      name,
+      request: toEngineRequest(tab.request),
+      description: tab.description?.trim() ? tab.description : undefined,
+      preRequestScript: tab.preRequestScript,
+      testScript: tab.testScript,
+      assertions: tab.assertions,
+      examples,
+    };
     const items = exists ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, folderId, node);
     await saveCollection({ ...c, items });
     setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, name, collectionId, requestId: node.id, dirty: false } : t)));
@@ -413,7 +426,7 @@ function RequestEditor({
   setParams(p: KeyValue[]): void;
   setExamples(e: SavedExample[]): void;
 }) {
-  const [sub, setSub] = useState<'params' | 'auth' | 'headers' | 'body' | 'cookies' | 'scripts' | 'tests' | 'examples' | 'settings'>('params');
+  const [sub, setSub] = useState<'params' | 'auth' | 'headers' | 'body' | 'cookies' | 'scripts' | 'tests' | 'examples' | 'docs' | 'settings'>('params');
   const r = tab.request;
   const count = (a?: Array<{ enabled?: boolean }>) => a?.filter((x) => x.enabled !== false).length || undefined;
   return (
@@ -430,6 +443,7 @@ function RequestEditor({
           { id: 'scripts', label: 'Scripts', badge: (tab.preRequestScript ? 1 : 0) + (tab.testScript ? 1 : 0) || undefined },
           { id: 'tests', label: 'Tests', badge: tab.assertions.length || undefined },
           { id: 'examples', label: 'Examples', badge: tab.examples?.length || undefined },
+          { id: 'docs', label: 'Docs', badge: tab.description?.trim() ? '•' : undefined },
           { id: 'settings', label: 'Settings' },
         ]}
         right={
@@ -473,6 +487,7 @@ function RequestEditor({
           </div>
         )}
         {sub === 'scripts' && <ScriptsPanel pre={tab.preRequestScript ?? ''} post={tab.testScript ?? ''} onPre={(v) => update({ preRequestScript: v })} onPost={(v) => update({ testScript: v })} />}
+        {sub === 'docs' && <DocsEditor value={tab.description ?? ''} onChange={(description) => update({ description })} />}
         {sub === 'examples' && <ExamplesPanel key={tab.id} collectionId={tab.collectionId} requestId={tab.requestId} examples={tab.examples ?? []} onChange={setExamples} />}
         {sub === 'tests' && <AssertionEditor checks={tab.assertions} onChange={(assertions) => update({ assertions })} groups={['Response', 'Body']} />}
         {sub === 'settings' && (
@@ -705,5 +720,23 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
       <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, or Protolens collections.</p>
       <textarea className="field mono w-full h-64 text-xs" placeholder="Paste a document here…" value={text} onChange={(e) => setText(e.target.value)} />
     </Modal>
+  );
+}
+
+/** Request documentation: Markdown source and a live preview side by side. */
+function DocsEditor({ value, onChange }: { value: string; onChange(v: string): void }) {
+  return (
+    <div className="h-full grid grid-cols-2 gap-3 p-2 min-h-0">
+      <textarea
+        className="field h-full resize-none mono text-sm"
+        placeholder={'Document this request in Markdown: what it does, required parameters, error cases…'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Request documentation (Markdown)"
+      />
+      <div className="overflow-auto border border-line rounded-md p-3">
+        {value.trim() ? <Markdown source={value} /> : <p className="text-sm text-muted">The preview appears here. The collection’s Docs tab shows the documentation of every request.</p>}
+      </div>
+    </div>
   );
 }

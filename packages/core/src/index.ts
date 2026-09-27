@@ -37,6 +37,7 @@ export * from './runner/collection-run.js';
 
 export * from './report/reports.js';
 export * from './report/regression.js';
+export * from './report/collection-docs.js';
 
 export * from './load/load.js';
 export * from './mock/mock-server.js';

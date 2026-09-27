@@ -50,6 +50,7 @@ import {
   exampleFromResponse,
   startMockServer,
   collectMockRoutes,
+  collectionMarkdown,
   type MockRoute,
   type MockServer,
   withRequestExamples,
@@ -432,6 +433,12 @@ export class Backend {
         this.ws.saveCollection(c);
         this.refreshMock(p.collectionId);
         return example;
+      },
+      /** Markdown documentation of a collection (the given draft, or the saved one), with secrets masked. */
+      'col.docs': ({ id, collection, environment }: { id?: string; collection?: Collection; environment?: string }) => {
+        const c = collection ?? this.ws.getCollection(id!);
+        const ctx = this.context({ environment, collectionId: collection ? undefined : c.id });
+        return collectionMarkdown(c, { redactor: ctx.redactor });
       },
       /** Replace a saved request's examples (rename, edit, delete). */
       'col.setExamples': (p: { collectionId: string; requestId: string; examples: SavedExample[] }) => {

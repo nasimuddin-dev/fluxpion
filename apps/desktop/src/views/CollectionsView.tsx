@@ -9,6 +9,7 @@ import { AuthEditor } from '../components/AuthEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { CollectionRunner } from '../components/CollectionRunner';
 import { MockPanel } from '../components/MockPanel';
+import { CollectionDocs } from '../components/CollectionDocs';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, Input, SectionTitle, Split, Tabs } from '../components/ui';
@@ -18,7 +19,7 @@ export function CollectionsView() {
   const [cols, setCols] = useState<Collection[]>([]);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Collection>();
-  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'overview' | 'run' | 'mock'>('requests');
+  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'docs' | 'run' | 'mock'>('requests');
   const [runFolder, setRunFolder] = useState<string>();
   const [importing, setImporting] = useState(false);
   const load = useCallback(async () => {
@@ -135,12 +136,12 @@ export function CollectionsView() {
                 { id: 'variables', label: 'Variables', badge: draft.variables.length },
                 { id: 'auth', label: 'Authorization' },
                 { id: 'scripts', label: 'Scripts' },
-                { id: 'overview', label: 'Overview' },
+                { id: 'docs', label: 'Docs' },
                 { id: 'run', label: 'Run' },
                 { id: 'mock', label: 'Mock' },
               ]}
             />
-            <div className={cx('flex-1 min-h-0', tab !== 'run' && 'overflow-auto')}>
+            <div className={cx('flex-1 min-h-0', tab !== 'run' && tab !== 'docs' && 'overflow-auto')}>
               {tab === 'mock' && <MockPanel collectionId={draft.id} onOpenRequest={(requestId) => useApp.getState().openIntent('rest', { collectionId: draft.id, requestId })} />}
               {tab === 'run' && <CollectionRunner collection={draft} folderId={runFolder} onFolderChange={setRunFolder} />}
               {tab === 'requests' && (
@@ -178,12 +179,7 @@ export function CollectionsView() {
                   <ScriptsPanel pre={draft.preRequestScript ?? ''} post={draft.testScript ?? ''} onPre={(preRequestScript) => setDraft({ ...draft, preRequestScript })} onPost={(testScript) => setDraft({ ...draft, testScript })} />
                 </div>
               )}
-              {tab === 'overview' && (
-                <div className="p-3 flex flex-col gap-2">
-                  <textarea className="field min-h-32" placeholder="Description (Markdown)" value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-                  <p className="text-xs text-muted">Collections are versioned JSON files in the workspace’s collections/ folder — commit them to git for review and history.</p>
-                </div>
-              )}
+              {tab === 'docs' && <CollectionDocs collection={draft} onDescription={(description) => setDraft({ ...draft, description })} />}
             </div>
           </>
         ) : (

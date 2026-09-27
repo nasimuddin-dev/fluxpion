@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "id": "veterinary-api",
   "name": "Veterinary API",
-  "description": "Requests for the local demo REST server (examples/servers/demo-servers.mjs).",
+  "description": "Requests for the local demo REST server (`examples/servers/demo-servers.mjs`).\n\n## Getting started\n\n1. Start the demo servers: `node examples/servers/demo-servers.mjs`.\n2. Select the **Development** environment.\n3. Run **Authentication → Get access token** first. Its test script saves `accessToken`, which the other requests use through the collection's bearer auth.\n\nThe **Cookie session** folder shows cookie-based login instead of tokens. **Get patient** has saved examples, so the collection's **Mock** tab can serve it without the demo server.",
   "version": 1,
   "variables": [],
   "auth": { "type": "bearer", "token": "{{accessToken}}" },
@@ -54,6 +54,7 @@
           "kind": "http",
           "id": "req-get",
           "name": "Get patient",
+          "description": "Returns one patient by id.\n\n| Status | When |\n|---|---|\n| `200` | The patient exists |\n| `401` | No or wrong bearer token |\n| `404` | No patient with that id |",
           "request": { "method": "GET", "url": "{{baseUrl}}/patients/1", "auth": { "type": "inherit" } },
           "assertions": [{ "type": "status", "expected": 200 }],
           "examples": [
@@ -99,6 +100,7 @@
           "kind": "http",
           "id": "req-session-login",
           "name": "Log in (sets a cookie)",
+          "description": "Logs in with a username and password. The server answers `303 See Other` with a `vet_session` cookie and redirects to **Who am I**. Protolens keeps the cookie in the workspace cookie jar and sends it with the next requests.",
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/session/login",

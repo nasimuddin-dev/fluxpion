@@ -19,6 +19,7 @@ Protolens combines an API client, a GraphQL playground, an MCP inspector, an LLM
 - Responses as a virtualised JSON tree, raw text with search, or an HTML preview, plus headers, cookies and a timing breakdown. Large bodies stream to disk.
 - Save responses as examples of a request (success and error cases), with secrets masked. Postman saved responses import as examples.
 - Mock servers on localhost serve a collection's examples, from the app or with `protolens mock`.
+- Markdown docs for every request and a generated documentation page per collection, exportable as Markdown or with `protolens docs`.
 - Pre-request and test scripts in a sandbox, assertions, highlighted variables, and one-click cURL export.
 
 [REST guide](/api-testing/rest) · [Authentication](/api-testing/authentication) · [Collections & import](/api-testing/collections)

@@ -189,6 +189,16 @@ describe('example workspace (end-to-end)', () => {
     expect(JSON.parse(readFileSync(join(dir, 'ck4', 'summary.json'), 'utf8'))).toMatchObject({ total: 3, passed: 3 });
   });
 
+  it('CLI: `protolens docs` writes Markdown documentation with examples and no secrets', async () => {
+    const cli = resolve('packages/cli/bin/protolens.js');
+    const r = await run([cli, 'docs', 'Veterinary API', '-w', ws.root], { ...process.env, PROTOLENS_HOME: join(dir, 'home') });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('# Veterinary API');
+    expect(r.stdout).toContain('### Get patient');
+    expect(r.stdout).toContain('**Example: Patient not found** · `404 Not Found`');
+    expect(r.stdout).not.toContain('demo-secret');
+  });
+
   it('CLI: `protolens mock` serves the saved examples of a collection', async () => {
     const cli = resolve('packages/cli/bin/protolens.js');
     const p = spawn(process.execPath, [cli, 'mock', 'Veterinary API', '-w', ws.root, '-q'], { env: { ...process.env, PROTOLENS_HOME: join(dir, 'home') } });

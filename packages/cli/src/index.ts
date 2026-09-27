@@ -20,6 +20,7 @@ import {
   CookieJar,
   cookiesFromJson,
   startMockServer,
+  collectionMarkdown,
   type MockServer,
   loadSuite,
   normalizeError,
@@ -434,22 +435,24 @@ async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promi
   return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
 }
 
+/** A collection by name or id from a workspace, or from a Protolens / Postman collection file. */
+function loadCollectionRef(ref: string, workspace: string | undefined): Collection {
+  if (existsSync(ref) && statSync(ref).isFile()) return readImport(resolve(ref), 'collection');
+  const { store, ephemeral } = openWorkspace(workspace, undefined, new WorkspaceManager());
+  try {
+    const cols = store.listCollections().filter((c) => !c.problem);
+    const found = cols.find((c) => c.id === ref) ?? cols.find((c) => c.name.toLowerCase() === ref.toLowerCase());
+    if (!found) throw new CliError(`Collection "${ref}" not found. Available: ${cols.map((c) => c.name).join(', ') || 'none'} (or pass a collection file)`, EXIT.CONFIG_ERROR);
+    return found;
+  } finally {
+    store.close();
+    if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
+  }
+}
+
 /** `protolens mock`: serve saved examples until interrupted. */
 async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }): Promise<number> {
-  let collection: Collection;
-  if (existsSync(ref) && statSync(ref).isFile()) collection = readImport(resolve(ref), 'collection');
-  else {
-    const { store, ephemeral } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
-    try {
-      const cols = store.listCollections().filter((c) => !c.problem);
-      const found = cols.find((c) => c.id === ref) ?? cols.find((c) => c.name.toLowerCase() === ref.toLowerCase());
-      if (!found) throw new CliError(`Collection "${ref}" not found. Available: ${cols.map((c) => c.name).join(', ') || 'none'} (or pass a collection file)`, EXIT.CONFIG_ERROR);
-      collection = found;
-    } finally {
-      store.close();
-      if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
-    }
-  }
+  const collection = loadCollectionRef(ref, o.workspace);
   const port = o.port ? Number(o.port) : 0;
   if (!(port >= 0 && port < 65536)) throw new CliError('--port must be between 0 and 65535', EXIT.CONFIG_ERROR);
   let mock: MockServer;
@@ -570,6 +573,21 @@ export function buildProgram(): Command {
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
     .action(async (ref: string, o: CollectionCliOptions) => {
       process.exitCode = await executeCollectionRun(ref, o);
+    });
+
+  program
+    .command('docs')
+    .description('write Markdown documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a Protolens / Postman v2.1 collection file')
+    .argument('<collection>', 'collection name, id or file')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-o, --out <file>', 'write to this file instead of stdout')
+    .option('--no-examples', 'leave out saved examples')
+    .action((ref: string, o: { workspace?: string; out?: string; examples?: boolean }) => {
+      const md = collectionMarkdown(loadCollectionRef(ref, o.workspace), { examples: o.examples });
+      if (o.out) {
+        writeFileSync(resolve(o.out), md);
+        console.error(dim(`Documentation written to ${resolve(o.out)}`));
+      } else process.stdout.write(md);
     });
 
   program

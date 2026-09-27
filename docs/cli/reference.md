@@ -12,6 +12,7 @@ protolens test [paths...]      Run test files, directories, globs or a *.suite.y
 protolens run --suite <name>   Run tests/<name>.suite.yaml from a workspace
 protolens run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
 protolens mock <collection>    Serve a collection's saved examples on localhost
+protolens docs <collection>    Write Markdown documentation for a collection
 protolens load <url>           Safeguarded load test
 protolens import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
 protolens workspace list|create|export
@@ -80,5 +81,20 @@ protolens mock api.postman_collection.json      # Postman saved responses work t
 | `-p, --port <port>` | Port to listen on (default: any free port; the URL is printed). |
 | `--delay <ms>` | Delay every response. |
 | `-q, --quiet` | Don't log requests. |
+
+## `docs`
+
+Writes the [documentation](/api-testing/collections#documentation) of a collection as Markdown: the collection description, a table of contents, then every folder and request with its description, URL, auth, parameters, headers, body and saved examples. Sensitive values are masked.
+
+```bash
+protolens docs "Veterinary API" -o API.md
+protolens docs api.postman_collection.json > API.md
+```
+
+| Option | Description |
+|---|---|
+| `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
+| `-o, --out <file>` | Write to a file instead of standard output. |
+| `--no-examples` | Leave out saved examples. |
 
 :::

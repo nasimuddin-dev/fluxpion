@@ -47,6 +47,17 @@ In the collection file an example looks like this:
 
 `request` is optional. It records the request that produced the response when that differs from the saved request.
 
+## Documentation
+
+Collections document themselves, like Postman's API documentation:
+
+- **Request docs:** each request has a **Docs** tab. Write Markdown on the left and see the preview on the right. The text is saved with the request.
+- **Collection docs:** the collection's **Docs** tab renders the whole collection as one page. It starts with the collection description, then a table of contents, then every folder and request: method and URL, description, auth, path variables, query parameters, headers, body and saved examples. Click **Edit description** to write the collection description, with a live preview. Click **Save** to keep it.
+- **Secrets stay out:** values of sensitive headers, parameters, variables and body fields are shown as `••••••` or `REDACTED`. References like `{{accessToken}}` are shown as written, since they are not secrets.
+- **Export Markdown** downloads the page as a `.md` file, ready for a wiki, a README or a static site. The CLI does the same: `protolens docs "Veterinary API" -o API.md`.
+
+Markdown is rendered with GitHub-flavoured syntax (tables, fenced code, task lists) and sanitised: scripts and event handlers are removed, and links open in your browser.
+
 ## Collection Runner
 
 The Collection Runner works like Postman's. It runs a whole collection or one folder, one request at a time and in order. Open it from the **Run** tab or button of a collection, or choose **Run collection** or **Run folder** in the **⋯** menu of the request tree.
