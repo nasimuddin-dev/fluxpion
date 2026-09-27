@@ -5,6 +5,7 @@ import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, Se
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { Spinner, TooltipProvider } from './components/ui';
 import { RestView } from './views/RestView';
+import { HomeView } from './views/HomeView';
 import { GraphQLView } from './views/GraphQLView';
 import { WebSocketView } from './views/WebSocketView';
 import { McpView } from './views/McpView';
@@ -19,6 +20,7 @@ import { EnvironmentsView } from './views/EnvironmentsView';
 import { SettingsView } from './views/SettingsView';
 
 const VIEWS: Record<ViewId, ComponentType> = {
+  home: HomeView,
   rest: RestView,
   graphql: GraphQLView,
   websocket: WebSocketView,

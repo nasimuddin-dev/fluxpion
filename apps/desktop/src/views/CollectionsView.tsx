@@ -38,6 +38,7 @@ export function CollectionsView() {
       setRunFolder(p.folderId);
     }
     if (p?.mock) setTab('mock');
+    if (p?.import) setImporting(true);
   });
   const save = async (c: Collection) => {
     await call('col.save', c);

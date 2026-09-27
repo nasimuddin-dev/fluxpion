@@ -35,7 +35,10 @@ export function EnvironmentsView() {
     setSecretValues({});
     if (e) void call('env.secretStatus', { envId: e.id, keys: e.variables.filter((v) => v.secret).map((v) => v.key) }).then(setSecretStatus);
   }, [sel, envs]);
-  useIntent('environments', (p) => p?.environmentId && (setScope('environment'), setSel(p.environmentId)));
+  useIntent('environments', (p) => {
+    if (p?.environmentId) (setScope('environment'), setSel(p.environmentId));
+    else if (p?.tab === 'globals') setScope('global');
+  });
 
   const rows: KeyValue[] = (draft?.variables ?? []).map((v) => ({ ...v, value: v.secret ? secretValues[v.key] ?? '' : v.value }));
   const save = async () => {

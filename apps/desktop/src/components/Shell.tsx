@@ -11,6 +11,7 @@ import {
   Gauge,
   GitBranch,
   History,
+  House,
   KeyRound,
   Layers,
   Network,
@@ -29,12 +30,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
 import logoUrl from '../../build/logo.svg';
 import { ConsolePanel } from './ConsolePanel';
+import { EnvQuickLook } from './EnvQuickLook';
 import { promptText, useApp, type ViewId, type DialogRequest } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
 
 export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: string }> = [
+  { id: 'home', label: 'Home', icon: <House size={18} />, group: 'Start' },
   { id: 'rest', label: 'REST', icon: <Network size={18} />, group: 'Protocols' },
   { id: 'graphql', label: 'GraphQL', icon: <GitBranch size={18} />, group: 'Protocols' },
   { id: 'websocket', label: 'WebSocket', icon: <Radio size={18} />, group: 'Protocols' },
@@ -243,6 +246,7 @@ export function TopBar() {
       </button>
       <div className="flex items-center gap-1.5" style={noDrag}>
         <EnvironmentPicker />
+        <EnvQuickLook />
         <Button size="md" variant="ghost" onClick={() => set({ paletteOpen: true })} icon={<TerminalSquare size={15} />}>
           <span className="hidden lg:inline">Commands</span> <Kbd>{modKey}+K</Kbd>
         </Button>

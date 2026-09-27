@@ -4,6 +4,7 @@ import type { AppSettings, WorkspaceCurrent } from './types';
 import { call } from './api';
 
 export type ViewId =
+  | 'home'
   | 'rest'
   | 'graphql'
   | 'websocket'
@@ -93,7 +94,8 @@ interface AppState {
 let toastId = 0;
 
 export const useApp = create<AppState>((set, get) => ({
-  view: (localStorage.getItem('aps.view') as ViewId) || 'rest',
+  // first launch opens the Home view
+  view: (localStorage.getItem('aps.view') as ViewId) || 'home',
   setView: (view) => {
     localStorage.setItem('aps.view', view);
     set({ view });

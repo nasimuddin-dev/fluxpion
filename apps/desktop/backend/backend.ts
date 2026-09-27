@@ -435,6 +435,25 @@ export class Backend {
         return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, this.logger.redactor.isSensitiveKey(k) ? '••••••' : v]));
       },
       'currentValues.reset': ({ scope, owner }: { scope?: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => this.currentValues?.reset(scope, owner),
+      /** Postman's environment "quick look": initial and current values of the active environment and globals, secrets masked. */
+      'env.quickLook': ({ environment }: { environment?: string }) => {
+        const mask = '••••••';
+        const r = this.logger.redactor;
+        const rows = (vars: Array<{ key: string; value: string; enabled?: boolean; secret?: boolean }>, current: Record<string, unknown>) => {
+          const keys = [...new Set([...vars.map((v) => v.key), ...Object.keys(current)])].filter(Boolean);
+          return keys.map((key) => {
+            const v = vars.find((x) => x.key === key);
+            const sensitive = !!v?.secret || r.isSensitiveKey(key);
+            const show = (x: unknown) => (x === undefined ? undefined : sensitive ? mask : typeof x === 'string' ? x : JSON.stringify(x));
+            return { key, initial: v ? (v.secret ? mask : show(v.value)) : undefined, current: show(current[key]), secret: sensitive, enabled: v?.enabled !== false };
+          });
+        };
+        const env = environment ? this.ws.getEnvironment(environment) : undefined;
+        return {
+          environment: env ? { id: env.id, name: env.name, isProduction: !!env.isProduction, variables: rows(env.variables, this.currentValues?.get('environment', env.name) ?? {}) } : undefined,
+          globals: rows(this.settings.globalVariables ?? [], this.currentValues?.get('globals', '') ?? {}),
+        };
+      },
 
       /* ---------------------------------------------------------------- cookies (kept on this machine, encrypted) */
       'cookies.list': () => ({ cookies: this.cookieStore?.jar.list() ?? [], persistent: this.cookieStore?.persistent ?? false }),
