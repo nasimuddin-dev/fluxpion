@@ -29,7 +29,7 @@ import { runAgent, type AgentTool } from '../ai/agent.js';
 import type { ChatMessage } from '../ai/types.js';
 import { runChecks, type CheckContext } from '../eval/checks.js';
 import { runScript } from '../scripts/sandbox.js';
-import { applyScriptOutput, scriptScopes, type PersistVariable } from '../scripts/bridge.js';
+import { applyScriptOutput, scriptRequestSender, scriptScopes, type PersistVariable } from '../scripts/bridge.js';
 import { query, tryParseJson } from '../util/jsonpath.js';
 import { withTimeout } from '../util/concurrency.js';
 import { applyCookieJarOps, type CookieJar } from '../cookies/cookie-jar.js';
@@ -89,6 +89,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
   const scriptChecks: CheckResult[] = [];
   let ctx: CheckContext = { testType: test.type, body: undefined, text: '' };
   let partial: Partial<ExecutionOutcome> = {};
+  const sendRequest = scriptRequestSender({ redactor: svc.redactor, cookieJar: svc.cookieJar, signal: opts.signal, timeoutMs: svc.defaultTimeoutMs });
 
   try {
     // pre-request script (Postman-compatible: can read/modify the request and set variables)
@@ -97,7 +98,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
         test.type === 'http'
           ? { method: test.request.method, url: test.request.url, headers: [...(test.request.headers ?? [])], body: test.request.body && 'content' in test.request.body ? test.request.body.content : undefined }
           : undefined;
-      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id } });
+      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id } }, { sendRequest });
       root.event('pre-request script', { logs: s.logs, error: s.error });
       if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
       applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
@@ -157,7 +158,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
       jar: svc.cookieJar?.list(),
       info: { requestName: test.name, requestId: test.id },
       data: { body: ctx.body, toolCalls: ctx.toolCalls, tokens: ctx.tokens, error: ctx.error },
-    });
+    }, { sendRequest });
     if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
     applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
     if (s.nextRequest !== undefined) metadata.nextRequest = s.nextRequest;

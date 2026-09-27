@@ -107,8 +107,52 @@ describe('Postman-compatible scripts (pm.*)', () => {
     expect(out.vars).toEqual({ a: 1 });
   });
 
-  it('explains unsupported features', async () => {
-    const out = await runScript(`pm.test('send', () => pm.sendRequest('https://x'));`, { variables: {} });
-    expect(out.tests[0]!.message).toMatch(/not supported/);
+  it('says when pm.sendRequest has no network access', async () => {
+    const out = await runScript(`pm.sendRequest('https://x', () => pm.environment.set('ran', true));`, { variables: {} });
+    expect(out.scopeSets.environment).toEqual({});
+    expect(out.logs.join(' ')).toMatch(/not available/);
+  });
+
+  it('pm.sendRequest: callbacks get real responses, chained calls work, only the last pass counts', async () => {
+    const calls: string[] = [];
+    const sendRequest = async (req: { method: string; url: string; headers: Array<{ key: string; value: string }>; body?: unknown }) => {
+      calls.push(`${req.method} ${req.url} ${JSON.stringify(req.headers)} ${JSON.stringify(req.body ?? null)}`);
+      if (req.url.endsWith('/token')) return { status: 200, statusText: 'OK', headers: [['content-type', 'application/json']] as Array<[string, string]>, body: '{"access_token":"t-1"}', time: 5 };
+      if (req.url.endsWith('/down')) throw new Error('connect ECONNREFUSED');
+      return { status: 201, headers: [] as Array<[string, string]>, body: JSON.stringify({ auth: req.headers.find((h) => h.key === 'Authorization')?.value }), time: 3 };
+    };
+    const code = `
+      console.log('start');
+      pm.sendRequest({ url: 'https://api.test/token', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: '{"u":"a"}' } }, (err, res) => {
+        pm.environment.set('token', res.json().access_token);
+        pm.test('token status', () => pm.expect(res.code).to.equal(200));
+        pm.sendRequest({ url: 'https://api.test/me', header: [{ key: 'Authorization', value: 'Bearer ' + res.json().access_token }] }, (err2, me) => {
+          pm.test('chained', () => pm.expect(me.json().auth).to.equal('Bearer t-1'));
+        });
+      });
+      pm.sendRequest('https://api.test/down', (err, res) => pm.test('network error', () => { pm.expect(err.message).to.include('ECONNREFUSED'); pm.expect(res).to.equal(null); }));
+    `;
+    const out = await runScript(code, { variables: {} }, { sendRequest });
+    expect(out.error).toBeUndefined();
+    // callbacks run synchronously, so a chained request's callback runs inside its parent's
+    expect(out.tests).toEqual([
+      { name: 'token status', passed: true },
+      { name: 'chained', passed: true },
+      { name: 'network error', passed: true },
+    ]);
+    expect(out.scopeSets.environment).toEqual({ token: 't-1' });
+    expect(out.logs).toEqual(['start']);
+    expect(calls).toEqual([
+      'POST https://api.test/token [{"key":"Content-Type","value":"application/json"}] "{\\"u\\":\\"a\\"}"',
+      'GET https://api.test/down [] null',
+      'GET https://api.test/me [{"key":"Authorization","value":"Bearer t-1"}] null',
+    ]);
+    expect(out.sentRequests?.map((r) => r.status ?? r.error)).toEqual([200, 'connect ECONNREFUSED', 201]);
+  });
+
+  it('pm.sendRequest: stops runaway scripts', async () => {
+    const sendRequest = async () => ({ status: 200, headers: [] as Array<[string, string]>, body: '{}' });
+    const out = await runScript(`function go(n) { pm.sendRequest('https://x.test/' + n, () => go(n + 1)); } go(0);`, { variables: {} }, { sendRequest, maxRequests: 5 });
+    expect(out.error).toMatch(/more than 5 requests/);
   });
 });

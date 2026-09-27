@@ -27,6 +27,8 @@ export interface ScriptInput {
   cookies?: Record<string, string>;
   /** Snapshot of the workspace cookie jar for `pm.cookies.jar()`. */
   jar?: StoredCookie[];
+  /** Responses to `pm.sendRequest` calls from earlier passes (set by the host). */
+  sent?: Array<{ key: string; response?: ScriptHttpResponse; error?: string }>;
   info?: { requestName?: string; requestId?: string; iteration?: number; iterationCount?: number };
   /** Arbitrary extra data exposed as `pm.data` (e.g. LLM output, MCP result). */
   data?: unknown;
@@ -47,8 +49,38 @@ export interface ScriptOutput {
   skipRequest?: boolean;
   /** Changes made through `pm.cookies.jar()` (apply with `applyCookieJarOps`). */
   jarOps?: CookieJarOp[];
+  /** `pm.sendRequest` calls the host has not answered yet (internal to the replay loop). */
+  pendingRequests?: Array<{ key: string; request: ScriptHttpRequest }>;
+  /** Requests sent through `pm.sendRequest`, for logs and the console. */
+  sentRequests?: Array<{ method: string; url: string; status?: number; error?: string; durationMs?: number }>;
   error?: string;
   durationMs: number;
+}
+
+/** A request made with `pm.sendRequest` (Postman request object or URL, normalised in the sandbox). */
+export interface ScriptHttpRequest {
+  method: string;
+  url: string;
+  headers: Array<{ key: string; value: string }>;
+  body?: string | { urlencoded: Array<{ key: string; value: string }> };
+}
+export interface ScriptHttpResponse {
+  status: number;
+  statusText?: string;
+  headers: Array<[string, string]>;
+  body: string;
+  time?: number;
+}
+/** Sends `pm.sendRequest` requests for the host (network, auth-free, with its own timeout). */
+export type ScriptRequestSender = (req: ScriptHttpRequest) => Promise<ScriptHttpResponse>;
+
+export interface ScriptOptions {
+  timeoutMs?: number;
+  memoryMb?: number;
+  /** Enables `pm.sendRequest`. Without it, calls are reported as unavailable. */
+  sendRequest?: ScriptRequestSender;
+  /** Most `pm.sendRequest` calls per script run (default 20). */
+  maxRequests?: number;
 }
 
 const emptyScopes = () => ({
@@ -63,7 +95,45 @@ function getModule(): Promise<QuickJSWASMModule> {
 
 const HASHES = new Set(['md5', 'sha1', 'sha256', 'sha512']);
 
-export async function runScript(code: string, input: ScriptInput, opts: { timeoutMs?: number; memoryMb?: number } = {}): Promise<ScriptOutput> {
+/**
+ * Run a script. `pm.sendRequest` is supported by replaying: when a pass records requests the host
+ * hasn't answered, they are sent and the script runs again from the start with the responses, so
+ * callbacks run synchronously with real data. Only the last pass's results are kept.
+ */
+export async function runScript(code: string, input: ScriptInput, opts: ScriptOptions = {}): Promise<ScriptOutput> {
+  const max = opts.maxRequests ?? 20;
+  const sent: NonNullable<ScriptInput['sent']> = [];
+  const log: NonNullable<ScriptOutput['sentRequests']> = [];
+  const t0 = performance.now();
+  for (let pass = 0; ; pass++) {
+    const out = await runScriptOnce(code, { ...input, sent }, opts);
+    const pending = out.pendingRequests ?? [];
+    delete out.pendingRequests;
+    if (!pending.length) return { ...out, ...(log.length ? { sentRequests: log } : {}), durationMs: Math.round(performance.now() - t0) };
+    if (!opts.sendRequest) {
+      out.logs.push('pm.sendRequest is not available here: the callback did not run.');
+      return out;
+    }
+    if (sent.length + pending.length > max || pass >= max) {
+      out.error ??= `pm.sendRequest: more than ${max} requests in one script`;
+      return { ...out, sentRequests: log };
+    }
+    for (const p of pending) {
+      const r0 = performance.now();
+      try {
+        const response = await opts.sendRequest(p.request);
+        sent.push({ key: p.key, response });
+        log.push({ method: p.request.method, url: p.request.url, status: response.status, durationMs: Math.round(performance.now() - r0) });
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        sent.push({ key: p.key, error });
+        log.push({ method: p.request.method, url: p.request.url, error });
+      }
+    }
+  }
+}
+
+async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptions = {}): Promise<ScriptOutput> {
   const t0 = performance.now();
   if (!code?.trim()) return { vars: {}, unset: [], ...emptyScopes(), tests: [], logs: [], request: input.request, durationMs: 0 };
   const mod = await getModule();

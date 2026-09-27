@@ -1,6 +1,8 @@
 import type { VariableScope, ScopeName } from '../vars/variables.js';
 import type { Redactor } from '../util/redact.js';
-import type { ScriptInput, ScriptOutput, ScriptScope } from './sandbox.js';
+import type { ScriptInput, ScriptOutput, ScriptRequestSender, ScriptScope } from './sandbox.js';
+import type { CookieJar } from '../cookies/cookie-jar.js';
+import { executeHttp } from '../protocols/http/client.js';
 
 /** Where `pm.environment` / `pm.globals` / `pm.collectionVariables` map to in the engine's scopes. */
 const SCOPE_MAP: Record<ScriptScope, ScopeName> = { environment: 'environment', globals: 'global', collectionVariables: 'collection' };
@@ -37,4 +39,20 @@ export function applyScriptOutput(out: Pick<ScriptOutput, 'vars' | 'unset' | 'sc
       opts.persist?.(scope, k, undefined);
     }
   }
+}
+
+/**
+ * The host side of `pm.sendRequest`: sends with the engine's HTTP client (shared cookie jar, redaction,
+ * cancellation) and a per-request timeout. `{{variables}}` are not resolved, as in Postman; scripts use
+ * `pm.variables.replaceIn()` for that.
+ */
+export function scriptRequestSender(o: { redactor?: Redactor; cookieJar?: CookieJar; signal?: AbortSignal; timeoutMs?: number }): ScriptRequestSender {
+  return async (req) => {
+    if (!/^https?:\/\//i.test(req.url)) throw new Error(`pm.sendRequest: "${req.url}" is not an http(s) URL`);
+    const timeoutMs = o.timeoutMs ?? 30_000;
+    const signal = o.signal ? AbortSignal.any([o.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
+    const body = typeof req.body === 'string' ? { type: 'text' as const, content: req.body } : req.body ? { type: 'form-urlencoded' as const, fields: req.body.urlencoded } : undefined;
+    const { response } = await executeHttp({ method: req.method, url: req.url, headers: req.headers, body, settings: { timeoutMs } }, { signal, redactor: o.redactor, cookieJar: o.cookieJar, maxPreviewBytes: 2 * 1024 * 1024 });
+    return { status: response.status, statusText: response.statusText, headers: response.headers, body: response.bodyPreview, time: response.durationMs };
+  };
 }

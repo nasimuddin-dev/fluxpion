@@ -272,6 +272,53 @@ function __cookieJar() {
   };
 }
 
+/* ---------------- pm.sendRequest ---------------- */
+// The sandbox is synchronous, so requests are replayed: on the first pass a call is recorded in
+// __out.pendingRequests and its callback does not run; the host sends it and runs the script again
+// with the response in __in.sent, and this time the callback runs straight away with it.
+// responses are keyed by request signature + occurrence, so calls added by callbacks don't shift them
+const __sendSeen = {};
+const __sent = __in.sent || [];
+__out.pendingRequests = [];
+function __normRequest(req) {
+  if (typeof req === 'string') return { method: 'GET', url: req, headers: [], body: undefined };
+  const r = req || {};
+  const url = typeof r.url === 'string' ? r.url : r.url && (r.url.raw || String(r.url));
+  const hs = r.header || r.headers || [];
+  const headers = Array.isArray(hs) ? hs.map((h) => ({ key: String(h.key), value: String(h.value) })) : Object.keys(hs).map((k) => ({ key: k, value: String(hs[k]) }));
+  let body;
+  const b = r.body;
+  if (typeof b === 'string') body = b;
+  else if (b && b.mode === 'raw') body = b.raw;
+  else if (b && b.mode === 'urlencoded') body = { urlencoded: (b.urlencoded || []).map((f) => ({ key: String(f.key), value: String(f.value) })) };
+  else if (b && typeof b === 'object' && !b.mode) body = JSON.stringify(b);
+  return { method: String(r.method || 'GET').toUpperCase(), url: String(url || ''), headers, body };
+}
+function __responseObject(res) {
+  const hdrs = (res.headers || []).map((h) => ({ key: h[0], value: h[1] }));
+  return {
+    code: res.status, status: res.statusText || '', responseTime: res.time, responseSize: (res.body || '').length,
+    headers: __headerList(hdrs),
+    json: () => JSON.parse(res.body || 'null'), text: () => res.body || '',
+    body: res.body,
+  };
+}
+function __sendRequest(req, cb) {
+  const n = __normRequest(req);
+  const sig = n.method + ' ' + n.url + ' ' + JSON.stringify(n.headers) + ' ' + JSON.stringify(n.body === undefined ? null : n.body);
+  __sendSeen[sig] = (__sendSeen[sig] || 0) + 1;
+  const key = sig + '#' + __sendSeen[sig];
+  const done = __sent.find((x) => x.key === key);
+  if (done) {
+    if (typeof cb === 'function') {
+      if (done.error) cb(new Error(done.error), null);
+      else cb(null, __responseObject(done.response));
+    }
+    return;
+  }
+  __out.pendingRequests.push({ key: key, request: n });
+}
+
 /* ---------------- libraries ---------------- */
 const __word = (hex) => ({ __hex: hex, toString: (enc) => (enc && enc.__b64 ? __host_hex2b64(hex) : hex), sigBytes: hex.length / 2 });
 const CryptoJS = {
@@ -312,7 +359,7 @@ const pm = {
   response: __response,
   info: Object.assign({ eventName: __in.response ? 'test' : 'prerequest', iteration: 0, iterationCount: 1, requestName: '', requestId: '' }, __in.info || {}),
   cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}), jar: __cookieJar },
-  sendRequest() { throw new Error('pm.sendRequest is not supported in the Protolens sandbox yet; use a separate request with dependsOn/extract instead.'); },
+  sendRequest: __sendRequest,
   execution: { setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); }, skipRequest: () => { __out.skipRequest = true; } },
   uuid: () => __host_uuid(),
   crypto: {

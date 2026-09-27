@@ -177,4 +177,28 @@ describe('pm.cookies.jar()', () => {
     const summary = await runTests({ name: 'cookies', runId: 'r1', tests, services: svc, concurrency: 1 });
     expect(summary.passed).toBe(2);
   });
+
+  it('pm.sendRequest in a pre-request script: fetch a token, then use it (and share the cookie jar)', async () => {
+    const vars = new VariableScope(new MemorySecretStore(), new Redactor());
+    const redactor = new Redactor();
+    const svc: ExecServices = { vars, providers: new ProviderRegistry([], vars, redactor), mcp: new McpManager(() => undefined, redactor), mcpServers: [], redactor, pricing: [], defaultTimeoutMs: 5000, cookieJar: new CookieJar() };
+    const tests = [
+      {
+        id: 'p',
+        name: 'patients with a fetched token',
+        type: 'http',
+        request: { method: 'GET', url: `${base}/patients` },
+        preRequestScript: `
+          pm.sendRequest({ url: '${base}/auth/token', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ client_id: 'demo', client_secret: 'demo-secret' }) } }, (err, res) => {
+            pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + res.json().access_token });
+          });
+          pm.sendRequest({ url: '${base}/session/login', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: '{"username":"vet","password":"paws"}' } }, () => {});`,
+        testScript: `pm.test('authorised', () => pm.response.to.have.status(200));`,
+      },
+    ] as TestCase[];
+    const summary = await runTests({ name: 'send', runId: 'r2', tests, services: svc, concurrency: 1 });
+    expect(summary.passed).toBe(1);
+    // the login inside the script went through the shared cookie jar
+    expect(svc.cookieJar!.list().map((c) => c.name).sort()).toEqual(['clinic', 'vet_session']);
+  });
 });

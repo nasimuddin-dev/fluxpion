@@ -60,6 +60,7 @@ import {
   withRequestExamples,
   type SavedExample,
   applyCookieJarOps,
+  scriptRequestSender,
   type CookieInput,
   runTests,
   runCollection,
@@ -790,6 +791,9 @@ export class Backend {
     const chunks = this.batched<unknown>('http.chunks', 80);
     let scriptLogs: string[] = [];
     let preLogCount: number | undefined;
+    const scriptSender = scriptRequestSender({ redactor: ctx.redactor, cookieJar: ctx.services.cookieJar, signal: ctrl.signal, timeoutMs: this.settings.defaultTimeoutMs });
+    const sentLogs = (o: { sentRequests?: Array<{ method: string; url: string; status?: number; error?: string; durationMs?: number }> }) =>
+      (o.sentRequests ?? []).map((r) => `pm.sendRequest ${r.method} ${ctx.redactor.redactUrl(r.url)} → ${r.error ? `error: ${r.error}` : `${r.status} (${r.durationMs} ms)`}`);
     const logsOf = () => scriptLogs.map((message, i) => ({ phase: i < (preLogCount ?? scriptLogs.length) ? ('pre-request' as const) : ('test' as const), message: ctx.redactor.redactString(message) }));
     try {
       let request = p.request;
@@ -804,8 +808,8 @@ export class Backend {
           request: { method: request.method, url: request.url, headers: request.headers ?? [], body: bodyText },
           jar: ctx.services.cookieJar?.list(),
           info: { requestName: p.name, requestId: p.requestId },
-        });
-        scriptLogs.push(...out.logs);
+        }, { sendRequest: scriptSender });
+        scriptLogs.push(...out.logs, ...sentLogs(out));
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
         if (out.error) throw new ApsError('ScriptError', `Pre-request script failed: ${out.error}`);
@@ -849,8 +853,8 @@ export class Backend {
           cookies: responseCookies(response.cookies, ctx.services.cookieJar, response.url),
           jar: ctx.services.cookieJar?.list(),
           info: { requestName: p.name, requestId: p.requestId },
-        });
-        scriptLogs.push(...out.logs);
+        }, { sendRequest: scriptSender });
+        scriptLogs.push(...out.logs, ...sentLogs(out));
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
         for (const t of out.tests) checks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });

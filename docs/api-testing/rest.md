@@ -79,9 +79,27 @@ pm.environment.set('patientId', pm.response.json().items[0].id);
 | Response | `pm.response.code`, `.status`, `.responseTime`, `.headers.get()`, `.json()`, `.text()`, `pm.response.to.have.status/header/body/jsonBody`, `pm.response.to.be.ok/success/error/json`, legacy `responseCode`, `responseBody` |
 | Request | `pm.request.method`, `.url.toString()/update()`, `.headers.add/upsert/remove/get`, `.body.toString()/update()` |
 | Variables | `pm.variables`, `pm.environment`, `pm.collectionVariables`, `pm.globals` (`get/set/unset/has/clear/toObject/replaceIn`), `pm.iterationData` |
-| Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `postman.setNextRequest`, `postman.setEnvironmentVariable`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `console.log` |
+| Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `pm.sendRequest`, `postman.setNextRequest`, `postman.setEnvironmentVariable`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `console.log` |
 
-`pm.sendRequest` isn't supported yet; chain requests in a collection run or use `dependsOn` + `extract` in YAML tests.
+**`pm.sendRequest`** sends another HTTP request from a pre-request or test script, for example to fetch a token first:
+
+```js
+pm.sendRequest({
+  url: pm.variables.replaceIn("{{baseUrl}}/auth/token"),
+  method: "POST",
+  header: { "Content-Type": "application/json" },
+  body: { mode: "raw", raw: JSON.stringify({ client_id: pm.environment.get("clientId") }) }
+}, (err, res) => {
+  if (err) return console.error(err.message);
+  pm.environment.set("accessToken", res.json().access_token);
+  pm.request.headers.upsert({ key: "Authorization", value: "Bearer " + res.json().access_token });
+});
+```
+
+- The request is a URL string or a Postman request object (`url`, `method`, `header` as a list or map, `body` with `mode: "raw"` or `"urlencoded"`). As in Postman, `{{variables}}` are not resolved automatically: use `pm.variables.replaceIn()`.
+- The response has `code`, `status`, `responseTime`, `headers`, `json()` and `text()`. On a network error, the callback gets `err` and `null`.
+- Requests share the run's cookie jar, time out like other requests, and appear in the [Console](#console) under the script's request.
+- **How it works:** the sandbox is synchronous, so the script runs, its requests are sent, then the script runs again from the start with the responses, and callbacks run immediately. Only the last run's variables, tests and logs count. So a request made inside a callback also has its callback run inside, before later callbacks. Keep scripts deterministic around `pm.sendRequest` (avoid a random URL per run). A script may send at most 20 requests.
 
 **Current values:** values set with `pm.environment.set`, `pm.collectionVariables.set` or `pm.globals.set` are kept on this machine as *current values* and override the stored values. They're never written to workspace files. Sensitive ones (tokens, passwords, secret variables) are encrypted. You can see and reset them under **Environments**.
 

@@ -26,6 +26,7 @@ export const SNIPPETS: Snippet[] = [
   { kind: 'both', label: 'Cookies: Read from the cookie jar', code: `const jar = pm.cookies.jar();\njar.get(pm.request.url.toString(), "session", (error, value) => {\n  pm.variables.set("session", value);\n});` },
   { kind: 'both', label: 'Cookies: Set a cookie in the jar', code: `pm.cookies.jar().set(pm.request.url.toString(), "cookie_name", "cookie_value");` },
   { kind: 'both', label: 'Cookies: Clear the jar for this domain', code: `pm.cookies.jar().clear(pm.request.url.toString());` },
+  { kind: 'both', label: 'Send a request (pm.sendRequest)', code: `pm.sendRequest({\n  url: pm.variables.replaceIn("{{baseUrl}}/auth/token"),\n  method: "POST",\n  header: { "Content-Type": "application/json" },\n  body: { mode: "raw", raw: JSON.stringify({ client_id: pm.environment.get("clientId") }) }\n}, (err, res) => {\n  if (err) return console.error(err.message);\n  pm.environment.set("accessToken", res.json().access_token);\n});` },
   { kind: 'pre', label: 'Add a request header', code: `pm.request.headers.upsert({ key: "X-Request-Id", value: pm.uuid() });` },
   { kind: 'pre', label: 'Timestamp variable', code: `pm.variables.set("timestamp", new Date().toISOString());` },
   { kind: 'pre', label: 'HMAC signature header', code: `const body = pm.request.body.toString();\nconst signature = CryptoJS.HmacSHA256(body, pm.environment.get("secret")).toString(CryptoJS.enc.Base64);\npm.request.headers.upsert({ key: "X-Signature", value: signature });` },
@@ -71,6 +72,11 @@ declare const pm: {
   info: { requestName: string; requestId: string; iteration: number; iterationCount: number; eventName: 'prerequest' | 'test' };
   cookies: { get(name: string): string | undefined; has(name: string): boolean; toObject(): Record<string, string>; jar(): PmCookieJar };
   execution: { setNextRequest(name: string | null): void; skipRequest(): void };
+  /** Send another HTTP request from a script. The callback runs with the response (or an error). */
+  sendRequest(
+    request: string | { url: string; method?: string; header?: Array<{ key: string; value: string }> | Record<string, string>; body?: { mode: 'raw'; raw: string } | { mode: 'urlencoded'; urlencoded: Array<{ key: string; value: string }> } },
+    callback?: (err: Error | null, res: { code: number; status: string; responseTime: number; headers: PmHeaderList; json(): any; text(): string } | null) => void,
+  ): void;
   uuid(): string;
 };
 declare const postman: { setNextRequest(name: string | null): void; setEnvironmentVariable(k: string, v: any): void; getEnvironmentVariable(k: string): any; setGlobalVariable(k: string, v: any): void; getGlobalVariable(k: string): any };
