@@ -28,6 +28,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
 import logoUrl from '../../build/logo.svg';
+import { ConsolePanel } from './ConsolePanel';
 import { promptText, useApp, type ViewId, type DialogRequest } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
@@ -263,6 +264,7 @@ export function StatusBar() {
   const info = useApp((s) => s.info);
   const mcp = useApp((s) => s.mcpConnected);
   const logsOpen = useApp((s) => s.logsOpen);
+  const bottomTab = useApp((s) => s.bottomTab);
   const envObj = ws?.environments.find((e) => e.name === env);
   const acts = Object.values(activity);
   return (
@@ -291,14 +293,41 @@ export function StatusBar() {
         <KeyRound size={12} /> {info?.secretBackend}
       </span>
       <span title="Metadata storage">{info?.metaBackend === 'sqlite' ? 'SQLite' : info?.metaBackend}</span>
-      <button className={cx('flex items-center gap-1 hover:text-fg', logsOpen && 'text-fg')} onClick={() => useApp.getState().set({ logsOpen: !logsOpen })}>
-        <ScrollText size={12} /> Logs
-      </button>
+      {(['console', 'logs'] as const).map((t) => (
+        <button
+          key={t}
+          className={cx('flex items-center gap-1 hover:text-fg', logsOpen && bottomTab === t && 'text-fg')}
+          title={t === 'console' ? 'Console: requests and script output (Ctrl+Alt+C)' : 'Application logs'}
+          onClick={() => useApp.getState().set(logsOpen && bottomTab === t ? { logsOpen: false } : { logsOpen: true, bottomTab: t })}
+        >
+          {t === 'console' ? <TerminalSquare size={12} /> : <ScrollText size={12} />} {t === 'console' ? 'Console' : 'Logs'}
+        </button>
+      ))}
     </footer>
   );
 }
 
+/** The bottom panel: Postman-style Console and the application logs. */
 export function LogsPanel() {
+  const tab = useApp((s) => s.bottomTab);
+  return (
+    <div className="h-60 border-t border-line bg-panel flex flex-col shrink-0">
+      <div className="flex items-center gap-1 px-2 h-8 border-b border-line text-xs shrink-0">
+        {(['console', 'logs'] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} className={cx('px-2 h-6 rounded-md font-medium', tab === t ? 'bg-hover text-fg' : 'text-muted hover:text-fg')} onClick={() => useApp.getState().set({ bottomTab: t })}>
+            {t === 'console' ? 'Console' : 'Logs'}
+          </button>
+        ))}
+        <IconButton label="Close panel" className="ml-auto" onClick={() => useApp.getState().set({ logsOpen: false })}>
+          <X size={13} />
+        </IconButton>
+      </div>
+      {tab === 'console' ? <ConsolePanel /> : <AppLogs />}
+    </div>
+  );
+}
+
+function AppLogs() {
   const [logs, setLogs] = useState<Array<{ time: string; level: string; scope: string; message: string; data?: unknown }>>([]);
   const [level, setLevel] = useState('ALL');
   useEffect(() => {
@@ -307,18 +336,14 @@ export function LogsPanel() {
   }, []);
   const shown = logs.filter((l) => level === 'ALL' || l.level === level);
   return (
-    <div className="h-48 border-t border-line bg-panel flex flex-col shrink-0">
-      <div className="flex items-center gap-2 px-3 h-7 border-b border-line text-xs">
-        <span className="font-medium">Logs</span>
-        <span className="text-muted">secrets are always redacted</span>
-        <select className="ml-auto bg-transparent" value={level} onChange={(e) => setLevel(e.target.value)}>
+    <>
+      <div className="flex items-center gap-2 px-3 h-7 border-b border-line text-xs shrink-0">
+        <span className="text-muted">Application logs · secrets are always redacted</span>
+        <select className="ml-auto bg-transparent" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Log level">
           {['ALL', 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'].map((l) => (
             <option key={l}>{l}</option>
           ))}
         </select>
-        <IconButton label="Close logs" onClick={() => useApp.getState().set({ logsOpen: false })}>
-          <X size={13} />
-        </IconButton>
       </div>
       <div className="flex-1 overflow-auto mono text-[0.8rem] px-3 py-1">
         {shown.map((l, i) => (
@@ -328,7 +353,7 @@ export function LogsPanel() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 

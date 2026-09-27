@@ -72,6 +72,8 @@ interface AppState {
   paletteOpen: boolean;
   searchOpen: boolean;
   logsOpen: boolean;
+  /** Which tab of the bottom panel is shown. */
+  bottomTab: 'console' | 'logs';
   assistant?: AssistantRequest;
   toasts: Toast[];
   activity: Record<string, string>;
@@ -99,6 +101,7 @@ export const useApp = create<AppState>((set, get) => ({
   paletteOpen: false,
   searchOpen: false,
   logsOpen: false,
+  bottomTab: 'console',
   toasts: [],
   activity: {},
   mcpConnected: 0,

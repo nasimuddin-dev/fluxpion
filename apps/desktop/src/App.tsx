@@ -96,6 +96,11 @@ export default function App() {
       } else if (mod && e.key === ',') {
         e.preventDefault();
         useApp.getState().setView('settings');
+      } else if (mod && e.altKey && e.key.toLowerCase() === 'c') {
+        // Postman's shortcut for the console
+        e.preventDefault();
+        const st = useApp.getState();
+        set(st.logsOpen && st.bottomTab === 'console' ? { logsOpen: false } : { logsOpen: true, bottomTab: 'console' });
       } else if (mod && e.altKey && /^[1-9]$/.test(e.key)) {
         const n = NAV[Number(e.key) - 1];
         if (n) useApp.getState().setView(n.id);
@@ -119,7 +124,8 @@ export default function App() {
       { id: 'open-settings', label: 'Open Settings', hint: `${'Ctrl'}+,`, run: () => s.setView('settings') },
       { id: 'export-results', label: 'Export Results', hint: 'Tests', run: () => s.openIntent('tests', { exportLatest: true }) },
       { id: 'search', label: 'Search Workspace', hint: 'Ctrl+Shift+F', run: () => s.set({ searchOpen: true }) },
-      { id: 'toggle-logs', label: 'Toggle Logs Panel', run: () => s.set({ logsOpen: !s.logsOpen }) },
+      { id: 'toggle-console', label: 'Show Console', hint: 'Ctrl+Alt+C', run: () => s.set({ logsOpen: true, bottomTab: 'console' }) },
+      { id: 'toggle-logs', label: 'Show Application Logs', run: () => s.set({ logsOpen: true, bottomTab: 'logs' }) },
       { id: 'assistant', label: 'Ask AI Assistant', run: () => s.set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } }) },
       { id: 'new-ws', label: 'New WebSocket Connection', run: () => s.setView('websocket') },
       { id: 'load', label: 'New Load Test', run: () => s.setView('load') },

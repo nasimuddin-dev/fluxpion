@@ -123,6 +123,28 @@ interface RunState {
   done: boolean;
 }
 
+const CONSOLE_MAX = 500;
+const CONSOLE_BODY_CHARS = 16_000;
+
+/** One line of the Postman-style console. Values are redacted before they are stored. */
+export interface ConsoleEntry {
+  id: string;
+  time: string;
+  source: 'request' | 'run';
+  run?: string;
+  name: string;
+  method: string;
+  url: string;
+  status?: number | string;
+  durationMs?: number;
+  size?: number;
+  request?: { headers: Array<[string, string]>; body?: string };
+  response?: { headers: Array<[string, string]>; body?: string };
+  logs: Array<{ phase: 'pre-request' | 'test'; message: string }>;
+  error?: string;
+  failedChecks?: number;
+}
+
 export class Backend {
   private host: BackendHost;
   private manager: WorkspaceManager;
@@ -134,6 +156,8 @@ export class Backend {
   private secrets: SecretStore;
   private logger: Logger;
   private logBuffer: LogRecord[] = [];
+  /** Postman-style console: recent requests with their details and script output. */
+  private consoleBuffer: ConsoleEntry[] = [];
   private controllers = new Map<string, AbortController>();
   private runs = new Map<string, RunState>();
   private mcpSessions = new Map<string, McpSession>();
@@ -224,6 +248,34 @@ export class Backend {
     return { running: false, routes: view(routes) };
   }
 
+  private consoleEntry(e: ConsoleEntry): void {
+    this.consoleBuffer.push(e);
+    if (this.consoleBuffer.length > CONSOLE_MAX) this.consoleBuffer.splice(0, this.consoleBuffer.length - CONSOLE_MAX);
+    this.host.emit('console', e);
+  }
+
+  /** Requests made by runs (test runner, Collection Runner) appear in the console too, without bodies. */
+  private consoleFromResult(r: TestResult, runName: string, redactor: Redactor): void {
+    if (r.type !== 'http' && r.type !== 'graphql') return;
+    const m = (r.metadata ?? {}) as { url?: string; method?: string; size?: number; preRequestLogs?: string[]; scriptLogs?: string[] };
+    const status = r.checks.find((c) => c.type === 'status')?.actual;
+    this.consoleEntry({
+      id: r.id,
+      time: new Date().toISOString(),
+      source: 'run',
+      run: runName,
+      name: r.name,
+      method: m.method ?? (r.type === 'graphql' ? 'POST' : 'GET'),
+      url: m.url ?? r.input ?? '',
+      status: typeof status === 'number' ? status : r.error ? r.error.kind : r.status,
+      durationMs: r.latencyMs,
+      size: m.size,
+      logs: [...(m.preRequestLogs ?? []).map((message) => ({ phase: 'pre-request' as const, message: redactor.redactString(message) })), ...(m.scriptLogs ?? []).map((message) => ({ phase: 'test' as const, message: redactor.redactString(message) }))],
+      error: r.error?.message,
+      failedChecks: r.checks.filter((c) => !c.passed).length,
+    });
+  }
+
   private get ws(): WorkspaceStore {
     if (!this.store) throw new ApsError('ConfigurationError', 'No workspace is open');
     return this.store;
@@ -297,6 +349,10 @@ export class Backend {
         return this.settings;
       },
       'logs.recent': () => this.logBuffer,
+      'console.recent': () => this.consoleBuffer,
+      'console.clear': () => {
+        this.consoleBuffer = [];
+      },
       'app.openExternal': ({ url }: { url: string }) => {
         if (!/^https?:\/\//.test(url)) throw new ApsError('ValidationError', 'Only http(s) URLs can be opened');
         return this.host.openExternal?.(url);
@@ -702,6 +758,8 @@ export class Backend {
     const root = tracer.start(p.name ?? 'request', 'http');
     const chunks = this.batched<unknown>('http.chunks', 80);
     let scriptLogs: string[] = [];
+    let preLogCount: number | undefined;
+    const logsOf = () => scriptLogs.map((message, i) => ({ phase: i < (preLogCount ?? scriptLogs.length) ? ('pre-request' as const) : ('test' as const), message: ctx.redactor.redactString(message) }));
     try {
       let request = p.request;
       if ((!request.auth || request.auth.type === 'inherit') && ctx.collection)
@@ -725,6 +783,7 @@ export class Backend {
           if (out.request.body !== undefined && request.body && 'content' in request.body) request = { ...request, body: { ...request.body, content: out.request.body } };
         }
       }
+      preLogCount = scriptLogs.length;
       const spec = ctx.vars.resolveDeep(request);
       spec.settings = { timeoutMs: this.settings.defaultTimeoutMs, ...spec.settings };
       const timeout = setTimeout(() => ctrl.abort(new ApsError('TimeoutError', `Request timed out after ${spec.settings!.timeoutMs} ms`)), spec.settings.timeoutMs);
@@ -783,6 +842,52 @@ export class Backend {
         payloadPath: response.payloadPath,
         traceId: trace.traceId,
       });
+      const clip = (t: string | undefined) => (t && t.length > CONSOLE_BODY_CHARS ? t.slice(0, CONSOLE_BODY_CHARS) + `… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);
+      // values typed into sensitive headers are secrets too (e.g. echoed back in a response body)
+      for (const h of spec.headers ?? [])
+        if (h.enabled !== false && ctx.redactor.isSensitiveKey(h.key) && h.value.length >= 6) {
+          ctx.redactor.addSecret(h.value);
+          const token = h.value.replace(/^\w+\s+/, '');
+          if (token !== h.value && token.length >= 6) ctx.redactor.addSecret(token);
+        }
+      // so are sensitive fields of the request body (servers often echo them back)
+      const collect = (v: unknown, key = '', depth = 0): void => {
+        if (depth > 20 || v == null) return;
+        if (typeof v === 'string') {
+          if (key && ctx.redactor.isSensitiveKey(key) && v.length >= 4) ctx.redactor.addSecret(v);
+        } else if (Array.isArray(v)) v.forEach((x) => collect(x, key, depth + 1));
+        else if (typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>)) collect(x, k, depth + 1);
+      };
+      if (spec.body && 'content' in spec.body)
+        try {
+          collect(JSON.parse(spec.body.content));
+        } catch {
+          /* not JSON */
+        }
+      else if (spec.body && 'fields' in spec.body) for (const f of spec.body.fields) collect(f.value, f.key);
+      const safeBody = (t: string | undefined) => {
+        if (!t) return t;
+        try {
+          return JSON.stringify(ctx.redactor.redact(JSON.parse(t)), null, 2);
+        } catch {
+          return ctx.redactor.redactString(t);
+        }
+      };
+      this.consoleEntry({
+        id,
+        time: new Date().toISOString(),
+        source: 'request',
+        name: p.name ?? `${prepared.method} ${prepared.url}`,
+        method: prepared.method,
+        url: prepared.url,
+        status: response.status,
+        durationMs: response.durationMs,
+        size: response.size,
+        request: { headers: prepared.headers, body: clip(safeBody(prepared.bodyPreview)) },
+        response: { headers: ctx.redactor.redact(response.headers), body: clip(safeBody(response.bodyPreview)) },
+        logs: logsOf(),
+        failedChecks: checks.filter((c) => !c.passed).length,
+      });
       return { id, response, prepared, checks, scriptLogs, unresolved: [...ctx.vars.unresolved], traceId: trace.traceId, historyId };
     } catch (e) {
       const err = normalizeError(ctrl.signal.reason instanceof ApsError ? ctrl.signal.reason : e);
@@ -790,6 +895,17 @@ export class Backend {
       const trace = tracer.finish('error');
       this.ws.saveTrace(trace, 'http');
       this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'http', name: p.name ?? `${p.request.method} ${p.request.url}`, method: p.request.method, url: ctx.redactor.redactUrl(ctx.vars.resolve(p.request.url)), status: err.kind, request: ctx.redactor.redact(p.request), traceId: trace.traceId });
+      this.consoleEntry({
+        id,
+        time: new Date().toISOString(),
+        source: 'request',
+        name: p.name ?? `${p.request.method} ${p.request.url}`,
+        method: p.request.method,
+        url: ctx.redactor.redactUrl(ctx.vars.resolve(p.request.url)),
+        status: err.kind,
+        logs: logsOf(),
+        error: err.message,
+      });
       return { id, error: err, scriptLogs, unresolved: [...ctx.vars.unresolved], traceId: trace.traceId };
     } finally {
       this.controllers.delete(id);
@@ -1030,6 +1146,7 @@ export class Backend {
           environment: opts.environment,
           // test-end events carry results; forward only compact info — the UI pages full results from disk
           onEvent: (e) => {
+            if (e.type === 'test-end') this.consoleFromResult(e.result, name, ctx.redactor);
             if (e.type === 'test-end') events.push({ ...e, result: { ...e.result, output: e.result.output?.slice(0, 500), input: e.result.input?.slice(0, 300), metadata: undefined } });
             else if (e.type !== 'test-start') events.push(e);
           },

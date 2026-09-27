@@ -63,6 +63,16 @@ pm.environment.set('patientId', pm.response.json().items[0].id);
 
 **Current values:** values set with `pm.environment.set`, `pm.collectionVariables.set` or `pm.globals.set` are kept on this machine as *current values* and override the stored values. They're never written to workspace files. Sensitive ones (tokens, passwords, secret variables) are encrypted. You can see and reset them under **Environments**.
 
+## Console
+
+The **Console** is Postman's console: a log of every request with its script output. Open it with **Console** in the status bar or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (<kbd>⌘</kbd>+<kbd>⌥</kbd>+<kbd>C</kbd> on macOS). It shares the bottom panel with the application **Logs**.
+
+- Each line shows the time, method, URL, status, duration and size. Requests from runs (the test runner and the Collection Runner) are marked **run**, and failed checks are counted.
+- `console.log`, `console.info`, `console.warn` and `console.error` output from pre-request and test scripts appears under its request, marked `pre ›` or `test ›`.
+- Click a request sent from a tab to expand it and see the request and response headers and bodies (up to 16,000 characters each).
+- **All / Errors / With logs** and the filter box narrow the list. The trash button clears it. The console keeps the last 500 requests until the app closes and is never written to disk.
+- Everything is redacted before it reaches the console: sensitive headers, sensitive JSON fields, known secret values, and values you typed into sensitive headers or body fields, even when a server echoes them back.
+
 See also [authentication](./authentication.md), [environments](./environments.md) and [collections](./collections.md).
 
 :::
