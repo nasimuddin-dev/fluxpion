@@ -41,6 +41,7 @@ export * from './report/collection-docs.js';
 
 export * from './load/load.js';
 export * from './mock/mock-server.js';
+export * from './mcp-server/protolens-mcp.js';
 
 export * from './storage/fsutil.js';
 export * from './storage/secrets.js';

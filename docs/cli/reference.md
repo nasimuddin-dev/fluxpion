@@ -15,6 +15,7 @@ protolens mock <collection>    Serve a collection's saved examples on localhost
 protolens docs <collection>    Write Markdown documentation for a collection
 protolens export <collection>  Export a collection as Postman v2.1 (or Protolens JSON)
 protolens export-environment <name>   Export an environment in Postman's format
+protolens mcp-server           Serve a workspace to AI agents over MCP (stdio)
 protolens load <url>           Safeguarded load test
 protolens import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
 protolens workspace list|create|export
@@ -116,5 +117,20 @@ protolens export-environment Staging -o staging.postman_environment.json
 | `-o, --out <file>` | Write to a file instead of standard output. |
 
 Parts that Postman can't represent are listed on standard error as `not exported: …`. Secret environment values are never written.
+
+## `mcp-server`
+
+Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request` and `run_collection`. See [Use Protolens from AI agents](/ai-testing/mcp-server).
+
+```bash
+protolens mcp-server -w my-workspace
+protolens mcp-server --read-only
+```
+
+| Option | Description |
+|---|---|
+| `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
+| `--read-only` | Only the browsing tools; no requests are sent. |
+| `--allow-production` | Allow sending to environments marked as production. |
 
 :::

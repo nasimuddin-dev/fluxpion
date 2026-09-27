@@ -44,8 +44,9 @@ Introspect a schema to get autocomplete, validation and hover docs in the editor
 - Tools, resources, resource templates and prompts, with input forms generated from JSON Schema.
 - A protocol trace of every JSON-RPC message, with direction, payloads and latency.
 - **Save as test** turns a tool call into a regression test.
+- The other direction too: `protolens mcp-server` serves your workspace to AI agents as MCP tools (browse collections, send requests, run collections), with secrets redacted.
 
-[MCP guide](/mcp/overview)
+[MCP guide](/mcp/overview) · [Use from AI agents](/ai-testing/mcp-server)
 
 ## AI Lab and model comparison
 

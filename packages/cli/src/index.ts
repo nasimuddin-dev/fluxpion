@@ -21,6 +21,8 @@ import {
   cookiesFromJson,
   startMockServer,
   collectionMarkdown,
+  serveProtolensMcp,
+  ENGINE_VERSION,
   exportPostmanCollection,
   exportPostmanEnvironment,
   type MockServer,
@@ -575,6 +577,29 @@ export function buildProgram(): Command {
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
     .action(async (ref: string, o: CollectionCliOptions) => {
       process.exitCode = await executeCollectionRun(ref, o);
+    });
+
+  program
+    .command('mcp-server')
+    .description('serve a workspace to AI agents over MCP (stdio): list and read collections, send requests, run collections')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--read-only', 'only the browsing tools: no requests are sent')
+    .option('--allow-production', 'allow sending to environments marked as production')
+    .action(async (o: { workspace?: string; readOnly?: boolean; allowProduction?: boolean }) => {
+      // stdout carries the MCP protocol: everything else goes to stderr
+      const mgr = new WorkspaceManager();
+      const { store, ephemeral } = openWorkspace(o.workspace, undefined, mgr);
+      if (ephemeral) {
+        store.close();
+        rmSync(ephemeral, { recursive: true, force: true });
+        throw new CliError('No workspace found: run inside a workspace folder or pass -w <name|path>', EXIT.CONFIG_ERROR);
+      }
+      console.error(dim(`Protolens MCP server for "${store.workspace.name}"${o.readOnly ? ' (read-only)' : ''} on stdio`));
+      try {
+        await serveProtolensMcp({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: mgr.loadSettings(), readOnly: o.readOnly, allowProduction: o.allowProduction, version: ENGINE_VERSION });
+      } finally {
+        store.close();
+      }
     });
 
   program

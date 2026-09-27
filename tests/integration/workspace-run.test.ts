@@ -22,6 +22,8 @@ import {
   runTests,
   streamTests,
   loadSuite,
+  McpSession,
+  mcpResultBody,
   type RunEvent,
   type TestResult,
 } from '../../packages/core/src/index.js';
@@ -203,6 +205,50 @@ describe('example workspace (end-to-end)', () => {
     expect(r.stderr).toBe('');
     expect(r.status).toBe(0);
     expect(JSON.parse(readFileSync(join(dir, 'pm-rt', 'summary.json'), 'utf8'))).toMatchObject({ total: 7, passed: 7 });
+  });
+
+  it('CLI: `protolens mcp-server` gives AI agents the workspace as MCP tools', async () => {
+    const env = { PROTOLENS_HOME: join(dir, 'home') } as Record<string, string>;
+    const cli = resolve('packages/cli/bin/protolens.js');
+    const s = new McpSession({ id: 'pl', name: 'protolens', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env });
+    await s.connect(20_000);
+    try {
+      const names = (await s.listTools()).map((t) => t.name).sort();
+      expect(names).toEqual(['collection_docs', 'get_request', 'list_collections', 'list_environments', 'list_requests', 'run_collection', 'send_request']);
+      const text = async (tool: string, args: Record<string, unknown> = {}) => {
+        const r = await s.callTool(tool, args);
+        return { isError: r.isError, text: mcpResultBody(r).text };
+      };
+      expect((await text('list_collections')).text).toContain('Veterinary API');
+      expect((await text('list_requests', { collection: 'Veterinary API' })).text).toContain('Get patient');
+      const envs = await text('list_environments');
+      expect(envs.text).toContain('clientSecret');
+      expect(envs.text).not.toContain('demo-secret');
+      const token = await text('get_request', { collection: 'Veterinary API', request: 'Get access token' });
+      expect(token.text).not.toContain('demo-secret');
+      // a saved request runs with its scripts; an ad-hoc one resolves {{variables}}
+      const saved = JSON.parse((await text('send_request', { collection: 'Veterinary API', request: 'Health', environment: 'Development' })).text);
+      expect(saved.status).toBe('passed');
+      const adhoc = JSON.parse((await text('send_request', { method: 'GET', url: '{{baseUrl}}/health', environment: 'Development' })).text);
+      expect(adhoc.status).toBe(200);
+      const run = JSON.parse((await text('run_collection', { collection: 'Veterinary API', folder: 'Authentication', environment: 'Development' })).text);
+      expect(run).toMatchObject({ total: 1, passed: 1 });
+      // production environments are refused unless the server allows them
+      const prod = await text('send_request', { method: 'GET', url: '{{baseUrl}}/health', environment: 'Production' });
+      expect(prod.isError).toBe(true);
+      expect(prod.text).toMatch(/production/);
+      expect((await text('collection_docs', { collection: 'Veterinary API' })).text).toContain('# Veterinary API');
+    } finally {
+      await s.close();
+    }
+    // --read-only hides the tools that send requests
+    const ro = new McpSession({ id: 'ro', name: 'protolens-ro', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root, '--read-only'], env });
+    await ro.connect(20_000);
+    try {
+      expect((await ro.listTools()).map((t) => t.name)).not.toContain('send_request');
+    } finally {
+      await ro.close();
+    }
   });
 
   it('CLI: `protolens docs` writes Markdown documentation with examples and no secrets', async () => {

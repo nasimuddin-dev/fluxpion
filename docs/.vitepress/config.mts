@@ -108,6 +108,7 @@ const docsSidebar = [
       { text: 'RAG', link: '/ai-testing/rag' },
       { text: 'Agents', link: '/ai-testing/agents' },
       { text: 'Safety', link: '/ai-testing/safety' },
+      { text: 'Use from AI agents (MCP)', link: '/ai-testing/mcp-server' },
     ],
   },
   {
