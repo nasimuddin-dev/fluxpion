@@ -33,6 +33,9 @@ const collection: Collection = {
       id: 'f',
       name: 'Pets',
       auth: { type: 'apiKey', key: 'X-Key', value: '{{key}}', in: 'header' },
+      variables: [{ key: 'species', value: 'dog' }],
+      preRequestScript: "console.log('folder pre');",
+      testScript: "pm.test('folder', () => pm.expect(pm.response.code).to.be.below(500));",
       items: [
         {
           kind: 'http',
@@ -136,6 +139,7 @@ describe('Postman v2.1 export', () => {
     }
     (((expected[0] as { items: CollectionNode[] }).items[2] as Extract<CollectionNode, { kind: 'http' }>).request.body as { fields: Array<{ enabled?: boolean; kind?: string }> }).fields.forEach((f) => ((f.enabled = true), (f.kind ??= 'text')));
     get.request.params!.forEach((p) => (p.enabled ??= true));
+    ((expected[0] as { variables: Array<{ enabled?: boolean }> }).variables).forEach((v) => (v.enabled ??= true));
     get.request.headers!.forEach((h) => (h.enabled ??= true));
     const g = expected[1] as Extract<CollectionNode, { kind: 'graphql' }>;
     g.request = { ...g.request, variables: JSON.stringify({ first: 2 }, null, 2), headers: [] };

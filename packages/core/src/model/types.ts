@@ -522,7 +522,12 @@ export interface CollectionFolder {
   name: string;
   items: CollectionNode[];
   auth?: AuthConfig;
+  /** Folder variables: visible to the requests inside (inner folders win), below request and data variables. */
   variables?: KeyValue[];
+  /** Run before the pre-request script of every request inside (after the collection's and outer folders'). */
+  preRequestScript?: string;
+  /** Run after every request inside (after the collection's and outer folders' test scripts). */
+  testScript?: string;
 }
 
 export type CollectionNode = CollectionFolder | SavedHttpRequest | SavedGraphQLRequest;

@@ -129,6 +129,9 @@ export interface CollectionFolder {
   name: string;
   items: CollectionNode[];
   auth?: AuthConfig;
+  variables?: KeyValue[];
+  preRequestScript?: string;
+  testScript?: string;
 }
 export type CollectionNode = CollectionFolder | SavedHttpRequest | SavedGraphQLRequest;
 export interface Collection {

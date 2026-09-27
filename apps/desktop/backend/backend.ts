@@ -60,6 +60,8 @@ import {
   withRequestExamples,
   type SavedExample,
   applyCookieJarOps,
+  folderChain,
+  folderVariables,
   scriptRequestSender,
   type CookieInput,
   runTests,
@@ -799,8 +801,11 @@ export class Backend {
       let request = p.request;
       if ((!request.auth || request.auth.type === 'inherit') && ctx.collection)
         request = { ...request, auth: p.requestId ? inheritedAuthFor(ctx.collection, p.requestId) : ctx.collection.auth };
-      // collection-level then request-level pre-request scripts
-      for (const script of [ctx.collection?.preRequestScript, p.preRequestScript]) {
+      // collection-level, folder-level (outer to inner), then request-level pre-request scripts
+      const folders = ctx.collection && p.requestId ? folderChain(ctx.collection, p.requestId) : [];
+      const fv = folderVariables(folders);
+      if (Object.keys(fv).length) ctx.vars.setScope('request', fv);
+      for (const script of [ctx.collection?.preRequestScript, ...folders.map((f) => f.preRequestScript), p.preRequestScript]) {
         if (!script?.trim()) continue;
         const bodyText = request.body && 'content' in request.body ? request.body.content : undefined;
         const out = await runScript(script, {
@@ -844,7 +849,7 @@ export class Backend {
 
       const cctx: CheckContext = { testType: 'http', status: response.status, headers: response.headers, body: response.json ?? response.bodyPreview, text: response.bodyPreview, latencyMs: response.durationMs };
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), cctx);
-      for (const script of [ctx.collection?.testScript, p.testScript]) {
+      for (const script of [ctx.collection?.testScript, ...folders.map((f) => f.testScript), p.testScript]) {
         if (!script?.trim()) continue;
         const out = await runScript(script, {
           ...scriptScopes(ctx.vars),

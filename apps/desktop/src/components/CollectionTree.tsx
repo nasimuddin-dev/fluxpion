@@ -1,9 +1,10 @@
-import { ChevronDown, ChevronRight, Copy, FilePlus2, Folder, FolderPlus, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, FilePlus2, Folder, FolderCog, FolderPlus, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode } from '../types';
 import { cx, Menu, type MenuItem } from './ui';
 import { promptText } from '../store';
 import { uid } from '../lib/format';
+import { FolderEditor } from './FolderEditor';
 
 export function mapNodes(nodes: CollectionNode[], fn: (n: CollectionNode) => CollectionNode | null): CollectionNode[] {
   const out: CollectionNode[] = [];
@@ -62,6 +63,7 @@ export function CollectionTree({
     setOpen(next);
     localStorage.setItem('aps.tree.open', JSON.stringify(next));
   };
+  const [editing, setEditing] = useState<{ c: Collection; folder: CollectionFolder }>();
   const f = filter?.toLowerCase();
   const matches = (n: CollectionNode): boolean =>
     !f || n.name.toLowerCase().includes(f) || (n.kind === 'http' && n.request.url.toLowerCase().includes(f)) || (n.kind === 'folder' && n.items.some(matches));
@@ -78,8 +80,10 @@ export function CollectionTree({
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
                 <span className="truncate">{n.name}</span>
+                {(n.preRequestScript || n.testScript || n.variables?.length) && <span className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0" title="Has folder scripts or variables" />}
               </button>
               <NodeMenu
+                onEdit={() => setEditing({ c, folder: n })}
                 onRename={async () => {
                   const name = await promptText('Rename folder', { value: n.name, okLabel: 'Rename' });
                   if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
@@ -119,6 +123,13 @@ export function CollectionTree({
 
   return (
     <div className="text-sm">
+      {editing && (
+        <FolderEditor
+          folder={editing.folder}
+          onClose={() => setEditing(undefined)}
+          onSave={(folder) => onChange({ ...editing.c, items: mapNodes(editing.c.items, (x) => (x.id === folder.id && x.kind === 'folder' ? { ...folder, items: x.items } : x)) })}
+        />
+      )}
       {collections.map((c) => {
         const isOpen = open[c.id] ?? true;
         return (
@@ -152,6 +163,7 @@ export function CollectionTree({
 }
 
 function NodeMenu({
+  onEdit,
   onRename,
   onDelete,
   onNewRequest,
@@ -160,6 +172,7 @@ function NodeMenu({
   onRun,
   runLabel = 'Run',
 }: {
+  onEdit?(): void;
   onRename?(): void;
   onDelete?(): void;
   onNewRequest?(): void;
@@ -171,6 +184,7 @@ function NodeMenu({
   const items: MenuItem[] = [];
   const add = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}) => fn && items.push({ label, icon, onSelect: fn, ...extra });
   add(runLabel, <Play size={14} />, onRun);
+  add('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit, { separator: !!onRun });
   add('New request', <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
   add('New folder', <FolderPlus size={14} />, onNewFolder);
   add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });

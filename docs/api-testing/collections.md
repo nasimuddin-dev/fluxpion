@@ -34,7 +34,7 @@ The CLI can import too: `protolens import openapi.yaml -w my-workspace`.
 Postman has no place for some Protolens features. When they are left out, a message lists them:
 
 - Assertions: a `status` check becomes a `pm.test(...)` in the request's test script, and other assertion types are skipped.
-- JWT auth, folder variables and the per-request Cookies table (its cookies are sent as a `Cookie` header instead).
+- JWT auth and the per-request Cookies table (its cookies are sent as a `Cookie` header instead).
 
 Importing an exported file back into Protolens gives the same collection, and the round trip is tested. **Environments → Export** writes an environment in Postman's environment format. Secret variables are exported with an empty value and type `secret`, because their values stay in your OS credential store.
 
@@ -82,6 +82,16 @@ Collections document themselves, like Postman's API documentation:
 
 Markdown is rendered with GitHub-flavoured syntax (tables, fenced code, task lists) and sanitised: scripts and event handlers are removed, and links open in your browser.
 
+## Folders
+
+Choose **Edit folder** in a folder's **⋯** menu to set up everything its requests share:
+
+- **Scripts:** a pre-request and a post-response script that run for every request in the folder, including requests in sub-folders. The order is: collection script, outer folders' scripts, this folder's script, then the request's own script. It is the same for sending from a tab, the Collection Runner and `protolens run-collection`.
+- **Variables:** visible to the requests inside. An inner folder's value wins over an outer folder's. Request variables and iteration data rows win over folder variables, and folder variables win over collection and environment variables.
+- **Authorization:** requests set to *Inherit* use the nearest folder's auth, or the collection's.
+
+Folders with scripts or variables show a dot in the tree. Folder scripts and variables are exported to and imported from Postman v2.1 (`event` and `variable` on folders).
+
 ## Collection Runner
 
 The Collection Runner works like Postman's. It runs a whole collection or one folder, one request at a time and in order. Open it from the **Run** tab or button of a collection, or choose **Run collection** or **Run folder** in the **⋯** menu of the request tree.
@@ -97,7 +107,7 @@ The Collection Runner works like Postman's. It runs a whole collection or one fo
 | Keep variable values | Values set with `pm.environment.set()` and similar are saved as [current values](./rest.md#scripts) after the run. Turn this off to throw them away |
 | Stop on first failure | End the run when a request fails or errors |
 
-Variables set by a script carry over to the requests that follow. A token saved by **Get access token** is used by later requests that inherit bearer auth `{{accessToken}}`. Collection-level scripts run before each request's own scripts.
+Variables set by a script carry over to the requests that follow. A token saved by **Get access token** is used by later requests that inherit bearer auth `{{accessToken}}`. Collection-level and [folder-level](#folders) scripts run before each request's own scripts.
 
 To control the order from scripts:
 

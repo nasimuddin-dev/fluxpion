@@ -1,4 +1,4 @@
-import type { AuthConfig, Collection, CollectionNode, RunSummary, SavedGraphQLRequest, SavedHttpRequest, TestCase, TestResult } from '../model/types.js';
+import type { AuthConfig, Collection, CollectionFolder, CollectionNode, RunSummary, SavedGraphQLRequest, SavedHttpRequest, TestCase, TestResult } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { sleep } from '../util/concurrency.js';
 import { runTests, type RunEvent, type RunOptions } from './runner.js';
@@ -12,6 +12,8 @@ export interface CollectionRequestRef {
   path: string[];
   node: SavedHttpRequest | SavedGraphQLRequest;
   auth?: AuthConfig;
+  /** The folders around the request, outermost first. */
+  folders: CollectionFolder[];
 }
 
 /**
@@ -21,22 +23,43 @@ export interface CollectionRequestRef {
 export function collectionRequests(collection: Collection, selection?: string[]): CollectionRequestRef[] {
   const wanted = selection?.length ? new Set(selection) : undefined;
   const out: CollectionRequestRef[] = [];
-  const walk = (nodes: CollectionNode[], path: string[], auth: AuthConfig | undefined, selected: boolean) => {
+  const walk = (nodes: CollectionNode[], path: string[], folders: CollectionFolder[], auth: AuthConfig | undefined, selected: boolean) => {
     for (const n of nodes) {
       if (n.kind === 'folder') {
-        walk(n.items, [...path, n.name], n.auth && n.auth.type !== 'inherit' ? n.auth : auth, selected || !!wanted?.has(n.id));
+        walk(n.items, [...path, n.name], [...folders, n], n.auth && n.auth.type !== 'inherit' ? n.auth : auth, selected || !!wanted?.has(n.id));
       } else if (!wanted || selected || wanted.has(n.id)) {
         const own = n.request.auth;
-        out.push({ id: n.id, name: n.name, path, node: n, auth: !own || own.type === 'inherit' ? auth : own });
+        out.push({ id: n.id, name: n.name, path, folders, node: n, auth: !own || own.type === 'inherit' ? auth : own });
       }
     }
   };
-  walk(collection.items, [], collection.auth, false);
+  walk(collection.items, [], [], collection.auth, false);
   return out;
 }
 
-/** Join collection-level and request-level scripts; blocks keep their `const`s apart. */
-function joinScripts(...scripts: Array<string | undefined>): string | undefined {
+/** The folders around a request, outermost first ([] for a top-level request or an unknown id). */
+export function folderChain(collection: Collection, requestId: string): CollectionFolder[] {
+  const find = (nodes: CollectionNode[], chain: CollectionFolder[]): CollectionFolder[] | undefined => {
+    for (const n of nodes) {
+      if (n.kind === 'folder') {
+        const r = find(n.items, [...chain, n]);
+        if (r) return r;
+      } else if (n.id === requestId) return chain;
+    }
+    return undefined;
+  };
+  return find(collection.items, []) ?? [];
+}
+
+/** Folder variables of a chain as one map (inner folders win). */
+export function folderVariables(folders: CollectionFolder[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of folders) for (const v of f.variables ?? []) if (v.key && v.enabled !== false) out[v.key] = v.value ?? '';
+  return out;
+}
+
+/** Join collection-level, folder-level and request-level scripts; blocks keep their `const`s apart. */
+export function joinScripts(...scripts: Array<string | undefined>): string | undefined {
   const parts = scripts.filter((s): s is string => !!s?.trim());
   if (!parts.length) return undefined;
   return parts.length === 1 ? parts[0] : parts.map((s) => `{\n${s}\n}`).join('\n');
@@ -47,7 +70,8 @@ export function collectionRequestToTest(collection: Collection, ref: CollectionR
   const base = {
     id: extra.id ?? ref.id,
     name: extra.name ?? [...ref.path, ref.name].join(' / '),
-    variables: extra.data,
+    // folder variables sit under the iteration's data row
+    variables: ref.folders.some((f) => f.variables?.length) ? { ...folderVariables(ref.folders), ...(extra.data ?? {}) } : extra.data,
     assertions: ref.node.assertions,
   };
   if (ref.node.kind === 'graphql') {
@@ -58,8 +82,8 @@ export function collectionRequestToTest(collection: Collection, ref: CollectionR
     ...base,
     type: 'http',
     request: { ...ref.node.request, auth: ref.auth ?? { type: 'none' } },
-    preRequestScript: joinScripts(collection.preRequestScript, ref.node.preRequestScript),
-    testScript: joinScripts(collection.testScript, ref.node.testScript),
+    preRequestScript: joinScripts(collection.preRequestScript, ...ref.folders.map((f) => f.preRequestScript), ref.node.preRequestScript),
+    testScript: joinScripts(collection.testScript, ...ref.folders.map((f) => f.testScript), ref.node.testScript),
   };
 }
 

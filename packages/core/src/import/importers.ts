@@ -218,7 +218,19 @@ export function importPostman(text: string): { collection: Collection } {
   const d = JSON.parse(text);
   const convert = (items: any[]): CollectionNode[] =>
     (items ?? []).map((it: any): CollectionNode => {
-      if (Array.isArray(it.item)) return { kind: 'folder', id: shortId('fld-'), name: it.name, items: convert(it.item), auth: pmAuth(it.auth) };
+      if (Array.isArray(it.item)) {
+        const variables: KeyValue[] = (it.variable ?? []).filter((v: any) => v.key).map((v: any) => ({ key: v.key, value: String(v.value ?? ''), enabled: !v.disabled }));
+        return {
+          kind: 'folder',
+          id: shortId('fld-'),
+          name: it.name,
+          items: convert(it.item),
+          auth: pmAuth(it.auth),
+          ...(variables.length ? { variables } : {}),
+          ...(pmScript(it.event, 'prerequest') ? { preRequestScript: pmScript(it.event, 'prerequest') } : {}),
+          ...(pmScript(it.event, 'test') ? { testScript: pmScript(it.event, 'test') } : {}),
+        };
+      }
       const r = typeof it.request === 'string' ? { url: it.request } : it.request ?? {};
       const url = typeof r.url === 'string' ? r.url : r.url?.raw ?? '';
       const [base, qs] = url.split('?');

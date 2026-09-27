@@ -7,7 +7,7 @@ import type { AuthConfig, BodyConfig, CheckConfig, Collection, CollectionNode, E
  * everything written here back.
  *
  * Not representable in Postman: Protolens assertions other than `status` (the status check becomes
- * a `pm.test`), JWT auth, OAuth 2.0 PKCE details, per-request cookies tables, and non-HTTP requests
+ * a `pm.test`), JWT auth, per-request cookies tables (sent as a Cookie header), and non-HTTP requests
  * other than GraphQL. `postmanExportNotes` lists what was left out.
  */
 
@@ -206,8 +206,8 @@ export function exportPostmanCollection(c: Collection): { collection: Record<str
     nodes.map((n) => {
       if (n.kind === 'folder') {
         const auth = pmAuth(n.auth, notes, n.name);
-        if (n.variables?.length) notes.push(`${n.name}: folder variables have no Postman equivalent and were left out`);
-        return { name: n.name, item: items(n.items), ...(auth ? { auth } : {}) };
+        const variable = (n.variables ?? []).filter((v) => v.key).map((v) => ({ key: v.key, value: v.value ?? '', type: 'string', ...(v.enabled === false ? { disabled: true } : {}) }));
+        return { name: n.name, item: items(n.items), ...(auth ? { auth } : {}), ...events(n.preRequestScript, n.testScript), ...(variable.length ? { variable } : {}) };
       }
       return n.kind === 'graphql' ? graphqlItem(n, notes) : httpItem(n, notes);
     });
