@@ -81,6 +81,11 @@ export class VariableScope {
   }
 
   /** Merged view of all scopes (for display / scripts). Secret values are included — callers must redact. */
+  /** Values defined in one scope only (e.g. the environment), for Postman-style pm.environment access. */
+  scopeValues(scope: ScopeName): Record<string, unknown> {
+    return Object.fromEntries(this.scopes.get(scope)!);
+  }
+
   toObject(): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const s of SCOPE_ORDER) for (const [k, v] of this.scopes.get(s)!) out[k] = v;

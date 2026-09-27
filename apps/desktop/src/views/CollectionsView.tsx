@@ -6,7 +6,7 @@ import { useIntent } from '../hooks';
 import type { Collection, CollectionNode } from '../types';
 import { download, timeAgo, uid } from '../lib/format';
 import { AuthEditor } from '../components/AuthEditor';
-import { CodeEditor } from '../components/CodeEditor';
+import { ScriptsPanel } from '../components/ScriptsPanel';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, Input, SectionTitle, Split, Tabs } from '../components/ui';
@@ -146,20 +146,9 @@ export function CollectionsView() {
                 </>
               )}
               {tab === 'scripts' && (
-                <Split id="col-scripts" initial={50}>
-                  <div className="h-full flex flex-col">
-                    <div className="text-xs text-muted px-3 py-1.5 border-b border-line">Pre-request script (runs before every request in the collection)</div>
-                    <div className="flex-1 min-h-0">
-                      <CodeEditor language="javascript" value={draft.preRequestScript ?? ''} onChange={(preRequestScript) => setDraft({ ...draft, preRequestScript })} />
-                    </div>
-                  </div>
-                  <div className="h-full flex flex-col">
-                    <div className="text-xs text-muted px-3 py-1.5 border-b border-line">Test script (runs after every request)</div>
-                    <div className="flex-1 min-h-0">
-                      <CodeEditor language="javascript" value={draft.testScript ?? ''} onChange={(testScript) => setDraft({ ...draft, testScript })} />
-                    </div>
-                  </div>
-                </Split>
+                <div className="h-full">
+                  <ScriptsPanel pre={draft.preRequestScript ?? ''} post={draft.testScript ?? ''} onPre={(preRequestScript) => setDraft({ ...draft, preRequestScript })} onPost={(testScript) => setDraft({ ...draft, testScript })} />
+                </div>
               )}
               {tab === 'overview' && (
                 <div className="p-3 flex flex-col gap-2">

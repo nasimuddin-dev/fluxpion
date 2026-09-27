@@ -23,6 +23,6 @@ All checks share `type`, an optional `name`, and usually `path` (JSONPath such a
 | `graphql-no-errors`, `graphql-errors` | `expected` (count or message) |
 | AI, RAG, agent and safety checks | see [evaluations](../ai-testing/evaluations.md) |
 
-Check options can use variables, e.g. `expected: "{{expected}}"`. Script tests (`aps.test`) also appear as checks.
+Check options can use variables, e.g. `expected: "{{expected}}"`. Script tests (`pm.test`) also appear as checks.
 
 :::

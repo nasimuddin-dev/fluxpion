@@ -148,7 +148,7 @@ describe('script sandbox (QuickJS/WASM)', () => {
   it('runs tests, sets variables and captures logs', async () => {
     const out = await runScript(
       `const j = aps.response.json();
-       aps.test('status is 200', () => aps.expect(aps.response.status).toBe(200));
+       aps.test('status is 200', () => aps.expect(aps.response.code).toBe(200));
        aps.test('has id', () => aps.expect(j).toHaveProperty('id'));
        aps.test('fails', () => aps.expect(j.id).toBe('nope'));
        aps.variables.set('patientId', j.id);
@@ -171,11 +171,11 @@ describe('script sandbox (QuickJS/WASM)', () => {
 
   it('has no access to Node, the filesystem or processes', async () => {
     const out = await runScript(
-      `aps.variables.set('types', [typeof require, typeof process, typeof fetch, typeof globalThis.Buffer].join(','));
+      `aps.variables.set('types', [(function(){ try { require('fs'); return 'loaded'; } catch (e) { return 'blocked'; } })(), typeof process, typeof fetch, typeof globalThis.Buffer].join(','));
        aps.variables.set('escape', (function(){ try { return typeof aps.test.constructor.constructor('return process')(); } catch (e) { return 'blocked'; } })());`,
       { variables: {} },
     );
-    expect(out.vars.types).toBe('undefined,undefined,undefined,undefined');
+    expect(out.vars.types).toBe('blocked,undefined,undefined,undefined');
     expect(out.vars.escape).not.toBe('object');
   });
 

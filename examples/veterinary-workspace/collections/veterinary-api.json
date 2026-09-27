@@ -29,7 +29,7 @@
               ]
             }
           },
-          "testScript": "aps.variables.set('accessToken', aps.response.json().access_token);",
+          "testScript": "pm.test('Status code is 200', () => pm.response.to.have.status(200));\npm.environment.set('accessToken', pm.response.json().access_token);",
           "assertions": [{ "type": "status", "expected": 200 }]
         }
       ]

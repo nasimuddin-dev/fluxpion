@@ -29,6 +29,7 @@ import { runAgent, type AgentTool } from '../ai/agent.js';
 import type { ChatMessage } from '../ai/types.js';
 import { runChecks, type CheckContext } from '../eval/checks.js';
 import { runScript } from '../scripts/sandbox.js';
+import { applyScriptOutput, scriptScopes, type PersistVariable } from '../scripts/bridge.js';
 import { query, tryParseJson } from '../util/jsonpath.js';
 import { withTimeout } from '../util/concurrency.js';
 
@@ -45,6 +46,8 @@ export interface ExecServices {
   /** Auth inherited from the collection/folder for requests with `auth: inherit`. */
   inheritedAuth?: AuthConfig;
   openExternal?: (url: string) => void | Promise<void>;
+  /** Persist values set by scripts via pm.environment/globals/collectionVariables (desktop "current values"). */
+  persistVariable?: PersistVariable;
 }
 
 export interface ExecutionOutcome {
@@ -74,7 +77,8 @@ function sha(s: string): string {
 }
 
 /** Execute one test case: scripts → protocol call → checks → extraction. Never throws (except cancellation). */
-export async function executeTest(test: TestCase, svc: ExecServices, opts: { tracer: Tracer; signal?: AbortSignal; parentSpan?: SpanHandle }): Promise<ExecutionOutcome> {
+export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { tracer: Tracer; signal?: AbortSignal; parentSpan?: SpanHandle }): Promise<ExecutionOutcome> {
+  let test = testIn;
   const scope = svc.vars.clone();
   if (test.variables) scope.setScope('request', test.variables);
   const root = opts.tracer.start(test.name, 'test', { parent: opts.parentSpan, attributes: { type: test.type, file: test.file && workspaceRelative(test.file) } });
@@ -84,12 +88,22 @@ export async function executeTest(test: TestCase, svc: ExecServices, opts: { tra
   let partial: Partial<ExecutionOutcome> = {};
 
   try {
-    // pre-request script
+    // pre-request script (Postman-compatible: can read/modify the request and set variables)
     if (test.preRequestScript) {
-      const s = await runScript(test.preRequestScript, { variables: scope.toObject() });
+      const req =
+        test.type === 'http'
+          ? { method: test.request.method, url: test.request.url, headers: [...(test.request.headers ?? [])], body: test.request.body && 'content' in test.request.body ? test.request.body.content : undefined }
+          : undefined;
+      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, info: { requestName: test.name, requestId: test.id } });
       root.event('pre-request script', { logs: s.logs, error: s.error });
-      applyScriptVars(s, scope, svc.vars);
+      applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
       if (s.error) throw new ApsError('ScriptError', `Pre-request script failed: ${s.error}`);
+      if (s.logs.length) metadata.preRequestLogs = s.logs.slice(0, 100);
+      if (test.type === 'http' && s.request) {
+        const body = test.request.body && 'content' in test.request.body && s.request.body !== undefined ? { ...test.request.body, content: s.request.body } : test.request.body;
+        test = { ...test, request: { ...test.request, method: s.request.method, url: s.request.url, headers: s.request.headers, body } };
+      }
+      if (s.skipRequest) throw new ApsError('CancelledError', 'Request skipped by pm.execution.skipRequest()');
     }
 
     const run = async (signal: AbortSignal) => {
@@ -128,11 +142,13 @@ export async function executeTest(test: TestCase, svc: ExecServices, opts: { tra
   // test script (sandboxed)
   if (test.testScript) {
     const s = await runScript(test.testScript, {
-      variables: scope.toObject(),
+      ...scriptScopes(scope, test.variables),
       response: { status: ctx.status, headers: ctx.headers, body: ctx.text, time: ctx.latencyMs },
+      info: { requestName: test.name, requestId: test.id },
       data: { body: ctx.body, toolCalls: ctx.toolCalls, tokens: ctx.tokens, error: ctx.error },
     });
-    applyScriptVars(s, scope, svc.vars);
+    applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
+    if (s.nextRequest !== undefined) metadata.nextRequest = s.nextRequest;
     for (const t of s.tests) scriptChecks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
     if (s.error) scriptChecks.push({ type: 'script', name: 'test script', passed: false, source: 'deterministic', message: s.error });
     if (s.logs.length) metadata.scriptLogs = s.logs.slice(0, 100);
@@ -182,17 +198,6 @@ export function workspaceRelative(file: string): string {
   const p = file.split('\\').join('/');
   const i = p.lastIndexOf('/tests/');
   return i >= 0 ? p.slice(i + 1) : p.slice(p.lastIndexOf('/') + 1);
-}
-
-function applyScriptVars(s: { vars: Record<string, unknown>; unset: string[] }, local: VariableScope, shared: VariableScope): void {
-  for (const [k, v] of Object.entries(s.vars)) {
-    local.set(k, v, 'runtime');
-    shared.set(k, v, 'runtime');
-  }
-  for (const k of s.unset) {
-    local.unset(k, 'runtime');
-    shared.unset(k, 'runtime');
-  }
 }
 
 function implicitChecks(test: TestCase, ctx: CheckContext): CheckConfig[] {

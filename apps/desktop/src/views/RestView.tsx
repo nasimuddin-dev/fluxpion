@@ -6,6 +6,7 @@ import { useIntent, useSendShortcut } from '../hooks';
 import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedHttpRequest } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
 import { CodeModal } from '../components/CodeModal';
+import { ScriptsPanel } from '../components/ScriptsPanel';
 import { uid } from '../lib/format';
 
 const isCurl = (t: string) => /^\s*curl(\.exe)?\s/i.test(t);
@@ -412,27 +413,7 @@ function RequestEditor({ tab, update, setReq, setParams }: { tab: RestTab; updat
             <KeyValueEditor rows={r.cookies ?? []} onChange={(cookies) => setReq({ cookies })} keyPlaceholder="Cookie" />
           </div>
         )}
-        {sub === 'scripts' && (
-          <Split id="rest-scripts" initial={50}>
-            <div className="h-full flex flex-col">
-              <div className="text-xs text-muted px-3 py-1.5 border-b border-line">Pre-request script — runs in a sandbox (no filesystem/network). Use aps.variables.set(), aps.request, aps.crypto</div>
-              <div className="flex-1 min-h-0">
-                <CodeEditor language="javascript" value={tab.preRequestScript ?? ''} onChange={(v) => update({ preRequestScript: v })} placeholder="aps.variables.set('nonce', aps.uuid());" />
-              </div>
-            </div>
-            <div className="h-full flex flex-col">
-              <div className="text-xs text-muted px-3 py-1.5 border-b border-line">Test script — aps.test(name, fn), aps.expect(), aps.response.json()</div>
-              <div className="flex-1 min-h-0">
-                <CodeEditor
-                  language="javascript"
-                  value={tab.testScript ?? ''}
-                  onChange={(v) => update({ testScript: v })}
-                  placeholder="aps.test('status is 200', () => aps.expect(aps.response.status).toBe(200));"
-                />
-              </div>
-            </div>
-          </Split>
-        )}
+        {sub === 'scripts' && <ScriptsPanel pre={tab.preRequestScript ?? ''} post={tab.testScript ?? ''} onPre={(v) => update({ preRequestScript: v })} onPost={(v) => update({ testScript: v })} />}
         {sub === 'tests' && <AssertionEditor checks={tab.assertions} onChange={(assertions) => update({ assertions })} groups={['Response', 'Body']} />}
         {sub === 'settings' && (
           <div className="p-4 grid grid-cols-2 gap-4 max-w-2xl text-sm">

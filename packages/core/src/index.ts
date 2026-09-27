@@ -26,6 +26,7 @@ export * from './ai/agent.js';
 export * from './eval/checks.js';
 export * from './eval/text.js';
 export * from './scripts/sandbox.js';
+export * from './scripts/bridge.js';
 
 export * from './runner/execute.js';
 export * from './runner/runner.js';
@@ -42,6 +43,7 @@ export * from './storage/secrets.js';
 export * from './storage/metastore.js';
 export * from './storage/workspace.js';
 export * from './storage/search.js';
+export * from './storage/current-values.js';
 
 export * from './import/importers.js';
 export * from './import/curl.js';

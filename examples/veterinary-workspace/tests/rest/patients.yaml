@@ -12,11 +12,11 @@ tests:
       - { type: greater-than, path: $.total, expected: 0 }
       - { type: latency, max: 2000 }
     testScript: |
-      const body = aps.response.json();
-      aps.test('every patient has a species', () => {
-        for (const p of body.items) aps.expect(p.species).toBeTruthy();
+      const body = pm.response.json();
+      pm.test('every patient has a species', () => {
+        for (const p of body.items) pm.expect(p.species).to.be.a('string').that.is.not.empty;
       });
-      aps.variables.set('firstPatientId', body.items[0].id);
+      pm.variables.set('firstPatientId', body.items[0].id);
 
   - id: create-patient
     name: Create patient

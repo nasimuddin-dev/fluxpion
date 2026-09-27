@@ -42,6 +42,9 @@ import {
   runChecks,
   runLoadTest,
   runScript,
+  scriptScopes,
+  applyScriptOutput,
+  CurrentValues,
   runTests,
   secretKeys,
   shortId,
@@ -104,6 +107,7 @@ export class Backend {
   private manager: WorkspaceManager;
   private settings: AppSettings;
   private store?: WorkspaceStore;
+  private currentValues?: CurrentValues;
   private search?: WorkspaceSearch;
   private secrets: SecretStore;
   private logger: Logger;
@@ -156,6 +160,7 @@ export class Backend {
     for (const s of this.mcpSessions.values()) void s.close();
     this.mcpSessions.clear();
     this.store = WorkspaceStore.open(path);
+    this.currentValues = new CurrentValues(join(this.host.appDir, 'current-values', `${this.store.id}.json`), this.secrets, this.store.id);
     this.search = new WorkspaceSearch(this.store);
     this.settings = this.manager.saveSettings({ ...this.settings, lastWorkspace: this.store.root });
     this.logger.info(`Opened workspace ${this.store.workspace.name}`, { migrations: this.store.migrationsApplied });
@@ -182,7 +187,7 @@ export class Backend {
   }
 
   private context(opts: { environment?: string; collectionId?: string }) {
-    return createEngineContext({
+    const ctx = createEngineContext({
       store: this.ws,
       secrets: this.secrets,
       settings: this.settings,
@@ -191,6 +196,20 @@ export class Backend {
       logger: this.logger,
       openExternal: this.host.openExternal?.bind(this.host),
     });
+    // Postman-style current values: set by scripts, kept on this machine, override stored values
+    const cv = this.currentValues;
+    if (cv) {
+      const envName = ctx.environment?.name;
+      cv.apply(ctx.vars, { environment: envName, collectionId: opts.collectionId }, ctx.redactor);
+      const secretEnvKeys = new Set(ctx.environment?.variables.filter((v) => v.secret).map((v) => v.key));
+      ctx.services.persistVariable = (scope, key, value) => {
+        const owner = scope === 'environment' ? envName : scope === 'collectionVariables' ? opts.collectionId : '';
+        if (owner === undefined) return; // no environment / collection selected: keep it for this run only
+        const sensitive = ctx.redactor.isSensitiveKey(key) || (scope === 'environment' && secretEnvKeys.has(key));
+        void cv.set(scope, owner, key, value, sensitive).catch((e) => this.logger.warn(`Could not save current value ${key}: ${(e as Error).message}`));
+      };
+    }
+    return ctx;
   }
 
   /** Emit high-frequency events in batches so the renderer is not flooded (spec §22). */
@@ -294,6 +313,13 @@ export class Backend {
         return this.ws.saveEnvironment(env);
       },
       'env.delete': ({ id }: { id: string }) => this.ws.deleteEnvironment(id),
+      'currentValues.summary': () => this.currentValues?.summary(),
+      'currentValues.get': ({ scope, owner }: { scope: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => {
+        const values = this.currentValues?.get(scope, owner ?? '') ?? {};
+        // never send secret values to the UI: mask sensitive keys
+        return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, this.logger.redactor.isSensitiveKey(k) ? '••••••' : v]));
+      },
+      'currentValues.reset': ({ scope, owner }: { scope?: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => this.currentValues?.reset(scope, owner),
       'env.secretStatus': ({ envId, keys }: { envId: string; keys: string[] }) => Object.fromEntries(keys.map((k) => [k, !!this.secrets.get(secretKeys.envVar(envId, k))])),
       'vars.inspect': ({ environment, collectionId, template }: { environment?: string; collectionId?: string; template?: string }) => {
         const ctx = this.context({ environment, collectionId });
@@ -546,9 +572,13 @@ export class Backend {
       for (const script of [ctx.collection?.preRequestScript, p.preRequestScript]) {
         if (!script?.trim()) continue;
         const bodyText = request.body && 'content' in request.body ? request.body.content : undefined;
-        const out = await runScript(script, { variables: ctx.vars.toObject(), request: { method: request.method, url: request.url, headers: request.headers ?? [], body: bodyText } });
+        const out = await runScript(script, {
+          ...scriptScopes(ctx.vars),
+          request: { method: request.method, url: request.url, headers: request.headers ?? [], body: bodyText },
+          info: { requestName: p.name, requestId: p.requestId },
+        });
         scriptLogs.push(...out.logs);
-        for (const [k, v] of Object.entries(out.vars)) ctx.vars.set(k, v);
+        applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (out.error) throw new ApsError('ScriptError', `Pre-request script failed: ${out.error}`);
         if (out.request) {
           request = { ...request, method: out.request.method, url: out.request.url, headers: out.request.headers };
@@ -581,8 +611,14 @@ export class Backend {
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), cctx);
       for (const script of [ctx.collection?.testScript, p.testScript]) {
         if (!script?.trim()) continue;
-        const out = await runScript(script, { variables: ctx.vars.toObject(), response: { status: response.status, headers: response.headers, body: response.bodyPreview, time: response.durationMs } });
+        const out = await runScript(script, {
+          ...scriptScopes(ctx.vars),
+          response: { status: response.status, headers: response.headers, body: response.bodyPreview, time: response.durationMs },
+          cookies: Object.fromEntries(response.cookies.map((c) => [c.name, c.value])),
+          info: { requestName: p.name, requestId: p.requestId },
+        });
         scriptLogs.push(...out.logs);
+        applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         for (const t of out.tests) checks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
         if (out.error) checks.push({ type: 'script', name: 'test script', passed: false, source: 'deterministic', message: out.error });
       }

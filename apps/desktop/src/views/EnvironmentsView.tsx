@@ -156,6 +156,7 @@ export function EnvironmentsView() {
                     setDraft({ ...draft, variables: next.map((r) => ({ key: r.key, value: r.secret ? '' : r.value, secret: r.secret, enabled: r.enabled })) });
                   }}
                 />
+                <CurrentValues envName={draft.name} />
                 <div className="text-xs text-muted flex items-start gap-2 bg-panel rounded-md p-2">
                   <KeyRound size={13} className="mt-0.5 shrink-0" />
                   <span>
@@ -198,6 +199,50 @@ export function EnvironmentsView() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Values set by scripts (pm.environment.set) for this environment — local to this machine, like Postman's current values. */
+function CurrentValues({ envName }: { envName: string }) {
+  const [values, setValues] = useState<Record<string, unknown>>({});
+  const load = () => void call<Record<string, unknown>>('currentValues.get', { scope: 'environment', owner: envName }).then(setValues);
+  useEffect(load, [envName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const keys = Object.keys(values);
+  return (
+    <div className="rounded-md border border-line">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-line text-sm">
+        <span className="font-medium">Current values</span>
+        <span className="text-xs text-muted">set by scripts on this machine; they override the values above and are never saved to workspace files</span>
+        <Button size="sm" variant="ghost" className="ml-auto" onClick={load}>
+          Refresh
+        </Button>
+        <Button
+          size="sm"
+          disabled={!keys.length}
+          onClick={async () => {
+            await call('currentValues.reset', { scope: 'environment', owner: envName });
+            load();
+            useApp.getState().toast('Current values reset', 'success');
+          }}
+        >
+          Reset all
+        </Button>
+      </div>
+      {keys.length ? (
+        <table className="w-full text-sm">
+          <tbody>
+            {keys.map((k) => (
+              <tr key={k} className="border-t border-line first:border-0">
+                <td className="px-3 py-1 mono w-1/3">{k}</td>
+                <td className="px-3 py-1 mono text-muted truncate">{typeof values[k] === 'object' ? JSON.stringify(values[k]) : String(values[k])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="px-3 py-2 text-xs text-muted">None yet. Scripts can set them with pm.environment.set("key", value).</div>
+      )}
     </div>
   );
 }

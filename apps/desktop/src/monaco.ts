@@ -2,6 +2,8 @@ import * as monaco from 'monaco-editor';
 import { loader } from '@monaco-editor/react';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import JsonWorker from 'monaco-editor/language/json/json.worker?worker';
+import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker';
+import { PM_TYPES } from './lib/snippets';
 import { buildSchema, type GraphQLSchema } from 'graphql';
 import { getAutocompleteSuggestions, getDiagnostics, Position } from 'graphql-language-service';
 
@@ -9,10 +11,17 @@ import { getAutocompleteSuggestions, getDiagnostics, Position } from 'graphql-la
 self.MonacoEnvironment = {
   getWorker(_id: string, label: string) {
     if (label === 'json') return new JsonWorker();
+    if (label === 'typescript' || label === 'javascript') return new TsWorker();
     return new EditorWorker();
   },
 };
 loader.config({ monaco });
+
+// Script editor IntelliSense for the Postman-compatible pm API. Scripts run as a function body,
+// so a top-level `return` is allowed (TS 1108).
+monaco.typescript.javascriptDefaults.addExtraLib(PM_TYPES, 'file:///protolens/pm.d.ts');
+monaco.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false, diagnosticCodesToIgnore: [1108] });
+monaco.typescript.javascriptDefaults.setCompilerOptions({ target: monaco.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, checkJs: false, lib: ['es2020'] });
 
 monaco.editor.defineTheme('aps-dark', { base: 'vs-dark', inherit: true, rules: [], colors: { 'editor.background': '#0d1117', 'editorGutter.background': '#0d1117' } });
 monaco.editor.defineTheme('aps-light', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff' } });
