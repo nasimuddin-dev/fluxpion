@@ -1,7 +1,7 @@
 import { Copy, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
-import { useApp } from '../store';
+import { promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Environment, KeyValue } from '../types';
 import { uid } from '../lib/format';
@@ -80,7 +80,7 @@ export function EnvironmentsView() {
                     variant="ghost"
                     icon={<Plus size={12} />}
                     onClick={async () => {
-                      const name = prompt('Environment name', 'Staging');
+                      const name = await promptText('New environment', { message: 'Environment name', value: 'Staging', okLabel: 'Create' });
                       if (!name) return;
                       const env: Environment = { id: uid('env-'), name, variables: [{ key: 'baseUrl', value: '', enabled: true }] };
                       await call('env.save', { env });

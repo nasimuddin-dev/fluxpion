@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, Layers, Play, Save, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
-import { useApp } from '../store';
+import { promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
@@ -138,7 +138,7 @@ export function TestsView() {
     }
   };
   const newFile = async (kind: string) => {
-    const name = prompt('File path inside tests/ (e.g. rest/health.yaml)', kind === 'suite' ? 'regression.suite.yaml' : `${kind === 'http' ? 'rest' : kind === 'llm' ? 'ai' : kind}/new-test.yaml`);
+    const name = await promptText('New test file', { message: 'File path inside tests/ (e.g. rest/health.yaml)', okLabel: 'Create', value: kind === 'suite' ? 'regression.suite.yaml' : `${kind === 'http' ? 'rest' : kind === 'llm' ? 'ai' : kind}/new-test.yaml` });
     if (!name) return;
     await call('tests.write', { path: name, content: TEMPLATES[kind] });
     await loadTree();

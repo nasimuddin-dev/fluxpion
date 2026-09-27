@@ -28,7 +28,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
 import logoUrl from '../../build/logo.svg';
-import { useApp, type ViewId } from '../store';
+import { promptText, useApp, type ViewId, type DialogRequest } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner } from './ui';
 
@@ -137,9 +137,9 @@ function WorkspaceMenu() {
               ],
               [
                 'Delete a workspace…',
-                () => {
+                async () => {
                   const other = list.filter((w) => w.path !== ws?.path);
-                  const target = prompt(`Type the name of the workspace to delete permanently:\n${other.map((w) => `• ${w.name}`).join('\n')}`);
+                  const target = await promptText('Delete a workspace', { message: 'Type the name of the workspace to delete permanently', detail: other.length ? `Workspaces: ${other.map((w) => w.name).join(', ')}` : 'There are no other workspaces (the open one cannot be deleted).', okLabel: 'Continue' });
                   const w = other.find((x) => x.name === target);
                   if (w && confirm(`Permanently delete "${w.name}" and all its files?`)) void act(() => call('ws.delete', { ref: w.path }), 'Workspace deleted');
                 },
@@ -549,20 +549,39 @@ export function Toaster() {
 /** Renders the pending `ask()` dialog, if any. */
 export function DialogHost() {
   const d = useApp((s) => s.dialog);
-  if (!d) return null;
+  return d ? <DialogView key={d.title + d.message} d={d} /> : null;
+}
+
+function DialogView({ d }: { d: DialogRequest }) {
+  const [value, setValue] = useState(d.input?.value ?? '');
+  const primary = d.buttons.find((b) => b.variant === 'primary');
   return (
     <Modal
       title={d.title}
-      onClose={() => d.resolve(d.cancelId)}
-      width={520}
+      onClose={() => d.resolve(d.cancelId, value)}
+      width={d.input ? 440 : 520}
       footer={d.buttons.map((b) => (
-        <Button key={b.id} variant={b.variant ?? 'default'} autoFocus={b.variant === 'primary'} onClick={() => d.resolve(b.id)}>
+        <Button key={b.id} variant={b.variant ?? 'default'} autoFocus={!d.input && b.variant === 'primary'} disabled={!!d.input && b === primary && !value.trim()} onClick={() => d.resolve(b.id, value)}>
           {b.label}
         </Button>
       ))}
     >
-      <p className="text-sm font-medium">{d.message}</p>
+      {d.message && <p className="text-sm font-medium">{d.message}</p>}
       {d.detail && <p className="text-sm text-muted whitespace-pre-line mt-3 max-h-72 overflow-auto">{d.detail}</p>}
+      {d.input && (
+        <Input
+          autoFocus
+          className={cx('w-full', (d.message || d.detail) && 'mt-3')}
+          value={value}
+          placeholder={d.input.placeholder}
+          aria-label={d.title}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && primary && value.trim()) d.resolve(primary.id, value);
+          }}
+        />
+      )}
     </Modal>
   );
 }

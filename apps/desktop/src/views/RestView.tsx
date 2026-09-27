@@ -1,7 +1,7 @@
 import { Code2, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
-import { useApp, persisted } from '../store';
+import { promptText, useApp, persisted } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedHttpRequest } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
@@ -175,7 +175,7 @@ export function RestView() {
   const saveTab = async (collectionId: string, name: string, folderId?: string) => {
     const cols = await call<Collection[]>('col.list');
     const c = cols.find((x) => x.id === collectionId);
-    if (!c) return;
+    if (!c) return useApp.getState().toast('That collection no longer exists — pick another one', 'error');
     const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: toEngineRequest(tab.request), preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions };
     const exists = tab.requestId && findNode(c.items, tab.requestId);
     const items = exists ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, folderId, node);
@@ -226,7 +226,7 @@ export function RestView() {
               <IconButton
                 label="New collection"
                 onClick={async () => {
-                  const name = prompt('Collection name');
+                  const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
                   if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
                 }}
               >
@@ -293,7 +293,11 @@ export function RestView() {
           </IconButton>
         </div>
         <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
-          <Select aria-label="Method" className={cx('mono font-bold w-28', `method-${tab.request.method}`)} value={METHODS.includes(tab.request.method) ? tab.request.method : 'CUSTOM'} onChange={(e) => setReq({ method: e.target.value === 'CUSTOM' ? prompt('Custom HTTP method', 'PROPFIND')?.toUpperCase() || 'GET' : e.target.value })}>
+          <Select aria-label="Method" className={cx('mono font-bold w-28', `method-${tab.request.method}`)} value={METHODS.includes(tab.request.method) ? tab.request.method : 'CUSTOM'} onChange={async (e) => {
+            if (e.target.value !== 'CUSTOM') return setReq({ method: e.target.value });
+            const m = await promptText('Custom HTTP method', { value: 'PROPFIND', okLabel: 'Use' });
+            if (m) setReq({ method: m.toUpperCase() });
+          }}>
             {METHODS.map((m) => (
               <option key={m}>{m}</option>
             ))}
@@ -529,6 +533,23 @@ function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { co
   const [name, setName] = useState(defaultName);
   const [cid, setCid] = useState(collections[0]?.id ?? '');
   const [folder, setFolder] = useState('');
+  // a name here means "create this collection and save into it" (the default when there are none yet)
+  const [newCollection, setNewCollection] = useState<string | null>(collections.length ? null : 'My collection');
+  const [busy, setBusy] = useState(false);
+  const creating = newCollection !== null;
+  const canSave = !!name.trim() && (creating ? !!newCollection.trim() : !!cid);
+  const submit = async () => {
+    if (!canSave || busy) return;
+    if (!creating) return onSave(cid, name.trim(), folder || undefined);
+    setBusy(true);
+    try {
+      const id = uid('col-');
+      await onCreate({ schemaVersion: '1.0', id, name: newCollection.trim(), version: 0, variables: [], items: [], updatedAt: '' });
+      onSave(id, name.trim());
+    } finally {
+      setBusy(false);
+    }
+  };
   const c = collections.find((x) => x.id === cid);
   const folders = useMemo(() => {
     const out: Array<{ id: string; name: string }> = [];
@@ -546,7 +567,7 @@ function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { co
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={!cid || !name.trim()} onClick={() => onSave(cid, name.trim(), folder || undefined)}>
+          <Button variant="primary" disabled={!canSave} loading={busy} onClick={submit}>
             Save
           </Button>
         </>
@@ -554,31 +575,29 @@ function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { co
     >
       <div className="flex flex-col gap-3">
         <Field label="Name">
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void submit()} />
         </Field>
-        <Field label="Collection">
+        <Field label={creating ? 'New collection' : 'Collection'} hint={creating && !collections.length ? 'You have no collections yet — this one will be created.' : undefined}>
           <div className="flex gap-2">
-            <Select className="flex-1" value={cid} onChange={(e) => setCid(e.target.value)}>
-              {collections.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-            </Select>
-            <Button
-              onClick={async () => {
-                const n = prompt('New collection name');
-                if (!n) return;
-                const id = uid('col-');
-                await onCreate({ schemaVersion: '1.0', id, name: n, version: 0, variables: [], items: [], updatedAt: '' });
-                setCid(id);
-              }}
-            >
-              New
-            </Button>
+            {creating ? (
+              <Input className="flex-1" value={newCollection} placeholder="Collection name" onChange={(e) => setNewCollection(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void submit()} />
+            ) : (
+              <Select className="flex-1" value={cid} onChange={(e) => (setCid(e.target.value), setFolder(''))}>
+                {collections.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+            {creating ? (
+              collections.length > 0 && <Button onClick={() => setNewCollection(null)}>Choose existing</Button>
+            ) : (
+              <Button onClick={() => setNewCollection('')}>New</Button>
+            )}
           </div>
         </Field>
-        {folders.length > 0 && (
+        {!creating && folders.length > 0 && (
           <Field label="Folder">
             <Select value={folder} onChange={(e) => setFolder(e.target.value)}>
               <option value="">(collection root)</option>

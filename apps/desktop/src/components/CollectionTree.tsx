@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, FilePlus2, Folder, FolderPlus, MoreHorizonta
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode } from '../types';
 import { cx } from './ui';
+import { promptText } from '../store';
 import { uid } from '../lib/format';
 
 export function mapNodes(nodes: CollectionNode[], fn: (n: CollectionNode) => CollectionNode | null): CollectionNode[] {
@@ -79,16 +80,16 @@ export function CollectionTree({
                 <span className="truncate">{n.name}</span>
               </button>
               <NodeMenu
-                onRename={() => {
-                  const name = prompt('Folder name', n.name);
+                onRename={async () => {
+                  const name = await promptText('Rename folder', { value: n.name, okLabel: 'Rename' });
                   if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
                 }}
                 onDelete={() => confirm(`Delete folder "${n.name}" and its requests?`) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
                 onNewRequest={() => onNewRequest(c, n.id)}
                 onRun={onRun && (() => onRun(c, n.id))}
                 runLabel="Run folder"
-                onNewFolder={() => {
-                  const name = prompt('Folder name');
+                onNewFolder={async () => {
+                  const name = await promptText('New folder', { message: 'Folder name', okLabel: 'Create' });
                   if (name) onChange({ ...c, items: addToFolder(c.items, n.id, { kind: 'folder', id: uid('fld-'), name, items: [] } as CollectionFolder) });
                 }}
               />
@@ -105,8 +106,8 @@ export function CollectionTree({
             <span className="truncate">{n.name}</span>
           </button>
           <NodeMenu
-            onRename={() => {
-              const name = prompt('Request name', n.name);
+            onRename={async () => {
+              const name = await promptText('Rename request', { value: n.name, okLabel: 'Rename' });
               if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
             }}
             onDelete={() => confirm(`Delete "${n.name}"?`) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
@@ -134,8 +135,8 @@ export function CollectionTree({
                   onNewRequest={() => onNewRequest(c)}
                   onRun={onRun && (() => onRun(c))}
                   runLabel="Run collection"
-                  onNewFolder={() => {
-                    const name = prompt('Folder name');
+                  onNewFolder={async () => {
+                    const name = await promptText('New folder', { message: 'Folder name', okLabel: 'Create' });
                     if (name) onChange({ ...c, items: [...c.items, { kind: 'folder', id: uid('fld-'), name, items: [] }] });
                   }}
                 />

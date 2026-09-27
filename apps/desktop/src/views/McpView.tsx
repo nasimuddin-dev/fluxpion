@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
-import { useApp } from '../store';
+import { promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, McpServerConfig } from '../types';
 import { formatMs, uid } from '../lib/format';
@@ -369,7 +369,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
   useSendShortcut('mcp', () => !running && void exec());
   const saveTest = async () => {
     if (!tool) return;
-    const name = prompt('Test name', `${tool.name} works`);
+    const name = await promptText('Save as test', { message: 'Test name', value: `${tool.name} works`, okLabel: 'Save' });
     if (!name) return;
     const rel = await call<string>('mcp.saveTest', { serverId, tool: tool.name, args: raw ? JSON.parse(rawText || '{}') : value, assertions, name });
     useApp.getState().toast(`Saved test tests/${rel}`, 'success');

@@ -2,7 +2,7 @@ import { BookOpen, ChevronLeft, Play, RefreshCw, Save, Sparkles, Square, Wand2 }
 import { useEffect, useMemo, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, type NormalizedError } from '../api';
-import { persisted, useApp } from '../store';
+import { persisted, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import { setGraphQLSchema } from '../monaco';
 import type { AuthConfig, CheckConfig, CheckResult, Collection, HttpResponseData, KeyValue, SavedGraphQLRequest } from '../types';
@@ -134,11 +134,16 @@ export function GraphQLView() {
     const cols = await call<Collection[]>('col.list');
     let c = cols.find((x) => x.id === d.collectionId);
     if (!c) {
-      const pick = prompt(`Save to which collection?\n${cols.map((x) => `• ${x.name}`).join('\n')}\n(or type a new name)`, cols[0]?.name ?? 'GraphQL');
+      const pick = await promptText('Save to collection', {
+        message: 'Collection name (an existing one, or a new name to create it)',
+        detail: cols.length ? `Existing: ${cols.map((x) => x.name).join(', ')}` : undefined,
+        value: cols[0]?.name ?? 'GraphQL',
+        okLabel: 'Next',
+      });
       if (!pick) return;
       c = cols.find((x) => x.name === pick) ?? { schemaVersion: '1.0', id: uid('col-'), name: pick, version: 0, variables: [], items: [], updatedAt: '' };
     }
-    const name = d.requestId ? d.name : prompt('Operation name', d.operationName ?? operations[0]?.name ?? d.name) ?? d.name;
+    const name = d.requestId ? d.name : ((await promptText('Save operation', { message: 'Request name', value: d.operationName ?? operations[0]?.name ?? d.name, okLabel: 'Save' })) ?? d.name);
     const node: SavedGraphQLRequest = { kind: 'graphql', id: d.requestId ?? uid('gql-'), name, request: { endpoint: d.endpoint, query: d.query, variables: d.variables, headers: d.headers, auth: d.auth, operationName: d.operationName }, assertions: d.assertions };
     const items = d.requestId && findNode(c.items, d.requestId) ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, undefined, node);
     await call('col.save', { ...c, items });

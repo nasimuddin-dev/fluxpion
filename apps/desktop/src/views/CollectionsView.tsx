@@ -1,7 +1,7 @@
 import { Download, FilePlus2, FolderPlus, FolderTree, Play, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '../api';
-import { useApp } from '../store';
+import { promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Collection, CollectionNode } from '../types';
 import { download, timeAgo, uid } from '../lib/format';
@@ -58,7 +58,7 @@ export function CollectionsView() {
                 variant="ghost"
                 icon={<FolderPlus size={12} />}
                 onClick={async () => {
-                  const name = prompt('Collection name');
+                  const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
                   if (name) {
                     const id = uid('col-');
                     await save({ schemaVersion: '1.0', id, name, version: 0, variables: [], items: [], updatedAt: '' });

@@ -2,7 +2,7 @@ import { KeyRound, Play, Plus, RefreshCw, Save, Square, Trash2, WifiOff } from '
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { stringifyYaml } from '../lib/yaml';
 import { asError, call, on, type NormalizedError } from '../api';
-import { persisted, useApp } from '../store';
+import { persisted, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, ProviderConfig } from '../types';
 import { formatCost, formatMs, templateVars, uid } from '../lib/format';
@@ -293,7 +293,7 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
   };
   useSendShortcut('ai', () => !running && void run());
   const saveAsTest = async () => {
-    const name = prompt('Test name', 'Prompt test');
+    const name = await promptText('Save as test', { message: 'Test name', value: 'Prompt test', okLabel: 'Save' });
     if (!name) return;
     const test: Record<string, unknown> = {
       name,

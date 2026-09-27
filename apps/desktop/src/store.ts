@@ -42,7 +42,9 @@ export interface DialogRequest {
   detail?: string;
   buttons: DialogButton[];
   cancelId: string;
-  resolve(id: string): void;
+  /** Show a text field; its value is passed to resolve. */
+  input?: { value: string; placeholder?: string; multiline?: boolean };
+  resolve(id: string, value?: string): void;
 }
 
 export interface ProgressState {
@@ -162,6 +164,32 @@ export function ask(req: Omit<DialogRequest, 'resolve'>): Promise<string> {
         resolve: (id) => {
           useApp.getState().set({ dialog: undefined });
           resolve(id);
+        },
+      },
+    }),
+  );
+}
+
+/**
+ * Ask for a line of text. Replaces window.prompt(), which Electron does not support (it returns null
+ * without showing anything). Resolves with the trimmed text, or null when cancelled or left empty.
+ */
+export function promptText(title: string, opts: { message?: string; value?: string; placeholder?: string; okLabel?: string; detail?: string } = {}): Promise<string | null> {
+  return new Promise((resolve) =>
+    useApp.getState().set({
+      dialog: {
+        title,
+        message: opts.message ?? '',
+        detail: opts.detail,
+        input: { value: opts.value ?? '', placeholder: opts.placeholder },
+        buttons: [
+          { id: 'cancel', label: 'Cancel' },
+          { id: 'ok', label: opts.okLabel ?? 'OK', variant: 'primary' },
+        ],
+        cancelId: 'cancel',
+        resolve: (id, value) => {
+          useApp.getState().set({ dialog: undefined });
+          resolve(id === 'ok' && value?.trim() ? value.trim() : null);
         },
       },
     }),
