@@ -4,6 +4,7 @@
 
 Postman parity work since 0.1.0:
 
+- **Postman-like sidebar.** The REST view's sidebar has Collections, Environments (click to activate, edit, create) and History (grouped by day, click to open) panes, and friendlier empty states.
 - **Home and environment quick look.** A new **Home** view, which the app opens on the first time, has quick actions (new request, GraphQL, import, new collection, MCP, AI, assistant, docs), recent requests, collections (with run) and environments (click to activate), plus keyboard shortcuts. An eye button next to the environment selector shows the active environment's and the global variables with initial and current values, secrets masked.
 - **Tabs and history.** Request tabs have a right-click menu: pin (pinned tabs stay first and survive bulk closes), duplicate, close, close others, close to the right and close all, with one confirmation for unsaved changes. History is grouped by day (Today, Yesterday, weekday, date), and double-clicking an entry reopens it.
 - **Console.** A Postman-style console in the bottom panel (status bar **Console** or Ctrl+Alt+C). It lists every request (from tabs and runs) with status, time and size, shows script `console.log` output under each request, and expands to request and response headers and bodies. It has All / Errors / With logs filters and search. Everything is redacted, including values echoed back by the server, and nothing is written to disk.

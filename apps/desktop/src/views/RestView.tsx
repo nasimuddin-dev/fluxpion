@@ -1,4 +1,4 @@
-import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, Pin, PinOff, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -9,6 +9,7 @@ import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { ExamplesPanel } from '../components/ExamplesPanel';
 import { Markdown } from '../components/Markdown';
+import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { uid } from '../lib/format';
 
@@ -21,7 +22,7 @@ import { COMMON_HEADERS, KeyValueEditor } from '../components/KeyValueEditor';
 import { ResponseViewer } from '../components/ResponseViewer';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
-import { Button, cx, Empty, Field, IconButton, Input, Menu, Modal, SectionTitle, Select, Split, Tabs, Toggle, type MenuItem } from '../components/ui';
+import { Button, cx, Empty, Field, IconButton, Input, Menu, Modal, Select, Split, Tabs, Toggle, Tooltip, type MenuItem } from '../components/ui';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
@@ -78,6 +79,21 @@ export function RestView() {
   const [importing, setImporting] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [showCookies, setShowCookies] = useState(false);
+  const [side, setSideState] = useState<'collections' | 'environments' | 'history'>(() => {
+    try {
+      return (localStorage.getItem('aps.rest.sidebar') as 'collections') || 'collections';
+    } catch {
+      return 'collections';
+    }
+  });
+  const setSide = (v: typeof side) => {
+    setSideState(v);
+    try {
+      localStorage.setItem('aps.rest.sidebar', v);
+    } catch {
+      /* ignore */
+    }
+  };
   const env = useApp((s) => s.environment);
   const tab = tabs.find((t) => t.id === active) ?? tabs[0]!;
   const streams = useRef<Record<string, string>>({});
@@ -298,9 +314,32 @@ export function RestView() {
     <>
     <Split id="rest-sidebar" initial={20} min={12}>
       <div className="h-full flex flex-col bg-panel/50 border-r border-line">
-        <SectionTitle
-          right={
-            <div className="flex">
+        <div role="tablist" aria-label="Sidebar" className="flex items-center gap-0.5 px-2 pt-2 pb-2">
+          {(
+            [
+              ['collections', 'Collections', <FolderTree key="c" size={13} />],
+              ['environments', 'Environments', <KeyRound key="e" size={13} />],
+              ['history', 'History', <History key="h" size={13} />],
+            ] as const
+          ).map(([id, label, icon]) => (
+            <Tooltip key={id} content={label}>
+              <button
+                role="tab"
+                aria-selected={side === id}
+                aria-label={label}
+                onClick={() => setSide(id)}
+                className={cx('flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-xs font-medium transition-colors', side === id ? 'bg-bg shadow-sm border border-line text-fg' : 'text-muted hover:text-fg hover:bg-hover')}
+              >
+                {icon}
+                <span className="truncate hidden xl:inline">{label}</span>
+              </button>
+            </Tooltip>
+          ))}
+        </div>
+        {side === 'collections' && (
+          <>
+            <div className="flex items-center gap-1 px-2 pb-2">
+              <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter requests" value={filter} onChange={(e) => setFilter(e.target.value)} />
               <IconButton label="Import OpenAPI / Postman / HAR" onClick={() => setImporting(true)}>
                 <Upload size={14} />
               </IconButton>
@@ -314,33 +353,48 @@ export function RestView() {
                 <FolderPlus size={14} />
               </IconButton>
             </div>
-          }
-        >
-          Collections
-        </SectionTitle>
-        <div className="px-2 pb-2">
-          <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter requests" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        </div>
-        <div className="flex-1 overflow-auto">
-          {collections.length ? (
-            <CollectionTree
-              collections={collections}
-              filter={filter}
-              activeRequestId={tab.requestId}
-              onOpen={openRequest}
-              onChange={saveCollection}
-              onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
-              onNewRequest={async (c, folderId) => {
-                const t = blankRequest();
-                const node: SavedHttpRequest = { kind: 'http', id: uid('req-'), name: 'New request', request: t.request, assertions: t.assertions };
-                await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
-                openRequest(c, node);
-              }}
-            />
-          ) : (
-            <Empty title="No collections yet">Create a collection or import an OpenAPI, Postman or HAR file.</Empty>
-          )}
-        </div>
+            <div className="flex-1 overflow-auto">
+              {collections.length ? (
+                <CollectionTree
+                  collections={collections}
+                  filter={filter}
+                  activeRequestId={tab.requestId}
+                  onOpen={openRequest}
+                  onChange={saveCollection}
+                  onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
+                  onNewRequest={async (c, folderId) => {
+                    const t = blankRequest();
+                    const node: SavedHttpRequest = { kind: 'http', id: uid('req-'), name: 'New request', request: t.request, assertions: t.assertions };
+                    await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
+                    openRequest(c, node);
+                  }}
+                />
+              ) : (
+                <Empty
+                  icon={<FolderTree size={22} />}
+                  title="No collections yet"
+                  action={
+                    <Button size="sm" icon={<Upload size={12} />} onClick={() => setImporting(true)}>
+                      Import
+                    </Button>
+                  }
+                >
+                  Save a request with Ctrl+S, create a collection, or import OpenAPI, Postman or HAR.
+                </Empty>
+              )}
+            </div>
+          </>
+        )}
+        {side === 'environments' && <EnvironmentsPane />}
+        {side === 'history' && (
+          <HistoryPane
+            onOpen={(request, name) => {
+              const t: RestTab = { ...blankRequest(), name, request: fromEngineRequest(request) };
+              setTabs((ts) => [...ts, t]);
+              setActive(t.id);
+            }}
+          />
+        )}
       </div>
       <div className="h-full flex flex-col min-w-0">
         <div className="flex items-end h-9 border-b border-line bg-panel/40 overflow-x-auto shrink-0" role="tablist">

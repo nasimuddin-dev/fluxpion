@@ -15,6 +15,16 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Body types:** JSON, XML, text, HTML, form URL-encoded, multipart (text and file fields), and binary file. Files are streamed from disk.
 - **Settings:** timeout, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS).
 
+## Sidebar
+
+The left sidebar of the REST view has three panes, like Postman's:
+
+- **Collections:** the request tree, with a filter, **Import** and **New collection**. Right-click or use **⋯** on folders and requests for more actions.
+- **Environments:** click an environment to make it active. **Edit** opens it, and **+** creates one.
+- **History:** your recent HTTP requests grouped by day, with a filter. Click one to open it in a new tab.
+
+The sidebar remembers the pane you last used.
+
 ## Tabs and history
 
 Each request opens in a tab. A dot on a tab means it has unsaved changes. Right-click a tab (or middle-click to close it) for:
