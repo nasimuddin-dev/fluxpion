@@ -1,4 +1,4 @@
-import { Download, ExternalLink, Sparkles } from 'lucide-react';
+import { BookmarkPlus, Download, ExternalLink, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import type { CheckResult, HttpResponseData, Trace } from '../types';
@@ -19,6 +19,7 @@ export function ResponseViewer({
   stream,
   scriptLogs,
   onSuggestAssertions,
+  onSaveExample,
 }: {
   response: HttpResponseData;
   checks?: CheckResult[];
@@ -27,6 +28,8 @@ export function ResponseViewer({
   stream?: string;
   scriptLogs?: string[];
   onSuggestAssertions?(): void;
+  /** Save this response as an example of the request. */
+  onSaveExample?(): void;
 }) {
   const [tab, setTab] = useState<Tab>(() => (checks?.some((c) => !c.passed) ? 'tests' : 'body'));
   const [mode, setMode] = useState<'pretty' | 'raw' | 'preview'>('pretty');
@@ -60,6 +63,11 @@ export function ResponseViewer({
           {onSuggestAssertions && (
             <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onSuggestAssertions}>
               Suggest assertions
+            </Button>
+          )}
+          {onSaveExample && (
+            <Button size="sm" variant="ghost" icon={<BookmarkPlus size={12} />} onClick={onSaveExample} title="Save this response as an example of the request">
+              Save as example
             </Button>
           )}
           {response.payloadPath && (

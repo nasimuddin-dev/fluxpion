@@ -55,7 +55,26 @@
           "id": "req-get",
           "name": "Get patient",
           "request": { "method": "GET", "url": "{{baseUrl}}/patients/1", "auth": { "type": "inherit" } },
-          "assertions": [{ "type": "status", "expected": 200 }]
+          "assertions": [{ "type": "status", "expected": 200 }],
+          "examples": [
+            {
+              "id": "ex-patient-found",
+              "name": "Patient found",
+              "status": 200,
+              "statusText": "OK",
+              "headers": [{ "key": "content-type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"1\",\n  \"name\": \"Rex\",\n  \"species\": \"dog\",\n  \"ownerId\": \"123\"\n}"
+            },
+            {
+              "id": "ex-patient-missing",
+              "name": "Patient not found",
+              "status": 404,
+              "statusText": "Not Found",
+              "headers": [{ "key": "content-type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"not_found\"\n}",
+              "request": { "method": "GET", "url": "{{baseUrl}}/patients/999" }
+            }
+          ]
         },
         {
           "kind": "http",

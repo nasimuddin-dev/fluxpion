@@ -16,11 +16,36 @@ Each collection is a versioned JSON file under `collections/` in the workspace, 
 **Import** accepts:
 
 - OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, and security schemes map to auth.
-- Postman v2.1 collections (including scripts) and environments.
+- Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
 - HAR files.
 - Protolens collections and workspace exports.
 
 The CLI can import too: `protolens import openapi.yaml -w my-workspace`.
+
+## Examples
+
+An example is a saved response of a request, like Postman's examples. Examples show what an endpoint returns without sending the request, for instance a success and an error case.
+
+- **Save a response:** send a saved request, then click **Save as example** above the response and give it a name. The request must be in a collection. A new request opens the Save dialog first.
+- **Browse:** the request's **Examples** tab lists its examples with their status. Select one to see its headers and body. Rename or delete it with the buttons at the top.
+- **Safe to commit:** examples are stored in the collection file, so sensitive data is masked when you save one. `Set-Cookie`, `Authorization` and token headers become `REDACTED`, and so do sensitive JSON fields (`access_token`, `password` …) and known secret values. Headers that only describe one transfer (`Date`, `Content-Length` …) are dropped. Bodies over 512 KB and truncated previews can't be saved as examples.
+- Examples are saved to the collection straight away and don't mark the request as changed. Saving the request keeps its examples.
+
+In the collection file an example looks like this:
+
+```json
+{
+  "id": "ex-patient-missing",
+  "name": "Patient not found",
+  "status": 404,
+  "statusText": "Not Found",
+  "headers": [{ "key": "content-type", "value": "application/json" }],
+  "body": "{ \"error\": \"not_found\" }",
+  "request": { "method": "GET", "url": "{{baseUrl}}/patients/999" }
+}
+```
+
+`request` is optional. It records the request that produced the response when that differs from the saved request.
 
 ## Collection Runner
 

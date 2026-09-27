@@ -47,6 +47,9 @@ import {
   CurrentValues,
   CookieJarStore,
   responseCookies,
+  exampleFromResponse,
+  withRequestExamples,
+  type SavedExample,
   applyCookieJarOps,
   type CookieInput,
   runTests,
@@ -364,6 +367,19 @@ export class Backend {
       'col.list': () => this.ws.listCollections(),
       'col.save': (c: Collection) => this.ws.saveCollection(c),
       'col.delete': ({ id }: { id: string }) => this.ws.deleteCollection(id),
+      /** Save a response as an example of a saved request (sensitive headers and values are masked). */
+      'col.addExample': (p: { collectionId: string; requestId: string; name: string; environment?: string; response: Parameters<typeof exampleFromResponse>[0]; request?: SavedExample['request'] }) => {
+        const ctx = this.context({ environment: p.environment, collectionId: p.collectionId });
+        const example = exampleFromResponse(p.response, { name: p.name, redactor: ctx.redactor, request: p.request });
+        const c = withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, (list) => [...list, example]);
+        this.ws.saveCollection(c);
+        return example;
+      },
+      /** Replace a saved request's examples (rename, edit, delete). */
+      'col.setExamples': (p: { collectionId: string; requestId: string; examples: SavedExample[] }) => {
+        this.ws.saveCollection(withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, () => p.examples));
+        return p.examples;
+      },
       'col.import': ({ text }: { text: string }) => {
         const r = importAny(text);
         if (r.collection) this.ws.saveCollection(r.collection);

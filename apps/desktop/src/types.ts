@@ -95,14 +95,26 @@ export interface HttpResponseData {
   json?: unknown;
 }
 
+export interface SavedExample {
+  id: string;
+  name: string;
+  status: number;
+  statusText?: string;
+  headers: KeyValue[];
+  body: string;
+  request?: { method: string; url: string; headers?: KeyValue[]; body?: string };
+  createdAt?: string;
+}
 export interface SavedHttpRequest {
   kind: 'http';
   id: string;
   name: string;
   request: HttpRequestSpec;
+  description?: string;
   preRequestScript?: string;
   testScript?: string;
   assertions?: CheckConfig[];
+  examples?: SavedExample[];
 }
 export interface SavedGraphQLRequest {
   kind: 'graphql';

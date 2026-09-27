@@ -1,5 +1,5 @@
 import { parse as parseYaml } from 'yaml';
-import type { AuthConfig, BodyConfig, Collection, CollectionFolder, CollectionNode, Environment, KeyValue, SavedHttpRequest } from '../model/types.js';
+import type { AuthConfig, BodyConfig, Collection, CollectionFolder, CollectionNode, Environment, KeyValue, SavedExample, SavedHttpRequest } from '../model/types.js';
 import { SCHEMA_VERSION } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { shortId, slugify } from '../util/ids.js';
@@ -163,6 +163,30 @@ function pmAuth(a: any): AuthConfig | undefined {
   }
 }
 
+/** Postman descriptions are a string or `{ content, type }`. */
+function pmDescription(d: any): string | undefined {
+  const s = typeof d === 'string' ? d : typeof d?.content === 'string' ? d.content : undefined;
+  return s?.trim() ? s : undefined;
+}
+
+/** Postman saved responses (`item.response[]`) → examples. */
+function pmExamples(responses: any): SavedExample[] | undefined {
+  if (!Array.isArray(responses) || !responses.length) return undefined;
+  return responses.map((r: any) => {
+    const o = r.originalRequest;
+    const url = typeof o?.url === 'string' ? o.url : o?.url?.raw;
+    return {
+      id: shortId('ex-'),
+      name: String(r.name || `${r.code ?? ''} ${r.status ?? ''}`.trim() || 'Example'),
+      status: Number(r.code) || 200,
+      statusText: r.status || undefined,
+      headers: (Array.isArray(r.header) ? r.header : []).map((h: any) => ({ key: String(h.key), value: String(h.value ?? '') })),
+      body: typeof r.body === 'string' ? r.body : '',
+      request: o && url ? { method: o.method ?? 'GET', url, headers: (o.header ?? []).map((h: any) => ({ key: h.key, value: h.value ?? '' })), body: o.body?.mode === 'raw' ? o.body.raw : undefined } : undefined,
+    };
+  });
+}
+
 export function importPostman(text: string): { collection: Collection } {
   const d = JSON.parse(text);
   const convert = (items: any[]): CollectionNode[] =>
@@ -196,8 +220,10 @@ export function importPostman(text: string): { collection: Collection } {
           body,
           auth: pmAuth(r.auth) ?? { type: 'inherit' },
         },
+        description: pmDescription(r.description ?? it.description),
         preRequestScript: script('prerequest'),
         testScript: script('test'),
+        examples: pmExamples(it.response),
       };
     });
   const collection = newCollection(d.info?.name ?? 'Postman import', convert(d.item), {

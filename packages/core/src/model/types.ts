@@ -482,14 +482,30 @@ export interface Environment {
   color?: string;
 }
 
+/** A saved response of a request (Postman "example"): documents the API and feeds the mock server. */
+export interface SavedExample {
+  id: string;
+  name: string;
+  status: number;
+  statusText?: string;
+  headers: KeyValue[];
+  body: string;
+  /** The request that produced this response, when it differs from the saved request. */
+  request?: { method: string; url: string; headers?: KeyValue[]; body?: string };
+  createdAt?: string;
+}
+
 export interface SavedHttpRequest {
   kind: 'http';
   id: string;
   name: string;
   request: HttpRequestSpec;
+  /** Markdown documentation for the request. */
+  description?: string;
   preRequestScript?: string;
   testScript?: string;
   assertions?: CheckConfig[];
+  examples?: SavedExample[];
 }
 
 export interface SavedGraphQLRequest {

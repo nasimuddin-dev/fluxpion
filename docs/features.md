@@ -17,6 +17,7 @@ Protolens combines an API client, a GraphQL playground, an MCP inspector, an LLM
 - A per-workspace cookie jar, like Postman's: cookies from responses (including redirects) are sent with later requests and managed in a Cookies dialog. The jar is encrypted on your machine and never written to workspace files.
 - API key, Basic, Bearer, JWT, OAuth 2.0 (client credentials, password, authorization code with PKCE), custom headers and mTLS, inherited from folders and collections.
 - Responses as a virtualised JSON tree, raw text with search, or an HTML preview, plus headers, cookies and a timing breakdown. Large bodies stream to disk.
+- Save responses as examples of a request (success and error cases), with secrets masked. Postman saved responses import as examples.
 - Pre-request and test scripts in a sandbox, assertions, highlighted variables, and one-click cURL export.
 
 [REST guide](/api-testing/rest) · [Authentication](/api-testing/authentication) · [Collections & import](/api-testing/collections)

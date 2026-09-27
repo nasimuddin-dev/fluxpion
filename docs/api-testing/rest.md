@@ -17,7 +17,7 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 
 ## Responses
 
-The status, duration, size, headers, cookies and a timeline (prepare → TTFB → download) are always shown. For the body:
+The status, duration, size, headers, cookies and a timeline (prepare → TTFB → download) are always shown. **Save as example** keeps the response with the request (see [Examples](/api-testing/collections#examples)). For the body:
 
 - **Pretty** is a virtualised JSON tree. Click a key to copy its JSONPath.
 - **Raw** is a virtualised text view with search.

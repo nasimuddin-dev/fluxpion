@@ -1,12 +1,13 @@
-import { Code2, Cookie, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { BookmarkPlus, Code2, Cookie, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
-import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedHttpRequest } from '../types';
+import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedExample, SavedHttpRequest } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
 import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
+import { ExamplesPanel } from '../components/ExamplesPanel';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { uid } from '../lib/format';
 
@@ -32,6 +33,8 @@ interface RestTab {
   assertions: CheckConfig[];
   collectionId?: string;
   requestId?: string;
+  /** Saved responses; persisted straight to the collection, so changing them does not make the tab dirty. */
+  examples?: SavedExample[];
   dirty?: boolean;
 }
 
@@ -89,6 +92,7 @@ export function RestView() {
 
   const update = (patch: Partial<RestTab>) => setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, ...patch, dirty: true } : t)));
   const setReq = (patch: Partial<HttpRequestSpec>) => update({ request: { ...tab.request, ...patch } });
+  const setExamples = (examples: SavedExample[]) => setTabs((ts) => ts.map((t) => (t.requestId && t.requestId === tab.requestId ? { ...t, examples } : t)));
   /** URL bar edits update the Params table and path variables (Postman behaviour). */
   const setUrl = (url: string) => setReq({ url, params: paramsFromUrl(url, tab.request.params), pathVariables: syncPathVariables(url, tab.request.pathVariables) });
   /** Params table edits rebuild the URL's query string. */
@@ -109,7 +113,7 @@ export function RestView() {
     if (n.kind !== 'http') return;
     const existing = tabs.find((t) => t.requestId === n.id);
     if (existing) return setActive(existing.id);
-    const t: RestTab = { id: uid('tab-'), name: n.name, request: fromEngineRequest(structuredClone(n.request)), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id };
+    const t: RestTab = { id: uid('tab-'), name: n.name, request: fromEngineRequest(structuredClone(n.request)), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, examples: n.examples };
     setTabs((ts) => [...ts, t]);
     setActive(t.id);
   };
@@ -178,8 +182,10 @@ export function RestView() {
     const cols = await call<Collection[]>('col.list');
     const c = cols.find((x) => x.id === collectionId);
     if (!c) return useApp.getState().toast('That collection no longer exists — pick another one', 'error');
-    const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: toEngineRequest(tab.request), preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions };
-    const exists = tab.requestId && findNode(c.items, tab.requestId);
+    const exists = tab.requestId ? findNode(c.items, tab.requestId) : undefined;
+    // examples and docs are saved on their own, so keep what is on disk
+    const kept = exists?.kind === 'http' ? { description: exists.description, examples: exists.examples } : {};
+    const node: SavedHttpRequest = { kind: 'http', id: tab.requestId ?? uid('req-'), name, request: toEngineRequest(tab.request), preRequestScript: tab.preRequestScript, testScript: tab.testScript, assertions: tab.assertions, ...kept };
     const items = exists ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, folderId, node);
     await saveCollection({ ...c, items });
     setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, name, collectionId, requestId: node.id, dirty: false } : t)));
@@ -208,6 +214,32 @@ export function RestView() {
   };
 
   const result = results[tab.id];
+  const saveExample = async () => {
+    const res = result?.response;
+    if (!res) return;
+    if (!tab.collectionId || !tab.requestId) {
+      useApp.getState().toast('Save the request to a collection first, then save responses as examples', 'error');
+      return setSaving(true);
+    }
+    const name = await promptText('Save as example', { value: `${res.status} ${res.statusText}`.trim(), okLabel: 'Save', message: 'Sensitive headers and values are masked before the example is saved to the collection.' });
+    if (!name?.trim()) return;
+    try {
+      const body = tab.request.body && 'content' in tab.request.body ? tab.request.body.content : undefined;
+      const ex = await call<SavedExample>('col.addExample', {
+        collectionId: tab.collectionId,
+        requestId: tab.requestId,
+        name,
+        environment: env,
+        response: { status: res.status, statusText: res.statusText, headers: res.headers, bodyPreview: res.bodyPreview, truncated: res.truncated, json: res.json },
+        request: { method: tab.request.method, url: tab.request.url, headers: tab.request.headers?.filter((h) => h.enabled !== false && h.key), body },
+      });
+      setExamples([...(tab.examples ?? []), ex]);
+      useApp.getState().toast(`Saved example "${ex.name}"`, 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+
   const suggest = result?.response
     ? () =>
         useApp.getState().set({
@@ -336,7 +368,7 @@ export function RestView() {
           </Button>
         </div>
         <Split id="rest-req-res" direction="vertical" initial={45}>
-          <RequestEditor tab={tab} update={update} setReq={setReq} setParams={setParams} />
+          <RequestEditor tab={tab} update={update} setReq={setReq} setParams={setParams} setExamples={setExamples} />
           <div className="h-full min-h-0 flex flex-col">
             {sending[tab.id] ? (
               <div className="h-full grid place-items-center text-muted text-sm">
@@ -350,7 +382,7 @@ export function RestView() {
                 <ErrorPanel error={result.error} context={{ request: { method: tab.request.method, url: tab.request.url } }} />
               </div>
             ) : result?.response ? (
-              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} onSuggestAssertions={suggest} />
+              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} onSuggestAssertions={suggest} onSaveExample={() => void saveExample()} />
             ) : (
               <Empty icon={<Send size={28} />} title="Send a request to see the response">
                 Press <b>Ctrl+Enter</b> to send. Variables like <span className="var-token mono">{'{{baseUrl}}'}</span> resolve from the active environment.
@@ -368,8 +400,20 @@ export function RestView() {
   );
 }
 
-function RequestEditor({ tab, update, setReq, setParams }: { tab: RestTab; update(p: Partial<RestTab>): void; setReq(p: Partial<HttpRequestSpec>): void; setParams(p: KeyValue[]): void }) {
-  const [sub, setSub] = useState<'params' | 'auth' | 'headers' | 'body' | 'cookies' | 'scripts' | 'tests' | 'settings'>('params');
+function RequestEditor({
+  tab,
+  update,
+  setReq,
+  setParams,
+  setExamples,
+}: {
+  tab: RestTab;
+  update(p: Partial<RestTab>): void;
+  setReq(p: Partial<HttpRequestSpec>): void;
+  setParams(p: KeyValue[]): void;
+  setExamples(e: SavedExample[]): void;
+}) {
+  const [sub, setSub] = useState<'params' | 'auth' | 'headers' | 'body' | 'cookies' | 'scripts' | 'tests' | 'examples' | 'settings'>('params');
   const r = tab.request;
   const count = (a?: Array<{ enabled?: boolean }>) => a?.filter((x) => x.enabled !== false).length || undefined;
   return (
@@ -385,6 +429,7 @@ function RequestEditor({ tab, update, setReq, setParams }: { tab: RestTab; updat
           { id: 'cookies', label: 'Cookies', badge: count(r.cookies) },
           { id: 'scripts', label: 'Scripts', badge: (tab.preRequestScript ? 1 : 0) + (tab.testScript ? 1 : 0) || undefined },
           { id: 'tests', label: 'Tests', badge: tab.assertions.length || undefined },
+          { id: 'examples', label: 'Examples', badge: tab.examples?.length || undefined },
           { id: 'settings', label: 'Settings' },
         ]}
         right={
@@ -428,6 +473,7 @@ function RequestEditor({ tab, update, setReq, setParams }: { tab: RestTab; updat
           </div>
         )}
         {sub === 'scripts' && <ScriptsPanel pre={tab.preRequestScript ?? ''} post={tab.testScript ?? ''} onPre={(v) => update({ preRequestScript: v })} onPost={(v) => update({ testScript: v })} />}
+        {sub === 'examples' && <ExamplesPanel key={tab.id} collectionId={tab.collectionId} requestId={tab.requestId} examples={tab.examples ?? []} onChange={setExamples} />}
         {sub === 'tests' && <AssertionEditor checks={tab.assertions} onChange={(assertions) => update({ assertions })} groups={['Response', 'Body']} />}
         {sub === 'settings' && (
           <div className="p-4 grid grid-cols-2 gap-4 max-w-2xl text-sm">
