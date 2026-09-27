@@ -1,10 +1,10 @@
 import { History, RotateCcw, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import { useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { HttpRequestSpec } from '../types';
-import { formatBytes, formatMs, timeAgo } from '../lib/format';
+import { formatBytes, formatMs, groupByDay } from '../lib/format';
 import { JsonTree } from '../components/JsonView';
 import { Badge, Button, cx, Empty, Input, Select, Split, statusTone, VirtualList } from '../components/ui';
 
@@ -48,6 +48,7 @@ export function HistoryView() {
   useIntent('history', async (p) => {
     if (p?.historyId) setSel(await call('history.get', { id: p.historyId }));
   });
+  const rows = useMemo(() => groupByDay(items, (e) => e.timestamp), [items]);
   const reopen = (e: Entry) => {
     if (e.kind === 'http') useApp.getState().openIntent('rest', { request: e.request as HttpRequestSpec, name: e.name });
     else if (e.kind === 'llm') useApp.getState().openIntent('ai', {});
@@ -77,15 +78,23 @@ export function HistoryView() {
             Clear
           </Button>
         </div>
-        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} entries</div>
+        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} entries · grouped by day · double-click to open</div>
         {items.length ? (
           <VirtualList
             className="flex-1"
-            items={items}
+            items={rows}
             rowHeight={44}
             onEndReached={items.length < total ? () => void load(false) : undefined}
-            render={(e) => (
-              <button onClick={() => setSel(e)} className={cx('w-full h-full text-left px-3 border-b border-line/60 flex flex-col justify-center', sel?.id === e.id ? 'bg-accent/10' : 'hover:bg-hover')}>
+            render={(row) => {
+              if ('header' in row)
+                return (
+                  <div className="h-full flex items-end px-3 pb-1.5 border-b border-line bg-panel/60 text-xs font-semibold text-muted uppercase tracking-wide" role="heading" aria-level={3}>
+                    {row.header}
+                  </div>
+                );
+              const e = row.item;
+              return (
+              <button onDoubleClick={() => reopen(e)} onClick={() => setSel(e)} className={cx('w-full h-full text-left px-3 border-b border-line/60 flex flex-col justify-center', sel?.id === e.id ? 'bg-accent/10' : 'hover:bg-hover')}>
                 <div className="flex items-center gap-2 text-sm">
                   {e.method && <span className={cx('mono text-[0.7rem] font-bold w-12', `method-${e.method}`)}>{e.method}</span>}
                   {!e.method && <Badge>{e.kind}</Badge>}
@@ -97,12 +106,13 @@ export function HistoryView() {
                   )}
                 </div>
                 <div className="text-xs text-muted flex gap-2">
-                  <span>{timeAgo(e.timestamp)}</span>
+                  <span>{new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   {e.durationMs !== undefined && <span>{formatMs(e.durationMs)}</span>}
                   {e.size !== undefined && <span>{formatBytes(e.size)}</span>}
                 </div>
               </button>
-            )}
+              );
+            }}
           />
         ) : (
           <Empty icon={<History size={24} />} title="No history yet" />

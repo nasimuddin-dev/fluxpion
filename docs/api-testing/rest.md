@@ -15,6 +15,18 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Body types:** JSON, XML, text, HTML, form URL-encoded, multipart (text and file fields), and binary file. Files are streamed from disk.
 - **Settings:** timeout, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS).
 
+## Tabs and history
+
+Each request opens in a tab. A dot on a tab means it has unsaved changes. Right-click a tab (or middle-click to close it) for:
+
+- **Pin tab:** pinned tabs move to the front, show a pin, have no close button, and are kept by the bulk close actions. Unpin from the same menu.
+- **Duplicate tab:** an unsaved copy of the request, opened next to it.
+- **Close tab**, **Close other tabs**, **Close tabs to the right**, **Close all tabs:** you are asked once if any of the closed tabs has unsaved changes.
+
+Open tabs, including pins, are restored when the app starts.
+
+**History** lists every request you sent, newest first, grouped by day (*Today*, *Yesterday*, weekday, then date). Search by name, URL, method or status, filter by kind, and double-click an entry (or click **Open**) to open it in a new tab. History stores redacted request metadata only.
+
 ## Responses
 
 The status, duration, size, headers, cookies and a timeline (prepare → TTFB → download) are always shown. **Save as example** keeps the response with the request (see [Examples](/api-testing/collections#examples)). For the body:

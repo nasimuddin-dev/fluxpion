@@ -1,4 +1,4 @@
-import { BookmarkPlus, Code2, Cookie, FolderPlus, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, Pin, PinOff, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -21,7 +21,7 @@ import { COMMON_HEADERS, KeyValueEditor } from '../components/KeyValueEditor';
 import { ResponseViewer } from '../components/ResponseViewer';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
-import { Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, Toggle } from '../components/ui';
+import { Button, cx, Empty, Field, IconButton, Input, Menu, Modal, SectionTitle, Select, Split, Tabs, Toggle, type MenuItem } from '../components/ui';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
@@ -39,6 +39,8 @@ interface RestTab {
   /** Saved responses; persisted straight to the collection, so changing them does not make the tab dirty. */
   examples?: SavedExample[];
   dirty?: boolean;
+  /** Pinned tabs stay first and are not closed by "close others / all". */
+  pinned?: boolean;
 }
 
 interface SendResult {
@@ -217,13 +219,45 @@ export function RestView() {
     return () => window.removeEventListener('keydown', k);
   });
 
-  const closeTab = (id: string) => {
-    const t = tabs.find((x) => x.id === id);
-    if (t?.dirty && !confirm(`Discard unsaved changes to "${t.name}"?`)) return;
-    const rest = tabs.filter((x) => x.id !== id);
+  // pinned tabs first, in their own order
+  const ordered = [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)];
+  /** Close several tabs, asking once when any has unsaved changes. */
+  const closeTabs = (ids: string[]) => {
+    const closing = tabs.filter((x) => ids.includes(x.id));
+    if (!closing.length) return;
+    const dirty = closing.filter((x) => x.dirty);
+    if (dirty.length && !confirm(dirty.length === 1 ? `Discard unsaved changes to "${dirty[0]!.name}"?` : `Discard unsaved changes in ${dirty.length} tabs?`)) return;
+    const rest = tabs.filter((x) => !ids.includes(x.id));
     const next = rest.length ? rest : [blankRequest()];
     setTabs(next);
-    if (active === id) setActive(next[Math.max(0, tabs.findIndex((x) => x.id === id) - 1)]?.id ?? next[0]!.id);
+    if (ids.includes(active)) {
+      const i = ordered.findIndex((x) => x.id === active);
+      const after = ordered.slice(i + 1).find((x) => !ids.includes(x.id)) ?? [...ordered.slice(0, i)].reverse().find((x) => !ids.includes(x.id));
+      setActive(after?.id ?? next[0]!.id);
+    }
+  };
+  const closeTab = (id: string) => closeTabs([id]);
+  const duplicateTab = (t: RestTab) => {
+    const copy: RestTab = { ...structuredClone(t), id: uid('tab-'), name: `${t.name} copy`, collectionId: undefined, requestId: undefined, examples: undefined, pinned: false, dirty: true };
+    setTabs((ts) => {
+      const i = ts.findIndex((x) => x.id === t.id);
+      return [...ts.slice(0, i + 1), copy, ...ts.slice(i + 1)];
+    });
+    setActive(copy.id);
+  };
+  const tabMenu = (t: RestTab) => {
+    const i = ordered.findIndex((x) => x.id === t.id);
+    const others = ordered.filter((x) => x.id !== t.id && !x.pinned).map((x) => x.id);
+    const right = ordered.slice(i + 1).filter((x) => !x.pinned).map((x) => x.id);
+    const unpinned = ordered.filter((x) => !x.pinned).map((x) => x.id);
+    return [
+      { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, onSelect: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))) },
+      { label: 'Duplicate tab', icon: <Copy size={13} />, onSelect: () => duplicateTab(t) },
+      { label: 'Close tab', icon: <X size={13} />, separator: true, onSelect: () => closeTab(t.id), shortcut: 'Middle-click' },
+      { label: 'Close other tabs', disabled: !others.length, onSelect: () => closeTabs(others) },
+      { label: 'Close tabs to the right', disabled: !right.length, onSelect: () => closeTabs(right) },
+      { label: 'Close all tabs', disabled: !unpinned.length, onSelect: () => closeTabs(unpinned) },
+    ];
   };
 
   const result = results[tab.id];
@@ -310,22 +344,8 @@ export function RestView() {
       </div>
       <div className="h-full flex flex-col min-w-0">
         <div className="flex items-end h-9 border-b border-line bg-panel/40 overflow-x-auto shrink-0" role="tablist">
-          {tabs.map((t) => (
-            <div
-              key={t.id}
-              role="tab"
-              aria-selected={t.id === tab.id}
-              onClick={() => setActive(t.id)}
-              onAuxClick={(e) => e.button === 1 && closeTab(t.id)}
-              className={cx('group flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer max-w-56 shrink-0', t.id === tab.id ? 'bg-bg' : 'text-muted hover:bg-hover')}
-            >
-              <span className={cx('mono text-[0.68rem] font-bold', `method-${t.request.method}`)}>{t.request.method}</span>
-              <span className="truncate">{t.name}</span>
-              {t.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
-              <button aria-label="Close tab" className="opacity-0 group-hover:opacity-100 hover:text-fg" onClick={(e) => (e.stopPropagation(), closeTab(t.id))}>
-                <X size={12} />
-              </button>
-            </div>
+          {ordered.map((t) => (
+            <RequestTabItem key={t.id} tab={t} active={t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} />
           ))}
           <IconButton
             label="New request tab"
@@ -737,6 +757,36 @@ function DocsEditor({ value, onChange }: { value: string; onChange(v: string): v
       <div className="overflow-auto border border-line rounded-md p-3">
         {value.trim() ? <Markdown source={value} /> : <p className="text-sm text-muted">The preview appears here. The collection’s Docs tab shows the documentation of every request.</p>}
       </div>
+    </div>
+  );
+}
+
+/** One tab of the request tab strip: right-click (or ⋯) for pin, duplicate and close actions. */
+function RequestTabItem({ tab: t, active, menu, onSelect, onClose }: { tab: RestTab; active: boolean; menu: MenuItem[]; onSelect(): void; onClose(): void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div
+      role="tab"
+      aria-selected={active}
+      title={t.dirty ? `${t.name} (unsaved changes)` : t.name}
+      onClick={onSelect}
+      onAuxClick={(e) => e.button === 1 && !t.pinned && onClose()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuOpen(true);
+      }}
+      className={cx('group relative flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer max-w-56 shrink-0', active ? 'bg-bg' : 'text-muted hover:bg-hover', t.pinned && 'pr-2')}
+    >
+      {t.pinned && <Pin size={11} className="shrink-0 text-muted" aria-label="Pinned" />}
+      <span className={cx('mono text-[0.68rem] font-bold', `method-${t.request.method}`)}>{t.request.method}</span>
+      <span className={cx('truncate', t.pinned && 'max-w-24')}>{t.name}</span>
+      {t.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="Unsaved changes" />}
+      {!t.pinned && (
+        <button aria-label="Close tab" className="opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-fg" onClick={(e) => (e.stopPropagation(), onClose())}>
+          <X size={12} />
+        </button>
+      )}
+      <Menu open={menuOpen} onOpenChange={setMenuOpen} align="start" width={210} items={menu} trigger={<span aria-hidden className="absolute left-2 bottom-0 w-0 h-0" />} />
     </div>
   );
 }

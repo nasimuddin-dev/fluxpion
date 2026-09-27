@@ -29,6 +29,30 @@ export function timeAgo(iso: string | number): string {
   return new Date(t).toLocaleDateString();
 }
 
+/** Postman-style day heading for history: "Today", "Yesterday", a weekday within the last week, else the date. */
+export function dayLabel(iso: string | number, now: Date = new Date()): string {
+  const d = new Date(typeof iso === 'number' ? iso : Date.parse(iso));
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+  return d.toLocaleDateString(undefined, { year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric', month: 'long', day: 'numeric' });
+}
+
+/** Interleave day headings with items (sorted newest first), for grouped lists. */
+export function groupByDay<T>(items: T[], time: (item: T) => string | number, now: Date = new Date()): Array<{ header: string } | { item: T }> {
+  const out: Array<{ header: string } | { item: T }> = [];
+  let last: string | undefined;
+  for (const item of items) {
+    const label = dayLabel(time(item), now);
+    if (label !== last) out.push({ header: label });
+    last = label;
+    out.push({ item });
+  }
+  return out;
+}
+
 export function uid(prefix = ''): string {
   return prefix + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }

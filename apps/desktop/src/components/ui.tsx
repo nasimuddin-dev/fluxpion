@@ -222,10 +222,27 @@ export interface MenuItem {
   separator?: boolean;
 }
 
-/** Dropdown menu (keyboard navigable, animated). `trigger` must be a single focusable element. */
-export function Menu({ trigger, items, align = 'end', width = 200 }: { trigger: ReactNode; items: MenuItem[]; align?: 'start' | 'center' | 'end'; width?: number }) {
+/**
+ * Dropdown menu (keyboard navigable, animated). `trigger` must be a single focusable element.
+ * Pass `open` / `onOpenChange` to control it, e.g. to open it from a right-click.
+ */
+export function Menu({
+  trigger,
+  items,
+  align = 'end',
+  width = 200,
+  open,
+  onOpenChange,
+}: {
+  trigger: ReactNode;
+  items: MenuItem[];
+  align?: 'start' | 'center' | 'end';
+  width?: number;
+  open?: boolean;
+  onOpenChange?(open: boolean): void;
+}) {
   return (
-    <MenuPrimitive.Root modal={false}>
+    <MenuPrimitive.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <MenuPrimitive.Trigger asChild>{trigger}</MenuPrimitive.Trigger>
       <MenuPrimitive.Portal>
         <MenuPrimitive.Content
