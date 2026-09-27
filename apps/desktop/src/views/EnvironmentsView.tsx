@@ -1,10 +1,10 @@
-import { Copy, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
+import { Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Environment, KeyValue } from '../types';
-import { uid } from '../lib/format';
+import { download, uid } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, Field, Input, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
 
@@ -126,6 +126,21 @@ export function EnvironmentsView() {
                       }}
                     >
                       Duplicate
+                    </Button>
+                    <Button
+                      icon={<Download size={13} />}
+                      title="Export in Postman's environment format (secret values are left out)"
+                      onClick={async () => {
+                        try {
+                          const r = await call<{ path?: string; environment?: unknown; name: string }>('env.export', { id: draft.id });
+                          if (r.environment) download(r.name, JSON.stringify(r.environment, null, 2));
+                          else if (r.path) useApp.getState().toast(`Exported to ${r.path}`, 'success');
+                        } catch (e) {
+                          useApp.getState().toast(asError(e).message, 'error');
+                        }
+                      }}
+                    >
+                      Export
                     </Button>
                     <Button
                       variant="ghost"

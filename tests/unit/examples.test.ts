@@ -89,6 +89,8 @@ describe('request examples in collections', () => {
       ['Found', 200],
       ['Missing', 404],
     ]);
-    expect(r.examples?.[0]).toMatchObject({ statusText: 'OK', body: '{"id":1}', headers: [{ key: 'Content-Type', value: 'application/json' }], request: { method: 'GET', url: '{{baseUrl}}/pets/1' } });
+    expect(r.examples?.[0]).toMatchObject({ statusText: 'OK', body: '{"id":1}', headers: [{ key: 'Content-Type', value: 'application/json' }] });
+    // an original request identical to the saved request is not repeated on the example
+    expect(r.examples?.[0]?.request).toBeUndefined();
   });
 });

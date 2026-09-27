@@ -24,6 +24,8 @@ newman run api.postman_collection.json -e staging.postman_environment.json -d da
 protolens run-collection api.postman_collection.json -e staging.postman_environment.json -d data.csv -n 2 --folder Smoke -r console junit -o results
 ```
 
+The other direction works too. If part of a team or pipeline stays on Newman, `protolens export "My API" -o api.postman_collection.json` and `protolens export-environment Staging -o staging.postman_environment.json` produce files Newman runs.
+
 **Exit codes:** `0` success · `1` test failure · `2` configuration error · `3` execution error (e.g. cancelled).
 
 **Secrets:** supply them through the CI secret store as environment variables:

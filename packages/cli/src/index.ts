@@ -21,6 +21,8 @@ import {
   cookiesFromJson,
   startMockServer,
   collectionMarkdown,
+  exportPostmanCollection,
+  exportPostmanEnvironment,
   type MockServer,
   loadSuite,
   normalizeError,
@@ -573,6 +575,46 @@ export function buildProgram(): Command {
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
     .action(async (ref: string, o: CollectionCliOptions) => {
       process.exitCode = await executeCollectionRun(ref, o);
+    });
+
+  program
+    .command('export')
+    .description('export a collection as a Postman v2.1 collection (default) or Protolens JSON\n<collection> is a collection name or id in the workspace, or a collection file to convert')
+    .argument('<collection>', 'collection name, id or file')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'protolens']).default('postman'))
+    .option('-o, --out <file>', 'write to this file instead of stdout')
+    .action((ref: string, o: { workspace?: string; format: 'postman' | 'protolens'; out?: string }) => {
+      const c = loadCollectionRef(ref, o.workspace);
+      const { collection, notes } = o.format === 'postman' ? exportPostmanCollection(c) : { collection: c, notes: [] as string[] };
+      const json = JSON.stringify(collection, null, 2) + '\n';
+      for (const n of notes) console.error(yellow(`not exported: ${n}`));
+      if (o.out) {
+        writeFileSync(resolve(o.out), json);
+        console.error(dim(`Collection written to ${resolve(o.out)}`));
+      } else process.stdout.write(json);
+    });
+
+  program
+    .command('export-environment')
+    .description("export a workspace environment in Postman's environment format (secret values are never included)")
+    .argument('<environment>', 'environment name or id')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-o, --out <file>', 'write to this file instead of stdout')
+    .action((ref: string, o: { workspace?: string; out?: string }) => {
+      const { store, ephemeral } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const env = store.getEnvironment(ref);
+        if (!env) throw new CliError(`Environment "${ref}" not found. Available: ${store.listEnvironments().map((e) => e.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+        const json = JSON.stringify(exportPostmanEnvironment(env), null, 2) + '\n';
+        if (o.out) {
+          writeFileSync(resolve(o.out), json);
+          console.error(dim(`Environment written to ${resolve(o.out)}`));
+        } else process.stdout.write(json);
+      } finally {
+        store.close();
+        if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
+      }
     });
 
   program

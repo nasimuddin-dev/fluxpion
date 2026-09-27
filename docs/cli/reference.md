@@ -13,6 +13,8 @@ protolens run --suite <name>   Run tests/<name>.suite.yaml from a workspace
 protolens run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
 protolens mock <collection>    Serve a collection's saved examples on localhost
 protolens docs <collection>    Write Markdown documentation for a collection
+protolens export <collection>  Export a collection as Postman v2.1 (or Protolens JSON)
+protolens export-environment <name>   Export an environment in Postman's format
 protolens load <url>           Safeguarded load test
 protolens import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
 protolens workspace list|create|export
@@ -96,5 +98,23 @@ protolens docs api.postman_collection.json > API.md
 | `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
 | `-o, --out <file>` | Write to a file instead of standard output. |
 | `--no-examples` | Leave out saved examples. |
+
+## `export` and `export-environment`
+
+Convert a collection to a Postman v2.1 collection, or write an environment in Postman's environment format. See [Export](/api-testing/collections#export) for what the Postman format can hold.
+
+```bash
+protolens export "Veterinary API" -o vet.postman_collection.json
+protolens export my.collection.json -f postman > out.json    # convert a file
+protolens export-environment Staging -o staging.postman_environment.json
+```
+
+| Option | Description |
+|---|---|
+| `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
+| `-f, --format` | `postman` (default) or `protolens` (`export` only). |
+| `-o, --out <file>` | Write to a file instead of standard output. |
+
+Parts that Postman can't represent are listed on standard error as `not exported: …`. Secret environment values are never written.
 
 :::

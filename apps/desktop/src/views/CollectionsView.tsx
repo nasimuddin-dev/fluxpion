@@ -1,6 +1,6 @@
 import { Download, FilePlus2, FolderPlus, FolderTree, Play, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { call } from '../api';
+import { asError, call } from '../api';
 import { promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Collection, CollectionNode } from '../types';
@@ -12,7 +12,7 @@ import { MockPanel } from '../components/MockPanel';
 import { CollectionDocs } from '../components/CollectionDocs';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
-import { Badge, Button, cx, Empty, Input, SectionTitle, Split, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
 import { ImportModal } from './RestView';
 
 export function CollectionsView() {
@@ -43,6 +43,17 @@ export function CollectionsView() {
     await call('col.save', c);
     await load();
     useApp.getState().toast('Collection saved', 'success');
+  };
+  const exportAs = async (id: string, format: 'protolens' | 'postman') => {
+    try {
+      const r = await call<{ path?: string; collection?: unknown; name: string; notes: string[] }>('col.export', { id, format });
+      if (r.collection) download(r.name, JSON.stringify(r.collection, null, 2));
+      else if (!r.path) return;
+      const extra = r.notes.length ? ` Not exported (no Postman equivalent): ${r.notes.join('; ')}.` : '';
+      useApp.getState().toast(`${r.path ? `Exported to ${r.path}.` : 'Exported.'}${extra}`, r.notes.length ? 'info' : 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
   };
   const open = (c: Collection, n: CollectionNode) => useApp.getState().openIntent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id });
   const count = (nodes: CollectionNode[]): number => nodes.reduce((a, n) => a + (n.kind === 'folder' ? count(n.items) : 1), 0);
@@ -108,9 +119,18 @@ export function CollectionsView() {
                 >
                   Run
                 </Button>
-                <Button size="sm" icon={<Download size={12} />} onClick={() => call('col.export', { id: draft.id }).then((r) => (r.collection ? download(`${draft.name}.collection.json`, JSON.stringify(r.collection, null, 2)) : useApp.getState().toast(`Exported to ${r.path}`, 'success')))}>
-                  Export
-                </Button>
+                <Menu
+                  trigger={
+                    <Button size="sm" icon={<Download size={12} />}>
+                      Export
+                    </Button>
+                  }
+                  width={230}
+                  items={[
+                    { label: 'Protolens collection (.json)', onSelect: () => void exportAs(draft.id, 'protolens') },
+                    { label: 'Postman collection v2.1', onSelect: () => void exportAs(draft.id, 'postman') },
+                  ]}
+                />
                 <Button size="sm" variant="primary" onClick={() => save(draft)}>
                   Save
                 </Button>

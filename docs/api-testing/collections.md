@@ -20,7 +20,31 @@ Each collection is a versioned JSON file under `collections/` in the workspace, 
 - HAR files.
 - Protolens collections and workspace exports.
 
+A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
+
 The CLI can import too: `protolens import openapi.yaml -w my-workspace`.
+
+## Export
+
+**Export** in a collection's toolbar offers two formats:
+
+- **Protolens collection (.json)**: the collection file as it is stored in the workspace.
+- **Postman collection v2.1**: for Postman, Newman or any tool that reads Postman collections. It includes folders, requests, params and path variables, headers, bodies (raw, form, multipart, file, GraphQL), auth (bearer, basic, API key, OAuth 2.0), collection and request scripts, collection variables, descriptions, saved examples and the *follow redirects* / *TLS verification* settings.
+
+Postman has no place for some Protolens features. When they are left out, a message lists them:
+
+- Assertions: a `status` check becomes a `pm.test(...)` in the request's test script, and other assertion types are skipped.
+- JWT auth, folder variables and the per-request Cookies table (its cookies are sent as a `Cookie` header instead).
+
+Importing an exported file back into Protolens gives the same collection, and the round trip is tested. **Environments → Export** writes an environment in Postman's environment format. Secret variables are exported with an empty value and type `secret`, because their values stay in your OS credential store.
+
+From the CLI:
+
+```bash
+protolens export "Veterinary API" -o vet.postman_collection.json          # Postman v2.1 (default)
+protolens export "Veterinary API" -f protolens -o vet.collection.json
+protolens export-environment Staging -o staging.postman_environment.json
+```
 
 ## Examples
 

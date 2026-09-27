@@ -51,6 +51,8 @@ import {
   startMockServer,
   collectMockRoutes,
   collectionMarkdown,
+  exportPostmanCollection,
+  exportPostmanEnvironment,
   type MockRoute,
   type MockServer,
   withRequestExamples,
@@ -468,11 +470,24 @@ export class Backend {
         const columns = [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))];
         return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
       },
-      'col.export': async ({ id }: { id: string }) => {
+      /** Export a collection as Protolens JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
+      'col.export': async ({ id, format = 'protolens' }: { id: string; format?: 'protolens' | 'postman' }) => {
         const c = this.ws.getCollection(id);
-        const dest = await this.host.saveDialog?.({ defaultPath: `${c.name}.collection.json` });
-        if (dest) writeFileSync(dest, JSON.stringify(c, null, 2));
-        return { path: dest, collection: dest ? undefined : c };
+        const { collection, notes } = format === 'postman' ? exportPostmanCollection(c) : { collection: c as unknown as Record<string, unknown>, notes: [] as string[] };
+        const name = format === 'postman' ? `${c.name}.postman_collection.json` : `${c.name}.collection.json`;
+        const dest = await this.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Collection', extensions: ['json'] }] });
+        if (dest) writeFileSync(dest, JSON.stringify(collection, null, 2));
+        return { path: dest, collection: dest ? undefined : collection, name, notes };
+      },
+      /** Export an environment in Postman's format (secret values are never included). */
+      'env.export': async ({ id }: { id: string }) => {
+        const env = this.ws.getEnvironment(id);
+        if (!env) throw new ApsError('ConfigurationError', `Environment "${id}" not found`);
+        const out = exportPostmanEnvironment(env);
+        const name = `${env.name}.postman_environment.json`;
+        const dest = await this.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Environment', extensions: ['json'] }] });
+        if (dest) writeFileSync(dest, JSON.stringify(out, null, 2));
+        return { path: dest, environment: dest ? undefined : out, name };
       },
 
       /* ---------------------------------------------------------------- HTTP */

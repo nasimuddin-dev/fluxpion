@@ -189,6 +189,22 @@ describe('example workspace (end-to-end)', () => {
     expect(JSON.parse(readFileSync(join(dir, 'ck4', 'summary.json'), 'utf8'))).toMatchObject({ total: 3, passed: 3 });
   });
 
+  it('CLI: `protolens export` / `export-environment` write Postman files that run-collection runs', async () => {
+    const cli = resolve('packages/cli/bin/protolens.js');
+    const env = { ...process.env, PROTOLENS_HOME: join(dir, 'home') };
+    const col = join(dir, 'vet.postman_collection.json');
+    const envFile = join(dir, 'dev.postman_environment.json');
+    const a = await run([cli, 'export', 'Veterinary API', '-w', ws.root, '-o', col], env);
+    expect(a.status).toBe(0);
+    expect(JSON.parse(readFileSync(col, 'utf8')).info.schema).toContain('v2.1.0');
+    const b = await run([cli, 'export-environment', 'Development', '-w', ws.root, '-o', envFile], env);
+    expect(b.status).toBe(0);
+    const r = await run([cli, 'run-collection', col, '-e', envFile, '--folder', 'Authentication', 'Patients', 'Cookie session', '-o', join(dir, 'pm-rt'), '-r', 'json', '-q'], env);
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(dir, 'pm-rt', 'summary.json'), 'utf8'))).toMatchObject({ total: 7, passed: 7 });
+  });
+
   it('CLI: `protolens docs` writes Markdown documentation with examples and no secrets', async () => {
     const cli = resolve('packages/cli/bin/protolens.js');
     const r = await run([cli, 'docs', 'Veterinary API', '-w', ws.root], { ...process.env, PROTOLENS_HOME: join(dir, 'home') });

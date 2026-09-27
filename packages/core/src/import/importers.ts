@@ -158,9 +158,33 @@ function pmAuth(a: any): AuthConfig | undefined {
       return { type: 'basic', username: get(a.basic, 'username'), password: get(a.basic, 'password') };
     case 'apikey':
       return { type: 'apiKey', key: get(a.apikey, 'key'), value: get(a.apikey, 'value'), in: get(a.apikey, 'in') === 'query' ? 'query' : 'header' };
+    case 'oauth2': {
+      const g = get(a.oauth2, 'grant_type');
+      const opt = (k: string) => get(a.oauth2, k) || undefined;
+      return {
+        type: 'oauth2',
+        grantType: g === 'client_credentials' ? 'client_credentials' : g === 'password_credentials' ? 'password' : 'authorization_code',
+        tokenUrl: get(a.oauth2, 'accessTokenUrl'),
+        authUrl: opt('authUrl'),
+        clientId: get(a.oauth2, 'clientId'),
+        clientSecret: opt('clientSecret'),
+        scope: opt('scope'),
+        username: opt('username'),
+        password: opt('password'),
+        usePkce: g === 'authorization_code_with_pkce' || undefined,
+      };
+    }
     default:
       return undefined;
   }
+}
+
+type PmEvent = { listen: string; script?: { exec?: string[] | string } };
+/** Script of a Postman `event` list (`prerequest` or `test`). */
+function pmScript(events: PmEvent[] | undefined, listen: string): string | undefined {
+  const e = (events ?? []).find((x) => x.listen === listen)?.script?.exec;
+  const s = Array.isArray(e) ? e.join('\n') : e;
+  return s?.trim() ? s : undefined;
 }
 
 /** Postman descriptions are a string or `{ content, type }`. */
@@ -170,10 +194,13 @@ function pmDescription(d: any): string | undefined {
 }
 
 /** Postman saved responses (`item.response[]`) → examples. */
-function pmExamples(responses: any): SavedExample[] | undefined {
+function pmExamples(responses: any, parent?: { method?: string; url?: string }): SavedExample[] | undefined {
   if (!Array.isArray(responses) || !responses.length) return undefined;
   return responses.map((r: any) => {
-    const o = r.originalRequest;
+    const url0 = typeof r.originalRequest?.url === 'string' ? r.originalRequest.url : r.originalRequest?.url?.raw;
+    // an original request identical to the saved request adds nothing
+    const same = parent && url0 === parent.url && (r.originalRequest?.method ?? 'GET') === (parent.method ?? 'GET') && !r.originalRequest?.body;
+    const o = same ? undefined : r.originalRequest;
     const url = typeof o?.url === 'string' ? o.url : o?.url?.raw;
     return {
       id: shortId('ex-'),
@@ -192,22 +219,32 @@ export function importPostman(text: string): { collection: Collection } {
   const convert = (items: any[]): CollectionNode[] =>
     (items ?? []).map((it: any): CollectionNode => {
       if (Array.isArray(it.item)) return { kind: 'folder', id: shortId('fld-'), name: it.name, items: convert(it.item), auth: pmAuth(it.auth) };
-      const r = it.request ?? {};
+      const r = typeof it.request === 'string' ? { url: it.request } : it.request ?? {};
       const url = typeof r.url === 'string' ? r.url : r.url?.raw ?? '';
       const [base, qs] = url.split('?');
-      const params: KeyValue[] = (r.url?.query ?? []).map((q: any) => ({ key: q.key, value: q.value ?? '', enabled: !q.disabled }));
+      const params: KeyValue[] = (r.url?.query ?? []).map((q: any) => ({ key: q.key, value: q.value ?? '', enabled: !q.disabled, ...(q.description ? { description: pmDescription(q.description) } : {}) }));
+      const pathVariables: KeyValue[] = (r.url?.variable ?? []).filter((v: any) => v.key).map((v: any) => ({ key: v.key, value: String(v.value ?? ''), ...(v.description ? { description: pmDescription(v.description) } : {}) }));
+      const headers: KeyValue[] = (r.header ?? []).map((h: any) => ({ key: h.key, value: h.value ?? '', enabled: !h.disabled, ...(h.description ? { description: pmDescription(h.description) } : {}) }));
+      const auth = pmAuth(r.auth) ?? { type: 'inherit' as const };
+      if (r.body?.mode === 'graphql') {
+        const g = r.body.graphql ?? {};
+        return {
+          kind: 'graphql',
+          id: shortId('gql-'),
+          name: it.name ?? url,
+          request: { endpoint: url, query: g.query ?? '', variables: typeof g.variables === 'string' && g.variables.trim() ? g.variables : undefined, headers, auth },
+        };
+      }
       let body: BodyConfig | undefined;
       if (r.body?.mode === 'raw') {
         const lang = r.body.options?.raw?.language;
-        body = { type: lang === 'json' || /^\s*[{[]/.test(r.body.raw ?? '') ? 'json' : lang === 'xml' ? 'xml' : 'text', content: r.body.raw ?? '' };
+        body = { type: lang === 'json' || (!lang && /^\s*[{[]/.test(r.body.raw ?? '')) ? 'json' : lang === 'xml' ? 'xml' : lang === 'html' ? 'html' : 'text', content: r.body.raw ?? '' };
       } else if (r.body?.mode === 'urlencoded') body = { type: 'form-urlencoded', fields: r.body.urlencoded.map((f: any) => ({ key: f.key, value: f.value ?? '', enabled: !f.disabled })) };
       else if (r.body?.mode === 'formdata')
         body = { type: 'multipart', fields: r.body.formdata.map((f: any) => ({ key: f.key, value: f.type === 'file' ? f.src ?? '' : f.value ?? '', kind: f.type === 'file' ? 'file' : 'text', enabled: !f.disabled })) };
-      const events = (it.event ?? []) as Array<{ listen: string; script?: { exec?: string[] | string } }>;
-      const script = (l: string) => {
-        const e = events.find((x) => x.listen === l)?.script?.exec;
-        return Array.isArray(e) ? e.join('\n') : e;
-      };
+      else if (r.body?.mode === 'file' && r.body.file?.src) body = { type: 'binary', filePath: r.body.file.src };
+      const behavior = it.protocolProfileBehavior ?? {};
+      const settings = { ...(behavior.followRedirects === false ? { followRedirects: false } : {}), ...(behavior.strictSSL === false ? { insecure: true } : {}) };
       return {
         kind: 'http',
         id: shortId('req-'),
@@ -216,20 +253,24 @@ export function importPostman(text: string): { collection: Collection } {
           method: r.method ?? 'GET',
           url: params.length ? base! : qs ? url : base!,
           params,
-          headers: (r.header ?? []).map((h: any) => ({ key: h.key, value: h.value ?? '', enabled: !h.disabled })),
+          ...(pathVariables.length ? { pathVariables } : {}),
+          headers,
           body,
-          auth: pmAuth(r.auth) ?? { type: 'inherit' },
+          auth,
+          ...(Object.keys(settings).length ? { settings } : {}),
         },
         description: pmDescription(r.description ?? it.description),
-        preRequestScript: script('prerequest'),
-        testScript: script('test'),
-        examples: pmExamples(it.response),
+        preRequestScript: pmScript(it.event, 'prerequest'),
+        testScript: pmScript(it.event, 'test'),
+        examples: pmExamples(it.response, { method: r.method, url }),
       };
     });
   const collection = newCollection(d.info?.name ?? 'Postman import', convert(d.item), {
-    description: typeof d.info?.description === 'string' ? d.info.description : undefined,
+    description: pmDescription(d.info?.description),
     variables: (d.variable ?? []).map((v: any) => ({ key: v.key, value: String(v.value ?? ''), enabled: !v.disabled })),
     auth: pmAuth(d.auth),
+    preRequestScript: pmScript(d.event, 'prerequest'),
+    testScript: pmScript(d.event, 'test'),
   });
   return { collection };
 }

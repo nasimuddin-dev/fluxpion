@@ -97,4 +97,4 @@ Every request, GraphQL operation, MCP call, LLM call, tool call and evaluation b
 
 ## Workspace and productivity
 
-Collections, environments with variable precedence, secret variables, searchable history, global search, a command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>), an AI assistant that explains errors and drafts tests (always labelled as AI-generated), and dark and light themes. Import from OpenAPI, Postman or HAR.
+Collections, environments with variable precedence, secret variables, searchable history, global search, a command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>), an AI assistant that explains errors and drafts tests (always labelled as AI-generated), and dark and light themes. Import from OpenAPI, Postman or HAR, and export collections and environments to Postman v2.1.
