@@ -130,14 +130,23 @@ function WorkspaceMenu() {
               ['Open folder…', () => act(() => call('ws.open', {}))],
               ['Export workspace…', () => act(() => call('ws.export'), 'Workspace exported (secrets excluded)')],
               [
-                'Import workspace…',
+                'Import…',
                 () => {
+                  // a workspace export opens as a new workspace; Postman / OpenAPI / HAR files are added to this one
                   const input = document.createElement('input');
                   input.type = 'file';
-                  input.accept = '.json';
+                  input.accept = '.json,.yaml,.yml,.har';
                   input.onchange = async () => {
                     const f = input.files?.[0];
-                    if (f) await act(async () => call('ws.import', { bundle: JSON.parse(await f.text()) }), 'Workspace imported');
+                    if (!f) return;
+                    let r: { kind: string; name?: string; format?: string; collection?: string; environment?: string; workspace?: string } | undefined;
+                    await act(async () => (r = await call('ws.importFile', { text: await f.text() })));
+                    if (r?.kind === 'workspace') toast(`Workspace "${r.name}" imported and opened`, 'success');
+                    else if (r) {
+                      const what = [r.collection && `collection "${r.collection}"`, r.environment && `environment "${r.environment}"`].filter(Boolean).join(' and ');
+                      toast(`Imported ${what || r.format} (${r.format}) into "${r.workspace}"`, 'success');
+                      useApp.getState().openIntent('collections', {});
+                    }
                   };
                   input.click();
                 },

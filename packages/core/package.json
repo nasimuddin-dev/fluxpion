@@ -1,6 +1,6 @@
 {
   "name": "@protolens/core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Protolens core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",

@@ -476,7 +476,7 @@ export class WorkspaceManager {
   }
 
   importBundle(bundle: WorkspaceBundle, name?: string): WorkspaceStore {
-    if (bundle?.format !== 'protolens-workspace') throw new ApsError('ValidationError', 'Not an Protolens workspace export');
+    if (bundle?.format !== 'protolens-workspace') throw new ApsError('ValidationError', 'Not a Protolens workspace export');
     const { ws } = migrateWorkspace({ ...(bundle.workspace as unknown as Record<string, unknown>), schemaVersion: bundle.schemaVersion });
     const store = this.create(name ?? `${(ws as unknown as Workspace).name} (imported)`);
     store.updateWorkspace({ variables: (ws as unknown as Workspace).variables, description: (ws as unknown as Workspace).description });

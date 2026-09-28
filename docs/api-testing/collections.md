@@ -26,6 +26,8 @@ To keep frequently used endpoints close at hand, choose **Add to favorites** fro
 
 A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
 
+**Import…** in the workspace menu (top bar) accepts the same files. A Protolens workspace export opens as a new workspace, and anything else (a Postman collection or environment, OpenAPI, HAR) is added to the open workspace.
+
 The CLI can import too: `protolens import openapi.yaml -w my-workspace`.
 
 ## Export

@@ -437,6 +437,27 @@ export class Backend {
         this.openStore(root);
         return this.handlers['ws.current']!({});
       },
+      /**
+       * "Import…" from the workspace menu: a Protolens workspace export becomes a new workspace; anything the
+       * collection importer understands (Postman, OpenAPI, HAR, Protolens collections) is added to the open one.
+       */
+      'ws.importFile': ({ text }: { text: string }) => {
+        let data: { format?: string } | undefined;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          /* YAML (OpenAPI) or not JSON: the collection importer decides */
+        }
+        if (data?.format === 'protolens-workspace') {
+          const s = this.manager.importBundle(data as unknown as WorkspaceBundle);
+          const root = s.root;
+          s.close();
+          this.openStore(root);
+          return { kind: 'workspace', name: this.ws.workspace.name };
+        }
+        const r = this.handlers['col.import']!({ text }) as { format: string; collection?: string; environment?: string };
+        return { kind: 'collection', ...r, workspace: this.ws.workspace.name };
+      },
       'ws.search': ({ query }: { query: string }) => this.search?.search(query, 60) ?? [],
 
       /* ---------------------------------------------------------------- environments & secrets */

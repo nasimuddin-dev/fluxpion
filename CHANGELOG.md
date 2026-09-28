@@ -4,6 +4,10 @@
 
 Nothing yet.
 
+## 0.3.1 — 2026-09-27
+
+- **Fix:** importing a Postman collection from the workspace menu failed with "Not an Protolens workspace export". The menu item is now **Import…**: a workspace export still opens as a new workspace, and Postman collections and environments, OpenAPI and HAR files are imported into the open workspace. The file picker also accepts `.yaml`, `.yml` and `.har`.
+
 ## 0.3.0 — 2026-09-27
 
 - **Favorite requests.** Choose **Add to favorites** in a REST or GraphQL request's ⋯ menu. The star next to **Filter requests** shows only favorites, with their folders kept for context. Favorites are saved in the collection.
