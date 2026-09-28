@@ -214,7 +214,7 @@ export function createProtolensMcpServer(opts: ProtolensMcpOptions): Server {
   const tools = all.filter((t) => !(opts.readOnly && t.write));
 
   const server = new Server(
-    { name: 'protolens', version: opts.version ?? '0.2.0' },
+    { name: 'protolens', version: opts.version ?? '0.3.0' },
     {
       capabilities: { tools: {} },
       instructions: `Protolens workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. Values of secrets are never returned.`,

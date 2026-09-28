@@ -2,10 +2,14 @@
 
 ## Unreleased
 
-- **Collection tree:** requests with saved examples get a chevron that lists the examples (status and name) under the request; clicking one opens the request.
+Nothing yet.
 
-- **Console:** `pm.sendRequest` calls made by runs (test runner, Collection Runner) are listed under their request, and recorded as `sentRequests` in the run results.
-- **Console:** GraphQL operations sent from the GraphQL view now appear in the Console, badged **GraphQL**, with the redacted query, variables, response and failures.
+## 0.3.0 — 2026-09-27
+
+- **Favorite requests.** Choose **Add to favorites** in a REST or GraphQL request's ⋯ menu. The star next to **Filter requests** shows only favorites, with their folders kept for context. Favorites are saved in the collection.
+- **Collection tree:** requests with saved examples get a chevron that lists the examples (status and name) under the request; clicking one opens the request.
+- **Console:** GraphQL operations sent from the GraphQL view appear in the Console, badged **GraphQL**, with the redacted query, variables, response and failures. `pm.sendRequest` calls made by runs (test runner, Collection Runner) are listed under their request and recorded as `sentRequests` in the run results.
+- **Faster start-up:** tool views load on demand instead of all at launch.
 - **Fix:** the last request tab could not be closed; closing it replaced it with a new "Untitled request". Closing every tab now leaves an empty editor with **New request** and **Describe with AI**, which is also kept after a restart.
 
 ## 0.2.0 — 2026-09-27
