@@ -1,10 +1,11 @@
-import { ChevronDown, ChevronRight, Copy, FilePlus2, Folder, FolderCog, FolderPlus, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, FilePlus2, Folder, FolderCog, FolderPlus, MoreHorizontal, Pencil, Play, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode } from '../types';
 import { cx, Menu, type MenuItem } from './ui';
 import { promptText } from '../store';
 import { uid } from '../lib/format';
 import { FolderEditor } from './FolderEditor';
+import { matchesCollectionNode } from '../lib/collection-filter';
 
 export function mapNodes(nodes: CollectionNode[], fn: (n: CollectionNode) => CollectionNode | null): CollectionNode[] {
   const out: CollectionNode[] = [];
@@ -41,6 +42,7 @@ export function CollectionTree({
   onNewRequest,
   onRun,
   filter,
+  favoritesOnly = false,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -50,6 +52,8 @@ export function CollectionTree({
   /** Open the Collection Runner for a collection or one of its folders. */
   onRun?(c: Collection, folderId?: string): void;
   filter?: string;
+  /** Show starred requests while retaining their containing folders for context. */
+  favoritesOnly?: boolean;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     try {
@@ -65,8 +69,7 @@ export function CollectionTree({
   };
   const [editing, setEditing] = useState<{ c: Collection; folder: CollectionFolder }>();
   const f = filter?.toLowerCase();
-  const matches = (n: CollectionNode): boolean =>
-    !f || n.name.toLowerCase().includes(f) || (n.kind === 'http' && n.request.url.toLowerCase().includes(f)) || (n.kind === 'folder' && n.items.some(matches));
+  const matches = (n: CollectionNode) => matchesCollectionNode(n, filter, favoritesOnly);
 
   const renderNodes = (c: Collection, nodes: CollectionNode[], depth: number): React.ReactNode =>
     nodes.filter(matches).map((n) => {
@@ -116,6 +119,8 @@ export function CollectionTree({
             }}
             onDelete={() => confirm(`Delete "${n.name}"?`) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
             onDuplicate={() => onChange({ ...c, items: mapNodes(c.items, (x) => x).flatMap((x) => (x.id === n.id ? [x, { ...x, id: uid('req-'), name: `${x.name} copy` }] : [x])) })}
+            onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}
+            favorite={!!n.favorite}
           />
         </div>
       );
@@ -158,6 +163,11 @@ export function CollectionTree({
           </div>
         );
       })}
+      {!collections.some((c) => c.items.some(matches)) && (
+        <p className="px-3 py-4 text-sm text-muted text-center">
+          {favoritesOnly ? 'No favorite requests yet. Use a request’s menu to add one.' : f ? 'No requests match this filter.' : 'No requests in these collections yet.'}
+        </p>
+      )}
     </div>
   );
 }
@@ -169,6 +179,8 @@ function NodeMenu({
   onNewRequest,
   onNewFolder,
   onDuplicate,
+  onToggleFavorite,
+  favorite,
   onRun,
   runLabel = 'Run',
 }: {
@@ -178,6 +190,8 @@ function NodeMenu({
   onNewRequest?(): void;
   onNewFolder?(): void;
   onDuplicate?(): void;
+  onToggleFavorite?(): void;
+  favorite?: boolean;
   onRun?(): void;
   runLabel?: string;
 }) {
@@ -189,6 +203,7 @@ function NodeMenu({
   add('New folder', <FolderPlus size={14} />, onNewFolder);
   add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });
   add('Duplicate', <Copy size={14} />, onDuplicate);
+  add(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite);
   add('Delete', <Trash2 size={14} />, onDelete, { danger: true, separator: true });
   return (
     <Menu

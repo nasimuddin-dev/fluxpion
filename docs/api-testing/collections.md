@@ -11,6 +11,10 @@ Collections hold folders and requests (REST and GraphQL), plus collection-level 
 
 Each collection is a versioned JSON file under `collections/` in the workspace, and its `version` increments on every save. Commit it to git for review and history.
 
+## Favorites
+
+To keep frequently used endpoints close at hand, choose **Add to favorites** from a REST or GraphQL request's **⋯** menu. In the REST view, select the star beside **Filter requests** to show only favorites. Their parent folders stay visible so the request's place in the collection remains clear. Favorites are stored with the request in the collection JSON and can be removed from the same menu.
+
 ## Import
 
 **Import** accepts:

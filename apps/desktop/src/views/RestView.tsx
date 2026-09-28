@@ -1,4 +1,4 @@
-import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Upload, X } from 'lucide-react';
+import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -77,6 +77,7 @@ export function RestView() {
   const [sending, setSending] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<Collection[]>([]);
   const [filter, setFilter] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(() => localStorage.getItem('aps.rest.favoritesOnly') === 'true');
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showCode, setShowCode] = useState(false);
@@ -399,6 +400,16 @@ export function RestView() {
           <>
             <div className="flex items-center gap-1 px-2 pb-2">
               <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter requests" value={filter} onChange={(e) => setFilter(e.target.value)} />
+              <IconButton
+                label={favoritesOnly ? 'Show all requests' : 'Show favorites only'}
+                active={favoritesOnly}
+                onClick={() => setFavoritesOnly((current) => {
+                  localStorage.setItem('aps.rest.favoritesOnly', String(!current));
+                  return !current;
+                })}
+              >
+                <Star size={14} fill={favoritesOnly ? 'currentColor' : 'none'} />
+              </IconButton>
               <IconButton label="Import OpenAPI / Postman / HAR" onClick={() => setImporting(true)}>
                 <Upload size={14} />
               </IconButton>
@@ -417,6 +428,7 @@ export function RestView() {
                 <CollectionTree
                   collections={collections}
                   filter={filter}
+                  favoritesOnly={favoritesOnly}
                   activeRequestId={tab.requestId}
                   onOpen={openRequest}
                   onChange={saveCollection}

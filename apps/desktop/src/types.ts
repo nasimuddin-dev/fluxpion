@@ -109,6 +109,8 @@ export interface SavedHttpRequest {
   kind: 'http';
   id: string;
   name: string;
+  /** Marks a frequently used request for the REST sidebar's Favorites view. */
+  favorite?: boolean;
   request: HttpRequestSpec;
   description?: string;
   preRequestScript?: string;
@@ -120,6 +122,8 @@ export interface SavedGraphQLRequest {
   kind: 'graphql';
   id: string;
   name: string;
+  /** Marks a frequently used request for the REST sidebar's Favorites view. */
+  favorite?: boolean;
   request: { endpoint: string; query: string; variables?: string; operationName?: string; headers?: KeyValue[]; auth?: AuthConfig };
   assertions?: CheckConfig[];
 }
