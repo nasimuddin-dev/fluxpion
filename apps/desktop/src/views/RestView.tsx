@@ -68,9 +68,11 @@ export function RestView() {
   const [tabs, setTabs] = useState<RestTab[]>(() => {
     const d = drafts.load();
     // drafts from before the URL/params sync kept the query only in the Params table
-    return d.tabs.length ? d.tabs.map((t) => (t.request.url.includes('?') ? t : { ...t, request: fromEngineRequest(t.request) })) : [blankRequest()];
+    if (d.tabs.length) return d.tabs.map((t) => (t.request.url.includes('?') ? t : { ...t, request: fromEngineRequest(t.request) }));
+    // first launch gets a blank request; if the user closed every tab (active saved as ''), keep it that way
+    return d.active === '' ? [] : [blankRequest()];
   });
-  const [active, setActive] = useState<string>(() => drafts.load().active ?? tabs[0]!.id);
+  const [active, setActive] = useState<string>(() => drafts.load().active ?? tabs[0]?.id ?? '');
   const [results, setResults] = useState<Record<string, SendResult>>({});
   const [sending, setSending] = useState<Record<string, string>>({});
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -95,7 +97,15 @@ export function RestView() {
     }
   };
   const env = useApp((s) => s.environment);
-  const tab = tabs.find((t) => t.id === active) ?? tabs[0]!;
+  // with every tab closed, a stable placeholder keeps the hooks below simple; the editor shows an empty state
+  const placeholder = useMemo(() => blankRequest(), []);
+  const noTabs = tabs.length === 0;
+  const tab = tabs.find((t) => t.id === active) ?? tabs[0] ?? placeholder;
+  const newTab = () => {
+    const t = blankRequest();
+    setTabs((ts) => [...ts, t]);
+    setActive(t.id);
+  };
   const streams = useRef<Record<string, string>>({});
 
   useEffect(() => drafts.save({ tabs, active }), [tabs, active]);
@@ -192,7 +202,7 @@ export function RestView() {
     }
   };
   const cancel = () => sending[tab.id] && call('http.cancel', { id: sending[tab.id] });
-  useSendShortcut('rest', () => (sending[tab.id] ? undefined : void send()));
+  useSendShortcut('rest', () => (noTabs || sending[tab.id] ? undefined : void send()));
 
   const saveCollection = async (c: Collection) => {
     await call('col.save', c);
@@ -223,7 +233,7 @@ export function RestView() {
     useApp.getState().toast('Saved', 'success');
   };
 
-  const quickSave = () => (tab.collectionId && tab.requestId ? saveTab(tab.collectionId, tab.name) : setSaving(true));
+  const quickSave = () => (noTabs ? undefined : tab.collectionId && tab.requestId ? saveTab(tab.collectionId, tab.name) : setSaving(true));
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'rest') {
@@ -243,13 +253,13 @@ export function RestView() {
     if (!closing.length) return;
     const dirty = closing.filter((x) => x.dirty);
     if (dirty.length && !confirm(dirty.length === 1 ? `Discard unsaved changes to "${dirty[0]!.name}"?` : `Discard unsaved changes in ${dirty.length} tabs?`)) return;
+    // closing the last tab leaves none (Postman-style), not a new blank request
     const rest = tabs.filter((x) => !ids.includes(x.id));
-    const next = rest.length ? rest : [blankRequest()];
-    setTabs(next);
+    setTabs(rest);
     if (ids.includes(active)) {
       const i = ordered.findIndex((x) => x.id === active);
       const after = ordered.slice(i + 1).find((x) => !ids.includes(x.id)) ?? [...ordered.slice(0, i)].reverse().find((x) => !ids.includes(x.id));
-      setActive(after?.id ?? next[0]!.id);
+      setActive(after?.id ?? rest[0]?.id ?? '');
     }
   };
   const closeTab = (id: string) => closeTabs([id]);
@@ -448,20 +458,31 @@ export function RestView() {
       <div className="h-full flex flex-col min-w-0">
         <div className="flex items-end h-9 border-b border-line bg-panel/40 overflow-x-auto shrink-0" role="tablist">
           {ordered.map((t) => (
-            <RequestTabItem key={t.id} tab={t} active={t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} />
+            <RequestTabItem key={t.id} tab={t} active={!noTabs && t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} />
           ))}
-          <IconButton
-            label="New request tab"
-            className="mx-1 mb-1"
-            onClick={() => {
-              const t = blankRequest();
-              setTabs((ts) => [...ts, t]);
-              setActive(t.id);
-            }}
-          >
+          <IconButton label="New request tab" className="mx-1 mb-1" onClick={newTab}>
             <Plus size={14} />
           </IconButton>
         </div>
+        {noTabs ? (
+          <Empty
+            icon={<Send size={28} />}
+            title="No open requests"
+            action={
+              <div className="flex gap-2">
+                <Button variant="primary" icon={<Plus size={13} />} onClick={newTab}>
+                  New request
+                </Button>
+                <Button icon={<Sparkles size={13} />} onClick={() => void describeRequest()}>
+                  Describe with AI
+                </Button>
+              </div>
+            }
+          >
+            Open a request from the sidebar, or start a new one.
+          </Empty>
+        ) : (
+        <>
         <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
           <Select aria-label="Method" className={cx('mono font-bold w-28', `method-${tab.request.method}`)} value={METHODS.includes(tab.request.method) ? tab.request.method : 'CUSTOM'} onChange={async (e) => {
             if (e.target.value !== 'CUSTOM') return setReq({ method: e.target.value });
@@ -529,6 +550,8 @@ export function RestView() {
             )}
           </div>
         </Split>
+        </>
+        )}
       </div>
     </Split>
       {saving && <SaveModal collections={collections} defaultName={tab.name} onClose={() => setSaving(false)} onSave={(cid, name, folder) => (setSaving(false), void saveTab(cid, name, folder))} onCreate={saveCollection} />}

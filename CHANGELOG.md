@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Nothing yet.
+- **Fix:** the last request tab could not be closed; closing it replaced it with a new "Untitled request". Closing every tab now leaves an empty editor with **New request** and **Describe with AI**, which is also kept after a restart.
 
 ## 0.2.0 — 2026-09-27
 

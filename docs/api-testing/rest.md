@@ -33,7 +33,7 @@ Each request opens in a tab. A dot on a tab means it has unsaved changes. Right-
 - **Duplicate tab:** an unsaved copy of the request, opened next to it.
 - **Close tab**, **Close other tabs**, **Close tabs to the right**, **Close all tabs:** you are asked once if any of the closed tabs has unsaved changes.
 
-Open tabs, including pins, are restored when the app starts.
+Open tabs, including pins, are restored when the app starts. You can close every tab: the editor then shows **New request** and **Describe with AI**, and stays empty after a restart until you open something.
 
 **History** lists every request you sent, newest first, grouped by day (*Today*, *Yesterday*, weekday, then date). Search by name, URL, method or status, filter by kind, and double-click an entry (or click **Open**) to open it in a new tab. History stores redacted request metadata only.
 
