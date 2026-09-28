@@ -214,7 +214,7 @@ export function createProtoPionMcpServer(opts: ProtoPionMcpOptions): Server {
   const tools = all.filter((t) => !(opts.readOnly && t.write));
 
   const server = new Server(
-    { name: 'protopion', version: opts.version ?? '0.3.1' },
+    { name: 'protopion', version: opts.version ?? '0.4.0' },
     {
       capabilities: { tools: {} },
       instructions: `ProtoPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. Values of secrets are never returned.`,

@@ -1,6 +1,6 @@
 {
   "name": "@protopion/core",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "ProtoPion core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",

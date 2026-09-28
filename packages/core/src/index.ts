@@ -58,4 +58,4 @@ export * from './import/postman-export.js';
 export * from './codegen/codegen.js';
 export * from './engine.js';
 
-export const ENGINE_VERSION = '0.3.1';
+export const ENGINE_VERSION = '0.4.0';

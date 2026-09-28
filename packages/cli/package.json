@@ -1,6 +1,6 @@
 {
   "name": "@protopion/cli",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "ProtoPion command-line runner for local and CI/CD test execution.",
   "license": "MIT",
   "type": "module",
@@ -17,7 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@protopion/core": "0.3.1",
+    "@protopion/core": "0.4.0",
     "commander": "^15.0.0"
   }
 }

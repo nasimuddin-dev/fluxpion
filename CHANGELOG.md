@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.4.0 — 2026-09-27
+
 - **Protolens is now ProtoPion.** New name for the app, the `protopion` CLI (`protolens` still works as an alias), the `@protopion/*` packages, the documentation site (https://nasimuddin-dev.github.io/protopion/) and the GitHub repository (nasimuddin-dev/protopion). Nothing to do when upgrading: the app updates in place and keeps its settings and saved secrets, the data folder `~/.protolens` moves to `~/.protopion`, `PROTOLENS_HOME` and `PROTOLENS_SECRET_*` variables still work, and workspace exports from Protolens still import. On macOS, secrets saved in the Keychain may need to be entered again.
 
 ## 0.3.1 — 2026-09-27
