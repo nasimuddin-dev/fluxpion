@@ -1,6 +1,6 @@
 {
   "name": "@fluxpion/cli",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "FluxPion command-line runner for local and CI/CD test execution.",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@fluxpion/core": "0.5.0",
+    "@fluxpion/core": "0.5.1",
     "commander": "^15.0.0"
   }
 }

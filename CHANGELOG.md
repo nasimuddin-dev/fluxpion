@@ -4,6 +4,10 @@
 
 Nothing yet.
 
+## 0.5.1 — 2026-09-27
+
+- **New FluxPion logo and icon.** The app icon (Windows, macOS and Linux, all sizes), the in-app logo, the website logo and favicons, the README banner and the link preview image now use the FluxPion brand: the gradient **F** with a sparkle, and the *Connect every protocol* wordmark. `npm run icons -w @fluxpion/desktop` regenerates every size from `build/logo.svg` and `build/wordmark.webp`.
+
 ## 0.5.0 — 2026-09-27
 
 - **ProtoPion is now FluxPion.** New name for the app, the `fluxpion` CLI (`protopion` and `protolens` still work as aliases), the `@fluxpion/*` packages, the documentation site (https://nasimuddin-dev.github.io/fluxpion/) and the GitHub repository (nasimuddin-dev/fluxpion). Nothing to do when upgrading: the app updates in place and keeps its settings and saved secrets, the data folder (`~/.protopion` or `~/.protolens`) moves to `~/.fluxpion`, `PROTOPION_*` / `PROTOLENS_*` variables still work, and workspace exports from ProtoPion and Protolens still import. On macOS, secrets saved in the Keychain may need to be entered again.

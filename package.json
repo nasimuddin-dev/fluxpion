@@ -1,7 +1,7 @@
 {
   "name": "fluxpion",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "FluxPion — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
   "license": "MIT",
   "type": "module",

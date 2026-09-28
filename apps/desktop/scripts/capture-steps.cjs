@@ -40,10 +40,19 @@ true;`;
 module.exports = async function run(win) {
   mkdirSync(OUT, { recursive: true });
   win.setContentSize(W, H);
+  // keep painting while the window is covered or the screen is locked, or capturePage returns stale frames
+  win.webContents.setBackgroundThrottling(false);
   const js = (code) => win.webContents.executeJavaScript(code, true);
   const shot = async (name) => {
     await sleep(700);
-    const img = await win.webContents.capturePage();
+    // force a full repaint: a window that isn't visible on screen (covered, locked screen) otherwise keeps
+    // stale regions; a one-pixel resize makes the compositor redraw everything
+    win.setContentSize(W, H + 1);
+    await sleep(150);
+    win.setContentSize(W, H);
+    win.webContents.invalidate();
+    await sleep(600);
+    const img = await win.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true });
     const out = img.resize({ width: W, quality: 'best' });
     writeFileSync(join(OUT, `${name}.jpg`), out.toJPEG(88));
     console.log(`[capture] ${name}.jpg ${JSON.stringify(out.getSize())}`);

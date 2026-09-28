@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/public/images/fluxpion-wordmark.png" alt="FluxPion — Connect every protocol" width="640"></p>
+
 # FluxPion
 
 **A local-first desktop app and CLI for testing, debugging and evaluating REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents.**
