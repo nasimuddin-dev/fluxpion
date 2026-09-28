@@ -106,8 +106,17 @@ export function CollectionTree({
         );
       }
       const method = n.kind === 'http' ? n.request.method : 'GQL';
+      const examples = n.kind === 'http' ? n.examples ?? [] : [];
+      const exKey = `${n.id}:examples`;
+      const examplesOpen = !!open[exKey];
       return (
-        <div key={n.id} className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover')} style={pad}>
+        <div key={n.id}>
+        <div className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover')} style={pad}>
+          {examples.length > 0 && (
+            <button className="shrink-0 -mr-3.5 w-3.5 text-muted hover:text-fg" aria-label={examplesOpen ? 'Hide examples' : `Show ${examples.length} examples`} aria-expanded={examplesOpen} onClick={() => toggle(exKey)}>
+              {examplesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          )}
           <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)}>
             <span className={cx('mono text-[0.7rem] font-bold w-9 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
@@ -122,6 +131,20 @@ export function CollectionTree({
             onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}
             favorite={!!n.favorite}
           />
+        </div>
+        {examplesOpen &&
+          examples.map((ex) => (
+            <button
+              key={ex.id}
+              className="w-full flex items-center gap-2 h-7 text-xs rounded-md mx-1 pr-2 hover:bg-hover text-left text-muted hover:text-fg"
+              style={{ paddingLeft: 8 + depth * 12 + 28 }}
+              title="Saved example: opens the request (see its Examples tab)"
+              onClick={() => onOpen(c, n)}
+            >
+              <span className={cx('mono font-bold w-9 shrink-0', ex.status < 300 ? 'text-ok' : ex.status < 400 ? 'text-warn' : 'text-bad')}>{ex.status}</span>
+              <span className="truncate">{ex.name}</span>
+            </button>
+          ))}
         </div>
       );
     });
