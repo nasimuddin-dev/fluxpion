@@ -136,6 +136,8 @@ export interface ConsoleEntry {
   id: string;
   time: string;
   source: 'request' | 'run';
+  /** Protocol; absent means HTTP. */
+  kind?: 'graphql';
   run?: string;
   name: string;
   method: string;
@@ -1003,11 +1005,30 @@ export class Backend {
       const trace = tracer.finish();
       this.ws.saveTrace(trace, 'graphql');
       this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'graphql', name: p.operationName ?? 'GraphQL query', method: 'POST', url: r.prepared.url, status: r.response.status, durationMs: r.response.durationMs, size: r.response.size, request: ctx.redactor.redact(p.request), traceId: trace.traceId });
+      const clip = (t: string) => (t.length > CONSOLE_BODY_CHARS ? `${t.slice(0, CONSOLE_BODY_CHARS)}… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);
+      this.consoleEntry({
+        id,
+        time: new Date().toISOString(),
+        source: 'request',
+        kind: 'graphql',
+        name: p.operationName ?? 'GraphQL query',
+        method: 'POST',
+        url: r.prepared.url,
+        status: r.response.status,
+        durationMs: r.response.durationMs,
+        size: r.response.size,
+        request: { headers: r.prepared.headers, body: clip(JSON.stringify(ctx.redactor.redact({ query: spec.query, variables: spec.variables, operationName: spec.operationName }), null, 2)) },
+        response: { headers: ctx.redactor.redact(r.response.headers), body: clip(r.response.json !== undefined ? JSON.stringify(ctx.redactor.redact(r.response.json), null, 2) : ctx.redactor.redactString(r.response.bodyPreview)) },
+        logs: [],
+        failedChecks: checks.filter((c) => !c.passed).length + (r.errors?.length ? 1 : 0),
+      });
       return { id, ...r, checks, traceId: trace.traceId };
     } catch (e) {
       span.fail(e);
       this.ws.saveTrace(tracer.finish('error'), 'graphql');
-      return { id, error: normalizeError(e) };
+      const err = normalizeError(e);
+      this.consoleEntry({ id, time: new Date().toISOString(), source: 'request', kind: 'graphql', name: p.operationName ?? 'GraphQL query', method: 'POST', url: ctx.redactor.redactUrl(ctx.vars.resolve(p.request.endpoint)), status: err.kind, logs: [], error: err.message });
+      return { id, error: err };
     } finally {
       this.controllers.delete(id);
     }

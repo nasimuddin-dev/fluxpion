@@ -8,6 +8,7 @@ export interface ConsoleEntry {
   id: string;
   time: string;
   source: 'request' | 'run';
+  kind?: 'graphql';
   run?: string;
   name: string;
   method: string;
@@ -112,6 +113,7 @@ export function ConsolePanel() {
                 <span className="mono truncate flex-1 text-fg" title={e.url}>
                   {e.url}
                 </span>
+                {e.kind === 'graphql' && <Badge tone="accent">GraphQL</Badge>}
                 {e.source === 'run' && <Badge title={e.run}>run</Badge>}
                 {e.status !== undefined && <Badge tone={typeof e.status === 'number' ? statusTone(e.status) : 'bad'}>{e.status}</Badge>}
                 {!!e.failedChecks && <Badge tone="bad">{e.failedChecks} failed</Badge>}

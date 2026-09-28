@@ -118,7 +118,7 @@ Context sent to the model is redacted first (sensitive headers, fields and secre
 
 The **Console** is Postman's console: a log of every request with its script output. Open it with **Console** in the status bar or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (<kbd>⌘</kbd>+<kbd>⌥</kbd>+<kbd>C</kbd> on macOS). It shares the bottom panel with the application **Logs**.
 
-- Each line shows the time, method, URL, status, duration and size. Requests from runs (the test runner and the Collection Runner) are marked **run**, and failed checks are counted.
+- Each line shows the time, method, URL, status, duration and size. GraphQL operations sent from the GraphQL view are marked **GraphQL** (their request shows the query and variables). Requests from runs (the test runner and the Collection Runner) are marked **run**, and failed checks, including GraphQL `errors`, are counted.
 - `console.log`, `console.info`, `console.warn` and `console.error` output from pre-request and test scripts appears under its request, marked `pre ›` or `test ›`.
 - Click a request sent from a tab to expand it and see the request and response headers and bodies (up to 16,000 characters each).
 - **All / Errors / With logs** and the filter box narrow the list. The trash button clears it. The console keeps the last 500 requests until the app closes and is never written to disk.
