@@ -17,7 +17,7 @@ window.__cap = {
   },
   click(text, tag) {
     const el = this.byText(text, tag);
-    if (!el) throw new Error('not found: ' + text);
+    if (!el) throw new Error('not found: ' + text + ' (page: ' + document.body.innerText.slice(0, 400).replace(/\\s+/g, ' ') + ')');
     el.click();
   },
   nav(label) {
@@ -58,7 +58,17 @@ module.exports = async function run(win) {
     location.reload(); true`);
   await sleep(3000);
   await js(HELPERS);
+  // a fresh profile opens on Home: go to REST explicitly
+  await js(`__cap.nav('REST'); true`);
+  await sleep(1200);
+  // keep the pointer off the navigation rail so no hover highlight ends up in the screenshots
+  win.webContents.sendInputEvent({ type: 'mouseMove', x: W - 5, y: H - 5 });
   await js(`__cap.click('Send'); true`);
+  // wait for the response panel (status badge + timing) rather than a fixed delay
+  for (let i = 0; i < 40; i++) {
+    if (await js(`!!document.querySelector('main') && /Time\\s+\\d/.test(document.querySelector('main').innerText)`)) break;
+    await sleep(250);
+  }
   await sleep(1500);
   await shot('rest');
 
