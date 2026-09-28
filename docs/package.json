@@ -3,7 +3,7 @@
   "version": "0.3.1",
   "private": true,
   "type": "module",
-  "description": "Protolens website and documentation (VitePress, deployed to GitHub Pages).",
+  "description": "ProtoPion website and documentation (VitePress, deployed to GitHub Pages).",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",

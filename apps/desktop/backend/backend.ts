@@ -1,7 +1,7 @@
 /**
  * Desktop backend: every capability of the UI is exposed as an RPC method here.
  * It runs in the Electron main process (via IPC) or, for browser-based development,
- * behind a local HTTP bridge. All protocol execution happens in @protolens/core — the same
+ * behind a local HTTP bridge. All protocol execution happens in @protopion/core — the same
  * engine the CLI uses — so the UI thread never performs network or test execution.
  */
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -109,7 +109,7 @@ import {
   type TestResult,
   type WorkspaceBundle,
   type ModelRef,
-} from '@protolens/core';
+} from '@protopion/core';
 
 export interface BackendHost {
   appDir: string;
@@ -438,8 +438,8 @@ export class Backend {
         return this.handlers['ws.current']!({});
       },
       /**
-       * "Import…" from the workspace menu: a Protolens workspace export becomes a new workspace; anything the
-       * collection importer understands (Postman, OpenAPI, HAR, Protolens collections) is added to the open one.
+       * "Import…" from the workspace menu: a ProtoPion workspace export becomes a new workspace; anything the
+       * collection importer understands (Postman, OpenAPI, HAR, ProtoPion collections) is added to the open one.
        */
       'ws.importFile': ({ text }: { text: string }) => {
         let data: { format?: string } | undefined;
@@ -448,7 +448,7 @@ export class Backend {
         } catch {
           /* YAML (OpenAPI) or not JSON: the collection importer decides */
         }
-        if (data?.format === 'protolens-workspace') {
+        if (data?.format === 'protopion-workspace' || data?.format === 'protolens-workspace') {
           const s = this.manager.importBundle(data as unknown as WorkspaceBundle);
           const root = s.root;
           s.close();
@@ -584,8 +584,8 @@ export class Backend {
         const columns = [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))];
         return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
       },
-      /** Export a collection as Protolens JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
-      'col.export': async ({ id, format = 'protolens' }: { id: string; format?: 'protolens' | 'postman' }) => {
+      /** Export a collection as ProtoPion JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
+      'col.export': async ({ id, format = 'protopion' }: { id: string; format?: 'protopion' | 'postman' }) => {
         const c = this.ws.getCollection(id);
         const { collection, notes } = format === 'postman' ? exportPostmanCollection(c) : { collection: c as unknown as Record<string, unknown>, notes: [] as string[] };
         const name = format === 'postman' ? `${c.name}.postman_collection.json` : `${c.name}.collection.json`;
@@ -664,7 +664,7 @@ export class Backend {
         try {
           const r = await s.callTool(tool, args);
           span.end({ status: r.isError ? 'error' : 'ok', output: r.raw });
-          const { mcpResultBody } = await import('@protolens/core');
+          const { mcpResultBody } = await import('@protopion/core');
           const { body, text } = mcpResultBody(r);
           const checks = await runChecks(assertions, { testType: 'mcp', body, text, isError: r.isError, latencyMs: r.durationMs });
           const trace = tracer.finish();
@@ -1151,8 +1151,8 @@ export class Backend {
       'explain-error':
         'Explain what went wrong in plain language, the most likely cause, and concrete troubleshooting steps. Be concise. Use short headings: What happened, Why, How to fix.',
       'generate-assertions':
-        'Propose assertions for this response as a YAML list using the Protolens check types (status, exists, equals, contains, regex, json-schema, type, length, latency, header). Output only YAML.',
-      'generate-test': 'Write an Protolens YAML test for the described scenario. Output only YAML.',
+        'Propose assertions for this response as a YAML list using the ProtoPion check types (status, exists, equals, contains, regex, json-schema, type, length, latency, header). Output only YAML.',
+      'generate-test': 'Write an ProtoPion YAML test for the described scenario. Output only YAML.',
       'generate-query': 'Write a GraphQL operation for the request using the given schema. Output only the GraphQL document.',
       'generate-args': 'Produce example JSON arguments that satisfy this JSON Schema. Output only JSON.',
       'generate-mock-data': 'Generate realistic mock data matching the description or schema. Output only JSON.',
@@ -1173,7 +1173,7 @@ export class Backend {
       temperature: 0.2,
       maxTokens: 1200,
       messages: [
-        { role: 'system', content: `You are the AI assistant inside Protolens, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free}` },
+        { role: 'system', content: `You are the AI assistant inside ProtoPion, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free}` },
         { role: 'user', content: `${p.question ? `Question: ${p.question}\n\n` : ''}Context:\n${context}` },
       ],
     });
@@ -1334,7 +1334,7 @@ export class Backend {
       maxVirtualUsers: this.settings.loadTesting.maxVirtualUsers,
     };
     // validate safeguards synchronously so the UI gets an immediate error
-    const { checkLoadSafeguards, buildUrl } = await import('@protolens/core');
+    const { checkLoadSafeguards, buildUrl } = await import('@protopion/core');
     checkLoadSafeguards(cfg, cfg.target.kind === 'http' ? buildUrl(cfg.target.request.url, cfg.target.request.params).toString() : undefined);
     void runLoadTest(cfg, { providers: ctx.services.providers, pricing: this.settings.pricing, redactor: ctx.redactor, signal: ctrl.signal, onSnapshot: (s) => this.host.emit('load.snapshot', { id, snapshot: s }) })
       .catch((e) => this.host.emit('load.error', { id, error: normalizeError(e) }))

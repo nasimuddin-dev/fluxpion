@@ -1,19 +1,27 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell, nativeTheme } from 'electron';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { Backend } from '../backend/backend.js';
 import { canInstallInPlace, createUpdater } from './updater.js';
-import { defaultAppDir } from '@protolens/core';
+import { defaultAppDir } from '@protopion/core';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 let win: BrowserWindow | null = null;
 let backend: Backend | null = null;
 
 // Documentation screenshot mode (scripts/capture.cjs): isolated profile, fixed size, dark theme.
-const capture = process.env.PROTOLENS_CAPTURE_SCRIPT;
+const capture = process.env.PROTOPION_CAPTURE_SCRIPT;
 if (capture) {
-  app.setPath('userData', join(process.env.PROTOLENS_HOME!, 'electron-profile'));
+  app.setPath('userData', join(process.env.PROTOPION_HOME!, 'electron-profile'));
   nativeTheme.themeSource = 'dark';
+}
+
+// Keep using the Electron profile of installs from before the ProtoPion rename ("Protolens"): it holds the
+// safeStorage key that decrypts saved secrets, plus UI state such as open tabs.
+if (!capture) {
+  const legacy = join(app.getPath('appData'), 'Protolens');
+  if (existsSync(legacy) && !existsSync(join(app.getPath('appData'), 'ProtoPion'))) app.setPath('userData', legacy);
 }
 
 // Single instance — a second launch focuses the existing window.
@@ -35,7 +43,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 960,
     minHeight: 600,
-    title: 'Protolens',
+    title: 'ProtoPion',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     show: false,
     webPreferences: {
@@ -88,9 +96,9 @@ app.whenReady().then(() => {
     start();
   } catch (e) {
     // never fail silently with no window: show what went wrong
-    dialog.showErrorBox('Protolens failed to start', `${(e as Error).message}
+    dialog.showErrorBox('ProtoPion failed to start', `${(e as Error).message}
 
-Data directory: ${process.env.PROTOLENS_HOME || defaultAppDir()}`);
+Data directory: ${process.env.PROTOPION_HOME || defaultAppDir()}`);
     app.quit();
   }
 });
@@ -98,7 +106,7 @@ Data directory: ${process.env.PROTOLENS_HOME || defaultAppDir()}`);
 function start(): void {
   const t0 = Date.now();
   backend = new Backend({
-    appDir: process.env.PROTOLENS_HOME || defaultAppDir(),
+    appDir: process.env.PROTOPION_HOME || defaultAppDir(),
     cipher: {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
       encrypt: (s) => safeStorage.encryptString(s),
@@ -147,9 +155,9 @@ function start(): void {
         submenu: [
           { label: 'Check for Updates…', click: () => emit('update.checkManual', {}) },
           { type: 'separator' },
-          { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/protolens/') },
-          { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/protolens/changelog') },
-          { label: 'Report an Issue', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/protolens/issues') },
+          { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/protopion/') },
+          { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/protopion/changelog') },
+          { label: 'Report an Issue', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/protopion/issues') },
         ],
       },
     ]),

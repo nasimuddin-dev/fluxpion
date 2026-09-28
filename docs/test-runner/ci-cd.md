@@ -1,6 +1,6 @@
 ---
 title: "CI/CD integration"
-description: "Run Protolens tests in GitHub Actions, GitLab CI, Azure DevOps and Jenkins."
+description: "Run ProtoPion tests in GitHub Actions, GitLab CI, Azure DevOps and Jenkins."
 ---
 
 ::: v-pre
@@ -8,9 +8,9 @@ description: "Run Protolens tests in GitHub Actions, GitLab CI, Azure DevOps and
 # CI/CD
 
 ```bash
-protolens test ./tests                      # nearest workspace.json is used
-protolens run --workspace veterinary-api --environment staging --suite regression
-protolens run-collection "Veterinary API" -e Staging          # a collection, like Newman
+protopion test ./tests                      # nearest workspace.json is used
+protopion run --workspace veterinary-api --environment staging --suite regression
+protopion run-collection "Veterinary API" -e Staging          # a collection, like Newman
 ```
 
 ### Coming from Newman
@@ -21,25 +21,25 @@ protolens run-collection "Veterinary API" -e Staging          # a collection, li
 # before
 newman run api.postman_collection.json -e staging.postman_environment.json -d data.csv -n 2 --folder Smoke --reporters cli,junit
 # after
-protolens run-collection api.postman_collection.json -e staging.postman_environment.json -d data.csv -n 2 --folder Smoke -r console junit -o results
+protopion run-collection api.postman_collection.json -e staging.postman_environment.json -d data.csv -n 2 --folder Smoke -r console junit -o results
 ```
 
-The other direction works too. If part of a team or pipeline stays on Newman, `protolens export "My API" -o api.postman_collection.json` and `protolens export-environment Staging -o staging.postman_environment.json` produce files Newman runs.
+The other direction works too. If part of a team or pipeline stays on Newman, `protopion export "My API" -o api.postman_collection.json` and `protopion export-environment Staging -o staging.postman_environment.json` produce files Newman runs.
 
 **Exit codes:** `0` success · `1` test failure · `2` configuration error · `3` execution error (e.g. cancelled).
 
 **Secrets:** supply them through the CI secret store as environment variables:
 
-- `PROTOLENS_SECRET_ENV_<ENV>_<KEY>` for environment secrets
-- `PROTOLENS_SECRET_PROVIDER_<ID>_APIKEY` for provider keys
+- `PROTOPION_SECRET_ENV_<ENV>_<KEY>` for environment secrets
+- `PROTOPION_SECRET_PROVIDER_<ID>_APIKEY` for provider keys
 - or reference `{{$env.NAME}}` directly
 
 ## GitHub Actions
 
 ```yaml
-- run: npx protolens test tests -e Staging -r console junit html -o test-results
+- run: npx protopion test tests -e Staging -r console junit html -o test-results
   env:
-    PROTOLENS_SECRET_PROVIDER_OPENAI_APIKEY: ${{ secrets.OPENAI_API_KEY }}
+    PROTOPION_SECRET_PROVIDER_OPENAI_APIKEY: ${{ secrets.OPENAI_API_KEY }}
 - uses: actions/upload-artifact@v4
   if: always()
   with: { name: test-results, path: test-results }
@@ -48,14 +48,14 @@ The other direction works too. If part of a team or pipeline stays on Newman, `p
 To run a collection instead of test files:
 
 ```yaml
-- run: npx protolens run-collection "Veterinary API" -e Staging -r console junit -o test-results
+- run: npx protopion run-collection "Veterinary API" -e Staging -r console junit -o test-results
 ```
 
 ## GitLab CI
 
 ```yaml
 api-tests:
-  script: npx protolens test tests -o results
+  script: npx protopion test tests -o results
   artifacts:
     when: always
     reports: { junit: results/junit.xml }

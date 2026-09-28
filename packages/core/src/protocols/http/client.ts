@@ -169,7 +169,7 @@ export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOp
   // the request's own cookies win over jar cookies with the same name
   const explicitCookie = headers.get('cookie') ?? undefined;
   if (opts.cookieJar) setJarCookies(headers, opts.cookieJar, url, explicitCookie);
-  if (!headers.has('user-agent')) headers.set('user-agent', 'Protolens/0.3');
+  if (!headers.has('user-agent')) headers.set('user-agent', 'ProtoPion/0.3');
   if (!headers.has('accept')) headers.set('accept', '*/*');
   await applyAuth(spec.auth, headers, url, opts);
   const { body, preview } = await buildBody(spec.body, headers);

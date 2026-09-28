@@ -14,11 +14,11 @@ import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 
 /**
- * `protolens mcp-server`: the Protolens engine as MCP tools, so AI agents (Claude, IDE assistants …)
+ * `protopion mcp-server`: the ProtoPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
  * can browse a workspace's collections, send requests and run collections. Output is redacted with the
  * workspace's redaction rules; secret values never leave the machine through this server.
  */
-export interface ProtolensMcpOptions {
+export interface ProtoPionMcpOptions {
   store: WorkspaceStore;
   secrets: SecretStore;
   settings: AppSettings;
@@ -41,7 +41,7 @@ interface Tool {
 
 const str = (description: string) => ({ type: 'string', description });
 
-export function createProtolensMcpServer(opts: ProtolensMcpOptions): Server {
+export function createProtoPionMcpServer(opts: ProtoPionMcpOptions): Server {
   const { store, secrets, settings } = opts;
   const redactor = new Redactor(settings.redactFields);
   const collections = () => store.listCollections().filter((c) => !c.problem);
@@ -81,7 +81,7 @@ export function createProtolensMcpServer(opts: ProtolensMcpOptions): Server {
   const all: Tool[] = [
     {
       name: 'list_collections',
-      description: 'List the collections of the Protolens workspace with their request counts.',
+      description: 'List the collections of the ProtoPion workspace with their request counts.',
       inputSchema: { type: 'object', properties: {} },
       run: () =>
         collections().map((c) => ({ id: c.id, name: c.name, description: c.description?.slice(0, 300), requests: flatten(c.items).length, examples: flatten(c.items).reduce((a, f) => a + (f.node.kind === 'http' ? f.node.examples?.length ?? 0 : 0), 0) })),
@@ -214,10 +214,10 @@ export function createProtolensMcpServer(opts: ProtolensMcpOptions): Server {
   const tools = all.filter((t) => !(opts.readOnly && t.write));
 
   const server = new Server(
-    { name: 'protolens', version: opts.version ?? '0.3.1' },
+    { name: 'protopion', version: opts.version ?? '0.3.1' },
     {
       capabilities: { tools: {} },
-      instructions: `Protolens workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. Values of secrets are never returned.`,
+      instructions: `ProtoPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. Values of secrets are never returned.`,
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));
@@ -236,8 +236,8 @@ export function createProtolensMcpServer(opts: ProtolensMcpOptions): Server {
 }
 
 /** Serve the workspace over stdio until the client disconnects. */
-export async function serveProtolensMcp(opts: ProtolensMcpOptions): Promise<void> {
-  const server = createProtolensMcpServer(opts);
+export async function serveProtoPionMcp(opts: ProtoPionMcpOptions): Promise<void> {
+  const server = createProtoPionMcpServer(opts);
   const transport = new StdioServerTransport();
   const closed = new Promise<void>((resolve) => (server.onclose = () => resolve()));
   await server.connect(transport);

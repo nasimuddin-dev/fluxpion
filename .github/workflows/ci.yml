@@ -27,7 +27,7 @@ jobs:
         run: |
           node examples/servers/demo-servers.mjs &
           sleep 2
-          node packages/cli/bin/protolens.js run -w examples/veterinary-workspace --suite regression -r console junit -o test-results
+          node packages/cli/bin/protopion.js run -w examples/veterinary-workspace --suite regression -r console junit -o test-results
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -41,5 +41,5 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
       - run: npm ci
-      - run: npm run build -w @protolens/core
+      - run: npm run build -w @protopion/core
       - run: npm run bench

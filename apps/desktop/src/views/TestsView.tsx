@@ -306,7 +306,7 @@ export function TestsView() {
                     ))
                   )}
                   <p className="p-3 text-xs text-muted">
-                    Test files are plain YAML/JSON in the workspace <span className="mono">tests/</span> folder — commit them to git and run them in CI with <span className="mono">protolens test</span>.
+                    Test files are plain YAML/JSON in the workspace <span className="mono">tests/</span> folder — commit them to git and run them in CI with <span className="mono">protopion test</span>.
                   </p>
                 </div>
               </Split>

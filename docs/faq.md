@@ -1,11 +1,11 @@
 ---
 title: FAQ
-description: Frequently asked questions about Protolens — pricing, privacy, supported protocols and AI providers, MCP, CI usage and data locations.
+description: Frequently asked questions about ProtoPion — pricing, privacy, supported protocols and AI providers, MCP, CI usage and data locations.
 ---
 
 # Frequently asked questions
 
-## Is Protolens free?
+## Is ProtoPion free?
 
 Yes. It's open source under the MIT license, with no account, subscription or paid tier.
 
@@ -27,7 +27,7 @@ stdio (a local command), Streamable HTTP and the legacy SSE transport. See [conn
 
 ## Can I run my tests in CI?
 
-Yes. Tests are YAML files in your repository, and the [`protolens` CLI](/installation/cli) runs them with JUnit, JSON, HTML and Markdown reports and standard exit codes. See [CI/CD](/test-runner/ci-cd).
+Yes. Tests are YAML files in your repository, and the [`protopion` CLI](/installation/cli) runs them with JUnit, JSON, HTML and Markdown reports and standard exit codes. See [CI/CD](/test-runner/ci-cd).
 
 ## Can I import my Postman collections or OpenAPI specs?
 
@@ -35,7 +35,7 @@ Yes: OpenAPI 3 and Swagger 2 (JSON or YAML), Postman v2.1 collections and enviro
 
 ## Are LLM-as-judge scores reliable?
 
-They're useful but not deterministic, so Protolens always labels them as **AI judge** results and records the judge's model, temperature, prompt version and a config hash. Use deterministic checks (exact match, JSON Schema, regex) for hard requirements. See [evaluations](/ai-testing/evaluations).
+They're useful but not deterministic, so ProtoPion always labels them as **AI judge** results and records the judge's model, temperature, prompt version and a config hash. Use deterministic checks (exact match, JSON Schema, regex) for hard requirements. See [evaluations](/ai-testing/evaluations).
 
 ## How big can responses and test suites get?
 
@@ -43,7 +43,7 @@ Response bodies stream to disk, and the viewer only shows a preview (2 MB by def
 
 ## Where is my data stored?
 
-In `~/.protolens` (`%USERPROFILE%\.protolens` on Windows): settings, logs, encrypted secrets and workspaces. A workspace can also live in any folder you open, such as one in a git repository.
+In `~/.protopion` (`%USERPROFILE%\.protopion` on Windows): settings, logs, encrypted secrets and workspaces. A workspace can also live in any folder you open, such as one in a git repository.
 
 ## Why does Windows or macOS warn me when installing?
 
@@ -51,4 +51,4 @@ The installers aren't code-signed yet. The [Windows](/installation/windows) and 
 
 ## How do I report a bug or request a feature?
 
-Open an issue on [GitHub](https://github.com/nasimuddin-dev/protolens/issues). Report security problems privately as described in [SECURITY.md](https://github.com/nasimuddin-dev/protolens/blob/main/SECURITY.md).
+Open an issue on [GitHub](https://github.com/nasimuddin-dev/protopion/issues). Report security problems privately as described in [SECURITY.md](https://github.com/nasimuddin-dev/protopion/blob/main/SECURITY.md).

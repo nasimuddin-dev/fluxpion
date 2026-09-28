@@ -7,7 +7,7 @@ description: "Inspect, debug and test MCP servers: tools, resources, prompts and
 
 # MCP
 
-Protolens is a full MCP client built on the official TypeScript SDK:
+ProtoPion is a full MCP client built on the official TypeScript SDK:
 
 - [Connect](./connecting.md) over **stdio**, **Streamable HTTP** or legacy **SSE**.
 - Discover [tools](./tools.md), [resources, resource templates](./resources.md) and prompts.

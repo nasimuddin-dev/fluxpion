@@ -1,6 +1,6 @@
 ---
 title: "Plugin system"
-description: "Extending Protolens with protocol adapters and custom checks."
+description: "Extending ProtoPion with protocol adapters and custom checks."
 ---
 
 ::: v-pre
@@ -10,7 +10,7 @@ description: "Extending Protolens with protocol adapters and custom checks."
 ## Protocol adapters
 
 ```ts
-import { registerProtocol, type ProtocolAdapter } from '@protolens/core';
+import { registerProtocol, type ProtocolAdapter } from '@protopion/core';
 
 registerProtocol({
   id: 'grpc',
@@ -26,7 +26,7 @@ HTTP, GraphQL, MCP and WebSocket are registered this way. Adapters are independe
 ## Custom checks
 
 ```ts
-import { registerCheck } from '@protolens/core';
+import { registerCheck } from '@protopion/core';
 registerCheck('is-uuid', (cfg, ctx) => ({
   type: 'is-uuid', name: 'is uuid', source: 'deterministic',
   passed: /^[0-9a-f-]{36}$/.test(String(ctx.body)), message: '…',

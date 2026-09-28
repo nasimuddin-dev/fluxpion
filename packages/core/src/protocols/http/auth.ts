@@ -168,7 +168,7 @@ async function authorizationCodeFlow(
       const code = u.searchParams.get('code');
       const err = u.searchParams.get('error');
       res.writeHead(200, { 'content-type': 'text/html' });
-      res.end(`<html><body style="font-family:sans-serif"><h3>${code ? 'Authorization complete' : 'Authorization failed'}</h3><p>You can close this window and return to Protolens.</p></body></html>`);
+      res.end(`<html><body style="font-family:sans-serif"><h3>${code ? 'Authorization complete' : 'Authorization failed'}</h3><p>You can close this window and return to ProtoPion.</p></body></html>`);
       clearTimeout(timer);
       server.close();
       if (err || !code) return reject(new ApsError('AuthenticationError', `Authorization failed: ${err ?? 'no code returned'}`));

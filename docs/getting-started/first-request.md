@@ -7,7 +7,7 @@ description: "Send an HTTP request, add assertions and save it to a collection."
 
 # Your first request
 
-Protolens opens on **Home**, with shortcuts to a new request, a GraphQL query, import, a new collection, MCP, the AI lab and these docs. It also shows your recent requests, collections and environments. Click an environment there to make it active.
+ProtoPion opens on **Home**, with shortcuts to a new request, a GraphQL query, import, a new collection, MCP, the AI lab and these docs. It also shows your recent requests, collections and environments. Click an environment there to make it active.
 
 1. Start the demo servers: `node examples/servers/demo-servers.mjs`.
 2. In **Environments**, create `Development` with `baseUrl = http://127.0.0.1:4010`. The eye button next to the environment selector gives a [quick look](/api-testing/environments#quick-look) at its variables.

@@ -14,8 +14,8 @@ import { compareVersions } from './semver.js';
 
 export { compareVersions };
 
-const REPO = 'nasimuddin-dev/protolens';
-const DOWNLOAD_PAGE = 'https://nasimuddin-dev.github.io/protolens/download';
+const REPO = 'nasimuddin-dev/protopion';
+const DOWNLOAD_PAGE = 'https://nasimuddin-dev.github.io/protopion/download';
 
 export interface UpdateCheckResult {
   current: string;
@@ -55,7 +55,7 @@ function configure(onProgress: (downloaded: number, total: number | null) => voi
 /** Ask GitHub for the latest release (used where electron-updater can't install in place). */
 async function latestRelease(): Promise<{ version: string; notes: string; url: string }> {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-    headers: { accept: 'application/vnd.github+json', 'user-agent': `Protolens/${app.getVersion()}` },
+    headers: { accept: 'application/vnd.github+json', 'user-agent': `ProtoPion/${app.getVersion()}` },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`GitHub returned HTTP ${res.status}`);

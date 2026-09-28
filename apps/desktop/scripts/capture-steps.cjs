@@ -3,7 +3,7 @@
 const { mkdirSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 
-const OUT = process.env.PROTOLENS_CAPTURE_DIR;
+const OUT = process.env.PROTOPION_CAPTURE_DIR;
 const W = 1440;
 const H = 900;
 

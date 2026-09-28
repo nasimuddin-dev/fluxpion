@@ -51,8 +51,8 @@ export function migrateWorkspace(ws: Record<string, unknown>, root = '', migrati
   let version = String(ws.schemaVersion ?? '0.9');
   const applied: string[] = [];
   if (cmpVersion(version, target) > 0)
-    throw new ApsError('ConfigurationError', `Workspace format ${version} is newer than this version of Protolens supports (${target})`, {
-      suggestions: ['Upgrade Protolens to open this workspace.'],
+    throw new ApsError('ConfigurationError', `Workspace format ${version} is newer than this version of ProtoPion supports (${target})`, {
+      suggestions: ['Upgrade ProtoPion to open this workspace.'],
     });
   while (cmpVersion(version, target) < 0) {
     const m = migrations.find((x) => x.from === version);
@@ -316,7 +316,7 @@ export class WorkspaceStore {
     };
     walk(this.testTree());
     return {
-      format: 'protolens-workspace',
+      format: 'protopion-workspace',
       schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       workspace: { ...this.ws, variables: this.ws.variables.map((v) => ((v as { secret?: boolean }).secret ? { ...v, value: '' } : v)) },
@@ -334,7 +334,8 @@ export class WorkspaceStore {
 }
 
 export interface WorkspaceBundle {
-  format: 'protolens-workspace';
+  /** "protolens-workspace" in exports made before the ProtoPion rename (still imported). */
+  format: 'protopion-workspace' | 'protolens-workspace';
   schemaVersion: string;
   exportedAt: string;
   workspace: Workspace;
@@ -355,12 +356,13 @@ export interface WorkspaceInfo {
 }
 
 export function defaultAppDir(): string {
-  const explicit = process.env.PROTOLENS_HOME || process.env.APS_HOME; // APS_HOME: name before the Protolens rename
+  // PROTOLENS_HOME / APS_HOME: the variable's names before the ProtoPion rename
+  const explicit = process.env.PROTOPION_HOME || process.env.PROTOLENS_HOME || process.env.APS_HOME;
   if (explicit) return explicit;
-  const dir = join(homedir(), '.protolens');
-  // one-time move of the data folder used by 0.1.x (named "AI Protocol Studio" then)
-  const legacy = join(homedir(), '.aipstudio');
-  if (!existsSync(dir) && existsSync(legacy)) {
+  const dir = join(homedir(), '.protopion');
+  // one-time move of the data folder of earlier versions: ".protolens" (0.2–0.3), ".aipstudio" (0.1)
+  for (const legacy of [join(homedir(), '.protolens'), join(homedir(), '.aipstudio')]) {
+    if (existsSync(dir) || !existsSync(legacy)) continue;
     try {
       renameSync(legacy, dir);
     } catch {
@@ -476,7 +478,7 @@ export class WorkspaceManager {
   }
 
   importBundle(bundle: WorkspaceBundle, name?: string): WorkspaceStore {
-    if (bundle?.format !== 'protolens-workspace') throw new ApsError('ValidationError', 'Not a Protolens workspace export');
+    if (bundle?.format !== 'protopion-workspace' && bundle?.format !== 'protolens-workspace') throw new ApsError('ValidationError', 'Not a ProtoPion workspace export');
     const { ws } = migrateWorkspace({ ...(bundle.workspace as unknown as Record<string, unknown>), schemaVersion: bundle.schemaVersion });
     const store = this.create(name ?? `${(ws as unknown as Workspace).name} (imported)`);
     store.updateWorkspace({ variables: (ws as unknown as Workspace).variables, description: (ws as unknown as Workspace).description });

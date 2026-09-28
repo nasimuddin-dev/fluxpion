@@ -1,9 +1,9 @@
 {
-  "name": "@protolens/desktop",
-  "productName": "Protolens",
+  "name": "@protopion/desktop",
+  "productName": "ProtoPion",
   "version": "0.3.1",
   "private": true,
-  "description": "Protolens desktop application",
+  "description": "ProtoPion desktop application",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -21,7 +21,7 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@monaco-editor/react": "^4.7.0",
-    "@protolens/core": "0.3.1",
+    "@protopion/core": "0.3.1",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-popover": "^1.1.23",
@@ -52,14 +52,14 @@
     "zustand": "^5.0.15"
   },
   "author": {
-    "name": "Protolens contributors",
+    "name": "ProtoPion contributors",
     "email": "noreply@github.com",
-    "url": "https://github.com/nasimuddin-dev/protolens"
+    "url": "https://github.com/nasimuddin-dev/protopion"
   },
-  "homepage": "https://nasimuddin-dev.github.io/protolens/",
+  "homepage": "https://nasimuddin-dev.github.io/protopion/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nasimuddin-dev/protolens.git"
+    "url": "https://github.com/nasimuddin-dev/protopion.git"
   },
   "license": "MIT"
 }

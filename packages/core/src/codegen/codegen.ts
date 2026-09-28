@@ -226,7 +226,7 @@ const generators: Record<string, (r: SnippetRequest) => string> = {
   raw(r) {
     const u = new URL(r.url);
     const lines = [`${r.method} ${u.pathname}${u.search} HTTP/1.1`, `Host: ${u.host}`, ...hdrs(r).map(([k, v]) => `${k}: ${v}`)];
-    if (r.form) lines.push('Content-Type: multipart/form-data; boundary=----ProtolensBoundary', '', ...r.form.flatMap((f) => ['------ProtolensBoundary', `Content-Disposition: form-data; name="${f.key}"${f.file ? `; filename="${f.value}"` : ''}`, '', f.file ? '<file contents>' : f.value]), '------ProtolensBoundary--');
+    if (r.form) lines.push('Content-Type: multipart/form-data; boundary=----ProtoPionBoundary', '', ...r.form.flatMap((f) => ['------ProtoPionBoundary', `Content-Disposition: form-data; name="${f.key}"${f.file ? `; filename="${f.value}"` : ''}`, '', f.file ? '<file contents>' : f.value]), '------ProtoPionBoundary--');
     else if (hasBody(r)) lines.push('', r.body!);
     return lines.join('\n');
   },

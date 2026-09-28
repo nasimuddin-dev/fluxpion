@@ -1,7 +1,7 @@
 {
-  "name": "@protolens/core",
+  "name": "@protopion/core",
   "version": "0.3.1",
-  "description": "Protolens core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
+  "description": "ProtoPion core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,30 +1,30 @@
 ---
-title: "Use Protolens from AI agents"
-description: "Serve a workspace to Claude, IDE assistants and other AI agents over MCP with protolens mcp-server, and point them to llms.txt."
+title: "Use ProtoPion from AI agents"
+description: "Serve a workspace to Claude, IDE assistants and other AI agents over MCP with protopion mcp-server, and point them to llms.txt."
 ---
 
 ::: v-pre
 
-# Use Protolens from AI agents
+# Use ProtoPion from AI agents
 
-`protolens mcp-server` makes a workspace available to AI agents as [Model Context Protocol](https://modelcontextprotocol.io) tools. An agent such as Claude Code, Claude Desktop or an IDE assistant can then find your requests, read their documentation, send them and run collections, with your environments and auth, without seeing your secrets.
+`protopion mcp-server` makes a workspace available to AI agents as [Model Context Protocol](https://modelcontextprotocol.io) tools. An agent such as Claude Code, Claude Desktop or an IDE assistant can then find your requests, read their documentation, send them and run collections, with your environments and auth, without seeing your secrets.
 
 ## Register the server
 
-The server speaks MCP over stdio. Point your agent at the `protolens` CLI with the workspace to serve:
+The server speaks MCP over stdio. Point your agent at the `protopion` CLI with the workspace to serve:
 
 ```json
 {
   "mcpServers": {
-    "protolens": {
-      "command": "protolens",
+    "protopion": {
+      "command": "protopion",
       "args": ["mcp-server", "-w", "/path/to/my-workspace"]
     }
   }
 }
 ```
 
-For Claude Code: `claude mcp add protolens -- protolens mcp-server -w /path/to/my-workspace`.
+For Claude Code: `claude mcp add protopion -- protopion mcp-server -w /path/to/my-workspace`.
 
 | Option | Description |
 |---|---|
@@ -47,11 +47,11 @@ For Claude Code: `claude mcp add protolens -- protolens mcp-server -w /path/to/m
 ## What agents can and can't see
 
 - Output uses the workspace's redaction rules. Sensitive headers, JSON fields and known secret values are masked, and environment values are never listed.
-- Secrets resolve inside Protolens when a request is sent. The agent sees `{{accessToken}}`, never the token. In the CLI, secrets come from `PROTOLENS_SECRET_*` environment variables (see [Secrets](/security/secrets)).
+- Secrets resolve inside ProtoPion when a request is sent. The agent sees `{{accessToken}}`, never the token. In the CLI, secrets come from `PROTOPION_SECRET_*` environment variables (see [Secrets](/security/secrets)).
 - Requests go only where your collections and environments point. Production environments need `--allow-production`, and `--read-only` removes sending altogether.
 
 ## llms.txt
 
-The documentation site publishes [`/llms.txt`](https://nasimuddin-dev.github.io/protolens/llms.txt), a short, link-rich summary of Protolens for language models. Give it to an assistant that should learn how Protolens works.
+The documentation site publishes [`/llms.txt`](https://nasimuddin-dev.github.io/protopion/llms.txt), a short, link-rich summary of ProtoPion for language models. Give it to an assistant that should learn how ProtoPion works.
 
 :::

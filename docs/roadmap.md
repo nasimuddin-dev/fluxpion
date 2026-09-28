@@ -1,11 +1,11 @@
 ---
 title: Roadmap
-description: What's planned for Protolens — more protocols, mock servers, signed installers and optional team features.
+description: What's planned for ProtoPion — more protocols, mock servers, signed installers and optional team features.
 ---
 
 # Roadmap
 
-Plans change with feedback. Vote or comment on [GitHub issues](https://github.com/nasimuddin-dev/protolens/issues).
+Plans change with feedback. Vote or comment on [GitHub issues](https://github.com/nasimuddin-dev/protopion/issues).
 
 ## Next
 
@@ -17,7 +17,7 @@ Plans change with feedback. Vote or comment on [GitHub issues](https://github.co
 
 ## Shipped in 0.2.0
 
-Cookie jar, saved examples and HTTP mock servers, request and collection documentation, Postman v2.1 export, a console, pinned tabs, a Home view, `pm.sendRequest`, folder scripts and variables, AI help in the request builder, and `protolens mcp-server` for AI agents. See the [changelog](/changelog).
+Cookie jar, saved examples and HTTP mock servers, request and collection documentation, Postman v2.1 export, a console, pinned tabs, a Home view, `pm.sendRequest`, folder scripts and variables, AI help in the request builder, and `protopion mcp-server` for AI agents. See the [changelog](/changelog).
 
 ## Later
 

@@ -1,6 +1,6 @@
 ---
 title: "Architecture overview"
-description: "How Protolens is structured: core engine, desktop app, CLI, storage and security."
+description: "How ProtoPion is structured: core engine, desktop app, CLI, storage and security."
 ---
 
 ::: v-pre
@@ -8,7 +8,7 @@ description: "How Protolens is structured: core engine, desktop app, CLI, storag
 # Architecture
 
 ```text
-apps/desktop  (Electron + React + Monaco)      packages/cli  (protolens)
+apps/desktop  (Electron + React + Monaco)      packages/cli  (protopion)
       │  IPC (contextIsolation, sandboxed renderer)     │
       ▼                                                 ▼
              packages/core — the single execution engine

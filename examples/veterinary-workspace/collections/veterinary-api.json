@@ -100,7 +100,7 @@
           "kind": "http",
           "id": "req-session-login",
           "name": "Log in (sets a cookie)",
-          "description": "Logs in with a username and password. The server answers `303 See Other` with a `vet_session` cookie and redirects to **Who am I**. Protolens keeps the cookie in the workspace cookie jar and sends it with the next requests.",
+          "description": "Logs in with a username and password. The server answers `303 See Other` with a `vet_session` cookie and redirects to **Who am I**. ProtoPion keeps the cookie in the workspace cookie jar and sends it with the next requests.",
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/session/login",

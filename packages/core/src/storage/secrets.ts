@@ -7,7 +7,7 @@ import type { SecretReader } from '../vars/variables.js';
  * Secret storage abstraction. Secrets are never written in plain text:
  *  - Desktop: values are encrypted with the OS credential facility (Windows DPAPI /
  *    macOS Keychain / Linux Secret Service via Electron `safeStorage`).
- *  - CLI / CI: secrets come from environment variables (`PROTOLENS_SECRET_<NAME>`), the
+ *  - CLI / CI: secrets come from environment variables (`PROTOPION_SECRET_<NAME>`), the
  *    standard mechanism for CI secret injection.
  */
 export interface SecretStore extends SecretReader {
@@ -20,9 +20,9 @@ export interface SecretStore extends SecretReader {
   list(): string[];
 }
 
-/** `provider.openai.apiKey` → `PROTOLENS_SECRET_PROVIDER_OPENAI_APIKEY` */
+/** `provider.openai.apiKey` → `PROTOPION_SECRET_PROVIDER_OPENAI_APIKEY` */
 export function envNameForSecret(name: string): string {
-  return 'PROTOLENS_SECRET_' + name.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase();
+  return 'PROTOPION_SECRET_' + name.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase();
 }
 
 export class EnvSecretStore implements SecretStore {
@@ -30,18 +30,19 @@ export class EnvSecretStore implements SecretStore {
   readonly writable = false;
   constructor(private env: NodeJS.ProcessEnv = process.env) {}
   get(name: string): string | undefined {
-    // APS_SECRET_*: prefix before the Protolens rename, still accepted
-    return this.env[envNameForSecret(name)] ?? this.env[envNameForSecret(name).replace(/^PROTOLENS_/, 'APS_')] ?? undefined;
+    // PROTOLENS_SECRET_* (the name before ProtoPion) and APS_SECRET_* (before that) are still accepted
+    const n = envNameForSecret(name);
+    return this.env[n] ?? this.env[n.replace(/^PROTOPION_/, 'PROTOLENS_')] ?? this.env[n.replace(/^PROTOPION_/, 'APS_')] ?? undefined;
   }
   async set(): Promise<void> {
-    throw new ApsError('ConfigurationError', 'Secrets cannot be written in CLI mode', { suggestions: ['Provide secrets as PROTOLENS_SECRET_* environment variables.'] });
+    throw new ApsError('ConfigurationError', 'Secrets cannot be written in CLI mode', { suggestions: ['Provide secrets as PROTOPION_SECRET_* environment variables.'] });
   }
   async delete(): Promise<void> {
     /* no-op */
   }
   list(): string[] {
     return Object.keys(this.env)
-      .filter((k) => k.startsWith('PROTOLENS_SECRET_'))
+      .filter((k) => k.startsWith('PROTOPION_SECRET_'))
       .map((k) => k.slice(11).toLowerCase());
   }
 }
@@ -109,7 +110,7 @@ export class EncryptedFileSecretStore implements SecretStore {
   async set(name: string, value: string): Promise<void> {
     if (!this.cipher.isAvailable())
       throw new ApsError('ConfigurationError', 'OS secure storage is not available; refusing to store the secret in plain text', {
-        suggestions: ['On Linux, install and unlock a Secret Service provider (gnome-keyring or KWallet).', 'Alternatively provide the secret via an PROTOLENS_SECRET_* environment variable.'],
+        suggestions: ['On Linux, install and unlock a Secret Service provider (gnome-keyring or KWallet).', 'Alternatively provide the secret via an PROTOPION_SECRET_* environment variable.'],
       });
     this.raw[name] = this.cipher.encrypt(value).toString('base64');
     this.cache.set(name, value);

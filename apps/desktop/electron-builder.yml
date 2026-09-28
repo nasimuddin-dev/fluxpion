@@ -1,15 +1,16 @@
 # Installers for Windows, macOS and Linux (electron-builder).
 # Asset names are stable so the website and README can link to them:
-#   Protolens-<version>-windows-x64-setup.exe     Windows installer (NSIS)
-#   Protolens-<version>-windows-x64-portable.exe  Windows portable (no install)
-#   Protolens-<version>-macos-arm64.dmg            Apple Silicon
-#   Protolens-<version>-macos-x64.dmg              Intel
-#   Protolens-<version>-linux-x86_64.AppImage
-#   Protolens-<version>-linux-amd64.deb
-#   Protolens-<version>-linux-x86_64.rpm
+#   ProtoPion-<version>-windows-x64-setup.exe     Windows installer (NSIS)
+#   ProtoPion-<version>-windows-x64-portable.exe  Windows portable (no install)
+#   ProtoPion-<version>-macos-arm64.dmg            Apple Silicon
+#   ProtoPion-<version>-macos-x64.dmg              Intel
+#   ProtoPion-<version>-linux-x86_64.AppImage
+#   ProtoPion-<version>-linux-amd64.deb
+#   ProtoPion-<version>-linux-x86_64.rpm
+# kept from the Protolens name so installed copies update in place and keep their settings
 appId: dev.nasimuddin.protolens
-productName: Protolens
-copyright: Copyright © 2026 Protolens contributors
+productName: ProtoPion
+copyright: Copyright © 2026 ProtoPion contributors
 electronVersion: 44.4.5
 directories:
   output: release
@@ -28,12 +29,12 @@ npmRebuild: false
 publish:
   - provider: github
     owner: nasimuddin-dev
-    repo: protolens
+    repo: protopion
     releaseType: release
 extraMetadata:
   main: dist-electron/main.cjs
-  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "Protolens"
-  name: protolens
+  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "ProtoPion"
+  name: protopion
 
 win:
   target:
@@ -48,10 +49,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Protolens
-  artifactName: Protolens-${version}-windows-${arch}-setup.${ext}
+  shortcutName: ProtoPion
+  artifactName: ProtoPion-${version}-windows-${arch}-setup.${ext}
 portable:
-  artifactName: Protolens-${version}-windows-${arch}-portable.${ext}
+  artifactName: ProtoPion-${version}-windows-${arch}-portable.${ext}
 
 mac:
   target:
@@ -62,9 +63,9 @@ mac:
   # Unsigned builds are ad-hoc signed so they run on Apple Silicon; notarization needs an Apple ID.
   identity: "-"
   hardenedRuntime: false
-  artifactName: Protolens-${version}-macos-${arch}.${ext}
+  artifactName: ProtoPion-${version}-macos-${arch}.${ext}
 dmg:
-  title: Protolens ${version}
+  title: ProtoPion ${version}
 
 linux:
   target:
@@ -75,14 +76,14 @@ linux:
     - target: rpm
       arch: [x64]
   category: Development
-  executableName: protolens
+  executableName: protopion
   icon: build/icon.png
-  maintainer: Protolens contributors <noreply@github.com>
+  maintainer: ProtoPion contributors <noreply@github.com>
   synopsis: Test and debug REST, GraphQL, MCP and AI systems
   description: Local-first desktop app for testing, debugging and evaluating REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents.
 appImage:
-  artifactName: Protolens-${version}-linux-x86_64.${ext}
+  artifactName: ProtoPion-${version}-linux-x86_64.${ext}
 deb:
-  artifactName: Protolens-${version}-linux-amd64.${ext}
+  artifactName: ProtoPion-${version}-linux-amd64.${ext}
 rpm:
-  artifactName: Protolens-${version}-linux-x86_64.${ext}
+  artifactName: ProtoPion-${version}-linux-x86_64.${ext}

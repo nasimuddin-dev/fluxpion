@@ -30,6 +30,6 @@ limits:
   latency_ms: 3000
 ```
 
-Run it with `protolens test tests/ai`.
+Run it with `protopion test tests/ai`.
 
 :::

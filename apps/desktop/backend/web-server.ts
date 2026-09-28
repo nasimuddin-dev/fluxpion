@@ -9,12 +9,12 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { Backend } from './backend.js';
 
-const port = Number(process.env.PROTOLENS_BRIDGE_PORT ?? 5174);
-const token = process.env.PROTOLENS_BRIDGE_TOKEN ?? randomBytes(16).toString('hex');
+const port = Number(process.env.PROTOPION_BRIDGE_PORT ?? 5174);
+const token = process.env.PROTOPION_BRIDGE_TOKEN ?? randomBytes(16).toString('hex');
 const clients = new Set<ServerResponse>();
 
 const backend = new Backend({
-  appDir: process.env.PROTOLENS_HOME || join(homedir(), '.protolens-dev'),
+  appDir: process.env.PROTOPION_HOME || join(homedir(), '.protopion-dev'),
   emit: (channel, payload) => {
     const data = `data: ${JSON.stringify({ channel, payload })}\n\n`;
     for (const c of clients) c.write(data);

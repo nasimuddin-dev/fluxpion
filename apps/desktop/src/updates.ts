@@ -46,7 +46,7 @@ async function install(version: string): Promise<void> {
   set({ progress: { title: `Updating to ${version}`, message: 'Downloading the update…', fraction: null } });
   const off = on<{ downloaded: number; total: number | null; installing?: boolean }>('update.progress', (p) => {
     const message = p.installing
-      ? 'Verifying and installing… Protolens will restart.'
+      ? 'Verifying and installing… ProtoPion will restart.'
       : `Downloading the update… ${(p.downloaded / MB).toFixed(1)}${p.total ? ` of ${(p.total / MB).toFixed(1)}` : ''} MB`;
     useApp.getState().set({ progress: { title: `Updating to ${version}`, message, fraction: p.total && !p.installing ? p.downloaded / p.total : null } });
   });
@@ -54,7 +54,7 @@ async function install(version: string): Promise<void> {
     await call('update.install');
     // the app quits while the installer runs; if it doesn't, keep the dialog up briefly
   } catch (e) {
-    toast(`Protolens ${version} couldn't be installed; your current version is unchanged. ${(e as Error).message ?? ''}`.trim(), 'error');
+    toast(`ProtoPion ${version} couldn't be installed; your current version is unchanged. ${(e as Error).message ?? ''}`.trim(), 'error');
     set({ progress: null });
   } finally {
     setTimeout(off, 60_000);
@@ -79,7 +79,7 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
     return 'error';
   }
   if (!found.version) {
-    if (manual) toast(`You're up to date. Protolens ${found.current} is the latest version.`, 'success');
+    if (manual) toast(`You're up to date. ProtoPion ${found.current} is the latest version.`, 'success');
     return 'current';
   }
   if (!manual && load(SKIP_KEY) === found.version) return 'available';
@@ -87,7 +87,7 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   const notes = summarise(found.notes);
   const choice = await ask({
     title: 'Update available',
-    message: `Protolens ${found.version} is available. You have ${found.current}.`,
+    message: `ProtoPion ${found.version} is available. You have ${found.current}.`,
     detail:
       (notes ? notes + '\n\n' : '') +
       (found.installable
