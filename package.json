@@ -1,8 +1,8 @@
 {
-  "name": "protopion",
+  "name": "fluxpion",
   "private": true,
   "version": "0.4.0",
-  "description": "ProtoPion — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
+  "description": "FluxPion — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
   "license": "MIT",
   "type": "module",
   "workspaces": [
@@ -15,12 +15,12 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "build": "npm run build -w @protopion/core && npm run build -w @protopion/cli && npm run build -w @protopion/desktop",
+    "build": "npm run build -w @fluxpion/core && npm run build -w @fluxpion/cli && npm run build -w @fluxpion/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "npm run dev -w @protopion/desktop",
-    "dev:web": "npm run dev:web -w @protopion/desktop",
+    "dev": "npm run dev -w @fluxpion/desktop",
+    "dev:web": "npm run dev:web -w @fluxpion/desktop",
     "bench": "node scripts/bench.mjs",
     "docs:dev": "npm run dev -w docs",
     "docs:build": "npm run build -w docs"

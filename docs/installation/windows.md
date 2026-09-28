@@ -1,9 +1,9 @@
 ---
 title: Install on Windows
-description: Install ProtoPion on Windows 10 or 11 with the installer or the portable app. Requirements, SmartScreen, per-user or all-users install, silent install and uninstalling.
+description: Install FluxPion on Windows 10 or 11 with the installer or the portable app. Requirements, SmartScreen, per-user or all-users install, silent install and uninstalling.
 ---
 
-# Install ProtoPion on Windows
+# Install FluxPion on Windows
 
 ## Requirements
 
@@ -17,31 +17,31 @@ description: Install ProtoPion on Windows 10 or 11 with the installer or the por
 
 ## Install
 
-1. Double-click `ProtoPion-<version>-windows-x64-setup.exe`.
+1. Double-click `FluxPion-<version>-windows-x64-setup.exe`.
 2. The installer isn't code-signed yet, so Windows SmartScreen may show **"Windows protected your PC"**. Click **More info**, then **Run anyway**. Your browser may also ask whether to keep the file; choose **Keep**.
 3. Choose who to install for:
-   - **Only for me:** installs to `%LOCALAPPDATA%\Programs\ProtoPion` without administrator rights.
-   - **Anyone who uses this computer:** installs to `C:\Program Files\ProtoPion`. Windows asks for administrator approval.
+   - **Only for me:** installs to `%LOCALAPPDATA%\Programs\FluxPion` without administrator rights.
+   - **Anyone who uses this computer:** installs to `C:\Program Files\FluxPion`. Windows asks for administrator approval.
 4. Optionally change the folder, then click **Install** and **Finish**.
 
-The app gets a Start menu entry and a desktop shortcut named **ProtoPion**, and appears under **Settings → Apps → Installed apps**.
+The app gets a Start menu entry and a desktop shortcut named **FluxPion**, and appears under **Settings → Apps → Installed apps**.
 
 ## Portable version
 
-`ProtoPion-<version>-windows-x64-portable.exe` runs without installing. Put it anywhere, for example on a USB stick, and double-click it. It starts a little slower than the installed app because it unpacks itself on each launch.
+`FluxPion-<version>-windows-x64-portable.exe` runs without installing. Put it anywhere, for example on a USB stick, and double-click it. It starts a little slower than the installed app because it unpacks itself on each launch.
 
 ## First launch
 
-Open **ProtoPion** from the Start menu. On first launch it creates a workspace called **My Workspace** in `%USERPROFILE%\.protopion\workspaces`. Continue with [your first request](/getting-started/first-request).
+Open **FluxPion** from the Start menu. On first launch it creates a workspace called **My Workspace** in `%USERPROFILE%\.fluxpion\workspaces`. Continue with [your first request](/getting-started/first-request).
 
 Secrets (tokens, API keys, secret variables) are encrypted with **Windows DPAPI**, tied to your Windows account.
 
 ## Silent install (IT administrators)
 
 ```powershell
-.\ProtoPion-<version>-windows-x64-setup.exe /S                 # current user
-.\ProtoPion-<version>-windows-x64-setup.exe /S /allusers       # all users (run elevated)
-.\ProtoPion-<version>-windows-x64-setup.exe /S /D=C:\Tools\ProtoPion  # custom folder (must be last)
+.\FluxPion-<version>-windows-x64-setup.exe /S                 # current user
+.\FluxPion-<version>-windows-x64-setup.exe /S /allusers       # all users (run elevated)
+.\FluxPion-<version>-windows-x64-setup.exe /S /D=C:\Tools\FluxPion  # custom folder (must be last)
 ```
 
 ## Updating
@@ -50,4 +50,4 @@ Download and run the newer installer. It upgrades in place and keeps your worksp
 
 ## Uninstall
 
-Use **Settings → Apps → Installed apps → ProtoPion → Uninstall**. Your workspaces and settings in `%USERPROFILE%\.protopion` are kept; delete that folder to remove them too.
+Use **Settings → Apps → Installed apps → FluxPion → Uninstall**. Your workspaces and settings in `%USERPROFILE%\.fluxpion` are kept; delete that folder to remove them too.

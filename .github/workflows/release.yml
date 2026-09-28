@@ -5,13 +5,13 @@ name: Release
 # to rebuild an existing release.
 #
 # Asset names are stable so the website's download page can link to them:
-#   ProtoPion-<version>-windows-x64-setup.exe
-#   ProtoPion-<version>-windows-x64-portable.exe
-#   ProtoPion-<version>-macos-arm64.dmg
-#   ProtoPion-<version>-macos-x64.dmg
-#   ProtoPion-<version>-linux-x86_64.AppImage
-#   ProtoPion-<version>-linux-amd64.deb
-#   ProtoPion-<version>-linux-x86_64.rpm
+#   FluxPion-<version>-windows-x64-setup.exe
+#   FluxPion-<version>-windows-x64-portable.exe
+#   FluxPion-<version>-macos-arm64.dmg
+#   FluxPion-<version>-macos-x64.dmg
+#   FluxPion-<version>-linux-x86_64.AppImage
+#   FluxPion-<version>-linux-amd64.deb
+#   FluxPion-<version>-linux-x86_64.rpm
 #   SHA256SUMS.txt
 on:
   push:
@@ -63,8 +63,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run build -w @protopion/core
-      - run: npm run build -w @protopion/desktop
+      - run: npm run build -w @fluxpion/core
+      - run: npm run build -w @fluxpion/desktop
       - name: Package
         working-directory: apps/desktop
         shell: bash
@@ -76,7 +76,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          cp apps/desktop/release/ProtoPion-* out/
+          cp apps/desktop/release/FluxPion-* out/
           # update manifests for in-place updates: latest.yml (Windows installer), latest-linux.yml (AppImage)
           for f in latest.yml latest-linux.yml; do
             [ -f "apps/desktop/release/$f" ] && cp "apps/desktop/release/$f" out/
@@ -105,7 +105,7 @@ jobs:
           merge-multiple: true
       - name: Checksums
         working-directory: out
-        run: ls ProtoPion-* | grep -v '.blockmap$' | xargs sha256sum > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: ls FluxPion-* | grep -v '.blockmap$' | xargs sha256sum > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Release notes from CHANGELOG.md
         shell: bash
         run: |
@@ -115,7 +115,7 @@ jobs:
             echo
             echo "### Downloads"
             echo
-            echo "See the [download page](https://nasimuddin-dev.github.io/protopion/download) for which file to choose and the [installation guides](https://nasimuddin-dev.github.io/protopion/installation/windows)."
+            echo "See the [download page](https://nasimuddin-dev.github.io/fluxpion/download) for which file to choose and the [installation guides](https://nasimuddin-dev.github.io/fluxpion/installation/windows)."
             echo
             echo "The installers aren't code-signed yet: Windows SmartScreen and macOS Gatekeeper ask you to confirm the first launch."
           } >> notes.md
@@ -128,5 +128,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" out/* --clobber
           else
-            gh release create "$TAG" out/* --title "ProtoPion ${TAG#v}" --notes-file notes.md
+            gh release create "$TAG" out/* --title "FluxPion ${TAG#v}" --notes-file notes.md
           fi

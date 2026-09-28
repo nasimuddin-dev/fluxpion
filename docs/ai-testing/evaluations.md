@@ -40,7 +40,7 @@ Each record's fields are available as variables in both the prompt and the evalu
 Save a run as a **baseline**, then compare later runs against it using thresholds for latency (+%), tokens (+%) and score drop. New failures, score drops and metric regressions are highlighted. In CI:
 
 ```bash
-protopion test tests/ai --baseline main --fail-on-regression
+fluxpion test tests/ai --baseline main --fail-on-regression
 ```
 
 :::

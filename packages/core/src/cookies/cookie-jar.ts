@@ -213,7 +213,7 @@ export class CookieJar {
 }
 
 /**
- * Read a cookie jar file: ProtoPion' own format (`{ cookies: [...] }` or a plain list) or the
+ * Read a cookie jar file: FluxPion' own format (`{ cookies: [...] }` or a plain list) or the
  * tough-cookie JSON that Newman's `--export-cookie-jar` writes (`key` instead of `name`).
  */
 export function cookiesFromJson(data: unknown): StoredCookie[] {

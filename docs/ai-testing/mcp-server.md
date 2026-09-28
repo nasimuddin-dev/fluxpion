@@ -1,30 +1,30 @@
 ---
-title: "Use ProtoPion from AI agents"
-description: "Serve a workspace to Claude, IDE assistants and other AI agents over MCP with protopion mcp-server, and point them to llms.txt."
+title: "Use FluxPion from AI agents"
+description: "Serve a workspace to Claude, IDE assistants and other AI agents over MCP with fluxpion mcp-server, and point them to llms.txt."
 ---
 
 ::: v-pre
 
-# Use ProtoPion from AI agents
+# Use FluxPion from AI agents
 
-`protopion mcp-server` makes a workspace available to AI agents as [Model Context Protocol](https://modelcontextprotocol.io) tools. An agent such as Claude Code, Claude Desktop or an IDE assistant can then find your requests, read their documentation, send them and run collections, with your environments and auth, without seeing your secrets.
+`fluxpion mcp-server` makes a workspace available to AI agents as [Model Context Protocol](https://modelcontextprotocol.io) tools. An agent such as Claude Code, Claude Desktop or an IDE assistant can then find your requests, read their documentation, send them and run collections, with your environments and auth, without seeing your secrets.
 
 ## Register the server
 
-The server speaks MCP over stdio. Point your agent at the `protopion` CLI with the workspace to serve:
+The server speaks MCP over stdio. Point your agent at the `fluxpion` CLI with the workspace to serve:
 
 ```json
 {
   "mcpServers": {
-    "protopion": {
-      "command": "protopion",
+    "fluxpion": {
+      "command": "fluxpion",
       "args": ["mcp-server", "-w", "/path/to/my-workspace"]
     }
   }
 }
 ```
 
-For Claude Code: `claude mcp add protopion -- protopion mcp-server -w /path/to/my-workspace`.
+For Claude Code: `claude mcp add fluxpion -- fluxpion mcp-server -w /path/to/my-workspace`.
 
 | Option | Description |
 |---|---|
@@ -47,11 +47,11 @@ For Claude Code: `claude mcp add protopion -- protopion mcp-server -w /path/to/m
 ## What agents can and can't see
 
 - Output uses the workspace's redaction rules. Sensitive headers, JSON fields and known secret values are masked, and environment values are never listed.
-- Secrets resolve inside ProtoPion when a request is sent. The agent sees `{{accessToken}}`, never the token. In the CLI, secrets come from `PROTOPION_SECRET_*` environment variables (see [Secrets](/security/secrets)).
+- Secrets resolve inside FluxPion when a request is sent. The agent sees `{{accessToken}}`, never the token. In the CLI, secrets come from `FLUXPION_SECRET_*` environment variables (see [Secrets](/security/secrets)).
 - Requests go only where your collections and environments point. Production environments need `--allow-production`, and `--read-only` removes sending altogether.
 
 ## llms.txt
 
-The documentation site publishes [`/llms.txt`](https://nasimuddin-dev.github.io/protopion/llms.txt), a short, link-rich summary of ProtoPion for language models. Give it to an assistant that should learn how ProtoPion works.
+The documentation site publishes [`/llms.txt`](https://nasimuddin-dev.github.io/fluxpion/llms.txt), a short, link-rich summary of FluxPion for language models. Give it to an assistant that should learn how FluxPion works.
 
 :::

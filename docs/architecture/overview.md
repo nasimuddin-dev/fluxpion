@@ -1,6 +1,6 @@
 ---
 title: "Architecture overview"
-description: "How ProtoPion is structured: core engine, desktop app, CLI, storage and security."
+description: "How FluxPion is structured: core engine, desktop app, CLI, storage and security."
 ---
 
 ::: v-pre
@@ -8,7 +8,7 @@ description: "How ProtoPion is structured: core engine, desktop app, CLI, storag
 # Architecture
 
 ```text
-apps/desktop  (Electron + React + Monaco)      packages/cli  (protopion)
+apps/desktop  (Electron + React + Monaco)      packages/cli  (fluxpion)
       │  IPC (contextIsolation, sandboxed renderer)     │
       ▼                                                 ▼
              packages/core — the single execution engine

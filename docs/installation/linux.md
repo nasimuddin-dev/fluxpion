@@ -1,9 +1,9 @@
 ---
 title: Install on Linux
-description: Install ProtoPion on Linux with the AppImage, .deb or .rpm package, plus the Secret Service requirement for storing secrets.
+description: Install FluxPion on Linux with the AppImage, .deb or .rpm package, plus the Secret Service requirement for storing secrets.
 ---
 
-# Install ProtoPion on Linux
+# Install FluxPion on Linux
 
 ## Requirements
 
@@ -17,8 +17,8 @@ description: Install ProtoPion on Linux with the AppImage, .deb or .rpm package,
 ## AppImage (any distribution)
 
 ```bash
-chmod +x ProtoPion-*-linux-x86_64.AppImage
-./ProtoPion-*-linux-x86_64.AppImage
+chmod +x FluxPion-*-linux-x86_64.AppImage
+./FluxPion-*-linux-x86_64.AppImage
 ```
 
 On Ubuntu 22.04 and later, AppImages need FUSE 2: `sudo apt install libfuse2` (on Ubuntu 24.04: `libfuse2t64`).
@@ -26,34 +26,34 @@ On Ubuntu 22.04 and later, AppImages need FUSE 2: `sudo apt install libfuse2` (o
 ## Debian, Ubuntu and derivatives (.deb)
 
 ```bash
-sudo apt install ./ProtoPion-*-linux-amd64.deb
+sudo apt install ./FluxPion-*-linux-amd64.deb
 ```
 
 ## Fedora, RHEL and openSUSE (.rpm)
 
 ```bash
-sudo dnf install ./ProtoPion-*-linux-x86_64.rpm     # Fedora, RHEL, Rocky
-sudo zypper install ./ProtoPion-*-linux-x86_64.rpm  # openSUSE
+sudo dnf install ./FluxPion-*-linux-x86_64.rpm     # Fedora, RHEL, Rocky
+sudo zypper install ./FluxPion-*-linux-x86_64.rpm  # openSUSE
 ```
 
-The packages add **ProtoPion** to your application menu.
+The packages add **FluxPion** to your application menu.
 
 Continue with [your first request](/getting-started/first-request).
 
 ## Updating
 
-Install the newer package the same way, or replace the AppImage. Your workspaces and settings in `~/.protopion` are kept.
+Install the newer package the same way, or replace the AppImage. Your workspaces and settings in `~/.fluxpion` are kept.
 
 ## Uninstall
 
 ```bash
-sudo apt remove protopion     # .deb
-sudo dnf remove protopion     # .rpm
+sudo apt remove fluxpion     # .deb
+sudo dnf remove fluxpion     # .rpm
 ```
 
-To remove your data too, delete `~/.protopion` and `~/.config/ProtoPion`.
+To remove your data too, delete `~/.fluxpion` and `~/.config/FluxPion`.
 
 ## Troubleshooting
 
 - **The window is blank or the app crashes on start** (some virtual machines and older GPUs): start it with `--disable-gpu`.
-- **"Secure storage is not available"** when saving a secret: install and unlock `gnome-keyring` (or KWallet), or supply the secret as a `PROTOPION_SECRET_*` environment variable.
+- **"Secure storage is not available"** when saving a secret: install and unlock `gnome-keyring` (or KWallet), or supply the secret as a `FLUXPION_SECRET_*` environment variable.

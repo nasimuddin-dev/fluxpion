@@ -1,23 +1,23 @@
 ---
 layout: home
-title: ProtoPion
+title: FluxPion
 titleTemplate: API, MCP and AI Testing Tool
-description: ProtoPion is a free, local-first desktop app and CLI for testing and debugging REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.
+description: FluxPion is a free, local-first desktop app and CLI for testing and debugging REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.
 
 hero:
-  name: ProtoPion
+  name: FluxPion
   text: Test and debug APIs, MCP servers and AI systems in one place
   tagline: REST, GraphQL, WebSocket, MCP, LLMs, RAG and agents — with a test runner, evaluation lab and trace viewer. Local-first, private, and the same engine in your CI.
   image:
     src: /logo.svg
-    alt: ProtoPion logo
+    alt: FluxPion logo
   actions:
     - theme: brand
       text: Download
       link: /download
     - theme: alt
       text: View on GitHub
-      link: https://github.com/nasimuddin-dev/protopion
+      link: https://github.com/nasimuddin-dev/fluxpion
     - theme: alt
       text: Read the docs
       link: /getting-started/installation
@@ -40,7 +40,7 @@ features:
     link: /ai-testing/evaluations
     linkText: Evaluation guide
   - title: Test runner & CI
-    details: YAML test suites with parallel workers, retries, dependencies and resumable runs. JUnit, JSON, HTML and Markdown reports, and an protopion CLI for any CI system.
+    details: YAML test suites with parallel workers, retries, dependencies and resumable runs. JUnit, JSON, HTML and Markdown reports, and an fluxpion CLI for any CI system.
     link: /test-runner/overview
     linkText: Test runner
   - title: Local-first and private
@@ -56,7 +56,7 @@ import { data as release } from "./data/release.data";
 ## See it in action
 
 <figure class="aps-screenshot">
-  <img src="/images/rest.jpg" alt="ProtoPion sending a GET request from the Veterinary API collection, showing a 200 response as a JSON tree and three passing assertions" width="1440" height="900">
+  <img src="/images/rest.jpg" alt="FluxPion sending a GET request from the Veterinary API collection, showing a 200 response as a JSON tree and three passing assertions" width="1440" height="900">
   <figcaption>A REST request from a collection, with the JSON response and passing assertions.</figcaption>
 </figure>
 
@@ -83,7 +83,7 @@ import { data as release } from "./data/release.data";
 
 ## Runs on your operating system
 
-ProtoPion is a desktop app for Windows, macOS and Linux, and every release has installers for each:
+FluxPion is a desktop app for Windows, macOS and Linux, and every release has installers for each:
 
 | System | Installers |
 | --- | --- |
@@ -91,9 +91,9 @@ ProtoPion is a desktop app for Windows, macOS and Linux, and every release has i
 | **macOS** 12+ | `.dmg` for Apple Silicon and for Intel |
 | **Linux** x86_64 | AppImage, `.deb` and `.rpm` |
 
-The `protopion` command-line runner uses the same engine and runs anywhere Node.js 22+ runs — see [installing the CLI](/installation/cli).
+The `fluxpion` command-line runner uses the same engine and runs anywhere Node.js 22+ runs — see [installing the CLI](/installation/cli).
 
-[Download ProtoPion](/download) · [Installation guides](/installation/windows)
+[Download FluxPion](/download) · [Installation guides](/installation/windows)
 
 ## Local-first by design
 
@@ -106,8 +106,8 @@ Read the [privacy notes](/security/privacy).
 
 ## Latest release
 
-**ProtoPion {{ release.version }}**<span v-if="release.date">, released {{ release.date }}</span>. See [what's new](/changelog) or <a :href="release.releaseUrl">all release files on GitHub</a>.
+**FluxPion {{ release.version }}**<span v-if="release.date">, released {{ release.date }}</span>. See [what's new](/changelog) or <a :href="release.releaseUrl">all release files on GitHub</a>.
 
 ## Developed in public on GitHub
 
-The source code, issues and releases are public at [github.com/nasimuddin-dev/protopion](https://github.com/nasimuddin-dev/protopion). [Report a bug or request a feature](https://github.com/nasimuddin-dev/protopion/issues), browse [releases](https://github.com/nasimuddin-dev/protopion/releases), or read the source.
+The source code, issues and releases are public at [github.com/nasimuddin-dev/fluxpion](https://github.com/nasimuddin-dev/fluxpion). [Report a bug or request a feature](https://github.com/nasimuddin-dev/fluxpion/issues), browse [releases](https://github.com/nasimuddin-dev/fluxpion/releases), or read the source.

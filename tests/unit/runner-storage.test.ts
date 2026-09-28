@@ -285,9 +285,9 @@ describe('workspace storage', () => {
     ws.close();
   });
 
-  it('reads CI secrets from PROTOPION_SECRET_* env vars', () => {
-    expect(envNameForSecret('provider.openai.apiKey')).toBe('PROTOPION_SECRET_PROVIDER_OPENAI_APIKEY');
-    const s = new EnvSecretStore({ PROTOPION_SECRET_PROVIDER_OPENAI_APIKEY: 'k' });
+  it('reads CI secrets from FLUXPION_SECRET_* env vars', () => {
+    expect(envNameForSecret('provider.openai.apiKey')).toBe('FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY');
+    const s = new EnvSecretStore({ FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY: 'k' });
     expect(s.get('provider.openai.apiKey')).toBe('k');
     expect(new MemorySecretStore().writable).toBe(true);
   });

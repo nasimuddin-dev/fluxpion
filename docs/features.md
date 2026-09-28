@@ -1,11 +1,11 @@
 ---
 title: Features
-description: Everything ProtoPion does — REST, GraphQL, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
+description: Everything FluxPion does — REST, GraphQL, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
 ---
 
 # Features
 
-ProtoPion combines an API client, a GraphQL playground, an MCP inspector, an LLM playground, an evaluation lab, a test runner, a load tester and a trace viewer. They all share one execution engine, which the [`protopion` CLI](/cli/reference) also uses.
+FluxPion combines an API client, a GraphQL playground, an MCP inspector, an LLM playground, an evaluation lab, a test runner, a load tester and a trace viewer. They all share one execution engine, which the [`fluxpion` CLI](/cli/reference) also uses.
 
 ## REST and HTTP
 
@@ -18,8 +18,8 @@ ProtoPion combines an API client, a GraphQL playground, an MCP inspector, an LLM
 - API key, Basic, Bearer, JWT, OAuth 2.0 (client credentials, password, authorization code with PKCE), custom headers and mTLS, inherited from folders and collections.
 - Responses as a virtualised JSON tree, raw text with search, or an HTML preview, plus headers, cookies and a timing breakdown. Large bodies stream to disk.
 - Save responses as examples of a request (success and error cases), with secrets masked. Postman saved responses import as examples.
-- Mock servers on localhost serve a collection's examples, from the app or with `protopion mock`.
-- Markdown docs for every request and a generated documentation page per collection, exportable as Markdown or with `protopion docs`.
+- Mock servers on localhost serve a collection's examples, from the app or with `fluxpion mock`.
+- Markdown docs for every request and a generated documentation page per collection, exportable as Markdown or with `fluxpion docs`.
 - Pre-request and test scripts in a sandbox, assertions, highlighted variables, one-click cURL export, and a console with every request and its script output.
 - Star frequently used REST or GraphQL requests from their **⋯** menu, then use the star button beside the collection filter to focus the REST sidebar on favorites. Favorites are saved in the collection file and retain their folder context.
 
@@ -45,7 +45,7 @@ Introspect a schema to get autocomplete, validation and hover docs in the editor
 - Tools, resources, resource templates and prompts, with input forms generated from JSON Schema.
 - A protocol trace of every JSON-RPC message, with direction, payloads and latency.
 - **Save as test** turns a tool call into a regression test.
-- The other direction too: `protopion mcp-server` serves your workspace to AI agents as MCP tools (browse collections, send requests, run collections), with secrets redacted.
+- The other direction too: `fluxpion mcp-server` serves your workspace to AI agents as MCP tools (browse collections, send requests, run collections), with secrets redacted.
 
 [MCP guide](/mcp/overview) · [Use from AI agents](/ai-testing/mcp-server)
 

@@ -17,7 +17,7 @@ interface HistoryItem {
   request?: unknown;
 }
 
-const DOCS = 'https://nasimuddin-dev.github.io/protopion/';
+const DOCS = 'https://nasimuddin-dev.github.io/fluxpion/';
 
 function Action({ icon, title, text, onClick }: { icon: ReactNode; title: string; text: string; onClick(): void }) {
   return (
@@ -76,7 +76,7 @@ export function HomeView() {
     <div className="h-full overflow-auto bg-panel/40">
       <div className="max-w-6xl mx-auto px-8 py-8 flex flex-col gap-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{ws ? ws.name : 'Welcome to ProtoPion'}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{ws ? ws.name : 'Welcome to FluxPion'}</h1>
           <p className="text-sm text-muted mt-1">Build, test and debug REST, GraphQL, MCP and AI APIs. Everything stays on this computer.</p>
         </div>
 

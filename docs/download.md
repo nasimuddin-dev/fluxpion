@@ -1,13 +1,13 @@
 ---
 title: Download
-description: Download ProtoPion for Windows (installer or portable), macOS (Apple Silicon and Intel) or Linux (AppImage, .deb, .rpm). Free, self-contained installers from GitHub Releases.
+description: Download FluxPion for Windows (installer or portable), macOS (Apple Silicon and Intel) or Linux (AppImage, .deb, .rpm). Free, self-contained installers from GitHub Releases.
 ---
 
 <script setup>
 import { data as release } from "./data/release.data";
 </script>
 
-# Download ProtoPion
+# Download FluxPion
 
 The current version is **{{ release.version }}**<span v-if="release.date">, released {{ release.date }}</span>. Every installer is self-contained: you don't need Node.js or anything else. The files are hosted on the project's <a :href="release.releaseUrl">GitHub release page</a>, which also lists their SHA-256 checksums.
 
@@ -18,7 +18,7 @@ The current version is **{{ release.version }}**<span v-if="release.date">, rele
 - **Windows:** use the **installer**. Choose the **portable** `.exe` if you can't install software; it keeps no shortcuts, but your workspaces and settings are stored the same way.
 - **macOS:** choose **Apple Silicon** for Macs with an M-series chip, or **Intel** for older Macs. Apple menu → **About This Mac** shows which one you have.
 - **Linux:** the **AppImage** runs on most distributions without installing. Use the **.deb** on Ubuntu and Debian derivatives, or the **.rpm** on Fedora, RHEL and openSUSE, to get a menu entry.
-- **CI servers:** use the [`protopion` CLI](/installation/cli) instead of the desktop app.
+- **CI servers:** use the [`fluxpion` CLI](/installation/cli) instead of the desktop app.
 
 ## Before you install
 
@@ -31,15 +31,15 @@ Each release includes `SHA256SUMS.txt`. Compare the checksum of your file with t
 ::: code-group
 
 ```powershell [Windows]
-Get-FileHash .\ProtoPion-*-setup.exe -Algorithm SHA256
+Get-FileHash .\FluxPion-*-setup.exe -Algorithm SHA256
 ```
 
 ```bash [macOS]
-shasum -a 256 ProtoPion-*.dmg
+shasum -a 256 FluxPion-*.dmg
 ```
 
 ```bash [Linux]
-sha256sum ProtoPion-*
+sha256sum FluxPion-*
 ```
 
 :::
@@ -51,4 +51,4 @@ sha256sum ProtoPion-*
 - [Install on Linux](/installation/linux)
 - [Install the CLI](/installation/cli)
 
-Older versions are on the [GitHub releases page](https://github.com/nasimuddin-dev/protopion/releases). To build from source, see [development](/contributing/development).
+Older versions are on the [GitHub releases page](https://github.com/nasimuddin-dev/fluxpion/releases). To build from source, see [development](/contributing/development).

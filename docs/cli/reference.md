@@ -1,6 +1,6 @@
 ---
 title: "CLI reference"
-description: "Reference for the protopion command-line interface."
+description: "Reference for the fluxpion command-line interface."
 ---
 
 ::: v-pre
@@ -8,19 +8,19 @@ description: "Reference for the protopion command-line interface."
 # CLI reference
 
 ```text
-protopion test [paths...]      Run test files, directories, globs or a *.suite.yaml
-protopion run --suite <name>   Run tests/<name>.suite.yaml from a workspace
-protopion run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
-protopion mock <collection>    Serve a collection's saved examples on localhost
-protopion docs <collection>    Write Markdown documentation for a collection
-protopion export <collection>  Export a collection as Postman v2.1 (or ProtoPion JSON)
-protopion export-environment <name>   Export an environment in Postman's format
-protopion mcp-server           Serve a workspace to AI agents over MCP (stdio)
-protopion load <url>           Safeguarded load test
-protopion import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
-protopion workspace list|create|export
-protopion mcp [--url|--sse] [-- command...]   Inspect an MCP server
-protopion report <results.jsonl>              Re-generate reports
+fluxpion test [paths...]      Run test files, directories, globs or a *.suite.yaml
+fluxpion run --suite <name>   Run tests/<name>.suite.yaml from a workspace
+fluxpion run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
+fluxpion mock <collection>    Serve a collection's saved examples on localhost
+fluxpion docs <collection>    Write Markdown documentation for a collection
+fluxpion export <collection>  Export a collection as Postman v2.1 (or FluxPion JSON)
+fluxpion export-environment <name>   Export an environment in Postman's format
+fluxpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
+fluxpion load <url>           Safeguarded load test
+fluxpion import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
+fluxpion workspace list|create|export
+fluxpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
+fluxpion report <results.jsonl>              Re-generate reports
 ```
 
 ## `test` / `run` options
@@ -32,7 +32,7 @@ protopion report <results.jsonl>              Re-generate reports
 | `-c, --concurrency` | Parallel workers. |
 | `--retries`, `--timeout` | Retries per failing test; per-test timeout in ms. |
 | `-r, --reporter` | `console junit json html markdown` |
-| `-o, --out` | Output directory (default `runs/<runId>` in the workspace, or `./protopion-results/<runId>` outside one). |
+| `-o, --out` | Output directory (default `runs/<runId>` in the workspace, or `./fluxpion-results/<runId>` outside one). |
 | `-t, --tags`, `-g, --grep` | Filter tests. |
 | `--bail` | Stop after the first failure. |
 | `--resume <runId>` | Continue an interrupted run. |
@@ -43,14 +43,14 @@ protopion report <results.jsonl>              Re-generate reports
 
 ## `run-collection`
 
-Runs a collection one request at a time, in order, with its `pm.*` scripts, like Postman's Collection Runner or Newman. `<collection>` is a collection name or id in the workspace, or a collection file (ProtoPion or Postman v2.1 JSON). A collection file runs in a temporary workspace, so your own workspace isn't changed.
+Runs a collection one request at a time, in order, with its `pm.*` scripts, like Postman's Collection Runner or Newman. `<collection>` is a collection name or id in the workspace, or a collection file (FluxPion or Postman v2.1 JSON). A collection file runs in a temporary workspace, so your own workspace isn't changed.
 
 ```bash
 # a collection in the workspace
-protopion run-collection "Veterinary API" -e Development
+fluxpion run-collection "Veterinary API" -e Development
 
 # Newman-style: Postman collection + environment files, one iteration per CSV row
-protopion run-collection api.postman_collection.json -e staging.postman_environment.json -d users.csv -r console junit
+fluxpion run-collection api.postman_collection.json -e staging.postman_environment.json -d users.csv -r console junit
 ```
 
 | Option | Description |
@@ -61,11 +61,11 @@ protopion run-collection api.postman_collection.json -e staging.postman_environm
 | `--delay-request <ms>` | Pause between requests. |
 | `--folder <name...>` | Only run these folders or requests, by name or id (repeatable). |
 | `--bail`, `--timeout` | Stop after the first failure; per-request timeout in ms. |
-| `--cookie-jar <file>` | Start with the cookies in this JSON file (ProtoPion format or a Newman cookie jar). |
+| `--cookie-jar <file>` | Start with the cookies in this JSON file (FluxPion format or a Newman cookie jar). |
 | `--export-cookie-jar <file>` | Write the run's cookie jar to this JSON file afterwards (plain text: keep it out of git). |
 | `-w`, `-r`, `-o`, `--var`, `--trace`, `--baseline` … | Same as `test`. |
 
-Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./protopion-results/<runId>` unless you pass `-o`.
+Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./fluxpion-results/<runId>` unless you pass `-o`.
 
 Exit codes: `0` success, `1` test failure, `2` configuration error, `3` execution error.
 
@@ -74,8 +74,8 @@ Exit codes: `0` success, `1` test failure, `2` configuration error, `3` executio
 Serves the [saved examples](/api-testing/collections#examples) of a collection on `127.0.0.1` until you press Ctrl+C. See [Mock servers](/api-testing/mock-servers) for how requests are matched to examples.
 
 ```bash
-protopion mock "Veterinary API" -p 4545
-protopion mock api.postman_collection.json      # Postman saved responses work too
+fluxpion mock "Veterinary API" -p 4545
+fluxpion mock api.postman_collection.json      # Postman saved responses work too
 ```
 
 | Option | Description |
@@ -90,8 +90,8 @@ protopion mock api.postman_collection.json      # Postman saved responses work t
 Writes the [documentation](/api-testing/collections#documentation) of a collection as Markdown: the collection description, a table of contents, then every folder and request with its description, URL, auth, parameters, headers, body and saved examples. Sensitive values are masked.
 
 ```bash
-protopion docs "Veterinary API" -o API.md
-protopion docs api.postman_collection.json > API.md
+fluxpion docs "Veterinary API" -o API.md
+fluxpion docs api.postman_collection.json > API.md
 ```
 
 | Option | Description |
@@ -105,26 +105,26 @@ protopion docs api.postman_collection.json > API.md
 Convert a collection to a Postman v2.1 collection, or write an environment in Postman's environment format. See [Export](/api-testing/collections#export) for what the Postman format can hold.
 
 ```bash
-protopion export "Veterinary API" -o vet.postman_collection.json
-protopion export my.collection.json -f postman > out.json    # convert a file
-protopion export-environment Staging -o staging.postman_environment.json
+fluxpion export "Veterinary API" -o vet.postman_collection.json
+fluxpion export my.collection.json -f postman > out.json    # convert a file
+fluxpion export-environment Staging -o staging.postman_environment.json
 ```
 
 | Option | Description |
 |---|---|
 | `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
-| `-f, --format` | `postman` (default) or `protopion` (`export` only). |
+| `-f, --format` | `postman` (default) or `fluxpion` (`export` only). |
 | `-o, --out <file>` | Write to a file instead of standard output. |
 
 Parts that Postman can't represent are listed on standard error as `not exported: …`. Secret environment values are never written.
 
 ## `mcp-server`
 
-Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request` and `run_collection`. See [Use ProtoPion from AI agents](/ai-testing/mcp-server).
+Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request` and `run_collection`. See [Use FluxPion from AI agents](/ai-testing/mcp-server).
 
 ```bash
-protopion mcp-server -w my-workspace
-protopion mcp-server --read-only
+fluxpion mcp-server -w my-workspace
+fluxpion mcp-server --read-only
 ```
 
 | Option | Description |

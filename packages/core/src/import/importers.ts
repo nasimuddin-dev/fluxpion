@@ -3,6 +3,7 @@ import type { AuthConfig, BodyConfig, Collection, CollectionFolder, CollectionNo
 import { SCHEMA_VERSION } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { shortId, slugify } from '../util/ids.js';
+import { WORKSPACE_FORMATS } from '../storage/workspace.js';
 
 function newCollection(name: string, items: CollectionNode[], extra: Partial<Collection> = {}): Collection {
   return { schemaVersion: SCHEMA_VERSION, id: slugify(name) + '-' + shortId().slice(-4), name, version: 0, variables: [], items, updatedAt: new Date().toISOString(), ...extra };
@@ -23,7 +24,7 @@ export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 
   if (d.info?._postman_id || String(d.info?.schema ?? '').includes('postman')) return 'postman';
   if (d._postman_variable_scope === 'environment' || (Array.isArray(d.values) && d.name)) return 'postman-env';
   if (d.log?.entries) return 'har';
-  if (d.format === 'protopion-workspace' || d.format === 'protolens-workspace') return 'aps-workspace';
+  if (WORKSPACE_FORMATS.has(d.format)) return 'aps-workspace';
   if (d.schemaVersion && Array.isArray(d.items)) return 'aps-collection';
   return 'unknown';
 }
@@ -344,7 +345,7 @@ export function importAny(text: string): { format: string; collection?: Collecti
     }
     default:
       throw new ApsError('ValidationError', `Unrecognised import format (${format})`, {
-        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, HAR, ProtoPion collections and workspace exports.'],
+        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, HAR, FluxPion collections and workspace exports.'],
       });
   }
 }

@@ -88,7 +88,7 @@ export function SettingsView() {
               <div className="rounded-md border border-line p-3 text-sm flex flex-col gap-1">
                 <div className="font-medium">Telemetry</div>
                 <p className="text-muted">
-                  Telemetry is <b>disabled</b> and not implemented in this build. ProtoPion never transmits request bodies, prompts, responses or credentials anywhere except to the endpoints and providers you
+                  Telemetry is <b>disabled</b> and not implemented in this build. FluxPion never transmits request bodies, prompts, responses or credentials anywhere except to the endpoints and providers you
                   explicitly call.
                 </p>
               </div>
@@ -184,7 +184,7 @@ export function SettingsView() {
           )}
           {tab === 'about' && (
             <div className="text-sm flex flex-col gap-2">
-              <div className="text-lg font-semibold">ProtoPion {info?.appVersion}</div>
+              <div className="text-lg font-semibold">FluxPion {info?.appVersion}</div>
               <div className="flex items-center gap-3 flex-wrap">
                 <Toggle checked={s.checkForUpdates !== false} onChange={(checkForUpdates) => set({ checkForUpdates })} label="Check for updates when the app starts" />
                 <Button size="sm" onClick={() => void checkForUpdates({ manual: true })}>

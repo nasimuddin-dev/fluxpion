@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping build ProtoPion.
+Thanks for helping build FluxPion.
 
 ## Setup
 
@@ -18,7 +18,7 @@ npm run typecheck
 Follow the engineering rules in the SRS (§72). The most important are:
 
 1. Keep protocol adapters independent of each other, and keep UI state separate from execution state.
-2. Never block the renderer. All execution happens in `@protopion/core` behind the backend RPC.
+2. Never block the renderer. All execution happens in `@fluxpion/core` behind the backend RPC.
 3. Use bounded concurrency and streaming, and never load unbounded data into memory.
 4. Never expose secrets. Route every persisted or logged artefact through the `Redactor`.
 5. Label AI-generated output, and don't make AI evaluation the only source of truth for deterministic requirements.

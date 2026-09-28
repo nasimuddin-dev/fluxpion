@@ -1,7 +1,7 @@
 name: Documentation website
 
 # Builds the VitePress site in docs/ and deploys it to GitHub Pages
-# (https://nasimuddin-dev.github.io/protopion/). Pull requests are built but not deployed.
+# (https://nasimuddin-dev.github.io/fluxpion/). Pull requests are built but not deployed.
 on:
   push:
     branches: [main]

@@ -1,16 +1,16 @@
 # Installers for Windows, macOS and Linux (electron-builder).
 # Asset names are stable so the website and README can link to them:
-#   ProtoPion-<version>-windows-x64-setup.exe     Windows installer (NSIS)
-#   ProtoPion-<version>-windows-x64-portable.exe  Windows portable (no install)
-#   ProtoPion-<version>-macos-arm64.dmg            Apple Silicon
-#   ProtoPion-<version>-macos-x64.dmg              Intel
-#   ProtoPion-<version>-linux-x86_64.AppImage
-#   ProtoPion-<version>-linux-amd64.deb
-#   ProtoPion-<version>-linux-x86_64.rpm
-# kept from the Protolens name so installed copies update in place and keep their settings
+#   FluxPion-<version>-windows-x64-setup.exe     Windows installer (NSIS)
+#   FluxPion-<version>-windows-x64-portable.exe  Windows portable (no install)
+#   FluxPion-<version>-macos-arm64.dmg            Apple Silicon
+#   FluxPion-<version>-macos-x64.dmg              Intel
+#   FluxPion-<version>-linux-x86_64.AppImage
+#   FluxPion-<version>-linux-amd64.deb
+#   FluxPion-<version>-linux-x86_64.rpm
+# kept from the first name (Protolens) so installed copies update in place and keep their settings
 appId: dev.nasimuddin.protolens
-productName: ProtoPion
-copyright: Copyright © 2026 ProtoPion contributors
+productName: FluxPion
+copyright: Copyright © 2026 FluxPion contributors
 electronVersion: 44.4.5
 directories:
   output: release
@@ -29,12 +29,12 @@ npmRebuild: false
 publish:
   - provider: github
     owner: nasimuddin-dev
-    repo: protopion
+    repo: fluxpion
     releaseType: release
 extraMetadata:
   main: dist-electron/main.cjs
-  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "ProtoPion"
-  name: protopion
+  # package / executable name on Linux (.deb, .rpm, binary); the display name stays "FluxPion"
+  name: fluxpion
 
 win:
   target:
@@ -49,10 +49,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: ProtoPion
-  artifactName: ProtoPion-${version}-windows-${arch}-setup.${ext}
+  shortcutName: FluxPion
+  artifactName: FluxPion-${version}-windows-${arch}-setup.${ext}
 portable:
-  artifactName: ProtoPion-${version}-windows-${arch}-portable.${ext}
+  artifactName: FluxPion-${version}-windows-${arch}-portable.${ext}
 
 mac:
   target:
@@ -63,9 +63,9 @@ mac:
   # Unsigned builds are ad-hoc signed so they run on Apple Silicon; notarization needs an Apple ID.
   identity: "-"
   hardenedRuntime: false
-  artifactName: ProtoPion-${version}-macos-${arch}.${ext}
+  artifactName: FluxPion-${version}-macos-${arch}.${ext}
 dmg:
-  title: ProtoPion ${version}
+  title: FluxPion ${version}
 
 linux:
   target:
@@ -76,14 +76,14 @@ linux:
     - target: rpm
       arch: [x64]
   category: Development
-  executableName: protopion
+  executableName: fluxpion
   icon: build/icon.png
-  maintainer: ProtoPion contributors <noreply@github.com>
+  maintainer: FluxPion contributors <noreply@github.com>
   synopsis: Test and debug REST, GraphQL, MCP and AI systems
   description: Local-first desktop app for testing, debugging and evaluating REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents.
 appImage:
-  artifactName: ProtoPion-${version}-linux-x86_64.${ext}
+  artifactName: FluxPion-${version}-linux-x86_64.${ext}
 deb:
-  artifactName: ProtoPion-${version}-linux-amd64.${ext}
+  artifactName: FluxPion-${version}-linux-amd64.${ext}
 rpm:
-  artifactName: ProtoPion-${version}-linux-x86_64.${ext}
+  artifactName: FluxPion-${version}-linux-x86_64.${ext}

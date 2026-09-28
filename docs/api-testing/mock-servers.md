@@ -20,13 +20,13 @@ The server follows the collection: examples you save, rename or delete are serve
 **From the CLI:**
 
 ```bash
-protopion mock "Veterinary API" -p 4545
+fluxpion mock "Veterinary API" -p 4545
 # Mock server for Veterinary API: http://127.0.0.1:4545
 #   GET     /patients/1 → 200 Patient found
 #   GET     /patients/999 → 404 Patient not found
 ```
 
-A Postman collection file with saved responses works too: `protopion mock api.postman_collection.json`.
+A Postman collection file with saved responses works too: `fluxpion mock api.postman_collection.json`.
 
 ## How a request finds its example
 

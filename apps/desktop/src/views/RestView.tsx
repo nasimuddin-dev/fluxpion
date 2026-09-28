@@ -878,7 +878,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
         </>
       }
     >
-      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, or ProtoPion collections.</p>
+      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, or FluxPion collections.</p>
       <textarea className="field mono w-full h-64 text-xs" placeholder="Paste a document here…" value={text} onChange={(e) => setText(e.target.value)} />
     </Modal>
   );

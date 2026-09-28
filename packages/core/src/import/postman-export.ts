@@ -6,7 +6,7 @@ import type { AuthConfig, BodyConfig, CheckConfig, Collection, CollectionNode, E
  * Postman / Newman without loss where the formats overlap. The importer (`importPostman`) reads
  * everything written here back.
  *
- * Not representable in Postman: ProtoPion assertions other than `status` (the status check becomes
+ * Not representable in Postman: FluxPion assertions other than `status` (the status check becomes
  * a `pm.test`), JWT auth, per-request cookies tables (sent as a Cookie header), and non-HTTP requests
  * other than GraphQL. `postmanExportNotes` lists what was left out.
  */
@@ -237,6 +237,6 @@ export function exportPostmanEnvironment(env: Environment): Record<string, unkno
     name: env.name,
     values: env.variables.filter((v) => v.key).map((v) => ({ key: v.key, value: v.secret ? '' : v.value ?? '', type: v.secret ? 'secret' : 'default', enabled: v.enabled !== false })),
     _postman_variable_scope: 'environment',
-    _postman_exported_using: 'ProtoPion',
+    _postman_exported_using: 'FluxPion',
   };
 }

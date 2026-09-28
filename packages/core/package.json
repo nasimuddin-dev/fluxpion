@@ -1,7 +1,7 @@
 {
-  "name": "@protopion/core",
+  "name": "@fluxpion/core",
   "version": "0.4.0",
-  "description": "ProtoPion core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
+  "description": "FluxPion core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

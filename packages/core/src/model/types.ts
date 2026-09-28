@@ -1,5 +1,5 @@
 /**
- * Core domain model for ProtoPion.
+ * Core domain model for FluxPion.
  *
  * Everything persisted to disk or exchanged between the engine, the desktop UI and
  * the CLI is described here. Types are intentionally plain JSON-serialisable data.

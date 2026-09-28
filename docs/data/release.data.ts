@@ -7,7 +7,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const REPO = 'https://github.com/nasimuddin-dev/protopion';
+const REPO = 'https://github.com/nasimuddin-dev/fluxpion';
 
 export interface Installer {
   label: string;
@@ -46,17 +46,17 @@ export default {
       date,
       releaseUrl: `${REPO}/releases/tag/v${version}`,
       windows: [
-        make('Installer (x64)', `ProtoPion-${version}-windows-x64-setup.exe`, 'Recommended. Adds Start menu and desktop shortcuts; install for yourself or for all users.'),
-        make('Portable (x64)', `ProtoPion-${version}-windows-x64-portable.exe`, 'Runs without installing — for locked-down PCs or USB sticks.'),
+        make('Installer (x64)', `FluxPion-${version}-windows-x64-setup.exe`, 'Recommended. Adds Start menu and desktop shortcuts; install for yourself or for all users.'),
+        make('Portable (x64)', `FluxPion-${version}-windows-x64-portable.exe`, 'Runs without installing — for locked-down PCs or USB sticks.'),
       ],
       macos: [
-        make('Apple Silicon (M1 and later)', `ProtoPion-${version}-macos-arm64.dmg`, 'Disk image for Macs with Apple chips.'),
-        make('Intel', `ProtoPion-${version}-macos-x64.dmg`, 'Disk image for Macs with Intel processors.'),
+        make('Apple Silicon (M1 and later)', `FluxPion-${version}-macos-arm64.dmg`, 'Disk image for Macs with Apple chips.'),
+        make('Intel', `FluxPion-${version}-macos-x64.dmg`, 'Disk image for Macs with Intel processors.'),
       ],
       linux: [
-        make('AppImage (x86_64)', `ProtoPion-${version}-linux-x86_64.AppImage`, 'Runs on most distributions without installation.'),
-        make('.deb (amd64)', `ProtoPion-${version}-linux-amd64.deb`, 'Ubuntu, Debian, Linux Mint, Pop!_OS.'),
-        make('.rpm (x86_64)', `ProtoPion-${version}-linux-x86_64.rpm`, 'Fedora, RHEL, Rocky Linux, openSUSE.'),
+        make('AppImage (x86_64)', `FluxPion-${version}-linux-x86_64.AppImage`, 'Runs on most distributions without installation.'),
+        make('.deb (amd64)', `FluxPion-${version}-linux-amd64.deb`, 'Ubuntu, Debian, Linux Mint, Pop!_OS.'),
+        make('.rpm (x86_64)', `FluxPion-${version}-linux-x86_64.rpm`, 'Fedora, RHEL, Rocky Linux, openSUSE.'),
       ],
     };
   },

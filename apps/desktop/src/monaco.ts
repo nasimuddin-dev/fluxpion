@@ -19,7 +19,7 @@ loader.config({ monaco });
 
 // Script editor IntelliSense for the Postman-compatible pm API. Scripts run as a function body,
 // so a top-level `return` is allowed (TS 1108).
-monaco.typescript.javascriptDefaults.addExtraLib(PM_TYPES, 'file:///protopion/pm.d.ts');
+monaco.typescript.javascriptDefaults.addExtraLib(PM_TYPES, 'file:///fluxpion/pm.d.ts');
 monaco.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false, diagnosticCodesToIgnore: [1108] });
 monaco.typescript.javascriptDefaults.setCompilerOptions({ target: monaco.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, checkJs: false, lib: ['es2020'] });
 

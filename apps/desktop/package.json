@@ -1,9 +1,9 @@
 {
-  "name": "@protopion/desktop",
-  "productName": "ProtoPion",
+  "name": "@fluxpion/desktop",
+  "productName": "FluxPion",
   "version": "0.4.0",
   "private": true,
-  "description": "ProtoPion desktop application",
+  "description": "FluxPion desktop application",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -21,7 +21,7 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@monaco-editor/react": "^4.7.0",
-    "@protopion/core": "0.4.0",
+    "@fluxpion/core": "0.4.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-popover": "^1.1.23",
@@ -52,14 +52,14 @@
     "zustand": "^5.0.15"
   },
   "author": {
-    "name": "ProtoPion contributors",
+    "name": "FluxPion contributors",
     "email": "noreply@github.com",
-    "url": "https://github.com/nasimuddin-dev/protopion"
+    "url": "https://github.com/nasimuddin-dev/fluxpion"
   },
-  "homepage": "https://nasimuddin-dev.github.io/protopion/",
+  "homepage": "https://nasimuddin-dev.github.io/fluxpion/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nasimuddin-dev/protopion.git"
+    "url": "https://github.com/nasimuddin-dev/fluxpion.git"
   },
   "license": "MIT"
 }

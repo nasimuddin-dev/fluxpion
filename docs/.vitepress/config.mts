@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 // The application version is read from the root package.json, never typed here.
 const app = JSON.parse(readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'));
 
-export const REPO = 'https://github.com/nasimuddin-dev/protopion';
-const SITE = 'https://nasimuddin-dev.github.io/protopion/';
-const BASE = '/protopion/';
+export const REPO = 'https://github.com/nasimuddin-dev/fluxpion';
+const SITE = 'https://nasimuddin-dev.github.io/fluxpion/';
+const BASE = '/fluxpion/';
 const SOCIAL_IMAGE = `${SITE}images/social-preview.jpg`;
 
 /** Page URL (clean URLs) for a source file such as `mcp/tools.md`. */
@@ -25,7 +25,7 @@ function structuredData(relativePath: string, title: string, description: string
       {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'ProtoPion',
+        name: 'FluxPion',
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Windows 10, Windows 11, macOS 12 or later, Linux',
         softwareVersion: app.version,
@@ -34,7 +34,7 @@ function structuredData(relativePath: string, title: string, description: string
         downloadUrl: `${REPO}/releases/latest`,
         screenshot: SOCIAL_IMAGE,
       },
-      { '@context': 'https://schema.org', '@type': 'WebSite', name: 'ProtoPion', url: SITE },
+      { '@context': 'https://schema.org', '@type': 'WebSite', name: 'FluxPion', url: SITE },
     ];
   }
   const parts = relativePath.replace(/(^|\/)index\.md$/, '').replace(/\.md$/, '').split('/').filter(Boolean);
@@ -151,9 +151,9 @@ const DOC_SECTIONS = ['getting-started', 'installation', 'api-testing', 'graphql
 
 export default defineConfig({
   lang: 'en-US',
-  title: 'ProtoPion',
-  titleTemplate: ':title | ProtoPion',
-  description: 'ProtoPion is a local-first desktop app and CLI for testing and debugging REST, GraphQL and MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.',
+  title: 'FluxPion',
+  titleTemplate: ':title | FluxPion',
+  description: 'FluxPion is a local-first desktop app and CLI for testing and debugging REST, GraphQL and MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.',
   base: BASE,
   cleanUrls: true,
   lastUpdated: true,
@@ -163,10 +163,10 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}logo.svg` }],
     ['meta', { name: 'theme-color', content: '#1d4ed8' }],
-    ['meta', { property: 'og:site_name', content: 'ProtoPion' }],
+    ['meta', { property: 'og:site_name', content: 'FluxPion' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:image', content: SOCIAL_IMAGE }],
-    ['meta', { property: 'og:image:alt', content: 'ProtoPion sending a REST request from a collection, with the JSON response and passing assertions' }],
+    ['meta', { property: 'og:image:alt', content: 'FluxPion sending a REST request from a collection, with the JSON response and passing assertions' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
     ['meta', { name: 'twitter:image', content: SOCIAL_IMAGE }],
   ],
@@ -186,7 +186,7 @@ export default defineConfig({
   },
   themeConfig: {
     logo: { src: '/logo.svg', alt: '' },
-    siteTitle: 'ProtoPion',
+    siteTitle: 'FluxPion',
     nav: [
       { text: 'Download', link: '/download' },
       { text: 'Features', link: '/features' },
@@ -203,12 +203,12 @@ export default defineConfig({
       },
     ],
     sidebar: Object.fromEntries(DOC_SECTIONS.map((s) => [`/${s}/`, docsSidebar])),
-    socialLinks: [{ icon: 'github', link: REPO, ariaLabel: 'ProtoPion on GitHub' }],
+    socialLinks: [{ icon: 'github', link: REPO, ariaLabel: 'FluxPion on GitHub' }],
     editLink: { pattern: `${REPO}/edit/main/docs/:path`, text: 'Edit this page on GitHub' },
     search: { provider: 'local' },
     outline: { level: [2, 3] },
     footer: {
-      message: `ProtoPion ${app.version} · MIT License · <a href="${REPO}">GitHub</a> · <a href="${REPO}/issues">Issues</a> · <a href="${REPO}/releases">Releases</a>`,
+      message: `FluxPion ${app.version} · MIT License · <a href="${REPO}">GitHub</a> · <a href="${REPO}/issues">Issues</a> · <a href="${REPO}/releases">Releases</a>`,
     },
   },
 });

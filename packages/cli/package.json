@@ -1,12 +1,13 @@
 {
-  "name": "@protopion/cli",
+  "name": "@fluxpion/cli",
   "version": "0.4.0",
-  "description": "ProtoPion command-line runner for local and CI/CD test execution.",
+  "description": "FluxPion command-line runner for local and CI/CD test execution.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "protopion": "./bin/protopion.js",
-    "protolens": "./bin/protopion.js"
+    "fluxpion": "./bin/fluxpion.js",
+    "protopion": "./bin/fluxpion.js",
+    "protolens": "./bin/fluxpion.js"
   },
   "files": [
     "bin",
@@ -17,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@protopion/core": "0.4.0",
+    "@fluxpion/core": "0.4.0",
     "commander": "^15.0.0"
   }
 }

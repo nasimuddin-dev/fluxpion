@@ -24,4 +24,4 @@ examples/veterinary-workspace/collections/.keep
 .claude/dev-routine/
 
 # CLI results written outside a workspace
-protopion-results/
+fluxpion-results/

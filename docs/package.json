@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "ProtoPion website and documentation (VitePress, deployed to GitHub Pages).",
+  "description": "FluxPion website and documentation (VitePress, deployed to GitHub Pages).",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",

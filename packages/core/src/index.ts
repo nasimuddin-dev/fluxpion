@@ -1,6 +1,6 @@
 /**
- * @protopion/core — the ProtoPion execution engine.
- * Shared by the desktop application and the `protopion` CLI.
+ * @fluxpion/core — the FluxPion execution engine.
+ * Shared by the desktop application and the `fluxpion` CLI.
  */
 export * from './model/types.js';
 export * from './errors.js';
@@ -42,7 +42,7 @@ export * from './report/collection-docs.js';
 
 export * from './load/load.js';
 export * from './mock/mock-server.js';
-export * from './mcp-server/protopion-mcp.js';
+export * from './mcp-server/fluxpion-mcp.js';
 
 export * from './storage/fsutil.js';
 export * from './storage/secrets.js';

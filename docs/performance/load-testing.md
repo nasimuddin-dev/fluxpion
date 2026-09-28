@@ -14,7 +14,7 @@ LLM targets also report tokens per second, input and output tokens, estimated co
 **Safeguards:** by default, only localhost and private-network hosts can be targeted. Remote hosts require an explicit opt-in and a confirmation. Environments marked as production are blocked unless you allow that environment for the run. The number of virtual users is capped in Settings. Only load test systems you own or are authorised to test.
 
 ```bash
-protopion load http://127.0.0.1:4010/health --vus 50 --duration 30 --ramp-up 5
+fluxpion load http://127.0.0.1:4010/health --vus 50 --duration 30 --ramp-up 5
 ```
 
 :::

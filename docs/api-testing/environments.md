@@ -17,7 +17,7 @@ description: "Variable scopes and precedence, secret variables, dynamic variable
 
 ## Secrets
 
-Mark a variable as **secret** (lock icon) and its value is encrypted in the OS credential store: Windows DPAPI, macOS Keychain or Linux Secret Service. The workspace file only records that the variable exists. In CI, supply the value as the environment variable `PROTOPION_SECRET_ENV_<ENVID>_<KEY>`, for example `PROTOPION_SECRET_ENV_STAGING_ACCESSTOKEN`.
+Mark a variable as **secret** (lock icon) and its value is encrypted in the OS credential store: Windows DPAPI, macOS Keychain or Linux Secret Service. The workspace file only records that the variable exists. In CI, supply the value as the environment variable `FLUXPION_SECRET_ENV_<ENVID>_<KEY>`, for example `FLUXPION_SECRET_ENV_STAGING_ACCESSTOKEN`.
 
 ## Quick look
 
@@ -25,7 +25,7 @@ Click the **eye** button next to the environment selector to see the active envi
 
 ## Export
 
-**Export** in an environment's toolbar writes it in Postman's environment format, which Postman and Newman read, and so does `protopion run-collection -e`. Secret variables are included by name only: the value is empty and the type is `secret`. The CLI equivalent is `protopion export-environment <name> -o file.json`.
+**Export** in an environment's toolbar writes it in Postman's environment format, which Postman and Newman read, and so does `fluxpion run-collection -e`. Secret variables are included by name only: the value is empty and the type is `secret`. The CLI equivalent is `fluxpion export-environment <name> -o file.json`.
 
 ## Production
 
