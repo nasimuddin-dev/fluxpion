@@ -104,6 +104,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
       applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
       if (s.error) throw new ApsError('ScriptError', `Pre-request script failed: ${s.error}`);
       if (s.logs.length) metadata.preRequestLogs = s.logs.slice(0, 100);
+      if (s.sentRequests?.length) metadata.sentRequests = s.sentRequests.map((r) => ({ ...r, url: svc.redactor.redactUrl(r.url) }));
       if (test.type === 'http' && s.request) {
         const body = test.request.body && 'content' in test.request.body && s.request.body !== undefined ? { ...test.request.body, content: s.request.body } : test.request.body;
         test = { ...test, request: { ...test.request, method: s.request.method, url: s.request.url, headers: s.request.headers, body } };
@@ -165,6 +166,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
     for (const t of s.tests) scriptChecks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
     if (s.error) scriptChecks.push({ type: 'script', name: 'test script', passed: false, source: 'deterministic', message: s.error });
     if (s.logs.length) metadata.scriptLogs = s.logs.slice(0, 100);
+    if (s.sentRequests?.length) metadata.sentRequests = [...((metadata.sentRequests as unknown[]) ?? []), ...s.sentRequests.map((r) => ({ ...r, url: svc.redactor.redactUrl(r.url) }))];
   }
 
   // check configs may reference variables, e.g. dataset fields: `expected: "{{expected}}"`

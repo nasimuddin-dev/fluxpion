@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Console:** `pm.sendRequest` calls made by runs (test runner, Collection Runner) are listed under their request, and recorded as `sentRequests` in the run results.
 - **Console:** GraphQL operations sent from the GraphQL view now appear in the Console, badged **GraphQL**, with the redacted query, variables, response and failures.
 - **Fix:** the last request tab could not be closed; closing it replaced it with a new "Untitled request". Closing every tab now leaves an empty editor with **New request** and **Describe with AI**, which is also kept after a restart.
 

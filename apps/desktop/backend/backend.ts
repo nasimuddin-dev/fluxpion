@@ -264,7 +264,14 @@ export class Backend {
   /** Requests made by runs (test runner, Collection Runner) appear in the console too, without bodies. */
   private consoleFromResult(r: TestResult, runName: string, redactor: Redactor): void {
     if (r.type !== 'http' && r.type !== 'graphql') return;
-    const m = (r.metadata ?? {}) as { url?: string; method?: string; size?: number; preRequestLogs?: string[]; scriptLogs?: string[] };
+    const m = (r.metadata ?? {}) as {
+      url?: string;
+      method?: string;
+      size?: number;
+      preRequestLogs?: string[];
+      scriptLogs?: string[];
+      sentRequests?: Array<{ method: string; url: string; status?: number; error?: string; durationMs?: number }>;
+    };
     const status = r.checks.find((c) => c.type === 'status')?.actual;
     this.consoleEntry({
       id: r.id,
@@ -277,7 +284,11 @@ export class Backend {
       status: typeof status === 'number' ? status : r.error ? r.error.kind : r.status,
       durationMs: r.latencyMs,
       size: m.size,
-      logs: [...(m.preRequestLogs ?? []).map((message) => ({ phase: 'pre-request' as const, message: redactor.redactString(message) })), ...(m.scriptLogs ?? []).map((message) => ({ phase: 'test' as const, message: redactor.redactString(message) }))],
+      logs: [
+        ...(m.preRequestLogs ?? []).map((message) => ({ phase: 'pre-request' as const, message: redactor.redactString(message) })),
+        ...(m.scriptLogs ?? []).map((message) => ({ phase: 'test' as const, message: redactor.redactString(message) })),
+        ...(m.sentRequests ?? []).map((s) => ({ phase: 'test' as const, message: `pm.sendRequest ${s.method} ${s.url} → ${s.error ? `error: ${s.error}` : `${s.status} (${s.durationMs} ms)`}` })),
+      ],
       error: r.error?.message,
       failedChecks: r.checks.filter((c) => !c.passed).length,
     });

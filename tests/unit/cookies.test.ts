@@ -196,8 +196,11 @@ describe('pm.cookies.jar()', () => {
         testScript: `pm.test('authorised', () => pm.response.to.have.status(200));`,
       },
     ] as TestCase[];
-    const summary = await runTests({ name: 'send', runId: 'r2', tests, services: svc, concurrency: 1 });
+    let meta: Record<string, unknown> | undefined;
+    const summary = await runTests({ name: 'send', runId: 'r2', tests, services: svc, concurrency: 1, onEvent: (e) => e.type === 'test-end' && (meta = e.result.metadata) });
     expect(summary.passed).toBe(1);
+    // the calls are recorded on the result (for the Console and reports)
+    expect((meta?.sentRequests as Array<{ method: string; status: number }>).map((r) => `${r.method} ${r.status}`)).toEqual(['POST 200', 'POST 200']);
     // the login inside the script went through the shared cookie jar
     expect(svc.cookieJar!.list().map((c) => c.name).sort()).toEqual(['clinic', 'vet_session']);
   });

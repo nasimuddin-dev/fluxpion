@@ -98,7 +98,7 @@ pm.sendRequest({
 
 - The request is a URL string or a Postman request object (`url`, `method`, `header` as a list or map, `body` with `mode: "raw"` or `"urlencoded"`). As in Postman, `{{variables}}` are not resolved automatically: use `pm.variables.replaceIn()`.
 - The response has `code`, `status`, `responseTime`, `headers`, `json()` and `text()`. On a network error, the callback gets `err` and `null`.
-- Requests share the run's cookie jar, time out like other requests, and appear in the [Console](#console) under the script's request.
+- Requests share the run's cookie jar, time out like other requests, and appear in the [Console](#console) under the script's request, whether the request was sent from a tab or by a run (they are also recorded as `sentRequests` in the run's results).
 - **How it works:** the sandbox is synchronous, so the script runs, its requests are sent, then the script runs again from the start with the responses, and callbacks run immediately. Only the last run's variables, tests and logs count. So a request made inside a callback also has its callback run inside, before later callbacks. Keep scripts deterministic around `pm.sendRequest` (avoid a random URL per run). A script may send at most 20 requests.
 
 **Current values:** values set with `pm.environment.set`, `pm.collectionVariables.set` or `pm.globals.set` are kept on this machine as *current values* and override the stored values. They're never written to workspace files. Sensitive ones (tokens, passwords, secret variables) are encrypted. You can see and reset them under **Environments**.
