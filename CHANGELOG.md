@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.5.0 — 2026-09-27
+
 - **ProtoPion is now FluxPion.** New name for the app, the `fluxpion` CLI (`protopion` and `protolens` still work as aliases), the `@fluxpion/*` packages, the documentation site (https://nasimuddin-dev.github.io/fluxpion/) and the GitHub repository (nasimuddin-dev/fluxpion). Nothing to do when upgrading: the app updates in place and keeps its settings and saved secrets, the data folder (`~/.protopion` or `~/.protolens`) moves to `~/.fluxpion`, `PROTOPION_*` / `PROTOLENS_*` variables still work, and workspace exports from ProtoPion and Protolens still import. On macOS, secrets saved in the Keychain may need to be entered again.
 
 ## 0.4.0 — 2026-09-27

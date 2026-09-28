@@ -1,6 +1,6 @@
 {
   "name": "@fluxpion/core",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "FluxPion core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",

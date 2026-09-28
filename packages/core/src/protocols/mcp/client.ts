@@ -152,7 +152,7 @@ export class McpSession {
     readonly config: McpServerConfig,
     private redactor?: Redactor,
   ) {
-    this.client = new Client({ name: 'fluxpion', version: '0.4.0' }, { capabilities: {} });
+    this.client = new Client({ name: 'fluxpion', version: '0.5.0' }, { capabilities: {} });
   }
 
   onEvent(l: McpEventListener): () => void {

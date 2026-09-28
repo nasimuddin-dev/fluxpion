@@ -538,7 +538,7 @@ export function buildProgram(): Command {
   program
     .name('fluxpion')
     .description('FluxPion CLI — run REST, GraphQL, MCP and AI tests locally and in CI/CD.\n\nExit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error')
-    .version('0.4.0');
+    .version('0.5.0');
 
   runOptions(program.command('test').description('run tests from files, directories, globs or a *.suite.yaml').argument('[paths...]', 'test files/dirs/globs')).action(async (paths: string[], o: RunCliOptions) => {
     process.exitCode = await executeRun(paths, o);
