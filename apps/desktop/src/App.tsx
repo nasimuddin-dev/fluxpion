@@ -1,40 +1,37 @@
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { Spinner, TooltipProvider } from './components/ui';
-import { RestView } from './views/RestView';
-import { HomeView } from './views/HomeView';
-import { GraphQLView } from './views/GraphQLView';
-import { WebSocketView } from './views/WebSocketView';
-import { McpView } from './views/McpView';
-import { AiLabView } from './views/AiLabView';
-import { EvaluationsView } from './views/EvaluationsView';
-import { TestsView } from './views/TestsView';
-import { LoadView } from './views/LoadView';
-import { TracesView } from './views/TracesView';
-import { CollectionsView } from './views/CollectionsView';
-import { HistoryView } from './views/HistoryView';
-import { EnvironmentsView } from './views/EnvironmentsView';
-import { SettingsView } from './views/SettingsView';
 
-const VIEWS: Record<ViewId, ComponentType> = {
-  home: HomeView,
-  rest: RestView,
-  graphql: GraphQLView,
-  websocket: WebSocketView,
-  mcp: McpView,
-  ai: AiLabView,
-  evaluations: EvaluationsView,
-  tests: TestsView,
-  load: LoadView,
-  traces: TracesView,
-  collections: CollectionsView,
-  history: HistoryView,
-  environments: EnvironmentsView,
-  settings: SettingsView,
+/**
+ * Each tool is a separate product surface. Loading it only when selected keeps
+ * startup fast and, importantly, defers Monaco and protocol-specific code until
+ * it is useful. Named exports keep view modules simple.
+ */
+const view = (load: () => Promise<any>, name: string) => lazy(async () => ({ default: (await load())[name] as ComponentType }));
+const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
+  home: view(() => import('./views/HomeView'), 'HomeView'),
+  rest: view(() => import('./views/RestView'), 'RestView'),
+  graphql: view(() => import('./views/GraphQLView'), 'GraphQLView'),
+  websocket: view(() => import('./views/WebSocketView'), 'WebSocketView'),
+  mcp: view(() => import('./views/McpView'), 'McpView'),
+  ai: view(() => import('./views/AiLabView'), 'AiLabView'),
+  evaluations: view(() => import('./views/EvaluationsView'), 'EvaluationsView'),
+  tests: view(() => import('./views/TestsView'), 'TestsView'),
+  load: view(() => import('./views/LoadView'), 'LoadView'),
+  traces: view(() => import('./views/TracesView'), 'TracesView'),
+  collections: view(() => import('./views/CollectionsView'), 'CollectionsView'),
+  history: view(() => import('./views/HistoryView'), 'HistoryView'),
+  environments: view(() => import('./views/EnvironmentsView'), 'EnvironmentsView'),
+  settings: view(() => import('./views/SettingsView'), 'SettingsView'),
 };
+
+// Keeping a few recently used screens mounted preserves short-lived work (such
+// as a stream or an unsaved request), without letting every editor and listener
+// in a long session consume memory and CPU indefinitely.
+const MAX_CACHED_VIEWS = 4;
 
 function useThemeEffect() {
   const settings = useApp((s) => s.settings);
@@ -62,16 +59,22 @@ export default function App() {
   const workspace = useApp((s) => s.workspace);
   const [ready, setReady] = useState(false);
   // keep visited views mounted so drafts, live sessions and streams survive navigation
-  const [visited, setVisited] = useState<Set<ViewId>>(new Set([view]));
+  const [visited, setVisited] = useState<ViewId[]>([view]);
   useThemeEffect();
 
   useEffect(() => {
     void (async () => {
-      const [info, settings] = await Promise.all([call('app.info'), call('settings.get')]);
-      useApp.getState().set({ info, settings });
-      await useApp.getState().refreshWorkspace();
-      setReady(true);
-      scheduleUpdateCheck();
+      try {
+        const [info, settings] = await Promise.all([call('app.info'), call('settings.get')]);
+        useApp.getState().set({ info, settings });
+        await useApp.getState().refreshWorkspace();
+        scheduleUpdateCheck();
+      } catch (error) {
+        useApp.getState().toast(`Could not finish starting Protolens: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      } finally {
+        // The shell remains usable if a workspace service is temporarily down.
+        setReady(true);
+      }
     })();
     const off = on('run.error', (p: { error: { message: string } }) => useApp.getState().toast(`Run failed: ${p.error.message}`, 'error'));
     const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
@@ -81,9 +84,14 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => setVisited((v) => (v.has(view) ? v : new Set([...v, view]))), [view]);
+  useEffect(() => {
+    setVisited((cached) => {
+      const next = [...cached.filter((id) => id !== view), view];
+      return next.length > MAX_CACHED_VIEWS ? next.slice(-MAX_CACHED_VIEWS) : next;
+    });
+  }, [view]);
   // re-mount views when the workspace changes
-  useEffect(() => setVisited(new Set([useApp.getState().view])), [workspace?.id]);
+  useEffect(() => setVisited([useApp.getState().view]), [workspace?.id]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -155,11 +163,13 @@ export default function App() {
         <Sidebar />
         <main className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0 relative">
-            {[...visited].map((id) => {
+            {visited.map((id) => {
               const V = VIEWS[id];
               return (
                 <div key={`${workspace?.id}-${id}`} className="absolute inset-0 flex flex-col" style={{ display: id === view ? 'flex' : 'none' }}>
-                  <V />
+                  <Suspense fallback={<div className="h-full grid place-items-center"><Spinner size={20} /></div>}>
+                    <V />
+                  </Suspense>
                 </div>
               );
             })}

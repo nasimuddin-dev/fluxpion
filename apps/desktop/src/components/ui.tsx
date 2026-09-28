@@ -342,6 +342,8 @@ export function VirtualList<T>({
   const ref = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(400);
+  const scrollFrame = useRef<number | undefined>(undefined);
+  const pendingScrollTop = useRef(0);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -356,6 +358,9 @@ export function VirtualList<T>({
     const top = scrollToIndex * rowHeight;
     if (top < el.scrollTop || top > el.scrollTop + el.clientHeight - rowHeight) el.scrollTop = Math.max(0, top - el.clientHeight / 3);
   }, [scrollToIndex, rowHeight]);
+  useEffect(() => () => {
+    if (scrollFrame.current !== undefined) cancelAnimationFrame(scrollFrame.current);
+  }, []);
   const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
   const end = Math.min(items.length, Math.ceil((scrollTop + height) / rowHeight) + overscan);
   useEffect(() => {
@@ -369,7 +374,20 @@ export function VirtualList<T>({
       </div>,
     );
   return (
-    <div ref={ref} className={cx('overflow-auto relative', className)} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+    <div
+      ref={ref}
+      className={cx('overflow-auto relative', className)}
+      onScroll={(e) => {
+        pendingScrollTop.current = e.currentTarget.scrollTop;
+        // Scrolling can emit far more events than frames. Coalescing updates
+        // keeps large lists responsive while preserving the same visible rows.
+        if (scrollFrame.current !== undefined) return;
+        scrollFrame.current = requestAnimationFrame(() => {
+          scrollFrame.current = undefined;
+          setScrollTop(pendingScrollTop.current);
+        });
+      }}
+    >
       <div style={{ height: items.length * rowHeight, position: 'relative' }}>{rows}</div>
     </div>
   );
