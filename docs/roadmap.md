@@ -12,8 +12,12 @@ Plans change with feedback. Vote or comment on [GitHub issues](https://github.co
 - **Signed installers:** Windows Authenticode, and macOS Developer ID with notarization.
 - **In-app update notifications.**
 - **GraphQL subscriptions** over graphql-ws.
-- **Mock servers** in the app for HTTP, GraphQL and MCP (a mock LLM provider already exists).
+- **Mock servers for GraphQL and MCP.** HTTP mock servers from saved examples shipped in 0.2.0; a mock LLM provider already exists.
 - **Published CLI package** on npm.
+
+## Shipped in 0.2.0
+
+Cookie jar, saved examples and HTTP mock servers, request and collection documentation, Postman v2.1 export, a console, pinned tabs, a Home view, `pm.sendRequest`, folder scripts and variables, AI help in the request builder, and `protolens mcp-server` for AI agents. See the [changelog](/changelog).
 
 ## Later
 

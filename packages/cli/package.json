@@ -1,6 +1,6 @@
 {
   "name": "@protolens/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Protolens command-line runner for local and CI/CD test execution.",
   "license": "MIT",
   "type": "module",
@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@protolens/core": "0.1.0",
+    "@protolens/core": "0.2.0",
     "commander": "^15.0.0"
   }
 }

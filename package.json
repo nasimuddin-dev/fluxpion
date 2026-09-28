@@ -1,7 +1,7 @@
 {
   "name": "protolens",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Protolens — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
   "license": "MIT",
   "type": "module",

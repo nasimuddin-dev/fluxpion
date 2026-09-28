@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-Postman parity work since 0.1.0:
+Nothing yet.
+
+## 0.2.0 — 2026-09-27
+
+Postman parity: most of Postman's day-to-day features, plus AI help and an MCP server for AI agents. Workspaces from 0.1.0 open unchanged.
 
 - **Folder scripts and variables.** **Edit folder** (in a folder's ⋯ menu) sets pre-request and post-response scripts, variables and auth for every request inside. Scripts run collection → outer folders → folder → request, in tabs, the Collection Runner and the CLI. Inner folder variables win, and request and data variables win over folder variables. Folder scripts and variables round-trip through Postman v2.1.
 - **`pm.sendRequest`.** Scripts can send HTTP requests (URL or Postman request object, raw or URL-encoded bodies) and use the response in a callback, including chained requests. Requests share the run's cookie jar, respect timeouts and cancellation, are limited to 20 per script, and are listed in the Console. Monaco typings and a snippet are included.
