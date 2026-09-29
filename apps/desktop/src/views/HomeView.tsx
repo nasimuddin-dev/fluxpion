@@ -93,7 +93,7 @@ export function HomeView() {
           <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-[var(--brand-from)] opacity-10 blur-3xl" />
           <p className="relative text-sm font-medium text-accent">{greeting()} 👋</p>
           <h1 className="relative text-[1.75rem] font-semibold tracking-tight mt-1">{ws ? ws.name : 'Welcome to TestPion'}</h1>
-          <p className="relative text-sm text-muted mt-1.5 max-w-2xl">Build, test and debug REST, GraphQL, MCP and AI APIs. Everything stays on this computer.</p>
+          <p className="relative text-sm text-muted mt-1.5 max-w-2xl">Build, test and debug REST, GraphQL, gRPC, WebSocket, MCP and AI APIs. Everything stays on this computer.</p>
           {env && (
             <p className="relative mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-bg/70 px-3 py-1 text-xs text-muted">
               <span className="w-2 h-2 rounded-full" style={{ background: ws?.environments.find((e) => e.name === env)?.color ?? 'var(--ok)' }} />

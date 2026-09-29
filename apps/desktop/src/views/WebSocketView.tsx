@@ -74,7 +74,7 @@ export function WebSocketView() {
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <Badge tone={status === 'open' ? 'ok' : status === 'connecting' ? 'warn' : 'default'}>{status}</Badge>
         <VarInput ariaLabel="WebSocket URL" className="flex-1 h-8" value={d.url} onChange={(url) => setD({ ...d, url })} placeholder="wss://example.com/socket" />
-        <Input className="w-48" placeholder="subprotocols (comma sep.)" value={d.protocols} onChange={(e) => setD({ ...d, protocols: e.target.value })} />
+        <Input className="w-48" placeholder="Subprotocols" title="Subprotocols, comma separated (e.g. graphql-ws, mqtt)" value={d.protocols} onChange={(e) => setD({ ...d, protocols: e.target.value })} />
         {status === 'open' ? (
           <Button icon={<Unplug size={13} />} onClick={disconnect}>
             Disconnect

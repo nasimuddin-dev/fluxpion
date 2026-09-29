@@ -1,5 +1,6 @@
 import { FlaskConical, History, Play } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useSticky } from '../lib/sticky';
 import { asError, call } from '../api';
 import { persisted, useApp } from '../store';
 import type { CheckConfig, ProviderConfig } from '../types';
@@ -81,9 +82,9 @@ function previewRecords(text: string, fmt: Draft['datasetFormat']): Array<Record
 export function EvaluationsView() {
   const [d, setD] = useState<Draft>(drafts.load);
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
-  const [runId, setRunId] = useState<string>();
+  const [runId, setRunId] = useSticky<string | undefined>('eval:runId', undefined);
   const [runs, setRuns] = useState<Array<{ id: string; name: string; startedAt: string; passed: number; total: number }>>([]);
-  const [sub, setSub] = useState<'prompt' | 'dataset' | 'evaluators'>('dataset');
+  const [sub, setSub] = useSticky<'prompt' | 'dataset' | 'evaluators'>('eval:sub', 'dataset');
   const env = useApp((s) => s.environment);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
   useEffect(() => drafts.save(d), [d]);
@@ -135,7 +136,8 @@ export function EvaluationsView() {
               Run {count ? `${d.limit ? Math.min(d.limit, count) : count} cases` : ''}
             </Button>
           </div>
-          <div className="grid grid-cols-[1fr_1fr_70px_70px_70px_70px] gap-2">
+          {/* two rows, so the fields fit however narrow the pane is */}
+          <div className="grid grid-cols-2 gap-2 [&>*]:min-w-0">
             <Field label="Provider">
               <Select value={d.provider} onChange={(e) => set({ provider: e.target.value, model: providers.find((p) => p.id === e.target.value)?.defaultModel ?? '' })}>
                 {providers.map((p) => (
@@ -148,6 +150,8 @@ export function EvaluationsView() {
             <Field label="Model">
               <Input className="mono" value={d.model} onChange={(e) => set({ model: e.target.value })} />
             </Field>
+          </div>
+          <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
             <Field label="Temp.">
               <Input type="number" step="0.1" value={d.temperature ?? ''} onChange={(e) => set({ temperature: e.target.value === '' ? undefined : Number(e.target.value) })} />
             </Field>

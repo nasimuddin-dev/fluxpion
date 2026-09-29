@@ -1,5 +1,6 @@
 import { KeyRound, Play, Plus, RefreshCw, Save, Square, Trash2, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSticky } from '../lib/sticky';
 import { stringifyYaml } from '../lib/yaml';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
@@ -65,7 +66,8 @@ const drafts = persisted<Draft>('ai', {
 });
 
 export function AiLabView() {
-  const [tab, setTab] = useState<'playground' | 'compare' | 'providers'>('playground');
+  // kept while the app runs, so switching tabs or views doesn't lose results
+  const [tab, setTab] = useSticky<'playground' | 'compare' | 'providers'>('ai:tab', 'playground');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const load = useCallback(() => call<ProviderConfig[]>('ai.providers').then(setProviders), []);
   useEffect(() => {
@@ -139,18 +141,18 @@ function ModelPicker({ providers, provider, model, onChange }: { providers: Prov
 function Params({ d, set }: { d: Draft; set(p: Partial<Draft>): void }) {
   const num = (v: string) => (v === '' ? undefined : Number(v));
   return (
-    <div className="grid grid-cols-4 gap-2 text-xs">
+    <div className="grid grid-cols-4 gap-2 text-xs [&>*]:min-w-0">
       <Field label="Temperature">
-        <Input type="number" step="0.1" min="0" max="2" value={d.temperature ?? ''} onChange={(e) => set({ temperature: num(e.target.value) })} />
+        <Input type="number" step="0.1" min="0" max="2" placeholder="default" value={d.temperature ?? ''} onChange={(e) => set({ temperature: num(e.target.value) })} />
       </Field>
       <Field label="Top P">
-        <Input type="number" step="0.05" min="0" max="1" value={d.topP ?? ''} onChange={(e) => set({ topP: num(e.target.value) })} />
+        <Input type="number" step="0.05" min="0" max="1" placeholder="default" value={d.topP ?? ''} onChange={(e) => set({ topP: num(e.target.value) })} />
       </Field>
       <Field label="Max tokens">
-        <Input type="number" value={d.maxTokens ?? ''} onChange={(e) => set({ maxTokens: num(e.target.value) })} />
+        <Input type="number" placeholder="default" value={d.maxTokens ?? ''} onChange={(e) => set({ maxTokens: num(e.target.value) })} />
       </Field>
       <Field label="Seed">
-        <Input type="number" value={d.seed ?? ''} onChange={(e) => set({ seed: num(e.target.value) })} />
+        <Input type="number" placeholder="none" value={d.seed ?? ''} onChange={(e) => set({ seed: num(e.target.value) })} />
       </Field>
     </div>
   );
@@ -176,7 +178,7 @@ function parseExpected(s: string): unknown {
 }
 
 function PromptEditor({ d, set }: { d: Draft; set(p: Partial<Draft>): void }) {
-  const [sub, setSub] = useState<'prompt' | 'system' | 'format' | 'evaluators'>('prompt');
+  const [sub, setSub] = useSticky<'prompt' | 'system' | 'format' | 'evaluators'>('ai:sub', 'prompt');
   const vars = useMemo(() => [...new Set([...templateVars(d.prompt), ...templateVars(d.system)])], [d.prompt, d.system]);
   return (
     <div className="h-full flex flex-col">
@@ -244,8 +246,8 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
   const [d, set] = useDraft();
   const [running, setRunning] = useState<string>();
   const [stream, setStream] = useState('');
-  const [result, setResult] = useState<ChatResult | { error: NormalizedError }>();
-  const [resTab, setResTab] = useState<'output' | 'json' | 'evaluation' | 'prompt'>('output');
+  const [result, setResult] = useSticky<ChatResult | { error: NormalizedError } | undefined>('ai:playground:result', undefined);
+  const [resTab, setResTab] = useSticky<'output' | 'json' | 'evaluation' | 'prompt'>('ai:playground:resTab', 'output');
   const env = useApp((s) => s.environment);
   const idRef = useRef<string | undefined>(undefined);
   useEffect(
@@ -391,7 +393,7 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
 function Compare({ providers }: { providers: ProviderConfig[] }) {
   const [d, set] = useDraft();
   const [running, setRunning] = useState(false);
-  const [results, setResults] = useState<Array<ChatResult & { error?: NormalizedError }>>([]);
+  const [results, setResults] = useSticky<Array<ChatResult & { error?: NormalizedError }>>('ai:compare:results', []);
   const env = useApp((s) => s.environment);
   const rows = d.compare.length ? d.compare : providers.slice(0, 2).map((p) => ({ provider: p.id, name: p.defaultModel ?? '' }));
   const run = async () => {

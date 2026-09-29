@@ -402,6 +402,19 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
         return useApp.getState().toast(`Invalid JSON: ${(e as Error).message}`, 'error');
       }
     }
+    // required arguments left empty: say which (sending them anyway is useful to test the server's validation)
+    const required = ((tool.inputSchema as { required?: string[] } | undefined)?.required ?? []).filter((k) => a[k] === undefined || a[k] === '');
+    if (
+      required.length &&
+      !(await confirmAction({
+        title: 'Required arguments are empty',
+        message: `${required.join(', ')} ${required.length > 1 ? 'are' : 'is'} required by ${tool.name}.`,
+        detail: 'The server will most likely reject the call. Execute anyway to test its validation.',
+        confirmLabel: 'Execute anyway',
+        tone: 'warning',
+      }))
+    )
+      return;
     setRunning(true);
     try {
       setResult(await call('mcp.call', { serverId, tool: tool.name, args: a, assertions }));
@@ -546,7 +559,7 @@ function ToolResult({ r, name }: { r: Extract<ToolRun, { content: unknown[] }>; 
           { id: 'tests', label: 'Assertions', badge: r.checks.length },
         ]}
       />
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto flex flex-col">
         {tab === 'content' && effective === 'raw' && <RawView text={text || JSON.stringify(r.content, null, 2)} />}
         {tab === 'content' && effective === 'markdown' && <Markdown className="p-4" source={text} />}
         {tab === 'content' &&
@@ -560,8 +573,10 @@ function ToolResult({ r, name }: { r: Extract<ToolRun, { content: unknown[] }>; 
                 parsed = undefined;
               }
             }
+            // a single content block (the usual case) fills the panel
+            const single = items.length === 1;
             return (
-              <div key={i} className="border-b border-line">
+              <div key={i} className={cx('border-b border-line', single && 'flex-1 min-h-0 flex flex-col')}>
                 <div className="px-3 py-1 text-xs text-muted">
                   {c.type}
                   {c.mimeType ? ` · ${c.mimeType}` : ''}
@@ -569,7 +584,7 @@ function ToolResult({ r, name }: { r: Extract<ToolRun, { content: unknown[] }>; 
                 {c.type === 'image' && c.data ? (
                   <img alt="tool output" className="max-w-full p-3" src={`data:${c.mimeType};base64,${c.data}`} />
                 ) : parsed !== undefined ? (
-                  <div className="h-64">
+                  <div className={single ? 'flex-1 min-h-0' : 'h-64'}>
                     <JsonTree data={parsed} />
                   </div>
                 ) : (
@@ -628,7 +643,7 @@ function ResourcesPanel({ serverId, disc }: { serverId: string; disc: Discovery 
             Read
           </Button>
         </div>
-        <div className="flex-1 min-h-0 overflow-auto">
+        <div className="flex-1 min-h-0 overflow-auto flex flex-col">
           {content &&
             ('error' in content ? (
               <ErrorPanel error={content.error} />
@@ -640,13 +655,15 @@ function ResourcesPanel({ serverId, disc }: { serverId: string; disc: Discovery 
                 } catch {
                   parsed = undefined;
                 }
+                // one content item (the usual case) fills the panel; several get a fixed height each
+                const single = content.contents.length === 1;
                 return (
-                  <div key={i} className="border-b border-line">
+                  <div key={i} className={cx('border-b border-line', single && 'flex-1 min-h-0 flex flex-col')}>
                     <div className="px-3 py-1 text-xs text-muted">
                       {c.uri} · {c.mimeType} · {formatMs(content.durationMs)}
                     </div>
                     {parsed !== undefined ? (
-                      <div className="h-80">
+                      <div className={single ? 'flex-1 min-h-0' : 'h-80'}>
                         <JsonTree data={parsed} />
                       </div>
                     ) : (
@@ -695,7 +712,17 @@ function PromptsPanel({ serverId, prompts }: { serverId: string; prompts: Discov
             </div>
           </div>
         )}
-        <div className="flex-1 min-h-0">{out && ('error' in out ? <ErrorPanel error={out.error} /> : <JsonTree data={out} />)}</div>
+        <div className="flex-1 min-h-0 overflow-auto">
+          {!out ? (
+            <Empty icon={<MessageSquare size={24} />} title="Get the prompt to see its messages">
+              The server fills its template with the arguments above and returns the messages an AI client would send to the model.
+            </Empty>
+          ) : 'error' in out ? (
+            <ErrorPanel error={out.error} />
+          ) : (
+            <PromptMessages out={out} />
+          )}
+        </div>
       </div>
     </Split>
   );
@@ -749,5 +776,36 @@ function McpTrace({ events, error }: { events: McpEvent[]; error?: NormalizedErr
         )}
       </div>
     </Split>
+  );
+}
+
+/** A prompt's messages as a conversation (role and text), with the raw JSON one click away. */
+function PromptMessages({ out }: { out: { messages: unknown[]; description?: string } }) {
+  const [json, setJson] = useState(false);
+  const messages = out.messages as Array<{ role: string; content: { type: string; text?: string; resource?: { uri: string; text?: string } } }>;
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm">
+        <span className="text-muted">{messages.length} messages</span>
+        {out.description && <span className="text-muted truncate">· {out.description}</span>}
+        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setJson(!json)}>
+          {json ? 'Messages' : 'JSON'}
+        </Button>
+      </div>
+      {json ? (
+        <div className="h-96">
+          <JsonTree data={out} />
+        </div>
+      ) : (
+        <div className="p-3 flex flex-col gap-2">
+          {messages.map((m, i) => (
+            <div key={i} className={cx('rounded-lg border border-line p-3', m.role === 'assistant' ? 'bg-accent-soft/40' : 'bg-panel')}>
+              <Badge tone={m.role === 'assistant' ? 'accent' : 'default'}>{m.role}</Badge>
+              <pre className="mt-2 text-sm whitespace-pre-wrap font-sans">{m.content?.text ?? m.content?.resource?.text ?? JSON.stringify(m.content, null, 2)}</pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

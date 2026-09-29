@@ -173,7 +173,7 @@ export function EnvironmentsView() {
                     <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                   </Field>
                   <Field label="Color">
-                    <input type="color" className="h-7 w-12 bg-transparent" value={draft.color ?? '#1a7f37'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} />
+                    <input type="color" aria-label="Environment color" className="field h-8 w-14 p-1 cursor-pointer" value={draft.color ?? '#1a7f37'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} />
                   </Field>
                   <Toggle checked={!!draft.isProduction} onChange={(isProduction) => setDraft({ ...draft, isProduction })} label="Production (blocks load tests, shows a warning)" />
                   <div className="ml-auto flex gap-2">

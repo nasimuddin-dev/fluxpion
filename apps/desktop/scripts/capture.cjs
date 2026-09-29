@@ -24,7 +24,7 @@ setTimeout(() => {
   const r = spawnSync(electron, ['.'], {
     cwd: resolve(__dirname, '..'),
     stdio: 'inherit',
-    env: { ...process.env, TESTPION_HOME: home, TESTPION_CAPTURE_SCRIPT: join(__dirname, 'capture-steps.cjs'), TESTPION_CAPTURE_DIR: process.env.TESTPION_CAPTURE_OUT ?? join(root, 'docs', 'public', 'images') },
+    env: { ...process.env, TESTPION_HOME: home, TESTPION_CAPTURE_SCRIPT: process.env.TESTPION_CAPTURE_SCRIPT ?? join(__dirname, 'capture-steps.cjs'), TESTPION_CAPTURE_DIR: process.env.TESTPION_CAPTURE_OUT ?? join(root, 'docs', 'public', 'images') },
   });
   servers.kill();
   rmSync(home, { recursive: true, force: true });

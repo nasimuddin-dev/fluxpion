@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, ChevronUp, Copy, Search, WrapText } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cx, IconButton, Input, VirtualList } from './ui';
 
 const ROW = 20;
@@ -138,16 +138,37 @@ export function RawView({ text, language }: { text: string; language?: string })
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [wrapAt, setWrapAt] = useState(true);
+  // rows have a fixed height (virtualised), so long lines are wrapped at the width of the view
+  const box = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(160);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => {
+      const probe = document.createElement('span');
+      probe.textContent = 'x'.repeat(50);
+      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+      el.appendChild(probe);
+      const charW = probe.getBoundingClientRect().width / 50 || 7.5;
+      probe.remove();
+      // the line-number gutter and the scrollbar take about 4rem
+      setCols(Math.max(40, Math.floor((el.clientWidth - 64) / charW)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const lines = useMemo(() => {
     const raw = text.split('\n');
     if (!wrapAt) return raw;
     const out: string[] = [];
     for (const l of raw) {
-      if (l.length <= 400) out.push(l);
-      else for (let i = 0; i < l.length; i += 400) out.push(l.slice(i, i + 400));
+      if (l.length <= cols) out.push(l);
+      else for (let i = 0; i < l.length; i += cols) out.push(l.slice(i, i + cols));
     }
     return out;
-  }, [text, wrapAt]);
+  }, [text, wrapAt, cols]);
   const matches = useMemo(() => {
     if (!query) return [] as number[];
     const q = query.toLowerCase();
@@ -208,18 +229,20 @@ export function RawView({ text, language }: { text: string; language?: string })
           </IconButton>
         </div>
       </div>
-      <VirtualList
-        className="flex-1 mono text-[0.9em]"
-        items={lines}
-        rowHeight={ROW}
-        scrollToIndex={activeLine}
-        render={(l, i) => (
-          <div className="flex leading-5 whitespace-pre">
-            <span className="w-12 shrink-0 text-right pr-3 text-muted select-none opacity-60">{i + 1}</span>
-            <span>{highlight(l, i === activeLine)}</span>
-          </div>
-        )}
-      />
+      <div ref={box} className="flex-1 min-h-0 flex flex-col mono text-[0.9em] relative">
+        <VirtualList
+          className="flex-1"
+          items={lines}
+          rowHeight={ROW}
+          scrollToIndex={activeLine}
+          render={(l, i) => (
+            <div className="flex leading-5 whitespace-pre">
+              <span className="w-12 shrink-0 text-right pr-3 text-muted select-none opacity-60">{i + 1}</span>
+              <span>{highlight(l, i === activeLine)}</span>
+            </div>
+          )}
+        />
+      </div>
     </div>
   );
 }
