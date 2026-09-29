@@ -16,6 +16,7 @@ Key facts for agents:
 
 - [Installation](https://nasimuddin-dev.github.io/fluxpion/getting-started/installation): install the desktop app or the CLI
 - [Your first request](https://nasimuddin-dev.github.io/fluxpion/getting-started/first-request): send a request, add assertions, save it to a collection
+- [Workspaces](https://nasimuddin-dev.github.io/fluxpion/getting-started/workspaces): switch, rename, duplicate, export and delete workspaces; `fluxpion workspace list|rename|delete --json`
 - [Your first AI test](https://nasimuddin-dev.github.io/fluxpion/getting-started/first-ai-test): test an LLM prompt with evaluators
 
 ## API testing

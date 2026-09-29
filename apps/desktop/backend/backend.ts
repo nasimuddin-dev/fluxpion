@@ -6,7 +6,7 @@
  */
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { basename, join, dirname } from 'node:path';
+import { basename, join, dirname, resolve as resolvePath } from 'node:path';
 import { stringify as toYaml } from 'yaml';
 import {
   ApsError,
@@ -481,17 +481,44 @@ export class Backend {
         return ws.updateWorkspace({ ...(name ? { name } : {}), ...(description !== undefined ? { description } : {}), ...(vars ? { variables: vars } : {}) });
       },
       'ws.duplicate': ({ ref, name }: { ref: string; name: string }) => this.manager.duplicate(ref, name),
+      /** A workspace with counts (collections, environments, tests) and whether deleting removes its files. */
+      'ws.details': ({ ref }: { ref: string }) => ({ ...this.manager.details(ref), current: !!this.store && resolvePath(this.manager.details(ref).path) === resolvePath(this.store.root) }),
+      /** Rename any workspace; the open one goes through its store so the UI state stays in sync. */
+      'ws.rename': ({ ref, name }: { ref: string; name: string }) => {
+        const p = this.manager.resolve(ref);
+        if (p && this.store && resolvePath(p) === resolvePath(this.store.root)) return this.ws.updateWorkspace({ name: name.trim() });
+        return this.manager.rename(ref, name);
+      },
+      /**
+       * Delete a workspace (or, for a folder the user opened, remove it from the list). Deleting the open
+       * workspace switches to another one first; the last workspace can't be deleted.
+       */
       'ws.delete': ({ ref }: { ref: string }) => {
         const p = this.manager.resolve(ref);
-        if (p && this.store && p === this.store.root) throw new ApsError('ValidationError', 'Switch to another workspace before deleting this one');
-        this.manager.delete(ref);
-        return this.manager.list();
+        if (!p) throw new ApsError('ConfigurationError', `Workspace "${ref}" not found`);
+        let switchedTo: string | undefined;
+        if (this.store && resolvePath(p) === resolvePath(this.store.root)) {
+          const other = this.manager.list().find((w) => resolvePath(w.path) !== resolvePath(p));
+          if (!other) throw new ApsError('ValidationError', 'This is your only workspace. Create another workspace first, then delete this one.');
+          this.openStore(other.path);
+          switchedTo = other.name;
+        }
+        const r = this.manager.delete(p);
+        return { ...r, switchedTo, list: this.manager.list() };
       },
-      'ws.export': async () => {
-        const bundle = this.ws.exportBundle();
-        const dest = await this.host.saveDialog?.({ defaultPath: `${this.ws.workspace.name}.apsworkspace.json`, filters: [{ name: 'Workspace', extensions: ['json'] }] });
-        if (dest) writeFileSync(dest, JSON.stringify(bundle, null, 2));
-        return { path: dest, bundle: dest ? undefined : bundle };
+      'ws.export': async ({ ref }: { ref?: string } = {}) => {
+        // any workspace can be exported; one that isn't open is read without opening it in the app
+        const p = ref ? this.manager.resolve(ref) : undefined;
+        const other = p && this.store && resolvePath(p) !== resolvePath(this.store.root) ? WorkspaceStore.open(p) : undefined;
+        try {
+          const store = other ?? this.ws;
+          const bundle = store.exportBundle();
+          const dest = await this.host.saveDialog?.({ defaultPath: `${store.workspace.name}.apsworkspace.json`, filters: [{ name: 'Workspace', extensions: ['json'] }] });
+          if (dest) writeFileSync(dest, JSON.stringify(bundle, null, 2));
+          return { path: dest, bundle: dest ? undefined : bundle };
+        } finally {
+          other?.close();
+        }
       },
       'ws.import': ({ bundle, name }: { bundle: WorkspaceBundle; name?: string }) => {
         const s = this.manager.importBundle(bundle, name);

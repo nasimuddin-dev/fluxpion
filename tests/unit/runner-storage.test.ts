@@ -267,6 +267,32 @@ describe('workspace storage', () => {
     store.close();
   });
 
+  it('workspace manager: details, rename, and delete (managed folders removed, opened folders kept)', () => {
+    const mgr = new WorkspaceManager(join(dir, 'app'));
+    const a = mgr.create('Alpha');
+    a.saveEnvironment({ id: 'dev', name: 'Dev', variables: [] });
+    const envCount = a.listEnvironments().length;
+    const aRoot = a.root;
+    a.close();
+    const extRoot = join(dir, 'external-ws');
+    mgr.create('Beta', extRoot).close();
+    mgr.saveSettings({ ...mgr.loadSettings(), lastWorkspace: aRoot });
+
+    expect(mgr.details('alpha')).toMatchObject({ name: 'Alpha', managed: true, environments: envCount, collections: 0 });
+    expect(mgr.details(extRoot)).toMatchObject({ name: 'Beta', managed: false });
+    expect(mgr.rename('Alpha', '  Alpha 2 ').name).toBe('Alpha 2');
+    expect(mgr.list().map((w) => w.name)).toEqual(['Alpha 2', 'Beta']);
+    expect(() => mgr.rename('nope', 'x')).toThrow(/not found/);
+
+    expect(mgr.delete('Alpha 2')).toEqual({ deletedFiles: true });
+    expect(existsSync(aRoot)).toBe(false);
+    expect(mgr.loadSettings().lastWorkspace).toBeUndefined();
+    expect(mgr.delete('Beta')).toEqual({ deletedFiles: false });
+    expect(existsSync(join(extRoot, 'workspace.json'))).toBe(true);
+    expect(mgr.list()).toEqual([]);
+    expect(() => mgr.delete('Beta')).toThrow(/not found/);
+  });
+
   it('keeps a user-chosen environment order', () => {
     const ws = new WorkspaceManager(join(dir, 'app')).create('Order');
     for (const [id, name] of [['development', 'Development'], ['production', 'Production'], ['staging', 'Staging'], ['uat', 'User Acceptance']])

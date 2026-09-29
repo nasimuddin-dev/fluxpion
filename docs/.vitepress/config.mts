@@ -58,6 +58,7 @@ const docsSidebar = [
     items: [
       { text: 'Installation', link: '/getting-started/installation' },
       { text: 'Your first request', link: '/getting-started/first-request' },
+      { text: 'Workspaces', link: '/getting-started/workspaces' },
       { text: 'Your first AI test', link: '/getting-started/first-ai-test' },
     ],
   },

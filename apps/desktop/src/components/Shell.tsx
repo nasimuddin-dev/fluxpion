@@ -3,8 +3,6 @@ import {
   BookOpen,
   Bot,
   Boxes,
-  Check,
-  ChevronDown,
   Cpu,
   FlaskConical,
   FolderTree,
@@ -13,7 +11,6 @@ import {
   History,
   House,
   KeyRound,
-  Layers,
   Network,
   Plug,
   Plus,
@@ -30,8 +27,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { call, asError, modKey, on } from '../api';
 import logoUrl from '../../build/logo.svg';
 import { ConsolePanel } from './ConsolePanel';
+import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
-import { promptText, useApp, type ViewId, type DialogRequest } from '../store';
+import { useApp, type ViewId, type DialogRequest } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
@@ -89,121 +87,6 @@ export function Sidebar() {
       ))}
       <div className="mt-auto pt-2">{item('settings', 'Settings', <Settings size={18} />, `${modKey}+,`)}</div>
     </nav>
-  );
-}
-
-function WorkspaceMenu() {
-  const ws = useApp((s) => s.workspace);
-  const [open, setOpen] = useState(false);
-  const [list, setList] = useState<Array<{ id: string; name: string; path: string }>>([]);
-  const [creating, setCreating] = useState<null | 'create' | 'rename' | 'duplicate'>(null);
-  const [name, setName] = useState('');
-  const { toast, refreshWorkspace } = useApp.getState();
-  useEffect(() => {
-    if (open) void call('ws.list').then(setList);
-  }, [open]);
-  const act = async (fn: () => Promise<unknown>, msg?: string) => {
-    try {
-      await fn();
-      await refreshWorkspace();
-      if (msg) toast(msg, 'success');
-      setOpen(false);
-    } catch (e) {
-      toast(asError(e).message, 'error');
-    }
-  };
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen(!open)} className={cx('flex items-center gap-1.5 h-8 px-2.5 rounded-md hover:bg-hover text-sm font-medium max-w-64 transition-colors', open && 'bg-hover')} aria-haspopup="menu" aria-expanded={open}>
-        <Layers size={14} className="text-muted" />
-        <span className="truncate">{ws?.name ?? 'No workspace'}</span>
-        <ChevronDown size={13} className="text-muted" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute left-0 top-9 z-40 w-72 rounded-lg border border-line bg-bg shadow-lg p-1 text-sm animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150">
-            <div className="px-2 py-1 text-[0.7rem] uppercase tracking-wider text-muted">Workspaces</div>
-            {list.map((w) => (
-              <button key={w.id} className="w-full text-left px-2 h-8 rounded-md hover:bg-hover transition-colors flex items-center gap-2" onClick={() => act(() => call('ws.open', { ref: w.path }))}>
-                <span className="w-3.5">{w.path === ws?.path && <Check size={13} className="text-accent" />}</span>
-                <span className="truncate">{w.name}</span>
-              </button>
-            ))}
-            <div className="border-t border-line my-1" />
-            {[
-              ['New workspace…', () => (setName(''), setCreating('create'))],
-              ['Rename…', () => (setName(ws?.name ?? ''), setCreating('rename'))],
-              ['Duplicate…', () => (setName(`${ws?.name} copy`), setCreating('duplicate'))],
-              ['Open folder…', () => act(() => call('ws.open', {}))],
-              ['Export workspace…', () => act(() => call('ws.export'), 'Workspace exported (secrets excluded)')],
-              [
-                'Import…',
-                () => {
-                  // a workspace export opens as a new workspace; Postman / OpenAPI / HAR files are added to this one
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = '.json,.yaml,.yml,.har';
-                  input.onchange = async () => {
-                    const f = input.files?.[0];
-                    if (!f) return;
-                    let r: { kind: string; name?: string; format?: string; collection?: string; environment?: string; workspace?: string } | undefined;
-                    await act(async () => (r = await call('ws.importFile', { text: await f.text() })));
-                    if (r?.kind === 'workspace') toast(`Workspace "${r.name}" imported and opened`, 'success');
-                    else if (r) {
-                      const what = [r.collection && `collection "${r.collection}"`, r.environment && `environment "${r.environment}"`].filter(Boolean).join(' and ');
-                      toast(`Imported ${what || r.format} (${r.format}) into "${r.workspace}"`, 'success');
-                      useApp.getState().openIntent('collections', {});
-                    }
-                  };
-                  input.click();
-                },
-              ],
-              [
-                'Delete a workspace…',
-                async () => {
-                  const other = list.filter((w) => w.path !== ws?.path);
-                  const target = await promptText('Delete a workspace', { message: 'Type the name of the workspace to delete permanently', detail: other.length ? `Workspaces: ${other.map((w) => w.name).join(', ')}` : 'There are no other workspaces (the open one cannot be deleted).', okLabel: 'Continue' });
-                  const w = other.find((x) => x.name === target);
-                  if (w && confirm(`Permanently delete "${w.name}" and all its files?`)) void act(() => call('ws.delete', { ref: w.path }), 'Workspace deleted');
-                },
-              ],
-            ].map(([label, fn]) => (
-              <button key={label as string} className="w-full text-left px-2 h-8 rounded-md hover:bg-hover transition-colors pl-7" onClick={fn as () => void}>
-                {label as string}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      {creating && (
-        <Modal
-          title={creating === 'create' ? 'New workspace' : creating === 'rename' ? 'Rename workspace' : 'Duplicate workspace'}
-          onClose={() => setCreating(null)}
-          width={420}
-          footer={
-            <>
-              <Button onClick={() => setCreating(null)}>Cancel</Button>
-              <Button
-                variant="primary"
-                disabled={!name.trim()}
-                onClick={() => {
-                  const n = name.trim();
-                  setCreating(null);
-                  if (creating === 'create') void act(() => call('ws.create', { name: n }), 'Workspace created');
-                  else if (creating === 'rename') void act(() => call('ws.update', { name: n }), 'Renamed');
-                  else void act(async () => call('ws.open', { ref: (await call('ws.duplicate', { ref: ws!.path, name: n })).path }), 'Workspace duplicated');
-                }}
-              >
-                {creating === 'create' ? 'Create' : creating === 'rename' ? 'Rename' : 'Duplicate'}
-              </Button>
-            </>
-          }
-        >
-          <Input autoFocus className="w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder="Workspace name" />
-        </Modal>
-      )}
-    </div>
   );
 }
 

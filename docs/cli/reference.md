@@ -19,7 +19,7 @@ fluxpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 fluxpion load <url>           Safeguarded load test
 fluxpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
 fluxpion env list|order -w    List environments; set their order
-fluxpion workspace list|create|export
+fluxpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 fluxpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 fluxpion report <results.jsonl>              Re-generate reports
 ```

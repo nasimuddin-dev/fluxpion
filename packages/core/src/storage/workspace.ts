@@ -498,14 +498,57 @@ export class WorkspaceManager {
     return { id: next.id, name: newName, path: dest, updatedAt: next.updatedAt };
   }
 
-  delete(ref: string): void {
+  /** Whether the app created this workspace (inside its data folder) rather than a folder the user opened. */
+  isManaged(path: string): boolean {
+    return resolve(path).startsWith(resolve(this.appDir, 'workspaces'));
+  }
+
+  /** A workspace with counts of what it holds, e.g. for a delete confirmation. */
+  details(ref: string): WorkspaceInfo & { managed: boolean; collections: number; environments: number; tests: number } {
     const p = this.resolve(ref);
-    if (!p) return;
-    const managed = resolve(p).startsWith(resolve(this.appDir, 'workspaces'));
-    const settings = this.loadSettings();
-    this.saveSettings({ ...settings, workspacePaths: settings.workspacePaths.filter((x) => resolve(x) !== resolve(p)) });
+    if (!p) throw new ApsError('ConfigurationError', `Workspace "${ref}" not found`);
+    const w = readJson<Workspace>(join(p, 'workspace.json'));
+    const count = (dir: string, re: RegExp): number => {
+      const d = join(p, dir);
+      if (!existsSync(d)) return 0;
+      let n = 0;
+      for (const e of readdirSync(d, { withFileTypes: true })) n += e.isDirectory() ? count(join(dir, e.name), re) : re.test(e.name) ? 1 : 0;
+      return n;
+    };
+    return { id: w.id, name: w.name, path: p, updatedAt: w.updatedAt, managed: this.isManaged(p), collections: count('collections', /\.json$/), environments: count('environments', /\.json$/), tests: count('tests', /\.ya?ml$/) };
+  }
+
+  /** Rename a workspace that isn't open (the open one is renamed through its store). */
+  rename(ref: string, name: string): WorkspaceInfo {
+    const p = this.resolve(ref);
+    if (!p) throw new ApsError('ConfigurationError', `Workspace "${ref}" not found`);
+    if (!name.trim()) throw new ApsError('ValidationError', 'The workspace name is empty');
+    const file = join(p, 'workspace.json');
+    const w = { ...readJson<Workspace>(file), name: name.trim(), updatedAt: new Date().toISOString() };
+    writeJson(file, w);
+    return { id: w.id, name: w.name, path: p, updatedAt: w.updatedAt };
+  }
+
+  /**
+   * Remove a workspace. Folders the app created are deleted; folders the user opened are only removed
+   * from the list (their files stay). Close the workspace first if it is open.
+   */
+  delete(ref: string): { deletedFiles: boolean } {
+    const p = this.resolve(ref);
+    if (!p) throw new ApsError('ConfigurationError', `Workspace "${ref}" not found`);
+    const managed = this.isManaged(p);
     // only delete files for workspaces the app created; external folders are just unregistered
-    if (managed) rmSync(p, { recursive: true, force: true });
+    if (managed) {
+      try {
+        // Windows: files can be briefly locked (SQLite, antivirus, an indexer); retry before giving up
+        rmSync(p, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch (e) {
+        throw new ApsError('ConfigurationError', `Could not delete the workspace folder ${p}: ${e instanceof Error ? e.message : String(e)}. Close programs using it and try again.`);
+      }
+    }
+    const settings = this.loadSettings();
+    this.saveSettings({ ...settings, workspacePaths: settings.workspacePaths.filter((x) => resolve(x) !== resolve(p)), ...(settings.lastWorkspace && resolve(settings.lastWorkspace) === resolve(p) ? { lastWorkspace: undefined } : {}) });
+    return { deletedFiles: managed };
   }
 
   importBundle(bundle: WorkspaceBundle, name?: string): WorkspaceStore {
