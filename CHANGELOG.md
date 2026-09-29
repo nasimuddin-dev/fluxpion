@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.6.3 — 2026-09-29
+
 - **Fixed: the HTTP method couldn't be changed** in the desktop app (the native drop-down didn't open properly). The method is now picked from TestPion's own menu, with each method's colour, and **Custom…** for other methods.
 - **Copy a request from the collection tree.** The request menu (right-click or **⋯**) has **Copy URL**, **Copy as cURL (bash)**, **cURL (cmd)**, **PowerShell**, **fetch** and **More code snippets…**, with variables resolved from the active environment. Right-click now opens the menu on any request.
 - **One design for every dialog.** All confirmations use TestPion's dialog instead of the operating system's plain boxes: a tone icon (info, question, warning, danger, success), a clear message and detail, and buttons that say what they do (**Delete collection**, **Discard changes** …). The update progress box uses the same design.
