@@ -74,7 +74,7 @@ interface AppState {
   workspace?: WorkspaceCurrent;
   environment?: string;
   settings?: AppSettings;
-  info?: { version: string; appVersion?: string; packaged?: boolean; canUpdateInPlace?: boolean; secretBackend: string; metaBackend?: string; platform: string; checkTypes: string[]; electron?: string; node?: string };
+  info?: { version: string; appVersion?: string; packaged?: boolean; canUpdateInPlace?: boolean; secretBackend: string; metaBackend?: string; platform: string; nativeDialogs?: boolean; checkTypes: string[]; electron?: string; node?: string };
   paletteOpen: boolean;
   searchOpen: boolean;
   logsOpen: boolean;

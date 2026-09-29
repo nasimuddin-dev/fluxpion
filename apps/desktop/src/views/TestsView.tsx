@@ -6,6 +6,7 @@ import { useIntent } from '../hooks';
 import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunPanel } from '../components/RunPanel';
+import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, IconButton, Input, SectionTitle, Split, Tabs } from '../components/ui';
 
 interface Node {
@@ -155,7 +156,7 @@ export function TestsView() {
     if (p?.runCurrent && file) void run([file], file);
     if (p?.exportLatest) {
       const latest = runs[0];
-      if (latest) void call('runs.exportReport', { runId: latest.id, format: 'html' });
+      if (latest) void call<SaveResult>('runs.exportReport', { runId: latest.id, format: 'html' }).then((r) => finishSave(r, 'Report'));
       else useApp.getState().toast('No runs to export yet');
     }
   });

@@ -38,6 +38,7 @@ import { COMMON_HEADERS, KeyValueEditor } from '../components/KeyValueEditor';
 import { ResponseViewer } from '../components/ResponseViewer';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
+import { pickTextFile } from '../lib/files';
 import { Button, cx, Empty, Field, IconButton, Input, Menu, Modal, Select, Split, Tabs, Toggle, Tooltip, type MenuItem } from '../components/ui';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -1039,7 +1040,18 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
       width={640}
       footer={
         <>
-          <Button onClick={() => run(() => call('col.importFile'))}>Choose file…</Button>
+          <Button
+            icon={<Upload size={13} />}
+            onClick={() =>
+              run(async () => {
+                // the browser picker works in the desktop app and in the browser / cloud alike
+                const f = await pickTextFile('.json,.yaml,.yml,.har,.txt,.sh,.ps1');
+                return f ? call('col.import', { text: f.text }) : null;
+              })
+            }
+          >
+            Choose file…
+          </Button>
           <Button variant="primary" loading={busy} disabled={!text.trim()} onClick={() => run(() => call('col.import', { text }))}>
             Import pasted content
           </Button>

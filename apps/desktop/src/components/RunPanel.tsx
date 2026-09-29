@@ -6,6 +6,7 @@ import type { RunSummary, TestResult, Trace } from '../types';
 import { formatCost, formatMs } from '../lib/format';
 import { CheckList, ErrorPanel, StatusIcon } from './Results';
 import { TraceView } from './TraceView';
+import { finishSave, viewContent, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Modal, Select, Split, Tabs, VirtualList } from './ui';
 
 interface Progress {
@@ -115,7 +116,11 @@ export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTota
         </span>
         {done && (
           <div className="ml-auto flex gap-1">
-            <Button size="sm" icon={<FileBarChart size={12} />} onClick={() => call('runs.openReport', { runId, format: 'html' }).catch((e) => useApp.getState().toast(asError(e).message, 'error'))}>
+            <Button size="sm" icon={<FileBarChart size={12} />} onClick={() =>
+              call<{ path: string; view?: { content: string; encoding: 'base64'; type: string } }>('runs.openReport', { runId, format: 'html' })
+                .then((r) => r.view && viewContent(r.view))
+                .catch((e) => useApp.getState().toast(asError(e).message, 'error'))
+            }>
               HTML report
             </Button>
             <ExportMenu runId={runId} />
@@ -198,7 +203,7 @@ function ExportMenu({ runId }: { runId: string }) {
                 className="w-full text-left px-2 py-1.5 rounded hover:bg-hover"
                 onClick={() => {
                   setOpen(false);
-                  void call('runs.exportReport', { runId, format: f }).then((p) => p && useApp.getState().toast(`Exported ${p}`, 'success'));
+                  void call<SaveResult>('runs.exportReport', { runId, format: f }).then((r) => finishSave(r, 'Report'));
                 }}
               >
                 {{ html: 'HTML', json: 'JSON', junit: 'JUnit XML', markdown: 'Markdown' }[f]}

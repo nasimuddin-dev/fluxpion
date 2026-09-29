@@ -5,6 +5,7 @@ import { useApp } from '../store';
 import type { Collection, CollectionNode } from '../types';
 import { timeAgo } from '../lib/format';
 import { RunPanel } from './RunPanel';
+import { hasNativeDialogs, pickTextFile } from '../lib/files';
 import { Badge, Button, cx, Empty, Field, Input, Modal, Select, Split, Toggle } from './ui';
 
 interface RunnableRequest {
@@ -124,7 +125,13 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
 
   const pickData = async () => {
     try {
-      const d = await call<DataFile | null>('col.pickDataFile');
+      let d: DataFile | null;
+      if (hasNativeDialogs()) d = await call<DataFile | null>('col.pickDataFile');
+      else {
+        // browser / cloud: upload the file into the workspace
+        const f = await pickTextFile('.csv,.json,.jsonl');
+        d = f ? await call<DataFile>('col.uploadDataFile', { name: f.name, text: f.text }) : null;
+      }
       if (d) {
         setData(d);
         setIterations('');

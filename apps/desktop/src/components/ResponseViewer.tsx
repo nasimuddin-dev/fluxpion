@@ -9,6 +9,7 @@ import { CheckList } from './Results';
 import { ResponseHistory } from './ResponseHistory';
 import { JsonTree, RawView } from './JsonView';
 import { TraceView } from './TraceView';
+import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
 
 type Tab = 'body' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream' | 'history';
@@ -104,7 +105,7 @@ export function ResponseViewer({
             </Button>
           )}
           {response.payloadPath && (
-            <Button size="sm" variant="ghost" icon={<Download size={12} />} onClick={() => call('http.saveBody', { payloadPath: response.payloadPath, name: 'response' + (isJson ? '.json' : '.txt') }).then((p) => p && useApp.getState().toast(`Saved to ${p}`, 'success'))}>
+            <Button size="sm" variant="ghost" icon={<Download size={12} />} onClick={() => call<SaveResult>('http.saveBody', { payloadPath: response.payloadPath, name: 'response' + (isJson ? '.json' : '.txt') }).then((r) => finishSave(r, 'Response'))}>
               Save response
             </Button>
           )}

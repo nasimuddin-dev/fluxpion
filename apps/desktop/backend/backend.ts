@@ -326,6 +326,28 @@ export class Backend {
     this.logger[level](message, data);
   }
 
+  /**
+   * Save a file for the user: with a native save dialog (desktop) the file is written where they
+   * choose; without one (browser bridge, cloud) the content is returned for the UI to download.
+   * Resolves to `{ path }`, `{ download }`, or `{}` when the dialog was cancelled.
+   */
+  private async saveOrDownload(
+    name: string,
+    filters: Array<{ name: string; extensions: string[] }> | undefined,
+    write: (dest: string) => void,
+    read: () => Buffer,
+  ): Promise<{ path?: string; download?: { name: string; content: string; encoding: 'base64'; type: string } }> {
+    if (this.host.saveDialog) {
+      const dest = await this.host.saveDialog({ defaultPath: name, filters });
+      if (!dest) return {};
+      write(dest);
+      return { path: dest };
+    }
+    const data = read();
+    if (data.length > 100 * 1024 * 1024) throw new ApsError('ValidationError', 'The file is larger than 100 MB and can only be saved from the desktop app');
+    return { download: { name, content: data.toString('base64'), encoding: 'base64', type: 'application/octet-stream' } };
+  }
+
   private consoleEntry(e: ConsoleEntry): void {
     this.consoleBuffer.push(e);
     if (this.consoleBuffer.length > CONSOLE_MAX) this.consoleBuffer.splice(0, this.consoleBuffer.length - CONSOLE_MAX);
@@ -422,6 +444,8 @@ export class Backend {
       /* ---------------------------------------------------------------- app */
       'app.info': () => ({
         version: ENGINE_VERSION,
+        /** Native open/save dialogs (desktop). Without them (browser bridge, cloud) the UI uploads and downloads. */
+        nativeDialogs: !!this.host.saveDialog && !!this.host.openDialog,
         platform: process.platform,
         appDir: this.host.appDir,
         secretBackend: this.secrets.kind,
@@ -474,6 +498,7 @@ export class Backend {
           const s = this.manager.loadSettings();
           if (!s.workspacePaths.includes(dir)) this.settings = this.manager.saveSettings({ ...s, workspacePaths: [...s.workspacePaths, dir] });
         }
+        if (!ref && !this.host.openDialog) throw new ApsError('ValidationError', 'There is no folder picker here: give the path of the workspace folder');
         if (!path) throw new ApsError('ConfigurationError', `Workspace ${ref} not found`);
         this.openStore(path);
         return this.handlers['ws.current']!({});
@@ -686,6 +711,20 @@ export class Backend {
         return this.handlers['col.import']!({ text: readFileSync(f, 'utf8') });
       },
       'col.run': (p: CollectionRunParams) => this.startCollectionRun(p),
+      /**
+       * A data file uploaded from the browser (no native file picker): it is stored in the workspace's
+       * datasets/uploads folder and previewed like a picked file.
+       */
+      'col.uploadDataFile': async ({ name, text }: { name: string; text: string }) => {
+        if (text.length > 50 * 1024 * 1024) throw new ApsError('ValidationError', 'The data file is larger than 50 MB');
+        const safe = basename(name).replace(/[^\w.-]+/g, '_').slice(0, 120) || 'data.csv';
+        if (!/\.(csv|json|jsonl)$/i.test(safe)) throw new ApsError('ValidationError', 'Use a .csv, .json or .jsonl file');
+        const dir = this.ws.path('datasets', 'uploads');
+        mkdirSync(dir, { recursive: true });
+        const dest = join(dir, safe);
+        writeFileSync(dest, text);
+        return this.handlers['col.previewDataFile']!({ path: dest });
+      },
       /** Pick a CSV/JSON data file for a collection run; returns a preview of its rows. */
       'col.pickDataFile': async () => {
         const f = await this.host.openDialog?.({ filters: [{ name: 'Data files', extensions: ['csv', 'json', 'jsonl'] }] });
@@ -736,9 +775,7 @@ export class Backend {
       'http.parseSnippet': ({ text }: { text: string }) => ({ format: detectRequestSnippet(text), request: parseRequestSnippet(text) }),
       'http.saveBody': async ({ payloadPath, name }: { payloadPath: string; name?: string }) => {
         if (!payloadPath || !payloadPath.startsWith(this.ws.path('payloads'))) throw new ApsError('ValidationError', 'Unknown payload');
-        const dest = await this.host.saveDialog?.({ defaultPath: name ?? 'response.bin' });
-        if (dest) copyFileSync(payloadPath, dest);
-        return dest;
+        return this.saveOrDownload(name ?? 'response.bin', undefined, (dest) => copyFileSync(payloadPath, dest), () => readFileSync(payloadPath));
       },
       'history.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => this.ws.meta.listHistory(q),
       'history.get': ({ id }: { id: string }) => this.ws.meta.getHistory(id),
@@ -901,15 +938,17 @@ export class Backend {
         const file = { html: 'report.html', markdown: 'report.md', junit: 'junit.xml', json: 'report.json' }[format];
         const p = join(this.ws.runDir(runId), file);
         if (!existsSync(p)) throw new ApsError('ConfigurationError', 'Report not found');
-        void this.host.openPath?.(p);
-        return p;
+        if (this.host.openPath) {
+          void this.host.openPath(p);
+          return { path: p };
+        }
+        // no desktop shell (browser, cloud): the UI shows the report itself
+        return { path: p, view: { name: file, content: readFileSync(p).toString('base64'), encoding: 'base64', type: format === 'html' ? 'text/html' : 'text/plain' } };
       },
       'runs.exportReport': async ({ runId, format }: { runId: string; format: 'html' | 'markdown' | 'junit' | 'json' }) => {
         const file = { html: 'report.html', markdown: 'report.md', junit: 'junit.xml', json: 'report.json' }[format];
         const src = join(this.ws.runDir(runId), file);
-        const dest = await this.host.saveDialog?.({ defaultPath: file });
-        if (dest) copyFileSync(src, dest);
-        return dest;
+        return this.saveOrDownload(file, undefined, (dest) => copyFileSync(src, dest), () => readFileSync(src));
       },
       'baselines.list': () => this.ws.listBaselines(),
       'baselines.save': async ({ runId, name }: { runId: string; name: string }) => {

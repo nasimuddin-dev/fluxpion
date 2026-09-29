@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Works without native file dialogs** (the browser version today, the planned online version later). Import, *Save response*, report export and viewing, workspace export and Collection Runner data files use the browser's file picker and downloads when the app has no native dialogs; *Open folder* asks for the folder's path. The desktop app still uses its native dialogs.
 - **Cookies for WebSocket and MCP.** WebSocket handshakes send the workspace cookie jar's cookies (so a session from a login request works), and MCP servers over Streamable HTTP or SSE send and receive cookies through the jar.
 - **Mock servers match on the request body.** Among examples of the same request, the one saved with the same body (JSON in any key order, a JSON subset, or form fields in any order) wins, so one endpoint can answer *Success* or *Wrong password*. Postman's `x-mock-match-request-body: true` and `x-mock-match-request-headers: a, b` headers make matching strict.
 - **Convert a collection's scripts between `pm.*` and `tp.*`.** Right-click a collection (or **⋯**): **Convert scripts to tp.\*** / **to pm.\***, with a preview of how many scripts change. CLI: `testpion scripts convert --to tp|pm [--collection] [--dry-run] --json`.

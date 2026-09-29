@@ -313,6 +313,7 @@ TestPion runs on your desktop today, and the same code is meant to run as an onl
 - **The UI talks to the engine only through RPC** (`call(...)`). No Node or Electron APIs in `apps/desktop/src`. Desktop-only features (menus, native dialogs, the updater) sit behind backend handlers and have a browser fallback, such as upload and download instead of file dialogs. The browser build (`dev.mjs --web`) must keep working.
 - **The engine is host-agnostic.** Files, metadata and secrets go through the `WorkspaceStore`, `MetaStore` and `SecretStore` interfaces, so a server can plug in a database and object storage. Context such as the workspace and user is passed explicitly, not held in process-wide globals.
 - **Data is multi-user ready:** stable ids, a `schemaVersion` on every file, and no assumption of one user per machine. Per-user secrets, sharing and permissions are considered when data is added.
+- **Files go through RPC, not paths.** Picking a file sends its content; saving either uses the native dialog (desktop) or returns a download (`saveOrDownload` in the backend, `finishSave` / `pickTextFile` in `src/lib/files.ts`). `app.info.nativeDialogs` tells the UI which one applies.
 - **Safe on a shared server.** Anything that sends requests, runs scripts or starts processes has limits, a sandbox, and guards for private networks and local processes that a hosted version can switch on.
 
 ## AI-first design

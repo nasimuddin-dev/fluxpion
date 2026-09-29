@@ -1,7 +1,8 @@
 import { Check, ChevronDown, Copy, Download, FolderOpen, FolderPlus, Layers, MoreHorizontal, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call } from '../api';
-import { useApp } from '../store';
+import { promptText, useApp } from '../store';
+import { downloadContent, hasNativeDialogs } from '../lib/files';
 import { Badge, Button, cx, IconButton, Input, Menu, Modal, Spinner, type MenuItem } from './ui';
 
 interface WorkspaceInfo {
@@ -88,7 +89,16 @@ export function WorkspaceMenu() {
     { label: 'Rename…', icon: <Pencil size={14} />, onSelect: () => setNameDialog({ mode: 'rename', target: w, value: w.name }) },
     { label: 'Duplicate…', icon: <Copy size={14} />, onSelect: () => setNameDialog({ mode: 'duplicate', target: w, value: `${w.name} copy` }) },
     { label: 'Show in folder', icon: <FolderOpen size={14} />, onSelect: () => void call('app.openPath', { path: w.path }) },
-    { label: 'Export…', icon: <Download size={14} />, onSelect: () => void act(() => call('ws.export', { ref: w.path }), 'Workspace exported (secret values are never exported)') },
+    {
+      label: 'Export…',
+      icon: <Download size={14} />,
+      onSelect: () =>
+        void act(async () => {
+          const r = await call<{ path?: string; bundle?: unknown }>('ws.export', { ref: w.path });
+          // no native save dialog (browser / cloud): download the export instead
+          if (r.bundle) downloadContent(`${w.name}.apsworkspace.json`, JSON.stringify(r.bundle, null, 2), { type: 'application/json' });
+        }, 'Workspace exported (secret values are never exported)'),
+    },
     { label: 'Delete…', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => (setOpen(false), setDeleting(w)) },
   ];
 
@@ -172,7 +182,13 @@ export function WorkspaceMenu() {
               <Button size="sm" variant="ghost" icon={<FolderPlus size={13} />} onClick={() => setNameDialog({ mode: 'create', value: '' })}>
                 New
               </Button>
-              <Button size="sm" variant="ghost" icon={<FolderOpen size={13} />} onClick={() => (setOpen(false), void act(() => call('ws.open', {})))}>
+              <Button size="sm" variant="ghost" icon={<FolderOpen size={13} />} onClick={async () => {
+                  setOpen(false);
+                  if (hasNativeDialogs()) return void act(() => call('ws.open', {}));
+                  // no folder picker in the browser: ask for the workspace folder's path
+                  const path = await promptText('Open workspace folder', { message: 'Path of a folder that contains workspace.json', placeholder: 'e.g. D:/work/api-tests', okLabel: 'Open' });
+                  if (path) void act(() => call('ws.open', { ref: path }));
+                }}>
                 Open folder
               </Button>
               <Button size="sm" variant="ghost" icon={<Upload size={13} />} onClick={() => (setOpen(false), importFile())}>
