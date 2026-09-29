@@ -55,3 +55,9 @@ kbd {
   background: var(--vp-c-bg-soft);
   white-space: nowrap;
 }
+
+/* nav bar: the TestPion wordmark (600×150 image) instead of the square icon and a text title */
+.VPNavBarTitle .logo {
+  height: 30px;
+  width: auto;
+}

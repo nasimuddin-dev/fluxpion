@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 150" width="600" height="150">
+  <!-- TestPion wordmark for the website's nav bar: transparent background, no tagline.
+       make-icons.cjs renders it twice, replacing PION_COLOR (white for dark mode, navy for light mode). -->
+  <defs>
+    <linearGradient id="test" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#1ff0ff"/>
+      <stop offset="0.22" stop-color="#1e88ff"/>
+      <stop offset="0.4" stop-color="#8b5cff"/>
+      <stop offset="0.5" stop-color="#f04fe0"/>
+    </linearGradient>
+    <linearGradient id="star" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f7bff"/>
+      <stop offset="0.55" stop-color="#8b5cff"/>
+      <stop offset="1" stop-color="#f04fe0"/>
+    </linearGradient>
+  </defs>
+  <text x="6" y="122" font-family="'Segoe UI Black', 'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="120" letter-spacing="-3"><tspan fill="url(#test)">Test</tspan><tspan fill="PION_COLOR">Pion</tspan></text>
+  <path fill="url(#star)" d="M556 6 C 560 30 568 38 592 42 C 568 46 560 54 556 78 C 552 54 544 46 520 42 C 544 38 552 30 556 6 Z"/>
+</svg>

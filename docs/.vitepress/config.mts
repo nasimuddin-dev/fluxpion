@@ -191,8 +191,9 @@ export default defineConfig({
     return head;
   },
   themeConfig: {
-    logo: { src: '/logo.svg', alt: '' },
-    siteTitle: 'TestPion',
+    // the wordmark replaces the icon + text title; separate files keep "Pion" readable in both themes
+    logo: { light: '/wordmark-nav-light.png', dark: '/wordmark-nav-dark.png', alt: 'TestPion' },
+    siteTitle: false,
     nav: [
       { text: 'Download', link: '/download' },
       { text: 'Features', link: '/features' },
