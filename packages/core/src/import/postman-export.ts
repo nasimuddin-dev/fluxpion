@@ -1,3 +1,4 @@
+import { toPostmanScript } from '../scripts/aliases.js';
 import { createHash } from 'node:crypto';
 import type { AuthConfig, BodyConfig, CheckConfig, Collection, CollectionNode, Environment, KeyValue, SavedExample, SavedGraphQLRequest, SavedHttpRequest } from '../model/types.js';
 
@@ -129,7 +130,10 @@ function statusTests(assertions: CheckConfig[] | undefined, notes: string[], whe
   return out;
 }
 
-function events(pre: string | undefined, test: string | undefined, extraTests: string[] = []) {
+function events(preScript: string | undefined, testScript: string | undefined, extraTests: string[] = []) {
+  // Postman has no `tp`: TestPion's name for the script API becomes `pm`
+  const pre = toPostmanScript(preScript);
+  const test = toPostmanScript(testScript);
   const ev: Array<Record<string, unknown>> = [];
   if (pre?.trim()) ev.push({ listen: 'prerequest', script: { type: 'text/javascript', exec: lines(pre) } });
   const t = [...(test?.trim() ? lines(test) : []), ...(extraTests.length && test?.trim() ? [''] : []), ...extraTests];

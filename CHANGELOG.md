@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Nothing yet.
+- **`tp.*` scripts.** Scripts can use `tp` (TestPion's name) or `pm` (Postman's) for the script API; they are the same object, so either works, even mixed in one script. Snippets and the editor's hints use `tp`, and autocomplete knows both. Postman imports keep `pm.*`; exports to Postman convert `tp.*` to `pm.*` so Postman and Newman can run them (only code is changed, not strings or comments).
 
 ## 0.6.2 — 2026-09-29
 

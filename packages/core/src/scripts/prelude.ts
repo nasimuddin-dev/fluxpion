@@ -387,6 +387,8 @@ const postman = {
   getGlobalVariable: (k) => pm.globals.get(k),
 };
 const tests = {};
+// TestPion's own name for the API: tp.* and Postman's pm.* are the same object
+const tp = pm;
 const aps = pm;
 // legacy Postman sandbox globals (pre-pm API)
 const responseCode = __in.response ? { code: __in.response.status, name: '', detail: '' } : undefined;

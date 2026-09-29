@@ -6,31 +6,31 @@ export interface Snippet {
 }
 
 export const SNIPPETS: Snippet[] = [
-  { kind: 'test', label: 'Status code: Code is 200', code: `pm.test("Status code is 200", function () {\n  pm.response.to.have.status(200);\n});` },
-  { kind: 'test', label: 'Status code: Successful POST request', code: `pm.test("Successful POST request", function () {\n  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);\n});` },
-  { kind: 'test', label: 'Response time is less than 200ms', code: `pm.test("Response time is less than 200ms", function () {\n  pm.expect(pm.response.responseTime).to.be.below(200);\n});` },
-  { kind: 'test', label: 'Response body: JSON value check', code: `pm.test("Your test name", function () {\n  const jsonData = pm.response.json();\n  pm.expect(jsonData.value).to.eql(100);\n});` },
-  { kind: 'test', label: 'Response body: Contains string', code: `pm.test("Body matches string", function () {\n  pm.expect(pm.response.text()).to.include("string_you_want_to_search");\n});` },
-  { kind: 'test', label: 'Response body: Is equal to a string', code: `pm.test("Body is correct", function () {\n  pm.response.to.have.body("response_body_string");\n});` },
-  { kind: 'test', label: 'Response headers: Content-Type header check', code: `pm.test("Content-Type is present", function () {\n  pm.response.to.have.header("Content-Type");\n});` },
-  { kind: 'test', label: 'Response body: Array has items', code: `pm.test("Returns items", function () {\n  const data = pm.response.json();\n  pm.expect(data.items).to.be.an("array").that.is.not.empty;\n});` },
-  { kind: 'test', label: 'Response body: Property types', code: `pm.test("Has the expected shape", function () {\n  const data = pm.response.json();\n  pm.expect(data).to.have.property("id");\n  pm.expect(data.id).to.be.a("string");\n});` },
-  { kind: 'test', label: 'Save a value from the response', code: `const data = pm.response.json();\npm.environment.set("token", data.access_token);` },
-  { kind: 'both', label: 'Set an environment variable', code: `pm.environment.set("variable_key", "variable_value");` },
-  { kind: 'both', label: 'Get an environment variable', code: `pm.environment.get("variable_key");` },
-  { kind: 'both', label: 'Set a collection variable', code: `pm.collectionVariables.set("variable_key", "variable_value");` },
-  { kind: 'both', label: 'Set a global variable', code: `pm.globals.set("variable_key", "variable_value");` },
-  { kind: 'both', label: 'Get a variable (any scope)', code: `pm.variables.get("variable_key");` },
-  { kind: 'both', label: 'Clear an environment variable', code: `pm.environment.unset("variable_key");` },
-  { kind: 'test', label: 'Cookies: Cookie is present', code: `pm.test("Session cookie is set", function () {\n  pm.expect(pm.cookies.has("session")).to.be.true;\n});` },
-  { kind: 'both', label: 'Cookies: Read from the cookie jar', code: `const jar = pm.cookies.jar();\njar.get(pm.request.url.toString(), "session", (error, value) => {\n  pm.variables.set("session", value);\n});` },
-  { kind: 'both', label: 'Cookies: Set a cookie in the jar', code: `pm.cookies.jar().set(pm.request.url.toString(), "cookie_name", "cookie_value");` },
-  { kind: 'both', label: 'Cookies: Clear the jar for this domain', code: `pm.cookies.jar().clear(pm.request.url.toString());` },
-  { kind: 'both', label: 'Send a request (pm.sendRequest)', code: `pm.sendRequest({\n  url: pm.variables.replaceIn("{{baseUrl}}/auth/token"),\n  method: "POST",\n  header: { "Content-Type": "application/json" },\n  body: { mode: "raw", raw: JSON.stringify({ client_id: pm.environment.get("clientId") }) }\n}, (err, res) => {\n  if (err) return console.error(err.message);\n  pm.environment.set("accessToken", res.json().access_token);\n});` },
-  { kind: 'pre', label: 'Add a request header', code: `pm.request.headers.upsert({ key: "X-Request-Id", value: pm.uuid() });` },
-  { kind: 'pre', label: 'Timestamp variable', code: `pm.variables.set("timestamp", new Date().toISOString());` },
-  { kind: 'pre', label: 'HMAC signature header', code: `const body = pm.request.body.toString();\nconst signature = CryptoJS.HmacSHA256(body, pm.environment.get("secret")).toString(CryptoJS.enc.Base64);\npm.request.headers.upsert({ key: "X-Signature", value: signature });` },
-  { kind: 'both', label: 'Log to the console', code: `console.log(pm.variables.toObject());` },
+  { kind: 'test', label: 'Status code: Code is 200', code: `tp.test("Status code is 200", function () {\n  tp.response.to.have.status(200);\n});` },
+  { kind: 'test', label: 'Status code: Successful POST request', code: `tp.test("Successful POST request", function () {\n  tp.expect(tp.response.code).to.be.oneOf([200, 201, 202]);\n});` },
+  { kind: 'test', label: 'Response time is less than 200ms', code: `tp.test("Response time is less than 200ms", function () {\n  tp.expect(tp.response.responseTime).to.be.below(200);\n});` },
+  { kind: 'test', label: 'Response body: JSON value check', code: `tp.test("Your test name", function () {\n  const jsonData = tp.response.json();\n  tp.expect(jsonData.value).to.eql(100);\n});` },
+  { kind: 'test', label: 'Response body: Contains string', code: `tp.test("Body matches string", function () {\n  tp.expect(tp.response.text()).to.include("string_you_want_to_search");\n});` },
+  { kind: 'test', label: 'Response body: Is equal to a string', code: `tp.test("Body is correct", function () {\n  tp.response.to.have.body("response_body_string");\n});` },
+  { kind: 'test', label: 'Response headers: Content-Type header check', code: `tp.test("Content-Type is present", function () {\n  tp.response.to.have.header("Content-Type");\n});` },
+  { kind: 'test', label: 'Response body: Array has items', code: `tp.test("Returns items", function () {\n  const data = tp.response.json();\n  tp.expect(data.items).to.be.an("array").that.is.not.empty;\n});` },
+  { kind: 'test', label: 'Response body: Property types', code: `tp.test("Has the expected shape", function () {\n  const data = tp.response.json();\n  tp.expect(data).to.have.property("id");\n  tp.expect(data.id).to.be.a("string");\n});` },
+  { kind: 'test', label: 'Save a value from the response', code: `const data = tp.response.json();\npm.environment.set("token", data.access_token);` },
+  { kind: 'both', label: 'Set an environment variable', code: `tp.environment.set("variable_key", "variable_value");` },
+  { kind: 'both', label: 'Get an environment variable', code: `tp.environment.get("variable_key");` },
+  { kind: 'both', label: 'Set a collection variable', code: `tp.collectionVariables.set("variable_key", "variable_value");` },
+  { kind: 'both', label: 'Set a global variable', code: `tp.globals.set("variable_key", "variable_value");` },
+  { kind: 'both', label: 'Get a variable (any scope)', code: `tp.variables.get("variable_key");` },
+  { kind: 'both', label: 'Clear an environment variable', code: `tp.environment.unset("variable_key");` },
+  { kind: 'test', label: 'Cookies: Cookie is present', code: `tp.test("Session cookie is set", function () {\n  tp.expect(tp.cookies.has("session")).to.be.true;\n});` },
+  { kind: 'both', label: 'Cookies: Read from the cookie jar', code: `const jar = tp.cookies.jar();\njar.get(tp.request.url.toString(), "session", (error, value) => {\n  tp.variables.set("session", value);\n});` },
+  { kind: 'both', label: 'Cookies: Set a cookie in the jar', code: `tp.cookies.jar().set(tp.request.url.toString(), "cookie_name", "cookie_value");` },
+  { kind: 'both', label: 'Cookies: Clear the jar for this domain', code: `tp.cookies.jar().clear(tp.request.url.toString());` },
+  { kind: 'both', label: 'Send a request (tp.sendRequest)', code: `tp.sendRequest({\n  url: tp.variables.replaceIn("{{baseUrl}}/auth/token"),\n  method: "POST",\n  header: { "Content-Type": "application/json" },\n  body: { mode: "raw", raw: JSON.stringify({ client_id: tp.environment.get("clientId") }) }\n}, (err, res) => {\n  if (err) return console.error(err.message);\n  tp.environment.set("accessToken", res.json().access_token);\n});` },
+  { kind: 'pre', label: 'Add a request header', code: `tp.request.headers.upsert({ key: "X-Request-Id", value: tp.uuid() });` },
+  { kind: 'pre', label: 'Timestamp variable', code: `tp.variables.set("timestamp", new Date().toISOString());` },
+  { kind: 'pre', label: 'HMAC signature header', code: `const body = tp.request.body.toString();\nconst signature = CryptoJS.HmacSHA256(body, tp.environment.get("secret")).toString(CryptoJS.enc.Base64);\npm.request.headers.upsert({ key: "X-Signature", value: signature });` },
+  { kind: 'both', label: 'Log to the console', code: `console.log(tp.variables.toObject());` },
   { kind: 'test', label: 'Collection runner: go to a request next', code: `postman.setNextRequest("Request name");` },
   { kind: 'test', label: 'Visualize the response as a table', code: `const template = \`
 <table>
@@ -40,7 +40,7 @@ export const SNIPPETS: Snippet[] = [
   {{/each}}
 </table>\`;
 // Handlebars template + data; open Body › Visualize to see it
-pm.visualizer.set(template, { response: pm.response.json() });` },
+tp.visualizer.set(template, { response: tp.response.json() });` },
 ];
 
 /** Type declarations for Monaco so the script editor autocompletes the pm API. */
@@ -95,4 +95,6 @@ declare const CryptoJS: any;
 declare const tests: Record<string, boolean>;
 declare function btoa(s: string): string;
 declare function atob(s: string): string;
+/** TestPion's name for the script API: the same object as pm. */
+declare const tp: typeof pm;
 `;

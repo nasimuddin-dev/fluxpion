@@ -29,8 +29,8 @@ export function ScriptsPanel({ pre, post, onPre, onPost }: { pre: string; post: 
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="text-xs text-muted px-3 py-1.5 border-b border-line">
-          {which === 'pre' ? 'Runs before the request is sent — set variables or change pm.request.' : 'Runs after the response — write pm.test(...) checks and save values with pm.environment.set(...).'} Postman
-          scripts work as-is; they run in a sandbox without file or network access.
+          {which === 'pre' ? 'Runs before the request is sent — set variables or change tp.request.' : 'Runs after the response — write tp.test(...) checks and save values with tp.environment.set(...).'} Write{' '}
+          <code>tp.*</code> or Postman's <code>pm.*</code>: both work (they are the same). Scripts run in a sandbox without file or network access.
         </div>
         <div className="flex-1 min-h-0">
           <CodeEditor
@@ -38,7 +38,7 @@ export function ScriptsPanel({ pre, post, onPre, onPost }: { pre: string; post: 
             language="javascript"
             value={value}
             onChange={set}
-            placeholder={which === 'pre' ? 'pm.variables.set("nonce", pm.uuid());' : 'pm.test("Status code is 200", () => pm.response.to.have.status(200));'}
+            placeholder={which === 'pre' ? 'tp.variables.set("nonce", tp.uuid());' : 'tp.test("Status code is 200", () => tp.response.to.have.status(200));'}
           />
         </div>
       </div>

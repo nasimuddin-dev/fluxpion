@@ -30,6 +30,7 @@ export * from './eval/text.js';
 export * from './scripts/sandbox.js';
 export * from './scripts/bridge.js';
 export * from './scripts/visualizer.js';
+export * from './scripts/aliases.js';
 
 export * from './runner/execute.js';
 export * from './runner/runner.js';
