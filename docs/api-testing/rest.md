@@ -161,7 +161,23 @@ After you send, the response body opens on **Visualize** (next to Pretty and Raw
 
 - `pm.visualizer.set(template, data)` renders `template` with `data` (anything JSON-serialisable). If several scripts (collection, folder, request) call it, the last call wins. `pm.visualizer.clear()` removes it.
 - Handlebars' built-in helpers work (`#each`, `#if`, `#with`, `lookup`, …), plus `{{json value}}` to print a value as JSON. `{{…}}` output is HTML-escaped. Use `{{{…}}}` only for HTML you trust.
-- **Security:** the template is rendered by the engine, the HTML is sanitised, and it is shown in a sandboxed frame. Scripts, event handlers, forms, and remote frames and stylesheets are removed. So tables, lists and `<style>` work, but chart libraries loaded with `<script>` (and Postman's `pm.getData()` inside the template) do not.
+- **Scripts and charts work**, like in Postman: a template can load a chart library from a CDN (`https://cdn.jsdelivr.net`, `https://cdnjs.cloudflare.com` or `https://unpkg.com`) and read its data with `pm.getData((err, data) => …)` (or `tp.getData`). For example:
+
+  ```js
+  const template = `
+    <canvas id="c" height="120"></canvas>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      pm.getData((err, data) => {
+        new Chart(document.getElementById('c'), {
+          type: 'bar',
+          data: { labels: data.items.map((p) => p.name), datasets: [{ label: 'Age', data: data.items.map((p) => p.age) }] },
+        });
+      });
+    </script>`;
+  tp.visualizer.set(template, tp.response.json());
+  ```
+- **Security:** the visualization runs on its own isolated origin (`tpviz://` in the desktop app), in a sandboxed frame that can't reach the app, its storage or your data. It can't make network requests, so nothing leaves your machine; only scripts from those CDNs (and inline scripts) load, and images and fonts must be inline. Hosts that can't serve the isolated page fall back to a sanitised, script-free view.
 
 **Current values:** values set with `pm.environment.set`, `pm.collectionVariables.set` or `pm.globals.set` are kept on this machine as *current values* and override the stored values. They're never written to workspace files. Sensitive ones (tokens, passwords, secret variables) are encrypted. You can see and reset them under **Environments**.
 

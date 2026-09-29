@@ -1,7 +1,7 @@
 import { BookmarkPlus, Download, ExternalLink, Sparkles } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useState } from 'react';
-import { call } from '../api';
+import { call, visualizationUrl } from '../api';
 import type { CheckResult, HttpResponseData, Trace } from '../types';
 import { formatBytes, formatMs } from '../lib/format';
 import { useApp } from '../store';
@@ -36,7 +36,7 @@ export function ResponseViewer({
   stream?: string;
   scriptLogs?: string[];
   /** Output of `pm.visualizer.set(template, data)`, rendered by the backend. */
-  visualizer?: { html?: string; error?: string };
+  visualizer?: { html?: string; error?: string; vizId?: string };
   /** Saved request: enables the History tab (earlier responses, compare). */
   requestId?: string;
   /** History entry of this response (marked "latest"). */
@@ -146,7 +146,12 @@ export function ResponseViewer({
           ) : mode === 'visualize' && visualizer ? (
             <div className="h-full flex flex-col">
               {visualizer.error && <div className="px-3 py-2 text-sm text-bad border-b border-line">{visualizer.error}</div>}
-              {visualHtml !== undefined && <iframe title="Visualization" sandbox="" className="flex-1 w-full bg-white" srcDoc={visualHtml} />}
+              {visualizer.vizId ? (
+                // scripts allowed (charts), on the isolated tpviz origin: no same-origin access to the app
+                <iframe title="Visualization" sandbox="allow-scripts" className="flex-1 w-full bg-white" src={visualizationUrl(visualizer.vizId)} />
+              ) : (
+                visualHtml !== undefined && <iframe title="Visualization" sandbox="" className="flex-1 w-full bg-white" srcDoc={visualHtml} />
+              )}
             </div>
           ) : mode === 'preview' ? (
             <iframe title="HTML preview" sandbox="" className="w-full h-full bg-white" srcDoc={response.bodyPreview} />

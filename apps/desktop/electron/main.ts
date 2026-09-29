@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, safeStorage, shell, nativeTheme } from 'electron';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -7,6 +7,10 @@ import { canInstallInPlace, createUpdater } from './updater.js';
 import { defaultAppDir } from '@testpion/core';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+// pm.visualizer pages run on their own origin (tpviz://<id>/) with their own security policy, so their
+// scripts (charts) never share the app's origin, storage or IPC bridge
+protocol.registerSchemesAsPrivileged([{ scheme: 'tpviz', privileges: { standard: true, secure: true } }]);
 let win: BrowserWindow | null = null;
 let backend: Backend | null = null;
 
@@ -191,6 +195,13 @@ function start(): void {
       },
     ]),
   );
+  protocol.handle('tpviz', (req) => {
+    const page = be.visualizationPage(new URL(req.url).hostname);
+    return new Response(page ?? 'This visualization is no longer available. Send the request again.', {
+      status: page ? 200 : 404,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': Backend.VIZ_CSP, 'x-content-type-options': 'nosniff' },
+    });
+  });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

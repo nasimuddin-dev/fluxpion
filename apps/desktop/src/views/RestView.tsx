@@ -72,7 +72,7 @@ interface SendResult {
   checks?: CheckResult[];
   traceId?: string;
   scriptLogs?: string[];
-  visualizer?: { html?: string; error?: string };
+  visualizer?: { html?: string; error?: string; vizId?: string };
   historyId?: string;
   unresolved?: string[];
   curl?: string;

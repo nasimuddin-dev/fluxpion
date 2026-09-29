@@ -24,6 +24,13 @@ const backend = new Backend({
 
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+  const viz = /^\/viz\/([0-9a-f]{32})\/?$/.exec(url.pathname);
+  if (viz && req.method === 'GET') {
+    const page = backend.visualizationPage(viz[1]!);
+    res.writeHead(page ? 200 : 404, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': Backend.VIZ_CSP, 'x-content-type-options': 'nosniff' });
+    res.end(page ?? 'This visualization is no longer available.');
+    return;
+  }
   if (url.searchParams.get('token') !== token && req.headers['x-aps-token'] !== token) {
     res.writeHead(403).end('forbidden');
     return;

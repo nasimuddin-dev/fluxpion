@@ -56,6 +56,11 @@ function webBridge(): Bridge {
 
 export const bridge: Bridge = window.aps ?? webBridge();
 
+/** URL of an isolated pm.visualizer page (its own origin and security policy; see the backend). */
+export function visualizationUrl(id: string): string {
+  return bridge.kind === 'electron' ? `tpviz://${id}/` : `/__aps/viz/${id}`;
+}
+
 // browser development mode only: expose the bridge for debugging from the devtools console
 if (bridge.kind === 'web' && import.meta.env.DEV) (window as unknown as { __aps: Bridge }).__aps = bridge;
 
