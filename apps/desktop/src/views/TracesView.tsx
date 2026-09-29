@@ -69,8 +69,8 @@ export function TracesView() {
               <button onClick={() => setSel(t.id)} className={cx('w-full h-full text-left px-3 border-b border-line/60 flex flex-col justify-center', sel === t.id ? 'bg-accent/10' : 'hover:bg-hover')}>
                 <div className="flex items-center gap-2 text-sm">
                   <span className={cx('w-1.5 h-1.5 rounded-full', t.status === 'ok' ? 'bg-ok' : 'bg-bad')} />
-                  <span className="truncate">{t.name}</span>
-                  <span className="ml-auto text-xs text-muted tabular-nums">{formatMs(t.durationMs)}</span>
+                  <span className="truncate min-w-0" title={t.name}>{t.name}</span>
+                  <span className="ml-auto text-xs text-muted tabular-nums whitespace-nowrap shrink-0 pl-2">{formatMs(t.durationMs)}</span>
                 </div>
                 <div className="text-xs text-muted flex gap-2 pl-3.5">
                   <Badge>{t.kind}</Badge>

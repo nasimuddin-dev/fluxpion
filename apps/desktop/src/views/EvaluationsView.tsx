@@ -125,13 +125,13 @@ export function EvaluationsView() {
     <Split id="eval-main" initial={42}>
       <div className="h-full flex flex-col">
         <div className="p-2 border-b border-line flex flex-col gap-2">
-          <div className="flex gap-2">
-            <Input className="flex-1 font-medium" value={d.name} onChange={(e) => set({ name: e.target.value })} aria-label="Evaluation name" />
+          <div className="flex gap-2 flex-wrap">
+            <Input className="flex-1 min-w-40 font-medium" value={d.name} onChange={(e) => set({ name: e.target.value })} aria-label="Evaluation name" />
             <Select value={d.type} onChange={(e) => set({ type: e.target.value as Draft['type'] })} aria-label="Evaluation type">
               <option value="llm">Prompt / LLM</option>
               <option value="rag">RAG</option>
             </Select>
-            <Button variant="primary" icon={<Play size={13} />} onClick={run} disabled={!count || !d.provider}>
+            <Button variant="primary" className="shrink-0" icon={<Play size={13} />} onClick={run} disabled={!count || !d.provider}>
               Run {count ? `${d.limit ? Math.min(d.limit, count) : count} cases` : ''}
             </Button>
           </div>

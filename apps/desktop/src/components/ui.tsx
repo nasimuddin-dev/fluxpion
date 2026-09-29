@@ -407,11 +407,16 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
   );
 }
 
+/** An even grid of Metric cards (equal widths, wraps cleanly) instead of ragged flex rows. */
+export function MetricGrid({ children, className, compact }: { children: ReactNode; className?: string; compact?: boolean }) {
+  return <div className={cx('grid gap-2', compact ? 'grid-cols-[repeat(auto-fill,minmax(118px,1fr))] [&>div]:px-3 [&>div]:py-2 [&>div>div:nth-child(2)]:text-base' : 'grid-cols-[repeat(auto-fill,minmax(150px,1fr))]', className)}>{children}</div>;
+}
+
 export function Metric({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: 'ok' | 'bad' | 'warn'; sub?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-line bg-bg shadow-sm px-4 py-3 min-w-[120px]">
-      <div className="text-xs text-muted font-medium">{label}</div>
-      <div className={cx('text-xl font-semibold tabular-nums tracking-tight mt-0.5', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad', tone === 'warn' && 'text-warn')}>{value}</div>
+    <div className="rounded-xl border border-line bg-bg shadow-sm px-4 py-3 min-w-0">
+      <div className="text-xs text-muted font-medium truncate" title={label}>{label}</div>
+      <div className={cx('text-xl font-semibold tabular-nums tracking-tight mt-0.5 truncate', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad', tone === 'warn' && 'text-warn')}>{value}</div>
       {sub && <div className="text-[0.72rem] text-muted">{sub}</div>}
     </div>
   );

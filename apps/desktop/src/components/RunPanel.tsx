@@ -1,4 +1,4 @@
-import { Activity, Download, FileBarChart, GitCompare, Square, Target } from 'lucide-react';
+import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
@@ -7,7 +7,7 @@ import { formatCost, formatMs } from '../lib/format';
 import { CheckList, ErrorPanel, StatusIcon } from './Results';
 import { TraceView } from './TraceView';
 import { finishSave, viewContent, type SaveResult } from '../lib/files';
-import { Badge, Button, cx, Empty, Field, Input, Metric, Modal, Select, Split, Tabs, VirtualList } from './ui';
+import { Badge, Button, cx, Empty, Field, Input, Metric, Modal, Select, Split, Tabs, VirtualList, Menu, MetricGrid } from './ui';
 
 interface Progress {
   completed: number;
@@ -28,6 +28,8 @@ function displayPath(file: string): string {
 }
 
 /** Live progress + paged, virtualised results for a test/evaluation run. Results are read from disk page by page. */
+const humanize = (k: string) => k.replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
 export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTotal?: number }) {
   const [progress, setProgress] = useState<Progress>({ completed: 0, passed: 0, failed: 0, skipped: 0, errors: 0, running: 0 });
   const [summary, setSummary] = useState<RunSummary | null>(null);
@@ -110,9 +112,12 @@ export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTota
         ) : (
           <Badge tone={s && s.failed + s.errors === 0 && !s.cancelled ? 'ok' : 'bad'}>{s?.cancelled ? 'cancelled' : s && s.failed + s.errors === 0 ? 'passed' : 'failed'}</Badge>
         )}
-        <span className="text-sm tabular-nums">
-          <span className="text-ok">{s?.passed ?? progress.passed} passed</span> · <span className="text-bad">{s?.failed ?? progress.failed} failed</span> · <span className="text-bad">{s?.errors ?? progress.errors} errors</span> · <span className="text-warn">{s?.skipped ?? progress.skipped} skipped</span>
-          {!done && progress.running > 0 && <span className="text-muted"> · {progress.running} running</span>}
+        <span className="flex items-center gap-1.5 flex-wrap text-sm tabular-nums">
+          <Badge tone="ok">{s?.passed ?? progress.passed} passed</Badge>
+          {(s?.failed ?? progress.failed) > 0 && <Badge tone="bad">{s?.failed ?? progress.failed} failed</Badge>}
+          {(s?.errors ?? progress.errors) > 0 && <Badge tone="bad">{s?.errors ?? progress.errors} errors</Badge>}
+          {(s?.skipped ?? progress.skipped) > 0 && <Badge tone="warn">{s?.skipped ?? progress.skipped} skipped</Badge>}
+          {!done && progress.running > 0 && <span className="text-muted text-xs">{progress.running} running</span>}
         </span>
         {done && (
           <div className="ml-auto flex gap-1">
@@ -136,15 +141,15 @@ export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTota
         </div>
       )}
       {s && (
-        <div className="flex gap-2 p-2 flex-wrap border-b border-line">
+        <MetricGrid compact className="p-2 border-b border-line max-h-[35%] overflow-auto">
           <Metric label="Duration" value={formatMs(s.durationMs)} />
           <Metric label="Latency p50 / p95" value={`${formatMs(s.latency.p50)} / ${formatMs(s.latency.p95)}`} sub={`p99 ${formatMs(s.latency.p99)}`} />
           {s.tokens.totalTokens > 0 && <Metric label="Tokens" value={s.tokens.totalTokens.toLocaleString()} sub={`${s.tokens.inputTokens} in / ${s.tokens.outputTokens} out`} />}
           {s.costUsd > 0 && <Metric label="Est. cost" value={formatCost(s.costUsd)} />}
           {Object.entries(s.scores).map(([k, v]) => (
-            <Metric key={k} label={`score · ${k}`} value={v.mean.toFixed(3)} sub={`${v.count} checks`} tone={v.mean >= 0.7 ? 'ok' : 'warn'} />
+            <Metric key={k} label={humanize(k)} value={v.mean.toFixed(3)} sub={`score · ${v.count} check${v.count === 1 ? '' : 's'}`} tone={v.mean >= 0.7 ? 'ok' : 'warn'} />
           ))}
-        </div>
+        </MetricGrid>
       )}
       <div className="flex-1 min-h-0">
         <Split id="run-results" initial={48}>
@@ -166,11 +171,11 @@ export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTota
                 rowHeight={30}
                 onEndReached={done && rows.length < total ? () => void loadPage(false) : undefined}
                 render={(r) => (
-                  <button onClick={() => setSel(r)} className={cx('w-full h-full flex items-center gap-2 px-3 border-b border-line/50 text-sm text-left hover:bg-hover', sel?.id === r.id && sel.attempts === r.attempts && 'bg-accent/10')}>
+                  <button title={r.name} onClick={() => setSel(r)} className={cx('w-full h-full flex items-center gap-2 px-3 border-b border-line/50 text-sm text-left hover:bg-hover', sel?.id === r.id && sel.attempts === r.attempts && 'bg-accent/10')}>
                     <StatusIcon status={r.status} />
-                    <span className="truncate flex-1">{r.name}</span>
-                    <Badge>{r.type}</Badge>
-                    <span className="text-xs text-muted tabular-nums w-16 text-right">{formatMs(r.latencyMs ?? r.durationMs)}</span>
+                    <span className="truncate flex-1 min-w-0">{r.name}</span>
+                    <span className="text-[0.7rem] text-muted uppercase tracking-wide shrink-0">{r.type}</span>
+                    <span className="text-xs text-muted tabular-nums w-14 text-right shrink-0">{formatMs(r.latencyMs ?? r.durationMs)}</span>
                   </button>
                 )}
               />
@@ -187,32 +192,22 @@ export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTota
 }
 
 function ExportMenu({ runId }: { runId: string }) {
-  const [open, setOpen] = useState(false);
+  const exp = (format: 'html' | 'json' | 'junit' | 'markdown') => void call<SaveResult>('runs.exportReport', { runId, format }).then((r) => finishSave(r, 'Report'));
   return (
-    <div className="relative">
-      <Button size="sm" icon={<Download size={12} />} onClick={() => setOpen(!open)}>
-        Export
-      </Button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-7 z-40 w-40 rounded-md border border-line bg-bg shadow-lg p-1 text-sm">
-            {(['html', 'json', 'junit', 'markdown'] as const).map((f) => (
-              <button
-                key={f}
-                className="w-full text-left px-2 py-1.5 rounded hover:bg-hover"
-                onClick={() => {
-                  setOpen(false);
-                  void call<SaveResult>('runs.exportReport', { runId, format: f }).then((r) => finishSave(r, 'Report'));
-                }}
-              >
-                {{ html: 'HTML', json: 'JSON', junit: 'JUnit XML', markdown: 'Markdown' }[f]}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    <Menu
+      width={210}
+      items={[
+        { label: 'HTML report', icon: <FileBarChart size={14} />, onSelect: () => exp('html') },
+        { label: 'JSON results', icon: <Braces size={14} />, onSelect: () => exp('json') },
+        { label: 'JUnit XML (CI)', icon: <FileCode2 size={14} />, onSelect: () => exp('junit') },
+        { label: 'Markdown summary', icon: <FileText size={14} />, onSelect: () => exp('markdown') },
+      ]}
+      trigger={
+        <Button size="sm" icon={<Download size={12} />}>
+          Export
+        </Button>
+      }
+    />
   );
 }
 

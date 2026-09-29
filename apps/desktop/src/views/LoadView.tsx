@@ -6,7 +6,7 @@ import type { KeyValue, LatencyStats, ProviderConfig } from '../types';
 import { formatBytes, formatCost, formatMs } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { VarInput } from '../components/VarInput';
-import { Badge, Button, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle } from '../components/ui';
+import { Badge, Button, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
 import type { NormalizedError } from '../api';
 
@@ -244,7 +244,7 @@ export function LoadView() {
                 {s.elapsedSec}s elapsed · {s.activeVUs} active VUs
               </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <MetricGrid>
               <Metric label="Requests" value={s.requests.toLocaleString()} />
               <Metric label="Throughput" value={`${s.throughput}/s`} />
               <Metric label="Error rate" value={`${(s.errorRate * 100).toFixed(2)}%`} tone={s.errorRate > 0.01 ? 'bad' : 'ok'} sub={`${s.connectionFailures} connection failures`} />
@@ -253,9 +253,9 @@ export function LoadView() {
               <Metric label="p95" value={formatMs(s.latency.p95)} />
               <Metric label="p99" value={formatMs(s.latency.p99)} />
               <Metric label="Transferred" value={formatBytes(s.bytes)} />
-            </div>
+            </MetricGrid>
             {s.ai && (
-              <div className="flex flex-wrap gap-2">
+              <MetricGrid>
                 <Metric label="Tokens / sec" value={s.ai.tokensPerSec} />
                 <Metric label="Input tokens" value={s.ai.inputTokens.toLocaleString()} />
                 <Metric label="Output tokens" value={s.ai.outputTokens.toLocaleString()} />
@@ -263,7 +263,7 @@ export function LoadView() {
                 <Metric label="Between tokens" value={formatMs(s.ai.interTokenMsAvg)} />
                 <Metric label="Generation p50" value={formatMs(s.ai.generation.p50)} />
                 <Metric label="Est. cost" value={formatCost(s.ai.costUsd)} />
-              </div>
+              </MetricGrid>
             )}
             <div className="grid grid-cols-2 gap-2">
               <Chart series={s.series} field="rps" color="var(--accent)" label="Requests / second" />

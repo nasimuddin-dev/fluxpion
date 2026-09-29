@@ -47,12 +47,12 @@ export function TraceView({ trace }: { trace: Trace }) {
   return (
     <div className="h-full flex flex-col min-h-0">
       <div className="flex items-center gap-3 px-3 h-9 border-b border-line text-sm shrink-0">
-        <span className="font-medium truncate">{trace.name}</span>
+        <span className="font-medium truncate min-w-0">{trace.name}</span>
         <Badge tone={trace.status === 'ok' ? 'ok' : trace.status === 'error' ? 'bad' : 'default'}>{trace.status}</Badge>
-        <span className="text-muted">{formatMs(total)}</span>
-        <span className="text-muted">{trace.spans.length} spans</span>
-        {tokens > 0 && <span className="text-muted">{tokens} tokens</span>}
-        <span className="text-muted mono text-xs ml-auto" title="Trace ID (OpenTelemetry-compatible)">
+        <span className="text-muted whitespace-nowrap tabular-nums shrink-0">
+          {formatMs(total)} · {trace.spans.length} spans{tokens > 0 ? ` · ${tokens.toLocaleString()} tokens` : ''}
+        </span>
+        <span className="text-muted mono text-xs ml-auto truncate min-w-0 hidden xl:inline" title="Trace ID (OpenTelemetry-compatible)">
           {trace.traceId}
         </span>
       </div>
