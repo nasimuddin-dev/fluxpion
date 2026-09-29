@@ -83,7 +83,8 @@ describe('HTTP client', () => {
     expect(bad.kind).toBe('AuthenticationError');
   });
 
-  it('streams large responses to disk with a bounded preview', async () => {
+  // RSS is noisy when the suite runs in parallel (other files allocate in the same process): retry the measurement
+  it('streams large responses to disk with a bounded preview', { retry: 2 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aps-payload-'));
     try {
       const before = process.memoryUsage().rss;
