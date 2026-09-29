@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { Backend } from '../backend/backend.js';
 import { canInstallInPlace, createUpdater } from './updater.js';
-import { defaultAppDir } from '@testpion/core';
+import { defaultAppDir, normalizeError } from '@testpion/core';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
@@ -157,7 +157,8 @@ function start(): void {
     try {
       return { ok: true, data: await backend!.invoke(method, params) };
     } catch (err) {
-      return { ok: false, error: err };
+      // a plain object keeps kind and suggestions (IPC would reduce an Error to its message)
+      return { ok: false, error: normalizeError(err) };
     }
   });
   ipcMain.handle('aps:startup', () => ({ backendMs: Date.now() - t0 }));
