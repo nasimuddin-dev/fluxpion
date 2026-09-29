@@ -21,6 +21,13 @@ The jar follows the browser rules in RFC 6265:
 
 When a request has its own entry in the **Cookies** tab with the same name as a jar cookie, the request's value is used.
 
+## WebSocket and MCP connections
+
+The jar is shared beyond HTTP requests, so a session you log in to with a request works for sockets and MCP servers too:
+
+- **WebSocket:** the handshake sends the jar's cookies for the socket URL (`ws://` uses the cookies of `http://`, `wss://` those of `https://`). A `Cookie` header you set on the connection replaces them.
+- **MCP servers over Streamable HTTP or SSE:** every request to the server sends the matching cookies, and cookies the server sets are stored in the jar.
+
 ## The Cookies dialog
 
 Click the **cookie button** next to **Send** to open the Cookies dialog. It opens on the domain of the current request.

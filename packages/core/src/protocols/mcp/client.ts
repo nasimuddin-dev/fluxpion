@@ -1,3 +1,4 @@
+import type { CookieJar } from '../../cookies/cookie-jar.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -151,6 +152,8 @@ export class McpSession {
   constructor(
     readonly config: McpServerConfig,
     private redactor?: Redactor,
+    /** `cookieJar`: HTTP transports send its cookies and store the ones the server sets. */
+    private opts: { cookieJar?: CookieJar } = {},
   ) {
     this.client = new Client({ name: 'testpion', version: '0.6.3' }, { capabilities: {} });
   }
@@ -173,6 +176,21 @@ export class McpSession {
       for (const x of kv ?? []) if (x.enabled !== false && x.key) h[x.key] = x.value;
       return h;
     };
+    // HTTP transports share the workspace cookie jar, like HTTP requests do
+    const jar = this.opts.cookieJar;
+    const jarFetch = jar
+      ? async (url: string | URL, init?: RequestInit): Promise<Response> => {
+          const headers = new Headers(init?.headers);
+          if (!headers.has('cookie')) {
+            const cookie = jar.headerFor(url);
+            if (cookie) headers.set('cookie', cookie);
+          }
+          const res = await fetch(url, { ...init, headers });
+          const setCookies = res.headers.getSetCookie?.() ?? [];
+          if (setCookies.length) jar.storeFromResponse(url, setCookies);
+          return res;
+        }
+      : undefined;
     switch (c.transport) {
       case 'stdio': {
         const t = new StdioClientTransport({
@@ -189,9 +207,9 @@ export class McpSession {
         return t;
       }
       case 'streamable-http':
-        return new StreamableHTTPClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) } });
+        return new StreamableHTTPClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) }, ...(jarFetch ? { fetch: jarFetch } : {}) });
       case 'sse':
-        return new SSEClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) } });
+        return new SSEClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) }, ...(jarFetch ? { fetch: jarFetch, eventSourceInit: { fetch: jarFetch } } : {}) });
     }
   }
 

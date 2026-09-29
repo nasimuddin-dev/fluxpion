@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Cookies for WebSocket and MCP.** WebSocket handshakes send the workspace cookie jar's cookies (so a session from a login request works), and MCP servers over Streamable HTTP or SSE send and receive cookies through the jar.
 - **Mock servers match on the request body.** Among examples of the same request, the one saved with the same body (JSON in any key order, a JSON subset, or form fields in any order) wins, so one endpoint can answer *Success* or *Wrong password*. Postman's `x-mock-match-request-body: true` and `x-mock-match-request-headers: a, b` headers make matching strict.
 - **Convert a collection's scripts between `pm.*` and `tp.*`.** Right-click a collection (or **⋯**): **Convert scripts to tp.\*** / **to pm.\***, with a preview of how many scripts change. CLI: `testpion scripts convert --to tp|pm [--collection] [--dry-run] --json`.
 - **Response history and compare.** Saved requests get a **History** tab in the response panel: earlier responses, newest first. View any of them, or compare two to see exactly what changed: status and time, header changes (ignoring headers such as `date` that change every time) and a field-by-field body diff with JSON paths (`$.items[2]` added, `$.total` 2 → 3), or a line diff for text. For agents and scripts: `testpion history list|diff --json` and the MCP tools `request_history` and `compare_responses` (sensitive values masked).

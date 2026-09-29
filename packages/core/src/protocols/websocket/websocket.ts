@@ -2,6 +2,7 @@ import { WebSocket as UndiciWebSocket } from 'undici';
 import { ApsError } from '../../errors.js';
 import { shortId } from '../../util/ids.js';
 import type { KeyValue } from '../../model/types.js';
+import type { CookieJar } from '../../cookies/cookie-jar.js';
 
 export interface WsMessage {
   id: string;
@@ -22,7 +23,8 @@ export class WebSocketSession {
 
   constructor(
     readonly url: string,
-    private opts: { protocols?: string[]; headers?: KeyValue[] } = {},
+    /** `cookieJar`: cookies for the handshake URL (e.g. a login session) are sent, like with HTTP requests. */
+    private opts: { protocols?: string[]; headers?: KeyValue[]; cookieJar?: CookieJar } = {},
   ) {}
 
   onMessage(l: (m: WsMessage) => void): () => void {
@@ -48,6 +50,15 @@ export class WebSocketSession {
   connect(timeoutMs = 15_000): Promise<void> {
     const headers: Record<string, string> = {};
     for (const h of this.opts.headers ?? []) if (h.enabled !== false && h.key) headers[h.key] = h.value;
+    // the handshake is an HTTP request: ws:// and wss:// use the cookies of http:// and https://
+    if (this.opts.cookieJar && !Object.keys(headers).some((k) => k.toLowerCase() === 'cookie')) {
+      try {
+        const cookie = this.opts.cookieJar.headerFor(this.url.replace(/^ws(s?):/i, 'http$1:'));
+        if (cookie) headers.Cookie = cookie;
+      } catch {
+        /* invalid URL: reported by the connection below */
+      }
+    }
     this.setStatus('connecting');
     return new Promise((resolve, reject) => {
       let ws: InstanceType<typeof UndiciWebSocket>;

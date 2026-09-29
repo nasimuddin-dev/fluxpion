@@ -776,7 +776,7 @@ export class Backend {
         if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
         const ctx = this.context({ environment });
         const resolved = ctx.vars.resolveDeep(cfg);
-        const session = new McpSession(resolved, ctx.redactor);
+        const session = new McpSession(resolved, ctx.redactor, { cookieJar: ctx.services.cookieJar });
         const b = this.batched<unknown>('mcp.events');
         session.onEvent((e) => b.push({ serverId, event: e }));
         this.mcpSessions.set(serverId, session);
@@ -934,7 +934,7 @@ export class Backend {
       /* ---------------------------------------------------------------- WebSocket */
       'wsock.connect': async ({ url, protocols, headers, environment }: { url: string; protocols?: string[]; headers?: Array<{ key: string; value: string }>; environment?: string }) => {
         const ctx = this.context({ environment });
-        const s = new WebSocketSession(ctx.vars.resolve(url), { protocols, headers: ctx.vars.resolveDeep(headers) });
+        const s = new WebSocketSession(ctx.vars.resolve(url), { protocols, headers: ctx.vars.resolveDeep(headers), cookieJar: ctx.services.cookieJar });
         const shown = ctx.redactor.redactUrl(ctx.vars.resolve(url));
         const b = this.batched<unknown>('wsock.messages');
         // the console gets connect, send and close (with message counts), not every received frame
