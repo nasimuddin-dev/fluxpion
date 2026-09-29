@@ -23,35 +23,35 @@ monaco.typescript.javascriptDefaults.addExtraLib(PM_TYPES, 'file:///testpion/pm.
 monaco.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false, diagnosticCodesToIgnore: [1108] });
 monaco.typescript.javascriptDefaults.setCompilerOptions({ target: monaco.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, checkJs: false, lib: ['es2020'] });
 
-// match the app's zinc/indigo tokens (styles.css) so editors blend into the panels
+// match the app's navy/blue tokens (styles.css) so editors blend into the panels
 monaco.editor.defineTheme('aps-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [
     { token: 'string', foreground: '9ee6b8' },
-    { token: 'string.key.json', foreground: 'a5b4fc' },
+    { token: 'string.key.json', foreground: '7fb2ff' },
     { token: 'number', foreground: 'fbbf77' },
     { token: 'keyword', foreground: 'c4a5fd' },
     { token: 'comment', foreground: '6b6b76', fontStyle: 'italic' },
   ],
   colors: {
-    'editor.background': '#111114',
-    'editorGutter.background': '#111114',
-    'editor.lineHighlightBackground': '#1a1a1f',
+    'editor.background': '#090f20',
+    'editorGutter.background': '#090f20',
+    'editor.lineHighlightBackground': '#101629',
     'editor.lineHighlightBorder': '#00000000',
-    'editorLineNumber.foreground': '#4a4a54',
-    'editorLineNumber.activeForeground': '#9b9ba7',
-    'editor.selectionBackground': '#6d6ff540',
-    'editor.inactiveSelectionBackground': '#6d6ff522',
-    'editorCursor.foreground': '#a5b4fc',
-    'editorIndentGuide.background1': '#26262d',
-    'editorWidget.background': '#17171b',
-    'editorWidget.border': '#2a2a31',
-    'editorSuggestWidget.background': '#17171b',
-    'editorSuggestWidget.border': '#2a2a31',
-    'editorSuggestWidget.selectedBackground': '#26262d',
-    'scrollbarSlider.background': '#3a3a4366',
-    'scrollbarSlider.hoverBackground': '#3a3a43aa',
+    'editorLineNumber.foreground': '#3f4866',
+    'editorLineNumber.activeForeground': '#9ba4be',
+    'editor.selectionBackground': '#2f7bff45',
+    'editor.inactiveSelectionBackground': '#2f7bff22',
+    'editorCursor.foreground': '#1ff0ff',
+    'editorIndentGuide.background1': '#20283f',
+    'editorWidget.background': '#161d32',
+    'editorWidget.border': '#333c58',
+    'editorSuggestWidget.background': '#161d32',
+    'editorSuggestWidget.border': '#333c58',
+    'editorSuggestWidget.selectedBackground': '#20283f',
+    'scrollbarSlider.background': '#333c5866',
+    'scrollbarSlider.hoverBackground': '#333c58aa',
   },
 });
 monaco.editor.defineTheme('aps-light', {
@@ -59,22 +59,22 @@ monaco.editor.defineTheme('aps-light', {
   inherit: true,
   rules: [
     { token: 'string', foreground: '15803d' },
-    { token: 'string.key.json', foreground: '4338ca' },
+    { token: 'string.key.json', foreground: '1d5fd6' },
     { token: 'number', foreground: 'c2410c' },
     { token: 'keyword', foreground: '7c3aed' },
     { token: 'comment', foreground: '8a8a95', fontStyle: 'italic' },
   ],
   colors: {
     'editor.background': '#ffffff',
-    'editor.lineHighlightBackground': '#f6f6f9',
+    'editor.lineHighlightBackground': '#f4f6fc',
     'editor.lineHighlightBorder': '#00000000',
     'editorLineNumber.foreground': '#b4b4bd',
     'editorLineNumber.activeForeground': '#6b6b76',
-    'editor.selectionBackground': '#4f46e52e',
-    'editorCursor.foreground': '#4f46e5',
+    'editor.selectionBackground': '#2f7bff2e',
+    'editorCursor.foreground': '#2f7bff',
     'editorIndentGuide.background1': '#ececf0',
     'editorWidget.border': '#e4e4e9',
-    'editorSuggestWidget.selectedBackground': '#eef0ff',
+    'editorSuggestWidget.selectedBackground': '#eaf1ff',
   },
 });
 

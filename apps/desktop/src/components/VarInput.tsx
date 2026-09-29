@@ -107,7 +107,7 @@ export function VarInput({
         aria-label={ariaLabel}
         aria-autocomplete="list"
         className="relative w-full h-full bg-transparent outline-none px-2 mono"
-        style={{ color: 'transparent', caretColor: 'var(--fg)' }}
+        style={{ color: 'transparent', caretColor: 'var(--caret)' }}
         placeholder={placeholder}
         value={value}
         spellCheck={false}

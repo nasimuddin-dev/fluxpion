@@ -4,8 +4,9 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
- * Design tokens, shadcn/ui (Tailwind v4) style: OKLCH colours on a cool neutral, with the TestPion
- * brand (blue → violet, from the logo) as the accent. Surfaces are layered so the layout reads at a
+ * Design tokens, shadcn/ui (Tailwind v4) style: OKLCH colours from the TestPion logo: neutrals tinted
+ * with its navy, its electric blue as the accent, the blue → violet gradient for primary actions and
+ * its magenta for AI. Surfaces are layered so the layout reads at a
  * glance: chrome (top bar, nav rail, status bar) → panel (sidebars) → bg (the work area) → popover.
  * Components use the Tailwind colours mapped in @theme below.
  */
@@ -13,31 +14,36 @@
   color-scheme: light;
   --font-size: 14px;
   --radius: 9px;
-  --chrome: oklch(0.967 0.005 275);
-  --panel: oklch(0.982 0.004 275);
+  --chrome: oklch(0.965 0.008 268);
+  --panel: oklch(0.981 0.005 268);
   --bg: oklch(1 0 0);
-  --panel-2: oklch(0.955 0.007 275);
-  --hover: oklch(0.94 0.01 275);
-  --line: oklch(0.915 0.008 275);
-  --line-strong: oklch(0.865 0.01 275);
+  --panel-2: oklch(0.952 0.011 268);
+  --hover: oklch(0.937 0.016 266);
+  --line: oklch(0.912 0.012 268);
+  --line-strong: oklch(0.86 0.016 268);
   --field: oklch(1 0 0);
   --popover: oklch(1 0 0);
-  --fg: oklch(0.21 0.02 275);
-  --muted: oklch(0.52 0.025 275);
-  --accent: oklch(0.54 0.225 268);
-  --accent-hover: oklch(0.49 0.225 268);
-  --accent-soft: oklch(0.955 0.03 270);
+  --fg: oklch(0.2 0.045 272);
+  --muted: oklch(0.5 0.035 270);
+  --accent: oklch(0.56 0.2 259);
+  --accent-hover: oklch(0.5 0.2 259);
+  --accent-soft: oklch(0.955 0.03 259);
   --accent-fg: oklch(1 0 0);
   --brand-from: #2f7bff;
   --brand-to: #8b5cff;
   --brand-gradient: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  /* the logo's highlight colours */
+  --brand-cyan: #1ff0ff;
+  --brand-magenta: #f04fe0;
+  /* text cursor: a logo colour, in sRGB so it is always painted */
+  --caret: #2f7bff;
   --ok: oklch(0.55 0.15 150);
   --bad: oklch(0.58 0.22 25);
   --warn: oklch(0.6 0.15 65);
-  --judge: oklch(0.56 0.23 305);
-  --focus: oklch(0.6 0.2 268);
-  --code-bg: oklch(0.985 0.003 275);
-  --overlay: oklch(0.15 0.02 275 / 0.42);
+  --judge: oklch(0.56 0.24 335);
+  --focus: oklch(0.62 0.2 259);
+  --code-bg: oklch(0.984 0.005 268);
+  --overlay: oklch(0.16 0.06 272 / 0.42);
   --elev-sm: 0 1px 2px oklch(0.2 0.02 275 / 0.06);
   --elev-md: 0 4px 14px -3px oklch(0.2 0.02 275 / 0.12), 0 2px 4px -2px oklch(0.2 0.02 275 / 0.06);
   --elev-lg: 0 20px 44px -12px oklch(0.2 0.03 275 / 0.3), 0 4px 12px -4px oklch(0.2 0.02 275 / 0.1);
@@ -53,32 +59,33 @@
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --chrome: oklch(0.145 0.01 275);
-  --panel: oklch(0.172 0.011 275);
-  --bg: oklch(0.205 0.012 275);
-  --panel-2: oklch(0.235 0.013 275);
-  --hover: oklch(0.262 0.015 275);
-  --line: oklch(0.275 0.013 275);
-  --line-strong: oklch(0.345 0.015 275);
-  --field: oklch(0.17 0.011 275);
-  --popover: oklch(0.225 0.013 275);
-  --fg: oklch(0.955 0.006 275);
-  --muted: oklch(0.715 0.02 275);
-  --accent: oklch(0.66 0.19 268);
-  --accent-hover: oklch(0.72 0.17 268);
-  --accent-soft: oklch(0.3 0.07 272);
+  --chrome: oklch(0.15 0.035 270);
+  --panel: oklch(0.172 0.038 270);
+  --bg: oklch(0.205 0.04 270);
+  --panel-2: oklch(0.235 0.042 270);
+  --hover: oklch(0.265 0.05 268);
+  --line: oklch(0.28 0.045 270);
+  --line-strong: oklch(0.36 0.05 270);
+  --field: oklch(0.165 0.036 270);
+  --popover: oklch(0.225 0.042 270);
+  --fg: oklch(0.96 0.012 270);
+  --muted: oklch(0.72 0.04 270);
+  --accent: oklch(0.68 0.18 257);
+  --accent-hover: oklch(0.74 0.16 257);
+  --accent-soft: oklch(0.3 0.085 262);
   --accent-fg: oklch(1 0 0);
   --ok: oklch(0.78 0.15 160);
   --bad: oklch(0.7 0.18 22);
   --warn: oklch(0.83 0.15 80);
-  --judge: oklch(0.75 0.16 305);
-  --focus: oklch(0.7 0.17 268);
-  --code-bg: oklch(0.172 0.01 275);
-  --overlay: oklch(0.08 0.01 275 / 0.62);
+  --judge: oklch(0.74 0.2 335);
+  --focus: oklch(0.74 0.15 250);
+  --code-bg: oklch(0.172 0.038 270);
+  --overlay: oklch(0.08 0.04 272 / 0.62);
   --elev-sm: 0 1px 2px oklch(0 0 0 / 0.35);
   --elev-md: 0 8px 20px -6px oklch(0 0 0 / 0.55);
   --elev-lg: 0 24px 52px -12px oklch(0 0 0 / 0.7), 0 0 0 1px oklch(1 0 0 / 0.05);
   --glow: 0 4px 18px -4px color-mix(in oklch, var(--brand-to) 60%, transparent);
+  --caret: #1ff0ff;
   --m-get: oklch(0.8 0.16 150);
   --m-post: oklch(0.8 0.14 60);
   --m-put: oklch(0.75 0.13 250);
@@ -139,6 +146,12 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+/* every text box shows a clear, on-brand cursor (inputs with transparent text included) */
+input,
+textarea,
+[contenteditable='true'] {
+  caret-color: var(--caret);
 }
 ::selection {
   background: color-mix(in srgb, var(--accent) 28%, transparent);
