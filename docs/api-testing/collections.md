@@ -51,7 +51,7 @@ The CLI can import too: `testpion import openapi.yaml -w my-workspace`.
 **Export** in a collection's toolbar offers two formats:
 
 - **TestPion collection (.json)**: the collection file as it is stored in the workspace.
-- **Postman collection v2.1**: for Postman, Newman or any tool that reads Postman collections. It includes folders, requests, params and path variables, headers, bodies (raw, form, multipart, file, GraphQL), auth (bearer, basic, API key, OAuth 2.0), collection and request scripts, collection variables, descriptions, saved examples and the *follow redirects* / *TLS verification* settings.
+- **Postman collection v2.1**: for Postman, Newman or any tool that reads Postman collections. It includes folders, requests, params and path variables, headers, bodies (raw, form, multipart, file, GraphQL), auth (bearer, basic, API key, OAuth 2.0, AWS Signature, Digest), collection and request scripts, collection variables, descriptions, saved examples and the *follow redirects* / *TLS verification* settings.
 
 Postman has no place for some TestPion features. When they are left out, a message lists them:
 

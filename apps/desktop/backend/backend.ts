@@ -659,6 +659,8 @@ export class Backend {
     const prepared = await prepareHttpRequest({ ...spec, auth }, { redactor: ctx.redactor });
     const headers = [...prepared.headers.entries()].filter(([k]) => k !== 'user-agent') as Array<[string, string]>;
     if (spec.auth?.type === 'oauth2') headers.push(['Authorization', 'Bearer <access token from OAuth 2.0>']);
+    // Digest is answered after the server's 401 challenge; AWS signatures below are valid for about 15 minutes
+    if (spec.auth?.type === 'digest') headers.push(['Authorization', 'Digest <answer to the server challenge>']);
     const body = spec.body;
     const snippet: SnippetRequest = {
       method: prepared.method,

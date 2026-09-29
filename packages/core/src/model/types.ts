@@ -45,7 +45,11 @@ export type AuthConfig =
       usePkce?: boolean;
       redirectPort?: number;
     }
-  | { type: 'headers'; headers: KeyValue[] };
+  | { type: 'headers'; headers: KeyValue[] }
+  /** HTTP Digest (RFC 7616): the first request gets the server's challenge, the second answers it. */
+  | { type: 'digest'; username: string; password: string }
+  /** AWS Signature Version 4 (API Gateway, S3, Lambda URLs, any AWS API). */
+  | { type: 'awsv4'; accessKey: string; secretKey: string; sessionToken?: string; region: string; service: string };
 
 /* ------------------------------------------------------------------ http */
 

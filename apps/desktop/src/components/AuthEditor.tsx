@@ -9,6 +9,8 @@ const TYPES: Array<{ id: AuthConfig['type']; label: string }> = [
   { id: 'basic', label: 'Basic auth' },
   { id: 'apiKey', label: 'API key' },
   { id: 'oauth2', label: 'OAuth 2.0' },
+  { id: 'awsv4', label: 'AWS Signature' },
+  { id: 'digest', label: 'Digest auth' },
   { id: 'jwt', label: 'JWT (HMAC signed)' },
   { id: 'headers', label: 'Custom headers' },
 ];
@@ -27,6 +29,10 @@ function defaults(type: AuthConfig['type']): AuthConfig {
       return { type, secret: '{{jwtSecret}}', algorithm: 'HS256', payload: '{\n  "sub": "user-123"\n}', expiresInSec: 3600 };
     case 'headers':
       return { type, headers: [] };
+    case 'digest':
+      return { type, username: '', password: '{{password}}' };
+    case 'awsv4':
+      return { type, accessKey: '{{awsAccessKey}}', secretKey: '{{awsSecretKey}}', region: 'us-east-1', service: 'execute-api' };
     default:
       return { type } as AuthConfig;
   }
@@ -153,6 +159,41 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth?: Aut
             </label>
           )}
           <p className="text-xs text-muted">Tokens are cached in memory until they expire and are redacted from history, traces and reports.</p>
+        </>
+      )}
+      {a.type === 'digest' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Username">
+              <Input value={a.username} onChange={(e) => set({ username: e.target.value })} />
+            </Field>
+            <Field label="Password">
+              <Input type="password" value={a.password} onChange={(e) => set({ password: e.target.value })} />
+            </Field>
+          </div>
+          <p className="text-xs text-muted">The first request receives the server's challenge (401); TestPion answers it and sends the request again. MD5, SHA-256 and their -sess variants.</p>
+        </>
+      )}
+      {a.type === 'awsv4' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Access key">
+              <Input className="mono" value={a.accessKey} onChange={(e) => set({ accessKey: e.target.value })} />
+            </Field>
+            <Field label="Secret key" hint="Reference a secret variable, e.g. {{awsSecretKey}}">
+              <Input className="mono" type="password" value={a.secretKey} onChange={(e) => set({ secretKey: e.target.value })} />
+            </Field>
+            <Field label="AWS region">
+              <Input className="mono" value={a.region} placeholder="us-east-1" onChange={(e) => set({ region: e.target.value })} />
+            </Field>
+            <Field label="Service name">
+              <Input className="mono" value={a.service} placeholder="execute-api, s3, lambda …" onChange={(e) => set({ service: e.target.value })} />
+            </Field>
+          </div>
+          <Field label="Session token" hint="Only for temporary credentials (STS, SSO).">
+            <Input className="mono" type="password" value={a.sessionToken ?? ''} onChange={(e) => set({ sessionToken: e.target.value || undefined })} />
+          </Field>
+          <p className="text-xs text-muted">Signed when the request is sent (method, URL, headers and body), so it stays valid after scripts change the request.</p>
         </>
       )}
       {a.type === 'headers' && <KeyValueEditor rows={a.headers} onChange={(headers) => set({ headers })} keyPlaceholder="Header" />}

@@ -88,6 +88,8 @@ export function parseCurlArgs(args: string[]): HttpRequestSpec {
   let json = false;
   let get = false;
   let auth: AuthConfig | undefined;
+  let digest = false;
+  let sigv4: string | undefined;
   const cookies: KeyValue[] = [];
   const settings: HttpRequestSpec['settings'] = {};
   const next = (i: number) => {
@@ -152,6 +154,15 @@ export function parseCurlArgs(args: string[]): HttpRequestSpec {
         auth = { type: 'basic', username: c >= 0 ? u.slice(0, c) : u, password: c >= 0 ? u.slice(c + 1) : '' };
         break;
       }
+      case '--digest':
+        digest = true;
+        break;
+      case '--basic':
+        break;
+      case '--aws-sigv4':
+        // "aws:amz:<region>:<service>"
+        sigv4 = val();
+        break;
       case '-b':
       case '--cookie':
         for (const part of val().split(/;\s*/)) {
@@ -280,6 +291,14 @@ export function parseCurlArgs(args: string[]): HttpRequestSpec {
       const i = headers.findIndex((h) => /^content-type$/i.test(h.key));
       if (i >= 0) headers.splice(i, 1);
     }
+  }
+  // -u with --digest / --aws-sigv4 is Digest or AWS Signature auth, not Basic
+  if (auth?.type === 'basic' && digest) auth = { type: 'digest', username: auth.username, password: auth.password };
+  if (auth?.type === 'basic' && sigv4) {
+    const [, , region = '', service = ''] = sigv4.split(':');
+    const session = headers.findIndex((h) => /^x-amz-security-token$/i.test(h.key));
+    auth = { type: 'awsv4', accessKey: auth.username, secretKey: auth.password, region, service, ...(session >= 0 ? { sessionToken: headers[session]!.value } : {}) };
+    if (session >= 0) headers.splice(session, 1);
   }
   const bearer = headers.findIndex((h) => /^authorization$/i.test(h.key) && /^bearer\s/i.test(h.value));
   if (bearer >= 0 && !auth) {

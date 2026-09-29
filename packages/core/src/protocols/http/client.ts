@@ -6,6 +6,7 @@ import { Agent, ProxyAgent, fetch as undiciFetch, FormData as UndiciFormData, ty
 import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelinePhase } from '../../model/types.js';
 import { ApsError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
+import { digestAuthorization, parseDigestChallenge, signAwsV4 } from './signing.js';
 import type { Redactor } from '../../util/redact.js';
 import { shortId } from '../../util/ids.js';
 import type { CookieJar } from '../../cookies/cookie-jar.js';
@@ -176,7 +177,12 @@ export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOp
   await applyAuth(spec.auth, headers, url, opts);
   const { body, preview } = await buildBody(spec.body, headers);
   const method = (spec.method || 'GET').toUpperCase();
-  return { url, headers, body: method === 'GET' || method === 'HEAD' ? undefined : body, bodyPreview: preview, method, explicitCookie };
+  const sent = method === 'GET' || method === 'HEAD' ? undefined : body;
+  if (spec.auth?.type === 'awsv4') {
+    signAwsV4(method, url, headers, sent, spec.auth);
+    opts.redactor?.addSecret(headers.get('authorization') ?? undefined);
+  }
+  return { url, headers, body: sent, bodyPreview: preview, method, explicitCookie };
 }
 
 function setJarCookies(headers: Headers, jar: CookieJar, url: URL, explicitCookie: string | undefined): void {
@@ -214,6 +220,7 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
   let curMethod = method;
   let curBody = body;
   let hops = 0;
+  let digestAnswered = false;
   let res;
   // with private networks blocked, every redirect hop is checked here (not followed inside undici)
   const guarded = getNetworkPolicy().blockPrivateNetworks;
@@ -229,6 +236,19 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
       // duplex is required by undici for streamed (Blob/FormData) bodies
       ...({ duplex: 'half' } as object),
     });
+    // Digest: answer the server's challenge once, on the same URL
+    if (spec.auth?.type === 'digest' && res.status === 401 && !digestAnswered) {
+      const challenge = parseDigestChallenge(res.headers.get('www-authenticate'));
+      if (challenge) {
+        digestAnswered = true;
+        jar?.storeFromResponse(current, res.headers.getSetCookie());
+        await res.body?.cancel().catch(() => undefined);
+        const answer = digestAuthorization(challenge, { username: spec.auth.username, password: spec.auth.password, method: curMethod, uri: current.pathname + current.search });
+        opts.redactor?.addSecret(answer);
+        headers.set('authorization', answer);
+        continue;
+      }
+    }
     if (!jar && !(follow && guarded)) break;
     jar?.storeFromResponse(current, res.headers.getSetCookie());
     const location = res.headers.get('location');

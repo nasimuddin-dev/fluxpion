@@ -159,6 +159,17 @@ function pmAuth(a: any): AuthConfig | undefined {
       return { type: 'basic', username: get(a.basic, 'username'), password: get(a.basic, 'password') };
     case 'apikey':
       return { type: 'apiKey', key: get(a.apikey, 'key'), value: get(a.apikey, 'value'), in: get(a.apikey, 'in') === 'query' ? 'query' : 'header' };
+    case 'digest':
+      return { type: 'digest', username: get(a.digest, 'username'), password: get(a.digest, 'password') };
+    case 'awsv4':
+      return {
+        type: 'awsv4',
+        accessKey: get(a.awsv4, 'accessKey'),
+        secretKey: get(a.awsv4, 'secretKey'),
+        region: get(a.awsv4, 'region'),
+        service: get(a.awsv4, 'service'),
+        ...(get(a.awsv4, 'sessionToken') ? { sessionToken: get(a.awsv4, 'sessionToken') } : {}),
+      };
     case 'oauth2': {
       const g = get(a.oauth2, 'grant_type');
       const opt = (k: string) => get(a.oauth2, k) || undefined;

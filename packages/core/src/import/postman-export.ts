@@ -54,6 +54,10 @@ function pmAuth(a: AuthConfig | undefined, notes: string[], where: string): PmAu
           ...(a.usePkce ? { grant_type: 'authorization_code_with_pkce' } : {}),
         }),
       };
+    case 'digest':
+      return { type: 'digest', digest: attr({ username: a.username, password: a.password, algorithm: 'MD5' }) };
+    case 'awsv4':
+      return { type: 'awsv4', awsv4: attr({ accessKey: a.accessKey, secretKey: a.secretKey, region: a.region, service: a.service, sessionToken: a.sessionToken }) };
     case 'headers':
       notes.push(`${where}: "custom headers" auth was exported as request headers`);
       return undefined;

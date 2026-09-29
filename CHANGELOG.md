@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Nothing yet.
+- **AWS Signature and Digest auth.** Two new auth types, as in Postman. *AWS Signature* (Version 4) signs requests to API Gateway, S3, Lambda function URLs or any AWS API when they are sent, with optional session tokens for temporary credentials. *Digest* answers the server's challenge (MD5 or SHA-256). Both import from Postman collections and from cURL (`--aws-sigv4`, `--digest`), export back to Postman, and keep their secrets redacted.
 
 ## 0.7.0 — 2026-09-29
 

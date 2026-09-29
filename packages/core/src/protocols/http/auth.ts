@@ -61,6 +61,14 @@ export async function applyAuth(auth: AuthConfig | undefined, headers: Headers, 
       for (const h of auth.headers) if (h.enabled !== false && h.key) headers.set(h.key, h.value);
       return;
     }
+    // signed from the final request by the HTTP client (see signing.ts)
+    case 'digest':
+      r?.addSecret(auth.password);
+      return;
+    case 'awsv4':
+      r?.addSecret(auth.secretKey);
+      r?.addSecret(auth.sessionToken);
+      return;
     case 'oauth2': {
       const tok = await getOAuth2Token(auth, ctx);
       r?.addSecret(tok.accessToken);
