@@ -345,7 +345,7 @@ export function importAny(text: string): { format: string; collection?: Collecti
     }
     default:
       throw new ApsError('ValidationError', `Unrecognised import format (${format})`, {
-        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, HAR, FluxPion collections and workspace exports.'],
+        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, HAR, TestPion collections and workspace exports.'],
       });
   }
 }

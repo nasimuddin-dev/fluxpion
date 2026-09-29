@@ -30,6 +30,6 @@ limits:
   latency_ms: 3000
 ```
 
-Run it with `fluxpion test tests/ai`.
+Run it with `testpion test tests/ai`.
 
 :::

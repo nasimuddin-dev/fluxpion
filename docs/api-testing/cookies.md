@@ -7,7 +7,7 @@ description: "The workspace cookie jar: cookies from responses are kept and sent
 
 # Cookies
 
-FluxPion keeps a **cookie jar** for each workspace, like a browser or Postman. When a response sets a cookie, it is stored. Later requests to a matching URL send it automatically. Logging in to a cookie-based API once is enough for the requests that follow.
+TestPion keeps a **cookie jar** for each workspace, like a browser or Postman. When a response sets a cookie, it is stored. Later requests to a matching URL send it automatically. Logging in to a cookie-based API once is enough for the requests that follow.
 
 ## How cookies are matched
 
@@ -68,14 +68,14 @@ Changes are applied when the script ends, so the request that follows a pre-requ
 
 ## In runs and the CLI
 
-The requests of one run (the test runner, the Collection Runner, `fluxpion run-collection`) share one jar. In the desktop app, that is the workspace jar. The CLI starts every run with an empty jar and never writes cookies anywhere unless you ask:
+The requests of one run (the test runner, the Collection Runner, `testpion run-collection`) share one jar. In the desktop app, that is the workspace jar. The CLI starts every run with an empty jar and never writes cookies anywhere unless you ask:
 
 ```bash
 # log in once and save the cookies
-fluxpion run-collection login.postman_collection.json --export-cookie-jar cookies.json
+testpion run-collection login.postman_collection.json --export-cookie-jar cookies.json
 
 # reuse them in another run
-fluxpion run-collection api.postman_collection.json --cookie-jar cookies.json
+testpion run-collection api.postman_collection.json --cookie-jar cookies.json
 ```
 
 `--cookie-jar` also reads the cookie files that Newman's `--export-cookie-jar` writes. The exported file contains cookie values in plain text, with file mode `600` on macOS and Linux. Keep it out of git.

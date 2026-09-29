@@ -51,8 +51,8 @@ export function migrateWorkspace(ws: Record<string, unknown>, root = '', migrati
   let version = String(ws.schemaVersion ?? '0.9');
   const applied: string[] = [];
   if (cmpVersion(version, target) > 0)
-    throw new ApsError('ConfigurationError', `Workspace format ${version} is newer than this version of FluxPion supports (${target})`, {
-      suggestions: ['Upgrade FluxPion to open this workspace.'],
+    throw new ApsError('ConfigurationError', `Workspace format ${version} is newer than this version of TestPion supports (${target})`, {
+      suggestions: ['Upgrade TestPion to open this workspace.'],
     });
   while (cmpVersion(version, target) < 0) {
     const m = migrations.find((x) => x.from === version);
@@ -344,7 +344,7 @@ export class WorkspaceStore {
     };
     walk(this.testTree());
     return {
-      format: 'fluxpion-workspace',
+      format: 'testpion-workspace',
       schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       workspace: { ...this.ws, variables: this.ws.variables.map((v) => ((v as { secret?: boolean }).secret ? { ...v, value: '' } : v)) },
@@ -362,8 +362,8 @@ export class WorkspaceStore {
 }
 
 export interface WorkspaceBundle {
-  /** "protopion-workspace" / "protolens-workspace" in exports from before the FluxPion name (still imported). */
-  format: 'fluxpion-workspace' | 'protopion-workspace' | 'protolens-workspace';
+  /** "fluxpion-workspace" / "protopion-workspace" / "protolens-workspace" in exports from before the TestPion name (still imported). */
+  format: 'testpion-workspace' | 'fluxpion-workspace' | 'protopion-workspace' | 'protolens-workspace';
   schemaVersion: string;
   exportedAt: string;
   workspace: Workspace;
@@ -384,15 +384,15 @@ export interface WorkspaceInfo {
 }
 
 /** Workspace export formats this version imports (the project's earlier names included). */
-export const WORKSPACE_FORMATS = new Set(['fluxpion-workspace', 'protopion-workspace', 'protolens-workspace']);
+export const WORKSPACE_FORMATS = new Set(['testpion-workspace', 'fluxpion-workspace', 'protopion-workspace', 'protolens-workspace']);
 
 export function defaultAppDir(): string {
-  // earlier names of the variable: PROTOPION_HOME (0.4), PROTOLENS_HOME (0.2–0.3), APS_HOME (0.1)
-  const explicit = process.env.FLUXPION_HOME || process.env.PROTOPION_HOME || process.env.PROTOLENS_HOME || process.env.APS_HOME;
+  // earlier names of the variable: FLUXPION_HOME (0.5), PROTOPION_HOME (0.4), PROTOLENS_HOME (0.2–0.3), APS_HOME (0.1)
+  const explicit = process.env.TESTPION_HOME || process.env.FLUXPION_HOME || process.env.PROTOPION_HOME || process.env.PROTOLENS_HOME || process.env.APS_HOME;
   if (explicit) return explicit;
-  const dir = join(homedir(), '.fluxpion');
-  // one-time move of the data folder of earlier versions: ".protopion" (0.4), ".protolens" (0.2–0.3), ".aipstudio" (0.1)
-  for (const legacy of [join(homedir(), '.protopion'), join(homedir(), '.protolens'), join(homedir(), '.aipstudio')]) {
+  const dir = join(homedir(), '.testpion');
+  // one-time move of the data folder of earlier versions: ".fluxpion" (0.5), ".protopion" (0.4), ".protolens" (0.2–0.3), ".aipstudio" (0.1)
+  for (const legacy of [join(homedir(), '.fluxpion'), join(homedir(), '.protopion'), join(homedir(), '.protolens'), join(homedir(), '.aipstudio')]) {
     if (existsSync(dir) || !existsSync(legacy)) continue;
     try {
       renameSync(legacy, dir);
@@ -552,7 +552,7 @@ export class WorkspaceManager {
   }
 
   importBundle(bundle: WorkspaceBundle, name?: string): WorkspaceStore {
-    if (!WORKSPACE_FORMATS.has(bundle?.format)) throw new ApsError('ValidationError', 'Not a FluxPion workspace export');
+    if (!WORKSPACE_FORMATS.has(bundle?.format)) throw new ApsError('ValidationError', 'Not a TestPion workspace export');
     const { ws } = migrateWorkspace({ ...(bundle.workspace as unknown as Record<string, unknown>), schemaVersion: bundle.schemaVersion });
     const store = this.create(name ?? `${(ws as unknown as Workspace).name} (imported)`);
     store.updateWorkspace({ variables: (ws as unknown as Workspace).variables, description: (ws as unknown as Workspace).description });

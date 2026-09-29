@@ -1,8 +1,8 @@
 {
-  "name": "fluxpion",
+  "name": "testpion",
   "private": true,
-  "version": "0.5.1",
-  "description": "FluxPion — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
+  "version": "0.6.0",
+  "description": "TestPion — test, debug and evaluate REST, GraphQL, MCP and AI/LLM systems.",
   "license": "MIT",
   "type": "module",
   "workspaces": [
@@ -15,12 +15,12 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "build": "npm run build -w @fluxpion/core && npm run build -w @fluxpion/cli && npm run build -w @fluxpion/desktop",
+    "build": "npm run build -w @testpion/core && npm run build -w @testpion/cli && npm run build -w @testpion/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "npm run dev -w @fluxpion/desktop",
-    "dev:web": "npm run dev:web -w @fluxpion/desktop",
+    "dev": "npm run dev -w @testpion/desktop",
+    "dev:web": "npm run dev:web -w @testpion/desktop",
     "bench": "node scripts/bench.mjs",
     "docs:dev": "npm run dev -w docs",
     "docs:build": "npm run build -w docs"

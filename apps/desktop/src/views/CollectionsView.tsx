@@ -45,7 +45,7 @@ export function CollectionsView() {
     await load();
     useApp.getState().toast('Collection saved', 'success');
   };
-  const exportAs = async (id: string, format: 'fluxpion' | 'postman') => {
+  const exportAs = async (id: string, format: 'testpion' | 'postman') => {
     try {
       const r = await call<{ path?: string; collection?: unknown; name: string; notes: string[] }>('col.export', { id, format });
       if (r.collection) download(r.name, JSON.stringify(r.collection, null, 2));
@@ -128,7 +128,7 @@ export function CollectionsView() {
                   }
                   width={230}
                   items={[
-                    { label: 'FluxPion collection (.json)', onSelect: () => void exportAs(draft.id, 'fluxpion') },
+                    { label: 'TestPion collection (.json)', onSelect: () => void exportAs(draft.id, 'testpion') },
                     { label: 'Postman collection v2.1', onSelect: () => void exportAs(draft.id, 'postman') },
                   ]}
                 />

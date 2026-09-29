@@ -24,7 +24,7 @@ import {
   cookiesFromJson,
   startMockServer,
   collectionMarkdown,
-  serveFluxPionMcp,
+  serveTestPionMcp,
   ENGINE_VERSION,
   exportPostmanCollection,
   exportPostmanEnvironment,
@@ -53,7 +53,7 @@ import {
   type TestCase,
   type TestResult,
   type McpServerConfig,
-} from '@fluxpion/core';
+} from '@testpion/core';
 
 /** Exit codes (spec §37). */
 export const EXIT = { SUCCESS: 0, TEST_FAILURE: 1, CONFIG_ERROR: 2, EXECUTION_ERROR: 3 } as const;
@@ -180,7 +180,7 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
   const ctx = createEngineContext({ store, secrets, settings, environment, logger, runtimeVars: o.var });
   const runId = o.resume ?? shortId('run-');
   // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
-  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('fluxpion-results', runId) : store.runDir(runId);
+  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('testpion-results', runId) : store.runDir(runId);
   const resultsFile = join(outDir, 'results.jsonl');
   if (o.resume && !existsSync(resultsFile)) throw new CliError(`Cannot resume: ${resultsFile} does not exist`, EXIT.CONFIG_ERROR);
 
@@ -192,7 +192,7 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
 
   const name = label ?? suite?.name ?? (paths.length ? paths.map((p) => relative(process.cwd(), resolve(p)) || '.').join(', ') : store.workspace.name);
   if (!o.quiet) {
-    console.log(bold(`FluxPion — ${name}`));
+    console.log(bold(`TestPion — ${name}`));
     console.log(dim(`workspace: ${ephemeral ? '(ephemeral)' : store.root}${environment ? ` · environment: ${environment}` : ''} · run: ${runId}`));
   }
 
@@ -239,7 +239,7 @@ async function executeRun(paths: string[], o: RunCliOptions, label?: string): Pr
     await ctx.dispose();
   }
 
-  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, rerun: `fluxpion test ${paths.join(' ')} --resume ${runId}` });
+  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, rerun: `testpion test ${paths.join(' ')} --resume ${runId}` });
 }
 
 /** Write reports, compare baselines, print the summary and work out the exit code (shared by test/run/run-collection). */
@@ -383,11 +383,11 @@ async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promi
   const environment = envName ?? envFile?.name;
   const runId = shortId('run-');
   // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
-  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('fluxpion-results', runId) : store.runDir(runId);
+  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('testpion-results', runId) : store.runDir(runId);
   const resultsFile = join(outDir, 'results.jsonl');
 
   if (!o.quiet) {
-    console.log(bold(`FluxPion — ${collection.name}`));
+    console.log(bold(`TestPion — ${collection.name}`));
     const bits = [ephemeral ? '' : `workspace: ${store.root}`, environment ? `environment: ${environment}` : '', data ? `data: ${data.length} rows` : '', `run: ${runId}`];
     console.log(dim(bits.filter(Boolean).join(' · ')));
   }
@@ -442,7 +442,7 @@ async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promi
   return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
 }
 
-/** A collection by name or id from a workspace, or from a FluxPion / Postman collection file. */
+/** A collection by name or id from a workspace, or from a TestPion / Postman collection file. */
 function loadCollectionRef(ref: string, workspace: string | undefined): Collection {
   if (existsSync(ref) && statSync(ref).isFile()) return readImport(resolve(ref), 'collection');
   const { store, ephemeral } = openWorkspace(workspace, undefined, new WorkspaceManager());
@@ -457,7 +457,7 @@ function loadCollectionRef(ref: string, workspace: string | undefined): Collecti
   }
 }
 
-/** `fluxpion mock`: serve saved examples until interrupted. */
+/** `testpion mock`: serve saved examples until interrupted. */
 async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }): Promise<number> {
   const collection = loadCollectionRef(ref, o.workspace);
   const port = o.port ? Number(o.port) : 0;
@@ -498,7 +498,7 @@ function cleanupFailedRun(a: { ephemeral?: string; outDir: string; explicitOut: 
   if (a.ephemeral && !a.explicitOut) {
     rmSync(a.outDir, { recursive: true, force: true });
     try {
-      rmdirSync(dirname(a.outDir)); // ./fluxpion-results, only when nothing else is in it
+      rmdirSync(dirname(a.outDir)); // ./testpion-results, only when nothing else is in it
     } catch {
       /* not empty */
     }
@@ -539,9 +539,9 @@ function runOptions(cmd: Command): Command {
 export function buildProgram(): Command {
   const program = new Command();
   program
-    .name('fluxpion')
-    .description('FluxPion CLI — run REST, GraphQL, MCP and AI tests locally and in CI/CD.\n\nExit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error')
-    .version('0.5.1');
+    .name('testpion')
+    .description('TestPion CLI — run REST, GraphQL, MCP and AI tests locally and in CI/CD.\n\nExit codes: 0 success · 1 test failure · 2 configuration error · 3 execution error')
+    .version('0.6.0');
 
   runOptions(program.command('test').description('run tests from files, directories, globs or a *.suite.yaml').argument('[paths...]', 'test files/dirs/globs')).action(async (paths: string[], o: RunCliOptions) => {
     process.exitCode = await executeRun(paths, o);
@@ -555,7 +555,7 @@ export function buildProgram(): Command {
     .command('run-collection')
     .description(
       'run a collection like Postman\'s Collection Runner / Newman: requests in order, pm.* scripts, iterations and data files\n' +
-        '<collection> is a collection name or id in the workspace, or a FluxPion / Postman v2.1 collection file',
+        '<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file',
     )
     .argument('<collection>', 'collection name, id or file')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
@@ -566,7 +566,7 @@ export function buildProgram(): Command {
     .option('--folder <nameOrId...>', 'only run these folders or requests (repeatable)')
     .option('--bail', 'stop after the first failure')
     .option('--timeout <ms>', 'per-request timeout in ms')
-    .option('--cookie-jar <file>', 'start with the cookies in this JSON file (FluxPion or Newman cookie jar)')
+    .option('--cookie-jar <file>', 'start with the cookies in this JSON file (TestPion or Newman cookie jar)')
     .option('--export-cookie-jar <file>', 'write the cookie jar to this JSON file after the run')
     .addOption(new Option('-r, --reporter <formats...>', 'reporters: console, junit, json, html, markdown').default(['console', 'junit', 'json', 'html', 'markdown']))
     .option('-o, --out <dir>', 'output directory for results and reports')
@@ -597,9 +597,9 @@ export function buildProgram(): Command {
         rmSync(ephemeral, { recursive: true, force: true });
         throw new CliError('No workspace found: run inside a workspace folder or pass -w <name|path>', EXIT.CONFIG_ERROR);
       }
-      console.error(dim(`FluxPion MCP server for "${store.workspace.name}"${o.readOnly ? ' (read-only)' : ''} on stdio`));
+      console.error(dim(`TestPion MCP server for "${store.workspace.name}"${o.readOnly ? ' (read-only)' : ''} on stdio`));
       try {
-        await serveFluxPionMcp({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: mgr.loadSettings(), readOnly: o.readOnly, allowProduction: o.allowProduction, version: ENGINE_VERSION });
+        await serveTestPionMcp({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: mgr.loadSettings(), readOnly: o.readOnly, allowProduction: o.allowProduction, version: ENGINE_VERSION });
       } finally {
         store.close();
       }
@@ -607,12 +607,12 @@ export function buildProgram(): Command {
 
   program
     .command('export')
-    .description('export a collection as a Postman v2.1 collection (default) or FluxPion JSON\n<collection> is a collection name or id in the workspace, or a collection file to convert')
+    .description('export a collection as a Postman v2.1 collection (default) or TestPion JSON\n<collection> is a collection name or id in the workspace, or a collection file to convert')
     .argument('<collection>', 'collection name, id or file')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
-    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'fluxpion']).default('postman'))
+    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'testpion']).default('postman'))
     .option('-o, --out <file>', 'write to this file instead of stdout')
-    .action((ref: string, o: { workspace?: string; format: 'postman' | 'fluxpion'; out?: string }) => {
+    .action((ref: string, o: { workspace?: string; format: 'postman' | 'testpion'; out?: string }) => {
       const c = loadCollectionRef(ref, o.workspace);
       const { collection, notes } = o.format === 'postman' ? exportPostmanCollection(c) : { collection: c, notes: [] as string[] };
       const json = JSON.stringify(collection, null, 2) + '\n';
@@ -647,7 +647,7 @@ export function buildProgram(): Command {
 
   program
     .command('docs')
-    .description('write Markdown documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a FluxPion / Postman v2.1 collection file')
+    .description('write Markdown documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file')
     .argument('<collection>', 'collection name, id or file')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-o, --out <file>', 'write to this file instead of stdout')
@@ -662,7 +662,7 @@ export function buildProgram(): Command {
 
   program
     .command('mock')
-    .description("serve a collection's saved examples on localhost (like a Postman mock server) until Ctrl+C\n<collection> is a collection name or id in the workspace, or a FluxPion / Postman v2.1 collection file")
+    .description("serve a collection's saved examples on localhost (like a Postman mock server) until Ctrl+C\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file")
     .argument('<collection>', 'collection name, id or file')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-p, --port <port>', 'port to listen on (default: any free port)')

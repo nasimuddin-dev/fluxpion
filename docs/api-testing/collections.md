@@ -22,35 +22,35 @@ To keep frequently used endpoints close at hand, choose **Add to favorites** fro
 - OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, and security schemes map to auth.
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
 - HAR files.
-- FluxPion collections and workspace exports.
+- TestPion collections and workspace exports.
 - A single request copied as cURL (bash or cmd), fetch or PowerShell. It is saved to the **Imported** collection, named after its method and path. Secrets in it (tokens, API keys, cookies, passwords) are replaced by `{{variables}}`, and a message lists the ones to add as secret environment variables. To just try the request without saving it, paste it into the REST view instead (see [paste a request](/api-testing/rest#paste-a-request-from-the-browser)).
 
 A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
 
-**Import…** in the workspace menu (top bar) accepts the same files. A FluxPion workspace export opens as a new workspace, and anything else (a Postman collection or environment, OpenAPI, HAR) is added to the open workspace.
+**Import…** in the workspace menu (top bar) accepts the same files. A TestPion workspace export opens as a new workspace, and anything else (a Postman collection or environment, OpenAPI, HAR) is added to the open workspace.
 
-The CLI can import too: `fluxpion import openapi.yaml -w my-workspace`.
+The CLI can import too: `testpion import openapi.yaml -w my-workspace`.
 
 ## Export
 
 **Export** in a collection's toolbar offers two formats:
 
-- **FluxPion collection (.json)**: the collection file as it is stored in the workspace.
+- **TestPion collection (.json)**: the collection file as it is stored in the workspace.
 - **Postman collection v2.1**: for Postman, Newman or any tool that reads Postman collections. It includes folders, requests, params and path variables, headers, bodies (raw, form, multipart, file, GraphQL), auth (bearer, basic, API key, OAuth 2.0), collection and request scripts, collection variables, descriptions, saved examples and the *follow redirects* / *TLS verification* settings.
 
-Postman has no place for some FluxPion features. When they are left out, a message lists them:
+Postman has no place for some TestPion features. When they are left out, a message lists them:
 
 - Assertions: a `status` check becomes a `pm.test(...)` in the request's test script, and other assertion types are skipped.
 - JWT auth and the per-request Cookies table (its cookies are sent as a `Cookie` header instead).
 
-Importing an exported file back into FluxPion gives the same collection, and the round trip is tested. **Environments → Export** writes an environment in Postman's environment format. Secret variables are exported with an empty value and type `secret`, because their values stay in your OS credential store.
+Importing an exported file back into TestPion gives the same collection, and the round trip is tested. **Environments → Export** writes an environment in Postman's environment format. Secret variables are exported with an empty value and type `secret`, because their values stay in your OS credential store.
 
 From the CLI:
 
 ```bash
-fluxpion export "Veterinary API" -o vet.postman_collection.json          # Postman v2.1 (default)
-fluxpion export "Veterinary API" -f fluxpion -o vet.collection.json
-fluxpion export-environment Staging -o staging.postman_environment.json
+testpion export "Veterinary API" -o vet.postman_collection.json          # Postman v2.1 (default)
+testpion export "Veterinary API" -f testpion -o vet.collection.json
+testpion export-environment Staging -o staging.postman_environment.json
 ```
 
 ## Examples
@@ -85,7 +85,7 @@ Collections document themselves, like Postman's API documentation:
 - **Request docs:** each request has a **Docs** tab. Write Markdown on the left and see the preview on the right. The text is saved with the request.
 - **Collection docs:** the collection's **Docs** tab renders the whole collection as one page. It starts with the collection description, then a table of contents, then every folder and request: method and URL, description, auth, path variables, query parameters, headers, body and saved examples. Click **Edit description** to write the collection description, with a live preview. Click **Save** to keep it.
 - **Secrets stay out:** values of sensitive headers, parameters, variables and body fields are shown as `••••••` or `REDACTED`. References like `{{accessToken}}` are shown as written, since they are not secrets.
-- **Export Markdown** downloads the page as a `.md` file, ready for a wiki, a README or a static site. The CLI does the same: `fluxpion docs "Veterinary API" -o API.md`.
+- **Export Markdown** downloads the page as a `.md` file, ready for a wiki, a README or a static site. The CLI does the same: `testpion docs "Veterinary API" -o API.md`.
 
 Markdown is rendered with GitHub-flavoured syntax (tables, fenced code, task lists) and sanitised: scripts and event handlers are removed, and links open in your browser.
 
@@ -93,7 +93,7 @@ Markdown is rendered with GitHub-flavoured syntax (tables, fenced code, task lis
 
 Choose **Edit folder** in a folder's **⋯** menu to set up everything its requests share:
 
-- **Scripts:** a pre-request and a post-response script that run for every request in the folder, including requests in sub-folders. The order is: collection script, outer folders' scripts, this folder's script, then the request's own script. It is the same for sending from a tab, the Collection Runner and `fluxpion run-collection`.
+- **Scripts:** a pre-request and a post-response script that run for every request in the folder, including requests in sub-folders. The order is: collection script, outer folders' scripts, this folder's script, then the request's own script. It is the same for sending from a tab, the Collection Runner and `testpion run-collection`.
 - **Variables:** visible to the requests inside. An inner folder's value wins over an outer folder's. Request variables and iteration data rows win over folder variables, and folder variables win over collection and environment variables.
 - **Authorization:** requests set to *Inherit* use the nearest folder's auth, or the collection's.
 
@@ -129,7 +129,7 @@ pm.execution.skipRequest();
 
 `postman.setNextRequest()` works too. An iteration stops after 1,000 requests, so a `setNextRequest` loop can't run forever.
 
-To run a collection from a terminal or CI, use [`fluxpion run-collection`](../cli/reference.md#run-collection). It runs the same way and also accepts Postman collection and environment files, like Newman.
+To run a collection from a terminal or CI, use [`testpion run-collection`](../cli/reference.md#run-collection). It runs the same way and also accepts Postman collection and environment files, like Newman.
 
 Results stream into the panel on the right, with checks, errors and a trace for each request. Earlier runs are listed under **Previous runs**, and every run is saved with its HTML, Markdown, JUnit and JSON reports. With more than one iteration, each result is prefixed with its iteration number, for example `#2 Patients / List patients`.
 

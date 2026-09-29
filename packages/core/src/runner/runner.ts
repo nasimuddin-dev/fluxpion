@@ -322,7 +322,7 @@ export async function runTests(opts: RunOptions): Promise<RunSummary> {
     cancelled,
     environment: opts.environment,
     reproducibility: {
-      engineVersion: '0.5.1',
+      engineVersion: '0.6.0',
       node: process.version,
       platform: process.platform,
       concurrency,

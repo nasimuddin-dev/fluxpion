@@ -17,7 +17,7 @@ interface HistoryItem {
   request?: unknown;
 }
 
-const DOCS = 'https://nasimuddin-dev.github.io/fluxpion/';
+const DOCS = 'https://nasimuddin-dev.github.io/testpion/';
 
 /** Hue per quick action so the grid is easy to scan. */
 const HUES = { blue: 'oklch(0.62 0.19 255)', violet: 'oklch(0.6 0.22 295)', teal: 'oklch(0.66 0.13 190)', green: 'oklch(0.64 0.16 150)', orange: 'oklch(0.7 0.16 55)', pink: 'oklch(0.64 0.21 350)', indigo: 'oklch(0.58 0.2 270)', slate: 'oklch(0.6 0.03 260)' };
@@ -92,7 +92,7 @@ export function HomeView() {
           <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-[image:var(--brand-gradient)] opacity-20 blur-3xl" />
           <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-[var(--brand-from)] opacity-10 blur-3xl" />
           <p className="relative text-sm font-medium text-accent">{greeting()} 👋</p>
-          <h1 className="relative text-[1.75rem] font-semibold tracking-tight mt-1">{ws ? ws.name : 'Welcome to FluxPion'}</h1>
+          <h1 className="relative text-[1.75rem] font-semibold tracking-tight mt-1">{ws ? ws.name : 'Welcome to TestPion'}</h1>
           <p className="relative text-sm text-muted mt-1.5 max-w-2xl">Build, test and debug REST, GraphQL, MCP and AI APIs. Everything stays on this computer.</p>
           {env && (
             <p className="relative mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-bg/70 px-3 py-1 text-xs text-muted">

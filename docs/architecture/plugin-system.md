@@ -1,6 +1,6 @@
 ---
 title: "Plugin system"
-description: "Extending FluxPion with protocol adapters and custom checks."
+description: "Extending TestPion with protocol adapters and custom checks."
 ---
 
 ::: v-pre
@@ -10,7 +10,7 @@ description: "Extending FluxPion with protocol adapters and custom checks."
 ## Protocol adapters
 
 ```ts
-import { registerProtocol, type ProtocolAdapter } from '@fluxpion/core';
+import { registerProtocol, type ProtocolAdapter } from '@testpion/core';
 
 registerProtocol({
   id: 'grpc',
@@ -26,7 +26,7 @@ HTTP, GraphQL, MCP and WebSocket are registered this way. Adapters are independe
 ## Custom checks
 
 ```ts
-import { registerCheck } from '@fluxpion/core';
+import { registerCheck } from '@testpion/core';
 registerCheck('is-uuid', (cfg, ctx) => ({
   type: 'is-uuid', name: 'is uuid', source: 'deterministic',
   passed: /^[0-9a-f-]{36}$/.test(String(ctx.body)), message: '…',

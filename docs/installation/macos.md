@@ -1,9 +1,9 @@
 ---
 title: Install on macOS
-description: Install FluxPion on macOS 12 or later (Apple Silicon or Intel) from a .dmg, open it past Gatekeeper, and uninstall it.
+description: Install TestPion on macOS 12 or later (Apple Silicon or Intel) from a .dmg, open it past Gatekeeper, and uninstall it.
 ---
 
-# Install FluxPion on macOS
+# Install TestPion on macOS
 
 ## Requirements
 
@@ -17,20 +17,20 @@ description: Install FluxPion on macOS 12 or later (Apple Silicon or Intel) from
 ## Install
 
 1. Open the downloaded `.dmg`.
-2. Drag **FluxPion** into the **Applications** folder.
+2. Drag **TestPion** into the **Applications** folder.
 3. Eject the disk image.
 
 ## First launch
 
 The app isn't notarized by Apple yet, so macOS blocks the first launch:
 
-1. Open **Applications**, **right-click** (or Control-click) **FluxPion** and choose **Open**.
+1. Open **Applications**, **right-click** (or Control-click) **TestPion** and choose **Open**.
 2. Click **Open** in the dialog. macOS remembers this choice.
 
 If macOS says the app **"is damaged and can't be opened"**, that's the quarantine flag on an unsigned download. Clear it in Terminal and open the app again:
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/FluxPion.app"
+xattr -dr com.apple.quarantine "/Applications/TestPion.app"
 ```
 
 On macOS 15 and later you may instead need to go to **System Settings → Privacy & Security** and click **Open Anyway** after the first attempt.
@@ -41,8 +41,8 @@ Continue with [your first request](/getting-started/first-request).
 
 ## Updating
 
-Download the new `.dmg` and replace the app in **Applications**. Your workspaces and settings in `~/.fluxpion` are kept.
+Download the new `.dmg` and replace the app in **Applications**. Your workspaces and settings in `~/.testpion` are kept.
 
 ## Uninstall
 
-Drag **FluxPion** from **Applications** to the Trash. To remove your data too, delete `~/.fluxpion` and `~/Library/Application Support/FluxPion`.
+Drag **TestPion** from **Applications** to the Trash. To remove your data too, delete `~/.testpion` and `~/Library/Application Support/TestPion`.

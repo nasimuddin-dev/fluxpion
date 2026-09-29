@@ -7,7 +7,7 @@ import type { SecretReader } from '../vars/variables.js';
  * Secret storage abstraction. Secrets are never written in plain text:
  *  - Desktop: values are encrypted with the OS credential facility (Windows DPAPI /
  *    macOS Keychain / Linux Secret Service via Electron `safeStorage`).
- *  - CLI / CI: secrets come from environment variables (`FLUXPION_SECRET_<NAME>`), the
+ *  - CLI / CI: secrets come from environment variables (`TESTPION_SECRET_<NAME>`), the
  *    standard mechanism for CI secret injection.
  */
 export interface SecretStore extends SecretReader {
@@ -20,9 +20,9 @@ export interface SecretStore extends SecretReader {
   list(): string[];
 }
 
-/** `provider.openai.apiKey` → `FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY` */
+/** `provider.openai.apiKey` → `TESTPION_SECRET_PROVIDER_OPENAI_APIKEY` */
 export function envNameForSecret(name: string): string {
-  return 'FLUXPION_SECRET_' + name.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase();
+  return 'TESTPION_SECRET_' + name.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase();
 }
 
 export class EnvSecretStore implements SecretStore {
@@ -30,23 +30,23 @@ export class EnvSecretStore implements SecretStore {
   readonly writable = false;
   constructor(private env: NodeJS.ProcessEnv = process.env) {}
   get(name: string): string | undefined {
-    // earlier names of the project still work: PROTOPION_ (0.4), PROTOLENS_ (0.2–0.3), APS_ (0.1)
+    // earlier names of the project still work: FLUXPION_ (0.5), PROTOPION_ (0.4), PROTOLENS_ (0.2–0.3), APS_ (0.1)
     const n = envNameForSecret(name);
-    for (const prefix of ['FLUXPION_', 'PROTOPION_', 'PROTOLENS_', 'APS_']) {
-      const v = this.env[n.replace(/^FLUXPION_/, prefix)];
+    for (const prefix of ['TESTPION_', 'FLUXPION_', 'PROTOPION_', 'PROTOLENS_', 'APS_']) {
+      const v = this.env[n.replace(/^TESTPION_/, prefix)];
       if (v !== undefined) return v;
     }
     return undefined;
   }
   async set(): Promise<void> {
-    throw new ApsError('ConfigurationError', 'Secrets cannot be written in CLI mode', { suggestions: ['Provide secrets as FLUXPION_SECRET_* environment variables.'] });
+    throw new ApsError('ConfigurationError', 'Secrets cannot be written in CLI mode', { suggestions: ['Provide secrets as TESTPION_SECRET_* environment variables.'] });
   }
   async delete(): Promise<void> {
     /* no-op */
   }
   list(): string[] {
     return Object.keys(this.env)
-      .filter((k) => k.startsWith('FLUXPION_SECRET_'))
+      .filter((k) => k.startsWith('TESTPION_SECRET_'))
       .map((k) => k.slice(11).toLowerCase());
   }
 }
@@ -114,7 +114,7 @@ export class EncryptedFileSecretStore implements SecretStore {
   async set(name: string, value: string): Promise<void> {
     if (!this.cipher.isAvailable())
       throw new ApsError('ConfigurationError', 'OS secure storage is not available; refusing to store the secret in plain text', {
-        suggestions: ['On Linux, install and unlock a Secret Service provider (gnome-keyring or KWallet).', 'Alternatively provide the secret via an FLUXPION_SECRET_* environment variable.'],
+        suggestions: ['On Linux, install and unlock a Secret Service provider (gnome-keyring or KWallet).', 'Alternatively provide the secret via an TESTPION_SECRET_* environment variable.'],
       });
     this.raw[name] = this.cipher.encrypt(value).toString('base64');
     this.cache.set(name, value);

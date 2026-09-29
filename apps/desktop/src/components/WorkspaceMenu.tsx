@@ -279,9 +279,9 @@ function DeleteWorkspaceDialog({ target, onClose, act }: { target: WorkspaceInfo
           {d.managed ? (
             <p className="text-bad">This permanently deletes the workspace folder and everything in it: collections, environments, tests, run history and traces. It can't be undone. Export it first if you may need it.</p>
           ) : (
-            <p className="text-muted">You opened this folder yourself, so its files stay on disk. It is only removed from FluxPion's list; open the folder again to bring it back.</p>
+            <p className="text-muted">You opened this folder yourself, so its files stay on disk. It is only removed from TestPion's list; open the folder again to bring it back.</p>
           )}
-          {d.current && <p className="text-muted">This is the open workspace. FluxPion switches to another workspace first.</p>}
+          {d.current && <p className="text-muted">This is the open workspace. TestPion switches to another workspace first.</p>}
           <label className="flex flex-col gap-1.5 text-xs">
             <span className="text-fg/80 font-medium">
               Type <span className="mono text-fg">{d.name}</span> to confirm

@@ -1,18 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- FluxPion app mark: the wordmark's gradient "F" and its four-point sparkle on the navy background -->
+  <!-- TestPion app mark: the wordmark's gradient "T" and its four-point sparkle on the navy background -->
   <defs>
     <radialGradient id="bg" cx="0.3" cy="0.25" r="1">
       <stop offset="0" stop-color="#172a6b"/>
       <stop offset="0.55" stop-color="#0c1440"/>
       <stop offset="1" stop-color="#070b26"/>
     </radialGradient>
-    <linearGradient id="f" x1="0" y1="0" x2="0.85" y2="1">
+    <linearGradient id="t" x1="0" y1="0" x2="0.85" y2="1">
       <stop offset="0" stop-color="#1ff0ff"/>
       <stop offset="0.5" stop-color="#1e88ff"/>
       <stop offset="1" stop-color="#2d4bf5"/>
     </linearGradient>
-    <linearGradient id="mid" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#1e88ff"/>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1ff0ff"/>
+      <stop offset="0.6" stop-color="#1e88ff"/>
       <stop offset="1" stop-color="#b44cff"/>
     </linearGradient>
     <linearGradient id="star" x1="0" y1="0" x2="1" y2="1">
@@ -32,11 +33,10 @@
   </defs>
   <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
   <rect x="6" y="6" width="1012" height="1012" rx="222" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="12"/>
-  <!-- F -->
+  <!-- T -->
   <g filter="url(#softglow)">
-    <rect x="262" y="236" width="168" height="560" rx="34" fill="url(#f)"/>
-    <rect x="262" y="236" width="420" height="152" rx="34" fill="url(#f)"/>
-    <rect x="262" y="466" width="330" height="138" rx="32" fill="url(#mid)"/>
+    <rect x="311" y="300" width="168" height="496" rx="34" fill="url(#t)"/>
+    <rect x="150" y="236" width="490" height="152" rx="34" fill="url(#bar)"/>
   </g>
   <!-- sparkle -->
   <path filter="url(#glow)" fill="url(#star)" d="M786 188 C 800 268 826 294 906 308 C 826 322 800 348 786 428 C 772 348 746 322 666 308 C 746 294 772 268 786 188 Z"/>

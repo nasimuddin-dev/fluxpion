@@ -70,7 +70,7 @@ export default function App() {
         await useApp.getState().refreshWorkspace();
         scheduleUpdateCheck();
       } catch (error) {
-        useApp.getState().toast(`Could not finish starting FluxPion: ${error instanceof Error ? error.message : String(error)}`, 'error');
+        useApp.getState().toast(`Could not finish starting TestPion: ${error instanceof Error ? error.message : String(error)}`, 'error');
       } finally {
         // The shell remains usable if a workspace service is temporarily down.
         setReady(true);

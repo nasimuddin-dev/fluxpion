@@ -4,23 +4,23 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { Backend } from '../backend/backend.js';
 import { canInstallInPlace, createUpdater } from './updater.js';
-import { defaultAppDir } from '@fluxpion/core';
+import { defaultAppDir } from '@testpion/core';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 let win: BrowserWindow | null = null;
 let backend: Backend | null = null;
 
 // Documentation screenshot mode (scripts/capture.cjs): isolated profile, fixed size, dark theme.
-const capture = process.env.FLUXPION_CAPTURE_SCRIPT;
+const capture = process.env.TESTPION_CAPTURE_SCRIPT;
 if (capture) {
-  app.setPath('userData', join(process.env.FLUXPION_HOME!, 'electron-profile'));
+  app.setPath('userData', join(process.env.TESTPION_HOME!, 'electron-profile'));
   nativeTheme.themeSource = 'dark';
 }
 
-// Keep using the Electron profile of installs from before the FluxPion name ("ProtoPion" 0.4, "Protolens" 0.2–0.3):
+// Keep using the Electron profile of installs from before the TestPion name ("FluxPion" 0.5, "ProtoPion" 0.4, "Protolens" 0.2–0.3):
 // it holds the safeStorage key that decrypts saved secrets, plus UI state such as open tabs.
-if (!capture && !existsSync(join(app.getPath('appData'), 'FluxPion'))) {
-  const legacy = ['ProtoPion', 'Protolens'].map((n) => join(app.getPath('appData'), n)).find((d) => existsSync(d));
+if (!capture && !existsSync(join(app.getPath('appData'), 'TestPion'))) {
+  const legacy = ['FluxPion', 'ProtoPion', 'Protolens'].map((n) => join(app.getPath('appData'), n)).find((d) => existsSync(d));
   if (legacy) app.setPath('userData', legacy);
 }
 
@@ -43,7 +43,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 960,
     minHeight: 600,
-    title: 'FluxPion',
+    title: 'TestPion',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     show: false,
     webPreferences: {
@@ -96,9 +96,9 @@ app.whenReady().then(() => {
     start();
   } catch (e) {
     // never fail silently with no window: show what went wrong
-    dialog.showErrorBox('FluxPion failed to start', `${(e as Error).message}
+    dialog.showErrorBox('TestPion failed to start', `${(e as Error).message}
 
-Data directory: ${process.env.FLUXPION_HOME || defaultAppDir()}`);
+Data directory: ${process.env.TESTPION_HOME || defaultAppDir()}`);
     app.quit();
   }
 });
@@ -106,7 +106,7 @@ Data directory: ${process.env.FLUXPION_HOME || defaultAppDir()}`);
 function start(): void {
   const t0 = Date.now();
   backend = new Backend({
-    appDir: process.env.FLUXPION_HOME || defaultAppDir(),
+    appDir: process.env.TESTPION_HOME || defaultAppDir(),
     cipher: {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
       encrypt: (s) => safeStorage.encryptString(s),
@@ -125,11 +125,29 @@ function start(): void {
   });
 
   // updates live in the Electron process (not the shared backend, which also serves the browser bridge)
-  const updater = createUpdater(emit);
+  const be = backend;
+  const updater = createUpdater(emit, (level, message) => be.appLog(level, message));
   const baseInfo = backend.handlers['app.info']!;
   backend.handlers['app.info'] = async (p) => ({ ...((await baseInfo(p)) as object), appVersion: app.getVersion(), packaged: app.isPackaged, canUpdateInPlace: canInstallInPlace() });
-  backend.handlers['update.check'] = () => updater.check();
-  backend.handlers['update.install'] = () => updater.install();
+  // every check and failure is logged, so "updates don't work" can be diagnosed from the Logs panel
+  backend.handlers['update.check'] = async () => {
+    try {
+      const r = await updater.check();
+      be.appLog('info', `Update check: running ${r.current}, ${r.version ? `${r.version} available` : 'up to date'}${r.installable ? '' : ' (this installation is updated by downloading the new version)'}`);
+      return r;
+    } catch (e) {
+      be.appLog('error', `Update check failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw e;
+    }
+  };
+  backend.handlers['update.install'] = async () => {
+    try {
+      return await updater.install();
+    } catch (e) {
+      be.appLog('error', `Update install failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw e;
+    }
+  };
 
   ipcMain.handle('aps:rpc', async (_e, method: string, params: unknown) => {
     try {
@@ -155,9 +173,9 @@ function start(): void {
         submenu: [
           { label: 'Check for Updates…', click: () => emit('update.checkManual', {}) },
           { type: 'separator' },
-          { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/fluxpion/') },
-          { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/fluxpion/changelog') },
-          { label: 'Report an Issue', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/fluxpion/issues') },
+          { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/testpion/') },
+          { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/testpion/changelog') },
+          { label: 'Report an Issue', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/testpion/issues') },
         ],
       },
     ]),

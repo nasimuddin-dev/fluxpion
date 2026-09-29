@@ -95,23 +95,23 @@ describe('example workspace (end-to-end)', () => {
     }
   });
 
-  it('CLI: `fluxpion run` exits 0 and writes all report formats', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
+  it('CLI: `testpion run` exits 0 and writes all report formats', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
     const out = join(dir, 'cli-out');
-    const r = await run([cli, 'run', '-w', ws.root, '--suite', 'smoke', '-o', out, '-q'], { ...process.env, FLUXPION_HOME: join(dir, 'home') });
+    const r = await run([cli, 'run', '-w', ws.root, '--suite', 'smoke', '-o', out, '-q'], { ...process.env, TESTPION_HOME: join(dir, 'home') });
     expect(r.stderr).toBe('');
     expect(r.status).toBe(0);
     expect(readFileSync(join(out, 'junit.xml'), 'utf8')).toContain('tests="4"');
     expect(JSON.parse(readFileSync(join(out, 'report.json'), 'utf8')).summary.passed).toBe(4);
     expect(readFileSync(join(out, 'report.md'), 'utf8')).toContain('Smoke');
     expect(readFileSync(join(out, 'report.html'), 'utf8')).toContain('PASSED');
-    const bad = await run([cli, 'test', join(dir, 'does-not-exist')], { ...process.env, FLUXPION_HOME: join(dir, 'home') });
+    const bad = await run([cli, 'test', join(dir, 'does-not-exist')], { ...process.env, TESTPION_HOME: join(dir, 'home') });
     expect(bad.status).toBe(2);
   });
 
-  it('CLI: `fluxpion run-collection` runs workspace collections and Postman files (Newman-style)', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const env = { ...process.env, FLUXPION_HOME: join(dir, 'home') };
+  it('CLI: `testpion run-collection` runs workspace collections and Postman files (Newman-style)', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
 
     // workspace collection, one folder, two iterations: the token script feeds the next requests
     const out = join(dir, 'col-out');
@@ -156,8 +156,8 @@ describe('example workspace (end-to-end)', () => {
   });
 
   it('CLI: run-collection keeps cookies across requests and exports / imports the cookie jar', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const env = { ...process.env, FLUXPION_HOME: join(dir, 'home') };
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
     const collection = (items: unknown[]) => JSON.stringify({ info: { name: 'Cookies', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' }, item: items });
     const me = {
       name: 'Me',
@@ -191,9 +191,9 @@ describe('example workspace (end-to-end)', () => {
     expect(JSON.parse(readFileSync(join(dir, 'ck4', 'summary.json'), 'utf8'))).toMatchObject({ total: 3, passed: 3 });
   });
 
-  it('CLI: `fluxpion export` / `export-environment` write Postman files that run-collection runs', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const env = { ...process.env, FLUXPION_HOME: join(dir, 'home') };
+  it('CLI: `testpion export` / `export-environment` write Postman files that run-collection runs', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
     const col = join(dir, 'vet.postman_collection.json');
     const envFile = join(dir, 'dev.postman_environment.json');
     const a = await run([cli, 'export', 'Veterinary API', '-w', ws.root, '-o', col], env);
@@ -207,10 +207,10 @@ describe('example workspace (end-to-end)', () => {
     expect(JSON.parse(readFileSync(join(dir, 'pm-rt', 'summary.json'), 'utf8'))).toMatchObject({ total: 7, passed: 7 });
   });
 
-  it('CLI: `fluxpion mcp-server` gives AI agents the workspace as MCP tools', async () => {
-    const env = { FLUXPION_HOME: join(dir, 'home') } as Record<string, string>;
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const s = new McpSession({ id: 'pl', name: 'fluxpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env });
+  it('CLI: `testpion mcp-server` gives AI agents the workspace as MCP tools', async () => {
+    const env = { TESTPION_HOME: join(dir, 'home') } as Record<string, string>;
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const s = new McpSession({ id: 'pl', name: 'testpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env });
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
@@ -264,7 +264,7 @@ describe('example workspace (end-to-end)', () => {
       await s.close();
     }
     // --read-only hides the tools that send requests
-    const ro = new McpSession({ id: 'ro', name: 'fluxpion-ro', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root, '--read-only'], env });
+    const ro = new McpSession({ id: 'ro', name: 'testpion-ro', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root, '--read-only'], env });
     await ro.connect(20_000);
     try {
       expect((await ro.listTools()).map((t) => t.name)).not.toContain('send_request');
@@ -273,9 +273,9 @@ describe('example workspace (end-to-end)', () => {
     }
   });
 
-  it('CLI: `fluxpion import` takes a copied request and `fluxpion env` lists and orders environments (--json)', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const env = { ...process.env, FLUXPION_HOME: join(dir, 'home') };
+  it('CLI: `testpion import` takes a copied request and `testpion env` lists and orders environments (--json)', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
     const file = join(dir, 'copied.ps1');
     writeFileSync(file, 'Invoke-RestMethod -Uri "https://api.test/v1/owners" -Method "POST" -Headers @{ "x-api-key" = "key-LEAK-9" } -ContentType "application/json" -Body \'{"name":"Ada","password":"pw-LEAK-8"}\'');
     const r = await run([cli, 'import', file, '-w', ws.root, '--collection', 'From CLI', '--folder', 'Owners', '--json'], env);
@@ -298,9 +298,9 @@ describe('example workspace (end-to-end)', () => {
     expect((await run([cli, 'env', 'order', 'Nope', '-w', ws.root], env)).status).not.toBe(0);
   });
 
-  it('CLI: `fluxpion docs` writes Markdown documentation with examples and no secrets', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const r = await run([cli, 'docs', 'Veterinary API', '-w', ws.root], { ...process.env, FLUXPION_HOME: join(dir, 'home') });
+  it('CLI: `testpion docs` writes Markdown documentation with examples and no secrets', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const r = await run([cli, 'docs', 'Veterinary API', '-w', ws.root], { ...process.env, TESTPION_HOME: join(dir, 'home') });
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('# Veterinary API');
     expect(r.stdout).toContain('### Get patient');
@@ -308,9 +308,9 @@ describe('example workspace (end-to-end)', () => {
     expect(r.stdout).not.toContain('demo-secret');
   });
 
-  it('CLI: `fluxpion mock` serves the saved examples of a collection', async () => {
-    const cli = resolve('packages/cli/bin/fluxpion.js');
-    const p = spawn(process.execPath, [cli, 'mock', 'Veterinary API', '-w', ws.root, '-q'], { env: { ...process.env, FLUXPION_HOME: join(dir, 'home') } });
+  it('CLI: `testpion mock` serves the saved examples of a collection', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const p = spawn(process.execPath, [cli, 'mock', 'Veterinary API', '-w', ws.root, '-q'], { env: { ...process.env, TESTPION_HOME: join(dir, 'home') } });
     try {
       const url = await new Promise<string>((ok, fail) => {
         let out = '';

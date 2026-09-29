@@ -4,17 +4,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EnvSecretStore, WorkspaceManager, detectFormat, envNameForSecret } from '../../packages/core/src/index.js';
 
-/** FluxPion was called ProtoPion, Protolens and AI Protocol Studio before: old names must keep working. */
-describe('names from before the FluxPion rename', () => {
+/** TestPion was called FluxPion, ProtoPion, Protolens and AI Protocol Studio before: old names must keep working. */
+describe('names from before the TestPion rename', () => {
   const dirs: string[] = [];
   afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-  it('reads secrets from FLUXPION_, PROTOLENS_ and APS_ variables, new name first', () => {
-    expect(envNameForSecret('provider.openai.apiKey')).toBe('FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY');
+  it('reads secrets from TESTPION_, FLUXPION_, PROTOPION_, PROTOLENS_ and APS_ variables, new name first', () => {
+    expect(new EnvSecretStore({ FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY: 'fp' }).get('provider.openai.apiKey')).toBe('fp');
+    expect(new EnvSecretStore({ TESTPION_SECRET_PROVIDER_OPENAI_APIKEY: 'tp', FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY: 'fp' }).get('provider.openai.apiKey')).toBe('tp');
+    expect(envNameForSecret('provider.openai.apiKey')).toBe('TESTPION_SECRET_PROVIDER_OPENAI_APIKEY');
     expect(new EnvSecretStore({ PROTOLENS_SECRET_PROVIDER_OPENAI_APIKEY: 'old' }).get('provider.openai.apiKey')).toBe('old');
     expect(new EnvSecretStore({ PROTOPION_SECRET_PROVIDER_OPENAI_APIKEY: 'pp' }).get('provider.openai.apiKey')).toBe('pp');
     expect(new EnvSecretStore({ APS_SECRET_PROVIDER_OPENAI_APIKEY: 'older' }).get('provider.openai.apiKey')).toBe('older');
-    expect(new EnvSecretStore({ FLUXPION_SECRET_PROVIDER_OPENAI_APIKEY: 'new', PROTOLENS_SECRET_PROVIDER_OPENAI_APIKEY: 'old' }).get('provider.openai.apiKey')).toBe('new');
+    expect(new EnvSecretStore({ TESTPION_SECRET_PROVIDER_OPENAI_APIKEY: 'new', PROTOLENS_SECRET_PROVIDER_OPENAI_APIKEY: 'old' }).get('provider.openai.apiKey')).toBe('new');
   });
 
   it('imports workspace exports made by Protolens', () => {
@@ -29,6 +31,9 @@ describe('names from before the FluxPion rename', () => {
     const imported = mgr.importBundle(old, 'From Protolens');
     expect(imported.workspace.name).toBe('From Protolens');
     imported.close();
+    const fp = mgr.importBundle({ ...bundle, format: 'fluxpion-workspace' as const }, 'From FluxPion');
+    expect(fp.workspace.name).toBe('From FluxPion');
+    fp.close();
     const pp = mgr.importBundle({ ...bundle, format: 'protopion-workspace' as const }, 'From ProtoPion');
     expect(pp.workspace.name).toBe('From ProtoPion');
     pp.close();

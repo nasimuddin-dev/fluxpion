@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+  <!-- TestPion wordmark: gradient "Test", white "Pion", sparkle, and the "Connect every protocol" tagline -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.35" r="0.85">
+      <stop offset="0" stop-color="#0f1c52"/>
+      <stop offset="0.6" stop-color="#0a1238"/>
+      <stop offset="1" stop-color="#060a24"/>
+    </radialGradient>
+    <linearGradient id="test" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#1ff0ff"/>
+      <stop offset="0.22" stop-color="#1e88ff"/>
+      <stop offset="0.4" stop-color="#8b5cff"/>
+      <stop offset="0.5" stop-color="#f04fe0"/>
+    </linearGradient>
+    <linearGradient id="pion" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe6ff"/>
+    </linearGradient>
+    <linearGradient id="star" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f7bff"/>
+      <stop offset="0.55" stop-color="#8b5cff"/>
+      <stop offset="1" stop-color="#f04fe0"/>
+    </linearGradient>
+    <linearGradient id="ruleL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1e88ff" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#1e88ff"/>
+      <stop offset="1" stop-color="#f04fe0"/>
+    </linearGradient>
+    <linearGradient id="ruleR" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f04fe0"/>
+      <stop offset="0.6" stop-color="#1e88ff"/>
+      <stop offset="1" stop-color="#1e88ff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.55  0 0 0 0 1  0 0 0 0.6 0" result="c"/>
+      <feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="starglow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="400" fill="url(#bg)"/>
+  <g font-family="'Segoe UI Black', 'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="190" letter-spacing="-4" filter="url(#glow)">
+    <text x="600" y="262" text-anchor="middle"><tspan fill="url(#test)">Test</tspan><tspan fill="url(#pion)">Pion</tspan></text>
+  </g>
+  <path filter="url(#starglow)" fill="url(#star)" d="M1012 42 C 1018 80 1030 92 1068 98 C 1030 104 1018 116 1012 154 C 1006 116 994 104 956 98 C 994 92 1006 80 1012 42 Z"/>
+  <rect x="140" y="303" width="130" height="3" rx="1.5" fill="url(#ruleL)"/>
+  <rect x="930" y="303" width="130" height="3" rx="1.5" fill="url(#ruleR)"/>
+  <text x="600" y="316" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-weight="500" font-size="30" letter-spacing="7" fill="#d7ddf5">CONNECT EVERY PROTOCOL</text>
+</svg>

@@ -21,6 +21,6 @@ Servers are saved in `mcp-servers.json` in the workspace:
 - Every field accepts variables, so tokens can come from secret environment variables.
 - On Windows, use `npx.cmd` or the full path to `node.exe` for stdio servers.
 - Anything the server writes to stderr is captured in the trace, which helps diagnose startup failures.
-- From the terminal, `fluxpion mcp -- node server.js` lists a server's tools, resources and prompts.
+- From the terminal, `testpion mcp -- node server.js` lists a server's tools, resources and prompts.
 
 :::

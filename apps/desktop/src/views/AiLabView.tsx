@@ -615,7 +615,7 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
               </Field>
             )}
             {p.kind !== 'mock' && (
-              <Field label="API key reference (advanced)" hint="Leave empty to use the stored key. CI: {{$env.OPENAI_API_KEY}} or FLUXPION_SECRET_PROVIDER_<ID>_APIKEY.">
+              <Field label="API key reference (advanced)" hint="Leave empty to use the stored key. CI: {{$env.OPENAI_API_KEY}} or TESTPION_SECRET_PROVIDER_<ID>_APIKEY.">
                 <Input className="mono" value={p.apiKey?.includes('$secret') ? '' : p.apiKey ?? ''} onChange={(e) => upd({ apiKey: e.target.value || undefined })} placeholder="{{$env.MY_KEY}}" />
               </Field>
             )}

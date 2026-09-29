@@ -14,8 +14,8 @@ import { compareVersions } from './semver.js';
 
 export { compareVersions };
 
-const REPO = 'nasimuddin-dev/fluxpion';
-const DOWNLOAD_PAGE = 'https://nasimuddin-dev.github.io/fluxpion/download';
+const REPO = 'nasimuddin-dev/testpion';
+const DOWNLOAD_PAGE = 'https://nasimuddin-dev.github.io/testpion/download';
 
 export interface UpdateCheckResult {
   current: string;
@@ -42,10 +42,19 @@ function notesText(notes: UpdateInfo['releaseNotes'] | string | null | undefined
   return notes.map((n) => n.note ?? '').join('\n\n');
 }
 
+export type UpdateLog = (level: 'info' | 'warn' | 'error', message: string) => void;
+
 let configured = false;
-function configure(onProgress: (downloaded: number, total: number | null) => void): void {
+function configure(onProgress: (downloaded: number, total: number | null) => void, log: UpdateLog): void {
   if (configured) return;
   configured = true;
+  // electron-updater's own messages (feed URL, download, signature checks) go to the app log
+  autoUpdater.logger = {
+    info: (m?: unknown) => log('info', `updater: ${String(m)}`),
+    warn: (m?: unknown) => log('warn', `updater: ${String(m)}`),
+    error: (m?: unknown) => log('error', `updater: ${String(m)}`),
+    debug: () => undefined,
+  };
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
@@ -55,7 +64,7 @@ function configure(onProgress: (downloaded: number, total: number | null) => voi
 /** Ask GitHub for the latest release (used where electron-updater can't install in place). */
 async function latestRelease(): Promise<{ version: string; notes: string; url: string }> {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-    headers: { accept: 'application/vnd.github+json', 'user-agent': `FluxPion/${app.getVersion()}` },
+    headers: { accept: 'application/vnd.github+json', 'user-agent': `TestPion/${app.getVersion()}` },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`GitHub returned HTTP ${res.status}`);
@@ -63,12 +72,13 @@ async function latestRelease(): Promise<{ version: string; notes: string; url: s
   return { version: j.tag_name.replace(/^v/, ''), notes: j.body ?? '', url: DOWNLOAD_PAGE };
 }
 
-export function createUpdater(emit: (channel: string, payload: unknown) => void) {
+export function createUpdater(emit: (channel: string, payload: unknown) => void, log: UpdateLog = () => undefined) {
+  const progress = (downloaded: number, total: number | null) => emit('update.progress', { downloaded, total });
   return {
     async check(): Promise<UpdateCheckResult> {
       const current = app.getVersion();
       if (canInstallInPlace()) {
-        configure((downloaded, total) => emit('update.progress', { downloaded, total }));
+        configure(progress, log);
         const r = await autoUpdater.checkForUpdates();
         const info = r?.updateInfo;
         const newer = info && compareVersions(info.version, current) > 0;
@@ -82,7 +92,7 @@ export function createUpdater(emit: (channel: string, payload: unknown) => void)
     /** Download (with progress events), verify and install; the app quits and restarts into the new version. */
     async install(): Promise<void> {
       if (!canInstallInPlace()) throw new Error('This installation can’t be updated in place; download the new version instead.');
-      configure((downloaded, total) => emit('update.progress', { downloaded, total }));
+      configure(progress, log);
       await autoUpdater.downloadUpdate();
       emit('update.progress', { downloaded: 1, total: 1, installing: true });
       // isSilent=false shows the installer's progress on Windows; forceRunAfter restarts the app afterwards

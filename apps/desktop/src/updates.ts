@@ -1,4 +1,4 @@
-import { bridge, call, on } from './api';
+import { asError, bridge, call, on } from './api';
 import { ask, useApp } from './store';
 
 const SKIP_KEY = 'aps.update.skip';
@@ -46,7 +46,7 @@ async function install(version: string): Promise<void> {
   set({ progress: { title: `Updating to ${version}`, message: 'Downloading the update…', fraction: null } });
   const off = on<{ downloaded: number; total: number | null; installing?: boolean }>('update.progress', (p) => {
     const message = p.installing
-      ? 'Verifying and installing… FluxPion will restart.'
+      ? 'Verifying and installing… TestPion will restart.'
       : `Downloading the update… ${(p.downloaded / MB).toFixed(1)}${p.total ? ` of ${(p.total / MB).toFixed(1)}` : ''} MB`;
     useApp.getState().set({ progress: { title: `Updating to ${version}`, message, fraction: p.total && !p.installing ? p.downloaded / p.total : null } });
   });
@@ -54,7 +54,7 @@ async function install(version: string): Promise<void> {
     await call('update.install');
     // the app quits while the installer runs; if it doesn't, keep the dialog up briefly
   } catch (e) {
-    toast(`FluxPion ${version} couldn't be installed; your current version is unchanged. ${(e as Error).message ?? ''}`.trim(), 'error');
+    toast(`TestPion ${version} couldn't be installed; your current version is unchanged. ${(e as Error).message ?? ''}`.trim(), 'error');
     set({ progress: null });
   } finally {
     setTimeout(off, 60_000);
@@ -74,12 +74,13 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   let found: UpdateCheckResult;
   try {
     found = await call<UpdateCheckResult>('update.check');
-  } catch {
-    if (manual) toast("Couldn't check for updates. Check your internet connection and try again.", 'error');
+  } catch (e) {
+    // the reason (and electron-updater's own log) is also in the Logs panel
+    if (manual) toast(`Couldn't check for updates: ${asError(e).message}. Check your internet connection and try again; details are in Logs.`, 'error');
     return 'error';
   }
   if (!found.version) {
-    if (manual) toast(`You're up to date. FluxPion ${found.current} is the latest version.`, 'success');
+    if (manual) toast(`You're up to date. TestPion ${found.current} is the latest version.`, 'success');
     return 'current';
   }
   if (!manual && load(SKIP_KEY) === found.version) return 'available';
@@ -87,7 +88,7 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   const notes = summarise(found.notes);
   const choice = await ask({
     title: 'Update available',
-    message: `FluxPion ${found.version} is available. You have ${found.current}.`,
+    message: `TestPion ${found.version} is available. You have ${found.current}.`,
     detail:
       (notes ? notes + '\n\n' : '') +
       (found.installable

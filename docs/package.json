@@ -1,9 +1,9 @@
 {
   "name": "docs",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
-  "description": "FluxPion website and documentation (VitePress, deployed to GitHub Pages).",
+  "description": "TestPion website and documentation (VitePress, deployed to GitHub Pages).",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",

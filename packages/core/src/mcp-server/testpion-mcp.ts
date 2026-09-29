@@ -16,11 +16,11 @@ import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js'
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
 
 /**
- * `fluxpion mcp-server`: the FluxPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
+ * `testpion mcp-server`: the TestPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
  * can browse a workspace's collections, send requests and run collections. Output is redacted with the
  * workspace's redaction rules; secret values never leave the machine through this server.
  */
-export interface FluxPionMcpOptions {
+export interface TestPionMcpOptions {
   store: WorkspaceStore;
   secrets: SecretStore;
   settings: AppSettings;
@@ -43,7 +43,7 @@ interface Tool {
 
 const str = (description: string) => ({ type: 'string', description });
 
-export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
+export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
   const { store, secrets, settings } = opts;
   const redactor = new Redactor(settings.redactFields);
   const collections = () => store.listCollections().filter((c) => !c.problem);
@@ -104,7 +104,7 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
   const all: Tool[] = [
     {
       name: 'list_collections',
-      description: 'List the collections of the FluxPion workspace with their request counts.',
+      description: 'List the collections of the TestPion workspace with their request counts.',
       inputSchema: { type: 'object', properties: {} },
       run: () =>
         collections().map((c) => ({ id: c.id, name: c.name, description: c.description?.slice(0, 300), requests: flatten(c.items).length, examples: flatten(c.items).reduce((a, f) => a + (f.node.kind === 'http' ? f.node.examples?.length ?? 0 : 0), 0) })),
@@ -203,7 +203,7 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
     {
       name: 'parse_request_snippet',
       description:
-        'Turn a request copied from browser devtools or docs (cURL for bash or cmd, fetch, fetch (Node.js), or PowerShell Invoke-WebRequest / Invoke-RestMethod) into a structured FluxPion request: method, URL, params, headers, cookies, body and auth. Nothing is sent or saved. Secret values (tokens, keys, cookies, passwords) are replaced by {{variables}} listed in `placeholders`.',
+        'Turn a request copied from browser devtools or docs (cURL for bash or cmd, fetch, fetch (Node.js), or PowerShell Invoke-WebRequest / Invoke-RestMethod) into a structured TestPion request: method, URL, params, headers, cookies, body and auth. Nothing is sent or saved. Secret values (tokens, keys, cookies, passwords) are replaced by {{variables}} listed in `placeholders`.',
       inputSchema: { type: 'object', properties: { snippet: str('The copied command or code') }, required: ['snippet'] },
       run: (a) => {
         const { request, format } = requestFrom({ snippet: a.snippet });
@@ -303,10 +303,10 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
   const tools = all.filter((t) => !(opts.readOnly && t.write));
 
   const server = new Server(
-    { name: 'fluxpion', version: opts.version ?? '0.5.1' },
+    { name: 'testpion', version: opts.version ?? '0.6.0' },
     {
       capabilities: { tools: {} },
-      instructions: `FluxPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. parse_request_snippet reads a cURL / fetch / PowerShell command${opts.readOnly ? '' : ' and save_request stores it in a collection (secrets become {{variables}})'}. Values of secrets are never returned.`,
+      instructions: `TestPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. parse_request_snippet reads a cURL / fetch / PowerShell command${opts.readOnly ? '' : ' and save_request stores it in a collection (secrets become {{variables}})'}. Values of secrets are never returned.`,
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));
@@ -325,8 +325,8 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
 }
 
 /** Serve the workspace over stdio until the client disconnects. */
-export async function serveFluxPionMcp(opts: FluxPionMcpOptions): Promise<void> {
-  const server = createFluxPionMcpServer(opts);
+export async function serveTestPionMcp(opts: TestPionMcpOptions): Promise<void> {
+  const server = createTestPionMcpServer(opts);
   const transport = new StdioServerTransport();
   const closed = new Promise<void>((resolve) => (server.onclose = () => resolve()));
   await server.connect(transport);

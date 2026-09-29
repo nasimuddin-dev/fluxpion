@@ -4,7 +4,7 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
- * Design tokens, shadcn/ui (Tailwind v4) style: OKLCH colours on a cool neutral, with the FluxPion
+ * Design tokens, shadcn/ui (Tailwind v4) style: OKLCH colours on a cool neutral, with the TestPion
  * brand (blue → violet, from the logo) as the accent. Surfaces are layered so the layout reads at a
  * glance: chrome (top bar, nav rail, status bar) → panel (sidebars) → bg (the work area) → popover.
  * Components use the Tailwind colours mapped in @theme below.

@@ -127,7 +127,7 @@ export function TopBar() {
     <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-chrome" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
       <div className="flex items-center gap-2 pr-1" style={noDrag}>
         <img src={logoUrl} alt="" className="h-7 w-7" />
-        <span className="font-semibold tracking-tight hidden md:inline bg-[image:var(--brand-gradient)] bg-clip-text text-transparent">FluxPion</span>
+        <span className="font-semibold tracking-tight hidden md:inline bg-[image:var(--brand-gradient)] bg-clip-text text-transparent">TestPion</span>
       </div>
       <span className="h-5 w-px bg-line hidden md:block" />
       <div style={noDrag}>

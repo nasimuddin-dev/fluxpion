@@ -64,7 +64,7 @@ async function* tests() {
 }
 
 const dir = mkdtempSync(join(tmpdir(), 'aps-bench-'));
-console.log(`FluxPion benchmark — ${TESTS.toLocaleString()} HTTP tests, ${WORKERS} workers, ${cpus().length} CPUs, Node ${process.version}\n`);
+console.log(`TestPion benchmark — ${TESTS.toLocaleString()} HTTP tests, ${WORKERS} workers, ${cpus().length} CPUs, Node ${process.version}\n`);
 const t0 = performance.now();
 const s = await runTests({ name: 'bench', tests: tests(), concurrency: WORKERS, services, resultsFile: join(dir, 'results.jsonl'), traceMode: 'none' });
 const dur = performance.now() - t0;

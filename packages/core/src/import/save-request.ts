@@ -106,7 +106,7 @@ export function addRequestToCollection(
 }
 
 /**
- * Import a copied cURL / fetch / PowerShell command as a saved request (CLI `fluxpion import` and the
+ * Import a copied cURL / fetch / PowerShell command as a saved request (CLI `testpion import` and the
  * Import dialog): secrets become `{{variables}}`, the request is named after its method and path.
  */
 export function importRequestSnippet(

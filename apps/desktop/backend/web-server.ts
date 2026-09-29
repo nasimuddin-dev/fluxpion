@@ -9,12 +9,12 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { Backend } from './backend.js';
 
-const port = Number(process.env.FLUXPION_BRIDGE_PORT ?? 5174);
-const token = process.env.FLUXPION_BRIDGE_TOKEN ?? randomBytes(16).toString('hex');
+const port = Number(process.env.TESTPION_BRIDGE_PORT ?? 5174);
+const token = process.env.TESTPION_BRIDGE_TOKEN ?? randomBytes(16).toString('hex');
 const clients = new Set<ServerResponse>();
 
 const backend = new Backend({
-  appDir: process.env.FLUXPION_HOME || join(homedir(), '.fluxpion-dev'),
+  appDir: process.env.TESTPION_HOME || process.env.FLUXPION_HOME || join(homedir(), '.testpion-dev'),
   emit: (channel, payload) => {
     const data = `data: ${JSON.stringify({ channel, payload })}\n\n`;
     for (const c of clients) c.write(data);

@@ -1,6 +1,6 @@
 /**
- * @fluxpion/core — the FluxPion execution engine.
- * Shared by the desktop application and the `fluxpion` CLI.
+ * @testpion/core — the TestPion execution engine.
+ * Shared by the desktop application and the `testpion` CLI.
  */
 export * from './model/types.js';
 export * from './errors.js';
@@ -43,7 +43,7 @@ export * from './report/collection-docs.js';
 
 export * from './load/load.js';
 export * from './mock/mock-server.js';
-export * from './mcp-server/fluxpion-mcp.js';
+export * from './mcp-server/testpion-mcp.js';
 
 export * from './storage/fsutil.js';
 export * from './storage/secrets.js';
@@ -61,4 +61,4 @@ export * from './import/postman-export.js';
 export * from './codegen/codegen.js';
 export * from './engine.js';
 
-export const ENGINE_VERSION = '0.5.1';
+export const ENGINE_VERSION = '0.6.0';

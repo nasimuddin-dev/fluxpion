@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install the FluxPion desktop app on Windows, macOS or Linux, or the fluxpion CLI."
+description: "Install the TestPion desktop app on Windows, macOS or Linux, or the testpion CLI."
 ---
 
 # Installation
@@ -15,15 +15,15 @@ Download the installer for your system from the [download page](/download), then
 
 ## Command-line runner
 
-For CI servers and scripts, install the [`fluxpion` CLI](/installation/cli).
+For CI servers and scripts, install the [`testpion` CLI](/installation/cli).
 
 ## Try it with the demo servers
 
 The repository includes local demo servers (REST, GraphQL, an OpenAI-compatible mock LLM, WebSocket and an MCP server) and an example workspace with 22 tests:
 
 ```bash
-git clone https://github.com/nasimuddin-dev/fluxpion.git
-cd fluxpion && npm ci && npm run build
+git clone https://github.com/nasimuddin-dev/testpion.git
+cd testpion && npm ci && npm run build
 node examples/servers/demo-servers.mjs
 ```
 
@@ -33,5 +33,5 @@ Open the `examples/veterinary-workspace` folder from the workspace menu (**Open 
 
 | Item | Location |
 |---|---|
-| Settings, logs, encrypted secrets | `~/.fluxpion/` (override with `FLUXPION_HOME`) |
-| Workspaces | `~/.fluxpion/workspaces/<name>/`, or any folder you open (for example inside a git repo) |
+| Settings, logs, encrypted secrets | `~/.testpion/` (override with `TESTPION_HOME`) |
+| Workspaces | `~/.testpion/workspaces/<name>/`, or any folder you open (for example inside a git repo) |

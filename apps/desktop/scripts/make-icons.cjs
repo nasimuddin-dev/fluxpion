@@ -1,6 +1,6 @@
-// Generates every FluxPion icon and logo size from two sources, using Chromium's renderer:
-//   build/logo.svg       the square app mark (gradient "F" + sparkle)
-//   build/wordmark.webp  the FluxPion wordmark ("Connect every protocol")
+// Generates every TestPion icon and logo size from two sources, using Chromium's renderer:
+//   build/logo.svg       the square app mark (gradient "T" + sparkle)
+//   build/wordmark.svg   the TestPion wordmark ("Connect every protocol")
 //
 // Desktop (apps/desktop/build):
 //   icon.png             1024×1024  electron-builder source (macOS .icns is derived from it)
@@ -11,10 +11,10 @@
 //   favicon.ico          16/32/48   browsers without SVG favicons
 //   apple-touch-icon.png 180×180
 //   icon-192.png, icon-512.png      web app manifest sizes
-//   images/fluxpion-wordmark.png    1200×400 wordmark for the README and docs
+//   images/testpion-wordmark.png    1200×400 wordmark for the README and docs
 //   images/social-preview.jpg       1280×640 link preview (og:image)
 //
-// Run: npm run icons -w @fluxpion/desktop
+// Run: npm run icons -w @testpion/desktop
 const { app, BrowserWindow } = require('electron');
 const { copyFileSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
@@ -28,7 +28,7 @@ const markSvg = (size) => {
   if (size <= 48) svg = svg.replace(/ filter="url\(#[a-z]+\)"/g, '').replace(/<rect x="6"[^>]*\/>/, '');
   return 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
 };
-const wordmark = 'data:image/webp;base64,' + readFileSync(join(build, 'wordmark.webp')).toString('base64');
+const wordmark = 'data:image/svg+xml;base64,' + readFileSync(join(build, 'wordmark.svg')).toString('base64');
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false });
@@ -118,7 +118,7 @@ app.whenReady().then(async () => {
   write(join(site, 'icon-192.png'), await mark(192));
   write(join(site, 'icon-512.png'), await mark(512));
   mkdirSync(join(site, 'images'), { recursive: true });
-  write(join(site, 'images', 'fluxpion-wordmark.png'), await render(wordmark, 1200, 400, { fit: true }));
+  write(join(site, 'images', 'testpion-wordmark.png'), await render(wordmark, 1200, 400));
   write(join(site, 'images', 'social-preview.jpg'), await render(wordmark, 1280, 640, { fit: true, type: 'image/jpeg' }));
 
   app.quit();
