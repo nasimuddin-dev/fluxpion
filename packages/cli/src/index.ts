@@ -19,6 +19,7 @@ import {
   importAny,
   importRequestSnippet,
   compareHistory,
+  setNetworkPolicy,
   convertCollectionScripts,
   redactDiff,
   isRequestSnippet,
@@ -591,7 +592,10 @@ export function buildProgram(): Command {
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('--read-only', 'only the browsing tools: no requests are sent')
     .option('--allow-production', 'allow sending to environments marked as production')
-    .action(async (o: { workspace?: string; readOnly?: boolean; allowProduction?: boolean }) => {
+    .option('--block-private-networks', 'refuse requests to localhost, private and cloud-metadata addresses (for shared or hosted use)')
+    .option('--allow-host <host...>', 'with --block-private-networks: hosts that stay reachable')
+    .action(async (o: { workspace?: string; readOnly?: boolean; allowProduction?: boolean; blockPrivateNetworks?: boolean; allowHost?: string[] }) => {
+      if (o.blockPrivateNetworks) setNetworkPolicy({ blockPrivateNetworks: true, allowHosts: o.allowHost ?? [] });
       // stdout carries the MCP protocol: everything else goes to stderr
       const mgr = new WorkspaceManager();
       const { store, ephemeral } = openWorkspace(o.workspace, undefined, mgr);

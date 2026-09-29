@@ -1,3 +1,4 @@
+import { assertUrlAllowed } from '../../net/policy.js';
 import { WebSocket as UndiciWebSocket } from 'undici';
 import { ApsError } from '../../errors.js';
 import { shortId } from '../../util/ids.js';
@@ -47,7 +48,18 @@ export class WebSocketSession {
     for (const l of this.statusListeners) l(s);
   }
 
-  connect(timeoutMs = 15_000): Promise<void> {
+  async connect(timeoutMs = 15_000): Promise<void> {
+    // the handshake is an HTTP request: the network policy applies as for http:// and https://
+    try {
+      await assertUrlAllowed(this.url.replace(/^ws(s?):/i, 'http$1:'));
+    } catch (e) {
+      if (e instanceof ApsError) throw e;
+      /* an invalid URL is reported below */
+    }
+    return this.open(timeoutMs);
+  }
+
+  private open(timeoutMs: number): Promise<void> {
     const headers: Record<string, string> = {};
     for (const h of this.opts.headers ?? []) if (h.enabled !== false && h.key) headers[h.key] = h.value;
     // the handshake is an HTTP request: ws:// and wss:// use the cookies of http:// and https://

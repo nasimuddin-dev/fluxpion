@@ -1,3 +1,4 @@
+import { assertUrlAllowed, getNetworkPolicy, policyLookup } from '../../net/policy.js';
 import { createWriteStream, openAsBlob, readFileSync, mkdirSync, type WriteStream } from 'node:fs';
 import { basename, join } from 'node:path';
 import { endAndClose } from '../../storage/fsutil.js';
@@ -41,7 +42,7 @@ function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
   const key = JSON.stringify([s.insecure, s.proxy, s.clientCert]);
   let d = dispatchers.get(key);
   if (!d) {
-    const connect: Record<string, unknown> = {};
+    const connect: Record<string, unknown> = { lookup: policyLookup };
     if (s.insecure) connect.rejectUnauthorized = false;
     if (s.clientCert) {
       connect.cert = readFileSync(s.clientCert.certPath);
@@ -57,7 +58,8 @@ function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
 
 let _default: Agent | undefined;
 function defaultAgent(): Agent {
-  return (_default ??= new Agent({ connections: 256, pipelining: 1, keepAliveTimeout: 10_000 }));
+  // policyLookup refuses private addresses at connect time when the network policy blocks them
+  return (_default ??= new Agent({ connections: 256, pipelining: 1, keepAliveTimeout: 10_000, connect: { lookup: policyLookup } as never }));
 }
 
 /** Names of `:name` path segments in a URL, e.g. `/users/:id/posts/:postId` → ["id", "postId"]. */
@@ -213,19 +215,22 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
   let curBody = body;
   let hops = 0;
   let res;
+  // with private networks blocked, every redirect hop is checked here (not followed inside undici)
+  const guarded = getNetworkPolicy().blockPrivateNetworks;
   for (;;) {
+    await assertUrlAllowed(current);
     res = await undiciFetch(current, {
       method: curMethod,
       headers: headers as unknown as Record<string, string>,
       body: curBody as never,
-      redirect: follow && !jar ? 'follow' : 'manual',
+      redirect: follow && !jar && !guarded ? 'follow' : 'manual',
       signal: opts.signal,
       dispatcher: dispatcherFor(spec),
       // duplex is required by undici for streamed (Blob/FormData) bodies
       ...({ duplex: 'half' } as object),
     });
-    if (!jar) break;
-    jar.storeFromResponse(current, res.headers.getSetCookie());
+    if (!jar && !(follow && guarded)) break;
+    jar?.storeFromResponse(current, res.headers.getSetCookie());
     const location = res.headers.get('location');
     if (!follow || !REDIRECT_CODES.has(res.status) || !location || hops >= (s.maxRedirects ?? 20)) break;
     await res.body?.cancel().catch(() => undefined);
@@ -240,7 +245,7 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
     if (next.origin !== current.origin) headers.delete('authorization');
     current = next;
     hops++;
-    setJarCookies(headers, jar, current, explicitCookie);
+    if (jar) setJarCookies(headers, jar, current, explicitCookie);
   }
   mark('waiting (TTFB)', tSend);
 

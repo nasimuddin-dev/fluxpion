@@ -180,5 +180,7 @@ testpion mcp-server --read-only
 | `-w, --workspace` | Workspace name or directory (default: nearest `workspace.json`). |
 | `--read-only` | Only the browsing tools; no requests are sent. |
 | `--allow-production` | Allow sending to environments marked as production. |
+| `--block-private-networks` | Refuse requests to localhost, private networks and cloud metadata addresses, and don't start local (stdio) MCP servers. For shared or hosted use; see [Network policy](/security/privacy#network-policy-shared-and-hosted-servers). |
+| `--allow-host <host...>` | With `--block-private-networks`: hosts that stay reachable. |
 
 :::

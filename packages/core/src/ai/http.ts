@@ -1,3 +1,4 @@
+import { assertUrlAllowed } from '../net/policy.js';
 import { ApsError, errorKindForStatus } from '../errors.js';
 import type { Redactor } from '../util/redact.js';
 
@@ -24,6 +25,7 @@ export async function doFetch(
   opts: { signal?: AbortSignal; redactor?: Redactor; provider: string; method?: string },
 ): Promise<Response> {
   let res: Response;
+  await assertUrlAllowed(url);
   try {
     res = await fetch(url, {
       method: opts.method ?? 'POST',

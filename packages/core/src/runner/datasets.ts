@@ -1,3 +1,4 @@
+import { assertUrlAllowed } from '../net/policy.js';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
@@ -54,6 +55,7 @@ async function* rawRecords(src: DatasetSource): AsyncGenerator<DatasetRecord> {
   }
   const fmt = formatOf(src);
   if (src.url) {
+    await assertUrlAllowed(src.url);
     const res = await fetch(src.url);
     if (!res.ok) throw new ApsError('NetworkError', `Dataset URL returned HTTP ${res.status}`);
     const text = await res.text();
