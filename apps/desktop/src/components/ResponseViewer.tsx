@@ -6,11 +6,12 @@ import type { CheckResult, HttpResponseData, Trace } from '../types';
 import { formatBytes, formatMs } from '../lib/format';
 import { useApp } from '../store';
 import { CheckList } from './Results';
+import { ResponseHistory } from './ResponseHistory';
 import { JsonTree, RawView } from './JsonView';
 import { TraceView } from './TraceView';
 import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
 
-type Tab = 'body' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream';
+type Tab = 'body' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream' | 'history';
 
 export function ResponseViewer({
   response,
@@ -20,6 +21,8 @@ export function ResponseViewer({
   stream,
   scriptLogs,
   visualizer,
+  requestId,
+  historyId,
   onSuggestAssertions,
   onSaveExample,
   onGenerateTests,
@@ -33,6 +36,10 @@ export function ResponseViewer({
   scriptLogs?: string[];
   /** Output of `pm.visualizer.set(template, data)`, rendered by the backend. */
   visualizer?: { html?: string; error?: string };
+  /** Saved request: enables the History tab (earlier responses, compare). */
+  requestId?: string;
+  /** History entry of this response (marked "latest"). */
+  historyId?: string;
   onSuggestAssertions?(): void;
   /** Save this response as an example of the request. */
   onSaveExample?(): void;
@@ -114,6 +121,7 @@ export function ResponseViewer({
           { id: 'tests', label: 'Tests', badge: checks?.length },
           ...(stream ? [{ id: 'stream' as Tab, label: 'Stream' }] : []),
           { id: 'trace', label: 'Trace' },
+          ...(requestId ? [{ id: 'history' as Tab, label: 'History' }] : []),
           ...(curl ? [{ id: 'code' as Tab, label: 'cURL' }] : []),
         ]}
         right={
@@ -145,6 +153,7 @@ export function ResponseViewer({
             <RawView text={mode === 'pretty' ? prettyText : response.bodyPreview} />
           ))}
         {tab === 'headers' && <KvTable rows={response.headers} />}
+        {tab === 'history' && requestId && <ResponseHistory requestId={requestId} latestId={historyId} />}
         {tab === 'cookies' &&
           (response.cookies.length ? (
             <table className="w-full text-sm">

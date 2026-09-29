@@ -38,6 +38,8 @@ export interface Page<T> {
 export interface ListQuery {
   query?: string;
   kind?: string;
+  /** History only: entries sent from this saved request. */
+  requestId?: string;
   limit?: number;
   offset?: number;
 }
@@ -122,7 +124,7 @@ class SqliteMetaStore implements MetaStore {
   addHistory(e: HistoryEntry): void {
     this.db
       .prepare('INSERT OR REPLACE INTO history (id, ts, kind, name, method, url, status, duration, size, trace_id, payload, doc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(e.id, e.timestamp, e.kind, e.name, e.method ?? null, e.url ?? null, e.status === undefined ? null : String(e.status), e.durationMs ?? null, e.size ?? null, e.traceId ?? null, e.payloadPath ?? null, JSON.stringify({ request: e.request, responseMeta: e.responseMeta }));
+      .run(e.id, e.timestamp, e.kind, e.name, e.method ?? null, e.url ?? null, e.status === undefined ? null : String(e.status), e.durationMs ?? null, e.size ?? null, e.traceId ?? null, e.payloadPath ?? null, JSON.stringify({ request: e.request, responseMeta: e.responseMeta, collectionId: e.collectionId, requestId: e.requestId }));
     // bound history size
     this.db.exec('DELETE FROM history WHERE id IN (SELECT id FROM history ORDER BY ts DESC LIMIT -1 OFFSET 20000)');
   }
@@ -143,6 +145,10 @@ class SqliteMetaStore implements MetaStore {
 
   listHistory(q: ListQuery = {}): Page<HistoryEntry> {
     const w = this.where(q, ['name', 'url', 'method', 'status']);
+    if (q.requestId) {
+      w.sql = (w.sql ? w.sql + ' AND ' : 'WHERE ') + "json_extract(doc, '$.requestId') = ?";
+      w.args.push(q.requestId);
+    }
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM history ${w.sql}`).get(...w.args) as { n: number }).n;
     const rows = this.db.prepare(`SELECT * FROM history ${w.sql} ORDER BY ts DESC LIMIT ? OFFSET ?`).all(...w.args, q.limit ?? 100, q.offset ?? 0) as Array<Record<string, unknown>>;
     return { total, items: rows.map(historyRow) };
@@ -233,6 +239,8 @@ function historyRow(r: Record<string, unknown>): HistoryEntry {
     payloadPath: (r.payload as string) ?? undefined,
     request: doc.request,
     responseMeta: doc.responseMeta,
+    collectionId: doc.collectionId,
+    requestId: doc.requestId,
   };
 }
 
@@ -292,7 +300,7 @@ class JsonlMetaStore implements MetaStore {
     this.log('history', e);
   }
   listHistory(q: ListQuery = {}) {
-    return this.page(this.data.history, q, (h, s) => `${h.name} ${h.url} ${h.method} ${h.status}`.toLowerCase().includes(s), (h) => h.timestamp);
+    return this.page(q.requestId ? this.data.history.filter((h) => h.requestId === q.requestId) : this.data.history, q, (h, s) => `${h.name} ${h.url} ${h.method} ${h.status}`.toLowerCase().includes(s), (h) => h.timestamp);
   }
   getHistory(id: string) {
     return this.data.history.find((h) => h.id === id);

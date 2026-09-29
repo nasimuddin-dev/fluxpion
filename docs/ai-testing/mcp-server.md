@@ -45,6 +45,8 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `run_collection` | Run a collection or one folder like the [Collection Runner](/api-testing/collections#collection-runner) and return totals and per-request results with failure messages, script logs and visualizations. |
 | `parse_request_snippet` | Turn a request copied from browser devtools or docs (cURL for bash or cmd, fetch, fetch (Node.js), PowerShell `Invoke-WebRequest` / `Invoke-RestMethod`) into a structured request: method, URL, params, headers, cookies, body and auth. Nothing is sent or saved. Tokens, keys, cookies and passwords come back as `{{variables}}`, listed in `placeholders`. |
 | `save_request` | Save a request into a collection and folder path (`"Auth / Tokens"`, created as needed; `create: true` makes a new collection). Give a `snippet` or `method` + `url` (+ `headers`, `body`). Secret values are **not** written to the workspace: they become `{{variables}}`, and the result's `placeholders` lists them so the user can add them as secret environment variables. |
+| `request_history` | Earlier responses of a saved request (sent in the app), newest first: id, time, status, duration, size. |
+| `compare_responses` | Compare two responses by history id: status, timing, header changes and a field-by-field JSON body diff (`$.path` added / removed / changed). Sensitive values are masked. |
 | `reorder_environments` | Set the order of environments in the environment picker (names or ids, first to last). |
 
 `save_request` and `reorder_environments` change workspace files, and `--read-only` hides them together with the tools that send requests.

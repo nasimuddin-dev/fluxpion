@@ -75,6 +75,8 @@ import {
   summarizeSchema,
   prepareHttpRequest,
   parseCurl,
+  compareHistory,
+  historyResponse,
   renderVisualizer,
   parseRequestSnippet,
   importRequestSnippet,
@@ -734,6 +736,17 @@ export class Backend {
       'history.get': ({ id }: { id: string }) => this.ws.meta.getHistory(id),
       'history.delete': ({ id }: { id: string }) => this.ws.meta.deleteHistory(id),
       'history.clear': () => this.ws.meta.clearHistory(),
+      /** Earlier responses of a saved request, newest first (response history). */
+      'history.forRequest': ({ requestId, limit }: { requestId: string; limit?: number }) =>
+        this.ws.meta.listHistory({ requestId, kind: 'http', limit: Math.min(limit ?? 50, 200) }).items,
+      /** One response from history, with its body (from the saved payload) for viewing. */
+      'history.response': ({ id }: { id: string }) => {
+        const h = this.ws.meta.getHistory(id);
+        if (!h) throw new ApsError('ConfigurationError', 'That response is no longer in the history');
+        return { entry: h, ...historyResponse(this.ws, h) };
+      },
+      /** Compare two responses from history (`before`, `after` are history ids). */
+      'history.compare': ({ before, after }: { before: string; after: string }) => compareHistory(this.ws, before, after),
 
       /* ---------------------------------------------------------------- GraphQL */
       'gql.introspect': async ({ request, environment }: { request: Omit<GraphQLRequestSpec, 'query'>; environment?: string }) => {
@@ -1091,6 +1104,9 @@ export class Backend {
         request: ctx.redactor.redact(p.request),
         payloadPath: response.payloadPath,
         traceId: trace.traceId,
+        collectionId: p.collectionId,
+        requestId: p.requestId,
+        responseMeta: { headers: ctx.redactor.redact(response.headers), contentType: response.contentType, truncated: response.truncated },
       });
       const clip = (t: string | undefined) => (t && t.length > CONSOLE_BODY_CHARS ? t.slice(0, CONSOLE_BODY_CHARS) + `… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);
       // values typed into sensitive headers are secrets too (e.g. echoed back in a response body)

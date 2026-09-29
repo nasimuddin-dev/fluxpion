@@ -14,6 +14,8 @@ import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
+import { compareHistory } from '../storage/history-compare.js';
+import { redactDiff } from '../report/response-diff.js';
 
 /**
  * `testpion mcp-server`: the TestPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
@@ -199,6 +201,26 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           await ctx.dispose();
         }
       },
+    },
+    {
+      name: 'request_history',
+      description:
+        'Earlier responses of a saved request, newest first (from requests sent in the TestPion app): id, time, status, duration and size. Use the ids with compare_responses to see what changed between two runs.',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request name or id'), limit: { type: 'number', description: 'How many (default 20, max 100)' } }, required: ['collection', 'request'] },
+      run: (a) => {
+        const { node } = findRequest(findCollection(a.collection), a.request);
+        const limit = Math.min(Math.max(Number(a.limit) || 20, 1), 100);
+        return store.meta
+          .listHistory({ requestId: node.id, kind: 'http', limit })
+          .items.map((h) => ({ id: h.id, timestamp: h.timestamp, status: h.status, durationMs: h.durationMs, size: h.size, url: h.url && redactor.redactUrl(h.url) }));
+      },
+    },
+    {
+      name: 'compare_responses',
+      description:
+        'Compare two responses from the history (ids from request_history): status, timing, header changes (volatile ones like date are flagged) and a field-by-field JSON body diff ($.path added / removed / changed), or a line diff for text. Sensitive values are masked.',
+      inputSchema: { type: 'object', properties: { before: str('History id of the older response'), after: str('History id of the newer response') }, required: ['before', 'after'] },
+      run: (a) => redactDiff(redactor.redact(compareHistory(store, String(a.before), String(a.after))), redactor),
     },
     {
       name: 'parse_request_snippet',

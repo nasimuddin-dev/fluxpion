@@ -39,6 +39,8 @@ export * from './runner/datasets.js';
 export * from './runner/collection-run.js';
 
 export * from './report/reports.js';
+export * from './report/response-diff.js';
+export * from './storage/history-compare.js';
 export * from './report/regression.js';
 export * from './report/collection-docs.js';
 

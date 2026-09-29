@@ -18,6 +18,8 @@ import {
   formatDuration,
   importAny,
   importRequestSnippet,
+  compareHistory,
+  redactDiff,
   isRequestSnippet,
   Redactor,
   CookieJar,
@@ -748,6 +750,60 @@ export function buildProgram(): Command {
         if (r.environment) store.saveEnvironment(r.environment);
         if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name }, null, 2));
         else console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
+      } finally {
+        store.close();
+      }
+    });
+
+  const histCmd = program.command('history').description('response history of requests sent in the app, and comparing two responses');
+  histCmd
+    .command('list')
+    .description('recent responses, newest first (optionally of one saved request)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--collection <nameOrId>', 'collection of --request')
+    .option('--request <nameOrId>', 'only responses of this saved request')
+    .option('-n, --limit <n>', 'how many', '20')
+    .option('--json', 'print as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        let requestId: string | undefined;
+        if (o.request) {
+          const want = String(o.request).toLowerCase();
+          const cols = store.listCollections().filter((c) => !c.problem && (!o.collection || c.id === o.collection || c.name.toLowerCase() === String(o.collection).toLowerCase()));
+          const flat = (nodes: CollectionNode[]): CollectionNode[] => nodes.flatMap((n) => (n.kind === 'folder' ? flat(n.items) : [n]));
+          const hit = cols.flatMap((c) => flat(c.items)).find((n) => n.id.toLowerCase() === want || n.name.toLowerCase() === want);
+          if (!hit) throw new CliError(`No saved request "${o.request}"`, EXIT.CONFIG_ERROR);
+          requestId = hit.id;
+        }
+        const items = store.meta.listHistory({ requestId, kind: requestId ? 'http' : undefined, limit: Math.min(Number(o.limit) || 20, 500) }).items;
+        const rows = items.map((h) => ({ id: h.id, timestamp: h.timestamp, kind: h.kind, name: h.name, method: h.method, status: h.status, durationMs: h.durationMs, size: h.size }));
+        if (o.json) console.log(JSON.stringify(rows, null, 2));
+        else for (const r of rows) console.log(`${dim(r.id)}  ${r.timestamp}  ${String(r.status ?? '').padEnd(4)} ${r.method ?? r.kind} ${r.name}  ${dim(formatDuration(r.durationMs ?? 0))}`);
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('diff')
+    .description('compare two responses from the history (older first): status, timing, headers and a field-by-field body diff')
+    .argument('<before>', 'history id of the older response')
+    .argument('<after>', 'history id of the newer response')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print the diff as JSON')
+    .action((before: string, after: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        // values of sensitive fields and headers are masked (agents read this output too)
+        const r = redactDiff(compareHistory(store, before, after), new Redactor(new WorkspaceManager().loadSettings().redactFields));
+        if (o.json) console.log(JSON.stringify(r, null, 2));
+        else {
+          console.log(`${r.diff.different ? yellow('Changed') : green('Same')}: ${r.diff.summary}`);
+          for (const c of r.diff.body.changes) console.log(`  ${c.kind === 'added' ? green('+') : c.kind === 'removed' ? red('-') : yellow('~')} ${c.path}  ${c.kind === 'added' ? JSON.stringify(c.after) : c.kind === 'removed' ? JSON.stringify(c.before) : `${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}`}`);
+          for (const l of r.diff.body.lines ?? []) if (l.op !== ' ') console.log(`  ${l.op === '+' ? green('+') : red('-')} ${l.text}`);
+          for (const h of r.diff.headers.filter((x) => !x.volatile)) console.log(`  header ${h.name}: ${h.before ?? '(none)'} -> ${h.after ?? '(none)'}`);
+        }
+        process.exitCode = 0;
       } finally {
         store.close();
       }

@@ -72,6 +72,19 @@ The status, duration, size, headers, cookies and a timeline (prepare → TTFB �
 
 The full body is streamed to `payloads/` on disk. The viewer only holds a preview, 2 MB by default and configurable in Settings. Larger bodies show a *truncated* badge; **Save response** exports the complete file. Streaming responses (`text/event-stream`) appear incrementally on the **Stream** tab.
 
+## Response history and compare
+
+For a saved request, the response panel has a **History** tab: every response you sent from the app, newest first, with its status, time, size and when it was sent.
+
+- Click a response to view its body.
+- To see what changed, tick two responses and click **Compare selected**, or use the compare button on a row to compare it with the response before it.
+- The comparison shows the status and time change, then the **body** field by field: each change is listed with its JSON path (`$.items[2]`, `$.total` …) as **added**, **removed**, **changed** or a **type** change. Text bodies get a line-by-line diff.
+- It also shows **header** changes. Headers that change on every response (`date`, request ids and similar) are hidden behind a link, so they don't hide real differences.
+
+Response bodies come from the payload files in the workspace (up to 2 MB each are compared). Responses sent before version 0.6.4 have no link to their saved request, so they don't appear here.
+
+**For AI agents and scripts:** `testpion history list --request "List patients" --json` and `testpion history diff <before> <after> --json` in the CLI, and `request_history` and `compare_responses` on the [MCP server](/ai-testing/mcp-server). In these, the values of sensitive fields such as tokens and passwords are masked.
+
 ## Scripts
 
 Pre-request and post-response scripts use the Postman script API under two names: **`tp`** (TestPion's name) and **`pm`** (Postman's). They are the same object, so write whichever you prefer, or mix them: `tp.test(...)`, `pm.test(...)`, `tp.environment.set(...)` all work. Scripts from imported Postman collections run unchanged. They run in a [sandbox](../security/privacy.md#script-sandbox) without file or network access. The **Snippets** list next to the editor inserts common scripts (written with `tp`), and the editor autocompletes both `tp.` and `pm.`.

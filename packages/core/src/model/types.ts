@@ -562,6 +562,9 @@ export interface HistoryEntry {
   responseMeta?: unknown;
   payloadPath?: string;
   traceId?: string;
+  /** The saved request this entry was sent from (for per-request response history). */
+  collectionId?: string;
+  requestId?: string;
 }
 
 export interface AppSettings {

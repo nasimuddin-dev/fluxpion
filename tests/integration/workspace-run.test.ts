@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
 /** Async spawn — the demo servers live in this process, so a blocking spawnSync would deadlock. */
@@ -214,7 +214,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['collection_docs', 'get_request', 'list_collections', 'list_environments', 'list_requests', 'parse_request_snippet', 'reorder_environments', 'run_collection', 'save_request', 'send_request']);
+      expect(names).toEqual(['collection_docs', 'compare_responses', 'get_request', 'list_collections', 'list_environments', 'list_requests', 'parse_request_snippet', 'reorder_environments', 'request_history', 'run_collection', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -296,6 +296,43 @@ describe('example workspace (end-to-end)', () => {
     expect(envs[0]!.name).toBe('Development');
     expect(list.stdout).not.toContain('demo-secret');
     expect((await run([cli, 'env', 'order', 'Nope', '-w', ws.root], env)).status).not.toBe(0);
+  });
+
+  it('response history: CLI list/diff and MCP request_history/compare_responses', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    const store = WorkspaceStore.open(ws.root);
+    const payload = (name: string, body: unknown) => {
+      const p = join(store.path('payloads'), name);
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(body));
+      return p;
+    };
+    const base = { kind: 'http' as const, name: 'List patients', method: 'GET', url: 'http://127.0.0.1:4010/patients', collectionId: 'veterinary-api', requestId: 'req-list' };
+    store.meta.addHistory({ ...base, id: 'h-old', timestamp: '2026-09-29T10:00:00.000Z', status: 200, durationMs: 50, size: 30, payloadPath: payload('h-old.json', { total: 2, items: [{ id: 1, token: 'tok-LEAK-7' }] }), responseMeta: { headers: [['content-type', 'application/json'], ['date', 'Mon']] } });
+    store.meta.addHistory({ ...base, id: 'h-new', timestamp: '2026-09-29T11:00:00.000Z', status: 200, durationMs: 40, size: 45, payloadPath: payload('h-new.json', { total: 3, items: [{ id: 1, token: 'tok-LEAK-8' }, { id: 2 }] }), responseMeta: { headers: [['content-type', 'application/json'], ['date', 'Tue']] } });
+    store.close();
+
+    const list = await run([cli, 'history', 'list', '-w', ws.root, '--request', 'List patients', '--json'], env);
+    expect(list.stderr).toBe('');
+    expect(JSON.parse(list.stdout).map((h: { id: string }) => h.id)).toEqual(['h-new', 'h-old']);
+    const diff = await run([cli, 'history', 'diff', 'h-old', 'h-new', '-w', ws.root, '--json'], env);
+    const d = JSON.parse(diff.stdout);
+    expect(d.diff.body.changes.map((c: { path: string }) => c.path)).toEqual(['$.total', '$.items[0].token', '$.items[1]']);
+    expect(d.diff.headers).toEqual([{ name: 'date', kind: 'changed', before: 'Mon', after: 'Tue', volatile: true }]);
+
+    const s = new McpSession({ id: 'hist', name: 'testpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env: { TESTPION_HOME: join(dir, 'home') } });
+    await s.connect(20_000);
+    try {
+      const text = async (tool: string, args: Record<string, unknown>) => mcpResultBody(await s.callTool(tool, args)).text;
+      expect(JSON.parse(await text('request_history', { collection: 'Veterinary API', request: 'List patients' })).map((h: { id: string }) => h.id)).toEqual(['h-new', 'h-old']);
+      const cmp = await text('compare_responses', { before: 'h-old', after: 'h-new' });
+      expect(JSON.parse(cmp).diff.summary).toBe('3 body changes');
+      // token values in the bodies are masked for agents
+      expect(cmp).not.toMatch(/LEAK/);
+    } finally {
+      await s.close();
+    }
   });
 
   it('CLI: `testpion docs` writes Markdown documentation with examples and no secrets', async () => {

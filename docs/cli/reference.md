@@ -19,6 +19,7 @@ testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 testpion load <url>           Safeguarded load test
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order -w    List environments; set their order
+testpion history list|diff -w   Response history of saved requests; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 testpion report <results.jsonl>              Re-generate reports
@@ -137,6 +138,15 @@ pbpaste | testpion import - -w my-workspace
 | `--json` | Print the result as JSON, for scripts and AI agents. |
 
 Secrets in a copied request (the `Authorization` header and other sensitive headers, auth credentials, cookies, and sensitive query or body fields) are not written to the workspace. They are replaced by `{{variables}}`, and the output lists them (`placeholders` with `--json`) so you can add them as secret environment variables.
+
+## `history`
+
+```bash
+testpion history list -w my-workspace --request "List patients" --json   # newest first
+testpion history diff h-abc h-def -w my-workspace --json                  # older id first
+```
+
+`history list` shows recent responses of requests sent in the app (`--collection`, `--request`, `-n/--limit`). `history diff` compares two of them: the status, timing, header changes (volatile ones such as `date` are flagged) and a field-by-field JSON body diff, or a line diff for text. Values of sensitive fields and headers are masked.
 
 ## `env`
 
