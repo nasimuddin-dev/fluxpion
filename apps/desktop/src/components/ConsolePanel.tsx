@@ -8,7 +8,7 @@ export interface ConsoleEntry {
   id: string;
   time: string;
   source: 'request' | 'run';
-  kind?: 'graphql';
+  kind?: 'graphql' | 'mcp' | 'websocket';
   run?: string;
   name: string;
   method: string;
@@ -25,7 +25,10 @@ export interface ConsoleEntry {
 
 type Filter = 'all' | 'errors' | 'logs';
 
-const isError = (e: ConsoleEntry) => !!e.error || (typeof e.status === 'number' ? e.status >= 400 : e.status !== undefined && e.status !== 'passed') || !!e.failedChecks;
+/** Non-numeric statuses that mean success (MCP calls, WebSocket connect / send / close). */
+const OK_STATUS = new Set(['passed', 'ok', 'open', 'sent', 'closed']);
+const isError = (e: ConsoleEntry) => !!e.error || (typeof e.status === 'number' ? e.status >= 400 : e.status !== undefined && !OK_STATUS.has(e.status)) || !!e.failedChecks;
+const KIND_LABEL = { graphql: 'GraphQL', mcp: 'MCP', websocket: 'WebSocket' } as const;
 
 /**
  * Postman-style console: every request sent from the app or a run, newest last, with its script
@@ -99,7 +102,7 @@ export function ConsolePanel() {
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
         }}
       >
-        {!shown.length && <p className="px-3 py-2 text-muted text-xs">{entries.length ? 'Nothing matches the filter.' : 'Requests you send, and the console.log output of their scripts, appear here.'}</p>}
+        {!shown.length && <p className="px-3 py-2 text-muted text-xs">{entries.length ? 'Nothing matches the filter.' : 'Requests you send (HTTP, GraphQL, MCP and WebSocket), and the console.log output of their scripts, appear here.'}</p>}
         {shown.map((e, i) => {
           const key = `${e.id}-${e.time}-${i}`;
           const expanded = open.has(key);
@@ -113,9 +116,9 @@ export function ConsolePanel() {
                 <span className="mono truncate flex-1 text-fg" title={e.url}>
                   {e.url}
                 </span>
-                {e.kind === 'graphql' && <Badge tone="accent">GraphQL</Badge>}
+                {e.kind && <Badge tone={e.kind === 'graphql' ? 'accent' : 'judge'}>{KIND_LABEL[e.kind]}</Badge>}
                 {e.source === 'run' && <Badge title={e.run}>run</Badge>}
-                {e.status !== undefined && <Badge tone={typeof e.status === 'number' ? statusTone(e.status) : 'bad'}>{e.status}</Badge>}
+                {e.status !== undefined && <Badge tone={typeof e.status === 'number' ? statusTone(e.status) : OK_STATUS.has(e.status) ? 'ok' : 'bad'}>{e.status}</Badge>}
                 {!!e.failedChecks && <Badge tone="bad">{e.failedChecks} failed</Badge>}
                 {e.durationMs !== undefined && <span className="text-muted tabular-nums w-16 text-right shrink-0">{formatMs(e.durationMs)}</span>}
                 {e.size !== undefined && <span className="text-muted tabular-nums w-16 text-right shrink-0">{formatBytes(e.size)}</span>}

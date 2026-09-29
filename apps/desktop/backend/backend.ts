@@ -140,7 +140,7 @@ export interface ConsoleEntry {
   time: string;
   source: 'request' | 'run';
   /** Protocol; absent means HTTP. */
-  kind?: 'graphql';
+  kind?: 'graphql' | 'mcp' | 'websocket';
   run?: string;
   name: string;
   method: string;
@@ -168,6 +168,9 @@ export class Backend {
   private logBuffer: LogRecord[] = [];
   /** Postman-style console: recent requests with their details and script output. */
   private consoleBuffer: ConsoleEntry[] = [];
+  /** Redactors of connected MCP servers and WebSocket sessions, for their console entries. */
+  private mcpRedactors = new Map<string, Redactor>();
+  private wsConsole = new Map<string, { url: string; redactor: Redactor; counts: { sent: number; received: number; opened: number } }>();
   private controllers = new Map<string, AbortController>();
   private runs = new Map<string, RunState>();
   private mcpSessions = new Map<string, McpSession>();
@@ -256,6 +259,60 @@ export class Backend {
       /* unknown collection */
     }
     return { running: false, routes: view(routes) };
+  }
+
+  /** Console entry for an MCP or WebSocket action; bodies are redacted and clipped. */
+  private consoleProtocol(
+    kind: 'mcp' | 'websocket',
+    redactor: Redactor,
+    e: { name: string; method: string; url: string; status?: string; durationMs?: number; request?: unknown; response?: unknown; error?: string; failedChecks?: number; logs?: string[] },
+  ): void {
+    const body = (v: unknown) => {
+      if (v === undefined) return undefined;
+      const t = typeof v === 'string' ? redactor.redactString(v) : JSON.stringify(redactor.redact(v), null, 2);
+      return t.length > CONSOLE_BODY_CHARS ? `${t.slice(0, CONSOLE_BODY_CHARS)}… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t;
+    };
+    this.consoleEntry({
+      id: shortId('c-'),
+      time: new Date().toISOString(),
+      source: 'request',
+      kind,
+      name: e.name,
+      method: e.method,
+      url: e.url,
+      status: e.status,
+      durationMs: e.durationMs,
+      request: e.request !== undefined ? { headers: [], body: body(e.request) } : undefined,
+      response: e.response !== undefined ? { headers: [], body: body(e.response) } : undefined,
+      logs: (e.logs ?? []).map((message) => ({ phase: 'test' as const, message: redactor.redactString(message) })),
+      error: e.error && redactor.redactString(e.error),
+      failedChecks: e.failedChecks,
+    });
+  }
+
+  /** Where an MCP server runs, for the console: the URL or the command line, redacted. */
+  private mcpTarget(cfg: McpServerConfig, redactor: Redactor): string {
+    return cfg.transport === 'stdio' ? redactor.redactString([cfg.command, ...(cfg.args ?? [])].join(' ')) : redactor.redactUrl(cfg.url);
+  }
+
+  private mcpRedactor(serverId: string): Redactor {
+    return this.mcpRedactors.get(serverId) ?? this.logger.redactor;
+  }
+
+  /** Run an MCP read or prompt request and log it to the console. */
+  private async mcpLogged<T>(serverId: string, method: string, what: string, request: unknown, fn: () => Promise<T>): Promise<T> {
+    const name = this.session(serverId).config.name;
+    const redactor = this.mcpRedactor(serverId);
+    const started = Date.now();
+    try {
+      const r = await fn();
+      this.consoleProtocol('mcp', redactor, { name, method, url: `${name} › ${what}`, status: 'ok', durationMs: Date.now() - started, request, response: r });
+      return r;
+    } catch (e) {
+      const err = normalizeError(e);
+      this.consoleProtocol('mcp', redactor, { name, method, url: `${name} › ${what}`, status: err.kind, durationMs: Date.now() - started, request, error: err.message });
+      throw e;
+    }
   }
 
   private consoleEntry(e: ConsoleEntry): void {
@@ -647,12 +704,21 @@ export class Backend {
         const cfg = this.ws.getMcpServers().find((s) => s.id === serverId);
         if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
         const ctx = this.context({ environment });
-        const session = new McpSession(ctx.vars.resolveDeep(cfg), ctx.redactor);
+        const resolved = ctx.vars.resolveDeep(cfg);
+        const session = new McpSession(resolved, ctx.redactor);
         const b = this.batched<unknown>('mcp.events');
         session.onEvent((e) => b.push({ serverId, event: e }));
         this.mcpSessions.set(serverId, session);
+        this.mcpRedactors.set(serverId, ctx.redactor);
+        const started = Date.now();
+        const target = `${cfg.name} › ${this.mcpTarget(resolved, ctx.redactor)}`;
         try {
           await session.connect();
+          this.consoleProtocol('mcp', ctx.redactor, { name: cfg.name, method: 'CONNECT', url: target, status: 'ok', durationMs: Date.now() - started, logs: [`transport: ${cfg.transport}`] });
+        } catch (e) {
+          const err = normalizeError(e);
+          this.consoleProtocol('mcp', ctx.redactor, { name: cfg.name, method: 'CONNECT', url: target, status: err.kind, durationMs: Date.now() - started, error: err.message });
+          throw e;
         } finally {
           b.flush();
         }
@@ -661,6 +727,7 @@ export class Backend {
       'mcp.disconnect': async ({ serverId }: { serverId: string }) => {
         await this.mcpSessions.get(serverId)?.close();
         this.mcpSessions.delete(serverId);
+        this.mcpRedactors.delete(serverId);
       },
       'mcp.events': ({ serverId }: { serverId: string }) => this.mcpSessions.get(serverId)?.events ?? [],
       'mcp.call': async ({ serverId, tool, args, assertions }: { serverId: string; tool: string; args: Record<string, unknown>; assertions?: CheckConfig[] }) => {
@@ -675,16 +742,30 @@ export class Backend {
           const checks = await runChecks(assertions, { testType: 'mcp', body, text, isError: r.isError, latencyMs: r.durationMs });
           const trace = tracer.finish();
           this.ws.saveTrace(trace, 'mcp');
+          this.consoleProtocol('mcp', this.mcpRedactor(serverId), {
+            name: `${s.config.name} · ${tool}`,
+            method: 'CALL',
+            url: `${s.config.name} › tools/call ${tool}`,
+            status: r.isError ? 'error' : 'ok',
+            durationMs: r.durationMs,
+            request: args,
+            response: r.raw,
+            failedChecks: checks.filter((c) => !c.passed).length,
+          });
           this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'mcp', name: `${s.config.name} · ${tool}`, status: r.isError ? 'error' : 'ok', durationMs: r.durationMs, request: { serverId, tool, args }, traceId: trace.traceId });
           return { ...r, body, checks, traceId: trace.traceId };
         } catch (e) {
           span.fail(e);
           this.ws.saveTrace(tracer.finish('error'), 'mcp');
+          const err = normalizeError(e);
+          this.consoleProtocol('mcp', this.mcpRedactor(serverId), { name: `${s.config.name} · ${tool}`, method: 'CALL', url: `${s.config.name} › tools/call ${tool}`, status: err.kind, request: args, error: err.message });
           throw e;
         }
       },
-      'mcp.read': async ({ serverId, uri }: { serverId: string; uri: string }) => this.session(serverId).readResource(uri),
-      'mcp.prompt': async ({ serverId, name, args }: { serverId: string; name: string; args: Record<string, string> }) => this.session(serverId).getPrompt(name, args),
+      'mcp.read': ({ serverId, uri }: { serverId: string; uri: string }) =>
+        this.mcpLogged(serverId, 'READ', `resources/read ${uri}`, undefined, () => this.session(serverId).readResource(uri)),
+      'mcp.prompt': ({ serverId, name, args }: { serverId: string; name: string; args: Record<string, string> }) =>
+        this.mcpLogged(serverId, 'PROMPT', `prompts/get ${name}`, args, () => this.session(serverId).getPrompt(name, args)),
       'mcp.ping': async ({ serverId }: { serverId: string }) => this.session(serverId).ping(),
       'mcp.saveTest': ({ serverId, tool, args, assertions, name }: { serverId: string; tool: string; args: Record<string, unknown>; assertions: CheckConfig[]; name: string }) => {
         const cfg = this.ws.getMcpServers().find((s) => s.id === serverId);
@@ -783,17 +864,53 @@ export class Backend {
       'wsock.connect': async ({ url, protocols, headers, environment }: { url: string; protocols?: string[]; headers?: Array<{ key: string; value: string }>; environment?: string }) => {
         const ctx = this.context({ environment });
         const s = new WebSocketSession(ctx.vars.resolve(url), { protocols, headers: ctx.vars.resolveDeep(headers) });
+        const shown = ctx.redactor.redactUrl(ctx.vars.resolve(url));
         const b = this.batched<unknown>('wsock.messages');
-        s.onMessage((m) => b.push({ id: s.id, message: m }));
-        s.onStatus((st) => this.host.emit('wsock.status', { id: s.id, status: st }));
+        // the console gets connect, send and close (with message counts), not every received frame
+        const counts = { sent: 0, received: 0, opened: 0 };
+        s.onMessage((m) => {
+          b.push({ id: s.id, message: m });
+          if (m.direction === 'received') counts.received++;
+        });
+        s.onStatus((st) => {
+          this.host.emit('wsock.status', { id: s.id, status: st });
+          if (st === 'closed' && counts.opened)
+            this.consoleProtocol('websocket', ctx.redactor, { name: shown, method: 'CLOSE', url: shown, status: 'closed', durationMs: Date.now() - counts.opened, logs: [`${counts.sent} sent · ${counts.received} received`] });
+        });
         this.wsSessions.set(s.id, s);
-        await s.connect();
+        this.wsConsole.set(s.id, { url: shown, redactor: ctx.redactor, counts });
+        const started = Date.now();
+        try {
+          await s.connect();
+        } catch (e) {
+          const err = normalizeError(e);
+          this.consoleProtocol('websocket', ctx.redactor, { name: shown, method: 'CONNECT', url: shown, status: err.kind, durationMs: Date.now() - started, error: err.message });
+          throw e;
+        }
+        counts.opened = Date.now();
+        this.consoleProtocol('websocket', ctx.redactor, {
+          name: shown,
+          method: 'CONNECT',
+          url: shown,
+          status: 'open',
+          durationMs: counts.opened - started,
+          request: headers?.length || protocols?.length ? { protocols, headers: ctx.vars.resolveDeep(headers) } : undefined,
+        });
         return { id: s.id };
       },
-      'wsock.send': ({ id, data }: { id: string; data: string }) => this.wsSessions.get(id)?.send(data),
+      'wsock.send': ({ id, data }: { id: string; data: string }) => {
+        const s = this.wsSessions.get(id);
+        s?.send(data);
+        const c = this.wsConsole.get(id);
+        if (s && c) {
+          c.counts.sent++;
+          this.consoleProtocol('websocket', c.redactor, { name: c.url, method: 'SEND', url: c.url, status: 'sent', request: data, logs: [`${data.length} characters`] });
+        }
+      },
       'wsock.close': ({ id }: { id: string }) => {
         this.wsSessions.get(id)?.close();
         this.wsSessions.delete(id);
+        this.wsConsole.delete(id);
       },
 
       /* ---------------------------------------------------------------- AI assistant */
