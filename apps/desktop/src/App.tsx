@@ -3,6 +3,7 @@ import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
+import { loadMonaco } from './components/CodeEditor';
 import { Spinner, TooltipProvider } from './components/ui';
 
 /**
@@ -69,6 +70,8 @@ export default function App() {
         useApp.getState().set({ info, settings });
         await useApp.getState().refreshWorkspace();
         scheduleUpdateCheck();
+        // warm the code editor in the background once the first screen is up
+        setTimeout(() => void loadMonaco(), 1500);
       } catch (error) {
         useApp.getState().toast(`Could not finish starting TestPion: ${error instanceof Error ? error.message : String(error)}`, 'error');
       } finally {

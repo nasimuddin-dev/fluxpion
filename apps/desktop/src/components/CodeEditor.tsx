@@ -1,6 +1,23 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../store';
 import { Spinner } from './ui';
+
+/**
+ * Monaco (several MB with its language workers) loads the first time an editor is shown, not at
+ * startup. The setup module bundles it locally (no CDN) and registers themes and languages.
+ */
+let monacoReady: Promise<unknown> | undefined;
+let monacoLoaded = false;
+export const loadMonaco = () => (monacoReady ??= import('../monaco').then(() => void (monacoLoaded = true)));
+
+function useMonaco(): boolean {
+  const [ready, setReady] = useState(monacoLoaded);
+  useEffect(() => {
+    if (!ready) void loadMonaco().then(() => setReady(true));
+  }, [ready]);
+  return ready;
+}
 
 export function useEditorTheme(): string {
   const theme = useApp((s) => s.settings?.theme ?? 'system');
@@ -31,6 +48,8 @@ export function CodeEditor({
 }) {
   const theme = useEditorTheme();
   const fontSize = useApp((s) => s.settings?.fontSize ?? 14);
+  const ready = useMonaco();
+  if (!ready) return <div className="h-full w-full grid place-items-center"><Spinner /></div>;
   return (
     <div className="h-full w-full min-h-0 relative">
       {!value && placeholder && <div className="absolute left-14 top-1 text-muted text-sm pointer-events-none z-10 mono">{placeholder}</div>}
