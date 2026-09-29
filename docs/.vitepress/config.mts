@@ -140,6 +140,7 @@ const docsSidebar = [
     items: [
       { text: 'CLI', link: '/cli/reference' },
       { text: 'Architecture', link: '/architecture/overview' },
+      { text: 'Design', link: '/architecture/design' },
       { text: 'Execution Engine', link: '/architecture/execution-engine' },
       { text: 'Plugin System', link: '/architecture/plugin-system' },
       { text: 'Development', link: '/contributing/development' },

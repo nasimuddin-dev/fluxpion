@@ -56,4 +56,5 @@ Key facts for agents:
 - [Privacy and redaction](https://nasimuddin-dev.github.io/testpion/security/privacy)
 - [Load testing](https://nasimuddin-dev.github.io/testpion/performance/load-testing)
 - [Architecture](https://nasimuddin-dev.github.io/testpion/architecture/overview)
+- [Design](https://nasimuddin-dev.github.io/testpion/architecture/design): principles, brand, colour tokens, layout, components, core architecture and the request lifecycle
 - [Changelog](https://nasimuddin-dev.github.io/testpion/changelog)
