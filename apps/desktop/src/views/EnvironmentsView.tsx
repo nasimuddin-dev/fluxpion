@@ -102,7 +102,7 @@ export function EnvironmentsView() {
       />
       <div className="flex-1 min-h-0">
         {scope === 'environment' && (
-          <Split id="envs" initial={22}>
+          <Split id="envs" sidebar initial={22}>
             <div className="h-full flex flex-col bg-panel/50">
               <SectionTitle
                 right={

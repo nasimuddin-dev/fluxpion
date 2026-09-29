@@ -190,7 +190,7 @@ export function GraphQLView() {
         </Button>
       </div>
       <div className="flex-1 min-h-0">
-        <Split id="gql-explorer" initial={22} min={12}>
+        <Split id="gql-explorer" sidebar initial={22} min={12}>
           <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onIntrospect={introspectNow} loading={introspecting} />
           <Split id="gql-main" initial={50}>
             <div className="h-full flex flex-col">

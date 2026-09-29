@@ -60,7 +60,7 @@ export function CollectionsView() {
   const count = (nodes: CollectionNode[]): number => nodes.reduce((a, n) => a + (n.kind === 'folder' ? count(n.items) : 1), 0);
   return (
     <>
-    <Split id="collections" initial={24}>
+    <Split id="collections" sidebar initial={24}>
       <div className="h-full flex flex-col bg-panel/50">
         <SectionTitle
           right={

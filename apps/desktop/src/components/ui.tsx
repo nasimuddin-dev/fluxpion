@@ -23,9 +23,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
         size === 'sm' && 'h-7 px-2.5 text-xs',
         size === 'md' && 'h-8 px-3 text-sm',
         size === 'lg' && 'h-9 px-4 text-sm',
-        variant === 'primary' && 'bg-accent border-accent text-white shadow-sm hover:bg-accent-hover hover:border-accent-hover',
-        variant === 'default' && 'bg-bg border-line-strong shadow-sm hover:bg-hover',
-        variant === 'soft' && 'bg-accent-soft border-transparent text-accent hover:brightness-95',
+        variant === 'primary' && 'bg-[image:var(--brand-gradient)] border-transparent text-white shadow-[var(--glow)] hover:brightness-110 hover:shadow-[var(--glow),var(--elev-md)]',
+        variant === 'default' && 'bg-bg border-line-strong shadow-sm hover:bg-hover hover:border-line-strong',
+        variant === 'soft' && 'bg-accent-soft border-transparent text-accent hover:bg-accent/20',
         variant === 'ghost' && 'border-transparent text-muted hover:text-fg hover:bg-hover',
         variant === 'danger' && 'bg-bad border-bad text-white shadow-sm hover:brightness-110',
         className,
@@ -130,7 +130,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, className, right
           className={cx(
             'relative px-2.5 h-10 text-sm whitespace-nowrap flex items-center gap-1.5 transition-colors duration-150',
             'after:absolute after:left-2 after:right-2 after:bottom-0 after:h-0.5 after:rounded-full after:transition-colors after:duration-200',
-            value === t.id ? 'text-fg font-medium after:bg-accent' : 'text-muted hover:text-fg after:bg-transparent',
+            value === t.id ? 'text-fg font-medium after:bg-[image:var(--brand-gradient)]' : 'text-muted hover:text-fg after:bg-transparent hover:after:bg-line-strong',
           )}
         >
           {t.label}
@@ -154,7 +154,7 @@ export function Badge({ children, tone = 'default', title }: { children: ReactNo
     judge: 'text-judge border-judge/25 bg-judge/10',
   };
   return (
-    <span title={title} className={cx('inline-flex items-center gap-1 rounded-md px-1.5 text-[0.75rem] leading-5 border font-medium whitespace-nowrap tabular-nums', tones[tone])}>
+    <span title={title} className={cx('inline-flex items-center gap-1 rounded-full px-2 text-[0.72rem] leading-5 border font-medium whitespace-nowrap tabular-nums', tones[tone])}>
       {children}
     </span>
   );
@@ -171,9 +171,9 @@ export function statusTone(status?: number | string): 'ok' | 'bad' | 'warn' | 'd
 export function Empty({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="h-full w-full flex flex-col items-center justify-center text-center gap-2 p-8 text-muted fade-in">
-      {icon && <div className="mb-1 grid place-items-center h-12 w-12 rounded-xl bg-panel2 border border-line text-muted">{icon}</div>}
-      <div className="text-fg font-semibold text-[1.05rem]">{title}</div>
-      {children && <div className="text-sm max-w-md leading-relaxed">{children}</div>}
+      {icon && <div className="mb-2 grid place-items-center h-14 w-14 rounded-2xl bg-accent-soft text-accent ring-1 ring-accent/20 shadow-sm">{icon}</div>}
+      <div className="text-fg font-semibold text-[1.05rem] tracking-tight">{title}</div>
+      {children && <div className="text-sm max-w-md leading-relaxed text-pretty">{children}</div>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -191,7 +191,7 @@ export function Modal({ title, onClose, children, footer, width = 560 }: { title
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-[2px] animate-in fade-in-0 duration-200" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-[9vh] z-50 -translate-x-1/2 bg-bg border border-line rounded-xl shadow-lg max-h-[82vh] flex flex-col outline-none animate-in fade-in-0 zoom-in-[0.97] slide-in-from-top-2 duration-200"
+          className="fixed left-1/2 top-[9vh] z-50 -translate-x-1/2 bg-popover border border-line rounded-2xl shadow-lg max-h-[82vh] flex flex-col outline-none animate-in fade-in-0 zoom-in-[0.97] slide-in-from-top-2 duration-200"
           style={{ width, maxWidth: '94vw' }}
         >
           <div className="flex items-center justify-between gap-3 pl-5 pr-3 h-14 shrink-0">
@@ -203,7 +203,7 @@ export function Modal({ title, onClose, children, footer, width = 560 }: { title
             </DialogPrimitive.Close>
           </div>
           <div className="px-5 pb-5 pt-1 overflow-auto">{children}</div>
-          {footer && <div className="px-5 py-3.5 border-t border-line bg-panel/60 rounded-b-xl flex justify-end gap-2 shrink-0">{footer}</div>}
+          {footer && <div className="px-5 py-3.5 border-t border-line bg-panel/60 rounded-b-2xl flex justify-end gap-2 shrink-0">{footer}</div>}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
@@ -249,7 +249,7 @@ export function Menu({
           align={align}
           sideOffset={4}
           style={{ minWidth: width }}
-          className="z-[70] rounded-lg border border-line bg-bg p-1 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
+          className="z-[70] rounded-xl border border-line bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
         >
           {items.map((it, i) => (
             <div key={it.label}>
@@ -275,8 +275,8 @@ export function Menu({
   );
 }
 
-/** Resizable two-pane split. Size is persisted per `id`. */
-export function Split({ id, direction = 'horizontal', initial = 50, min = 15, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; children: [ReactNode, ReactNode] }) {
+/** Resizable two-pane split. Size is persisted per `id`. `sidebar` gives the first pane the sidebar surface. */
+export function Split({ id, direction = 'horizontal', initial = 50, min = 15, sidebar, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; sidebar?: boolean; children: [ReactNode, ReactNode] }) {
   const [pct, setPct] = useState(() => Number(localStorage.getItem(`aps.split.${id}`)) || initial);
   const ref = useRef<HTMLDivElement>(null);
   const onDown = useCallback(
@@ -304,7 +304,7 @@ export function Split({ id, direction = 'horizontal', initial = 50, min = 15, ch
   const h = direction === 'horizontal';
   return (
     <div ref={ref} className={cx('flex min-h-0 min-w-0 h-full w-full', h ? 'flex-row' : 'flex-col')}>
-      <div className="min-h-0 min-w-0 overflow-hidden flex flex-col" style={{ flexBasis: `${pct}%` }}>
+      <div className={cx('min-h-0 min-w-0 overflow-hidden flex flex-col', sidebar && 'bg-panel')} style={{ flexBasis: `${pct}%` }}>
         {children[0]}
       </div>
       <div
@@ -408,7 +408,7 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
 
 export function Metric({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: 'ok' | 'bad' | 'warn'; sub?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-line bg-bg shadow-sm px-3.5 py-2.5 min-w-[120px]">
+    <div className="rounded-xl border border-line bg-bg shadow-sm px-4 py-3 min-w-[120px]">
       <div className="text-xs text-muted font-medium">{label}</div>
       <div className={cx('text-xl font-semibold tabular-nums tracking-tight mt-0.5', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad', tone === 'warn' && 'text-warn')}>{value}</div>
       {sub && <div className="text-[0.72rem] text-muted">{sub}</div>}

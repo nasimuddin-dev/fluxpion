@@ -97,7 +97,7 @@ export function HistoryPane({ onOpen }: { onOpen(request: HttpRequestSpec, name:
               title={r.item.url}
               onClick={() => r.item.request && onOpen(r.item.request as HttpRequestSpec, r.item.name)}
             >
-              <span className={cx('mono text-[0.66rem] font-bold w-11 shrink-0', r.item.method && `method-${r.item.method}`)}>{r.item.method}</span>
+              <span className={cx('mono method-badge text-[0.64rem] font-bold w-12 shrink-0', r.item.method && `method-${r.item.method}`)}>{r.item.method}</span>
               <span className="truncate flex-1">{r.item.url ?? r.item.name}</span>
               {r.item.status !== undefined && <Badge tone={statusTone(r.item.status)}>{r.item.status}</Badge>}
             </button>

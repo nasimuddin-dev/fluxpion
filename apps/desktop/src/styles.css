@@ -3,63 +3,93 @@
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Design tokens (shadcn/ui-style zinc + indigo). Components use the Tailwind colours mapped below. */
+/*
+ * Design tokens, shadcn/ui (Tailwind v4) style: OKLCH colours on a cool neutral, with the FluxPion
+ * brand (blue → violet, from the logo) as the accent. Surfaces are layered so the layout reads at a
+ * glance: chrome (top bar, nav rail, status bar) → panel (sidebars) → bg (the work area) → popover.
+ * Components use the Tailwind colours mapped in @theme below.
+ */
 :root {
   color-scheme: light;
   --font-size: 14px;
-  --radius: 8px;
-  --bg: #ffffff;
-  --panel: #f8f8fa;
-  --panel-2: #f1f1f4;
-  --hover: #ededf1;
-  --line: #e4e4e9;
-  --line-strong: #d4d4db;
-  --fg: #18181b;
-  --muted: #6b6b76;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef0ff;
-  --accent-fg: #ffffff;
-  --ok: #15803d;
-  --bad: #dc2626;
-  --warn: #b45309;
-  --judge: #9333ea;
-  --focus: #6366f1;
-  --code-bg: #fafafb;
-  --overlay: rgb(9 9 11 / 0.45);
-  --elev-sm: 0 1px 2px rgb(16 16 24 / 0.06);
-  --elev-md: 0 4px 12px -2px rgb(16 16 24 / 0.1), 0 2px 4px -2px rgb(16 16 24 / 0.06);
-  --elev-lg: 0 18px 40px -12px rgb(16 16 24 / 0.28), 0 4px 12px -4px rgb(16 16 24 / 0.1);
+  --radius: 9px;
+  --chrome: oklch(0.967 0.005 275);
+  --panel: oklch(0.982 0.004 275);
+  --bg: oklch(1 0 0);
+  --panel-2: oklch(0.955 0.007 275);
+  --hover: oklch(0.94 0.01 275);
+  --line: oklch(0.915 0.008 275);
+  --line-strong: oklch(0.865 0.01 275);
+  --field: oklch(1 0 0);
+  --popover: oklch(1 0 0);
+  --fg: oklch(0.21 0.02 275);
+  --muted: oklch(0.52 0.025 275);
+  --accent: oklch(0.54 0.225 268);
+  --accent-hover: oklch(0.49 0.225 268);
+  --accent-soft: oklch(0.955 0.03 270);
+  --accent-fg: oklch(1 0 0);
+  --brand-from: #2f7bff;
+  --brand-to: #8b5cff;
+  --brand-gradient: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  --ok: oklch(0.55 0.15 150);
+  --bad: oklch(0.58 0.22 25);
+  --warn: oklch(0.6 0.15 65);
+  --judge: oklch(0.56 0.23 305);
+  --focus: oklch(0.6 0.2 268);
+  --code-bg: oklch(0.985 0.003 275);
+  --overlay: oklch(0.15 0.02 275 / 0.42);
+  --elev-sm: 0 1px 2px oklch(0.2 0.02 275 / 0.06);
+  --elev-md: 0 4px 14px -3px oklch(0.2 0.02 275 / 0.12), 0 2px 4px -2px oklch(0.2 0.02 275 / 0.06);
+  --elev-lg: 0 20px 44px -12px oklch(0.2 0.03 275 / 0.3), 0 4px 12px -4px oklch(0.2 0.02 275 / 0.1);
+  --glow: 0 4px 14px -4px color-mix(in oklch, var(--brand-to) 55%, transparent);
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  /* HTTP method colours */
+  --m-get: oklch(0.55 0.15 150);
+  --m-post: oklch(0.6 0.17 50);
+  --m-put: oklch(0.52 0.2 260);
+  --m-patch: oklch(0.52 0.22 300);
+  --m-delete: oklch(0.56 0.22 25);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --bg: #111114;
-  --panel: #17171b;
-  --panel-2: #1f1f24;
-  --hover: #26262d;
-  --line: #2a2a31;
-  --line-strong: #3a3a43;
-  --fg: #ededf0;
-  --muted: #9b9ba7;
-  --accent: #6d6ff5;
-  --accent-hover: #7f81f7;
-  --accent-soft: #23233d;
-  --accent-fg: #ffffff;
-  --ok: #34d399;
-  --bad: #f87171;
-  --warn: #fbbf24;
-  --judge: #c084fc;
-  --focus: #818cf8;
-  --code-bg: #111114;
-  --overlay: rgb(0 0 0 / 0.6);
-  --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --elev-md: 0 6px 16px -4px rgb(0 0 0 / 0.55);
-  --elev-lg: 0 24px 48px -12px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --chrome: oklch(0.145 0.01 275);
+  --panel: oklch(0.172 0.011 275);
+  --bg: oklch(0.205 0.012 275);
+  --panel-2: oklch(0.235 0.013 275);
+  --hover: oklch(0.262 0.015 275);
+  --line: oklch(0.275 0.013 275);
+  --line-strong: oklch(0.345 0.015 275);
+  --field: oklch(0.17 0.011 275);
+  --popover: oklch(0.225 0.013 275);
+  --fg: oklch(0.955 0.006 275);
+  --muted: oklch(0.715 0.02 275);
+  --accent: oklch(0.66 0.19 268);
+  --accent-hover: oklch(0.72 0.17 268);
+  --accent-soft: oklch(0.3 0.07 272);
+  --accent-fg: oklch(1 0 0);
+  --ok: oklch(0.78 0.15 160);
+  --bad: oklch(0.7 0.18 22);
+  --warn: oklch(0.83 0.15 80);
+  --judge: oklch(0.75 0.16 305);
+  --focus: oklch(0.7 0.17 268);
+  --code-bg: oklch(0.172 0.01 275);
+  --overlay: oklch(0.08 0.01 275 / 0.62);
+  --elev-sm: 0 1px 2px oklch(0 0 0 / 0.35);
+  --elev-md: 0 8px 20px -6px oklch(0 0 0 / 0.55);
+  --elev-lg: 0 24px 52px -12px oklch(0 0 0 / 0.7), 0 0 0 1px oklch(1 0 0 / 0.05);
+  --glow: 0 4px 18px -4px color-mix(in oklch, var(--brand-to) 60%, transparent);
+  --m-get: oklch(0.8 0.16 150);
+  --m-post: oklch(0.8 0.14 60);
+  --m-put: oklch(0.75 0.13 250);
+  --m-patch: oklch(0.76 0.14 300);
+  --m-delete: oklch(0.72 0.17 22);
 }
 
 @theme inline {
+  --color-chrome: var(--chrome);
+  --color-popover: var(--popover);
+  --color-field: var(--field);
   --color-bg: var(--bg);
   --color-panel: var(--panel);
   --color-panel2: var(--panel-2);
@@ -82,10 +112,10 @@
   --text-xs--line-height: 1.1rem;
   --text-sm: 0.9rem;
   --text-sm--line-height: 1.3rem;
-  --radius-sm: 5px;
+  --radius-sm: 6px;
   --radius-md: var(--radius);
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --shadow-sm: var(--elev-sm);
   --shadow-md: var(--elev-md);
   --shadow-lg: var(--elev-lg);
@@ -249,7 +279,7 @@ body {
   font-size: 0.95em;
 }
 .field {
-  background: var(--bg);
+  background: var(--field);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 4px 10px;
@@ -283,7 +313,7 @@ select.field {
 /* native dropdown lists follow the theme (not the OS white popup) */
 select option,
 select optgroup {
-  background: var(--bg);
+  background: var(--popover);
   color: var(--fg);
 }
 textarea.field {
@@ -309,21 +339,26 @@ input[type='range'] {
   min-height: 26px;
 }
 .cell-input:focus {
-  background: var(--bg);
+  background: var(--field);
   box-shadow: inset 0 0 0 1.5px var(--accent);
   border-radius: 4px;
 }
-.method-GET { color: #15803d; }
-.method-POST { color: #c2410c; }
-.method-PUT { color: #1d4ed8; }
-.method-PATCH { color: #7c3aed; }
-.method-DELETE { color: #dc2626; }
+.method-GET { color: var(--m-get); }
+.method-POST { color: var(--m-post); }
+.method-PUT { color: var(--m-put); }
+.method-PATCH { color: var(--m-patch); }
+.method-DELETE { color: var(--m-delete); }
 .method-HEAD, .method-OPTIONS { color: var(--muted); }
-[data-theme='dark'] .method-GET { color: #4ade80; }
-[data-theme='dark'] .method-POST { color: #fb923c; }
-[data-theme='dark'] .method-PUT { color: #60a5fa; }
-[data-theme='dark'] .method-PATCH { color: #a78bfa; }
-[data-theme='dark'] .method-DELETE { color: #f87171; }
+/* compact coloured pill for methods in lists and tabs */
+.method-badge {
+  display: inline-block;
+  text-align: center;
+  border-radius: 5px;
+  padding: 0 3px;
+  line-height: 1.35rem;
+  letter-spacing: 0.02em;
+  background: color-mix(in oklch, currentColor 13%, transparent);
+}
 .var-token {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -358,7 +393,7 @@ input[type='range'] {
 .surface {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg, 10px);
+  border-radius: var(--radius-lg, 12px);
   box-shadow: var(--elev-sm);
 }
 .fade-in {

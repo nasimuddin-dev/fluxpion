@@ -220,7 +220,7 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
                       setUnchecked(next);
                     }}
                   />
-                  <span className={cx('mono text-[0.7rem] font-bold w-9 shrink-0', r.kind === 'http' ? `method-${r.method}` : 'text-[#e535ab]')}>{r.method.slice(0, 5)}</span>
+                  <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', r.kind === 'http' ? `method-${r.method}` : 'text-[#e535ab]')}>{r.method.slice(0, 5)}</span>
                   <span className="truncate">{r.name}</span>
                   {r.path.length > 0 && <span className="ml-auto text-xs text-muted truncate max-w-[45%]">{r.path.join(' / ')}</span>}
                 </label>

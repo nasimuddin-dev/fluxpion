@@ -562,7 +562,7 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
     }
   };
   return (
-    <Split id="ai-providers" initial={26}>
+    <Split id="ai-providers" sidebar initial={26}>
       <div className="h-full flex flex-col">
         <div className="flex-1 overflow-auto">
           {list.map((x) => (

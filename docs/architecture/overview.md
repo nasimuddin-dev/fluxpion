@@ -21,6 +21,7 @@ apps/desktop  (Electron + React + Monaco)      packages/cli  (fluxpion)
 - The desktop main process and the CLI call the **same** engine, so test execution logic is not duplicated (§38).
 - The React renderer never performs network or test execution. It sends RPC calls to the backend and receives batched events, throttled to about 50–100 ms, so high-frequency streams don't cause excessive renders.
 - Electron uses `contextIsolation`, a sandboxed renderer and a strict CSP. The preload exposes only an RPC bridge.
+- The UI is React 19 with Tailwind CSS v4 and Radix UI primitives, in the shadcn/ui style. Colours are OKLCH design tokens in `apps/desktop/src/styles.css`, with the FluxPion blue → violet brand as the accent, and surfaces layered as chrome (top bar, navigation rail, status bar) → sidebars → work area → popovers. Dark and light themes share the same tokens. New UI reuses the primitives in `apps/desktop/src/components/ui.tsx` (`Button`, `Tabs`, `Badge`, `Modal`, `Menu`, `Empty`, `Split` with `sidebar` …).
 
 ## Storage
 

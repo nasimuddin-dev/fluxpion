@@ -414,7 +414,7 @@ export function RestView() {
 
   return (
     <>
-    <Split id="rest-sidebar" initial={20} min={12}>
+    <Split id="rest-sidebar" sidebar initial={20} min={12}>
       <div className="h-full flex flex-col bg-panel/50 border-r border-line">
         <div role="tablist" aria-label="Sidebar" className="flex items-center gap-0.5 px-2 pt-2 pb-2">
           {(
@@ -961,7 +961,7 @@ function RequestTabItem({ tab: t, active, menu, onSelect, onClose }: { tab: Rest
       className={cx('group relative flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer max-w-56 shrink-0', active ? 'bg-bg' : 'text-muted hover:bg-hover', t.pinned && 'pr-2')}
     >
       {t.pinned && <Pin size={11} className="shrink-0 text-muted" aria-label="Pinned" />}
-      <span className={cx('mono text-[0.68rem] font-bold', `method-${t.request.method}`)}>{t.request.method}</span>
+      <span className={cx('mono method-badge text-[0.62rem] font-bold', `method-${t.request.method}`)}>{t.request.method}</span>
       <span className={cx('truncate', t.pinned && 'max-w-24')}>{t.name}</span>
       {t.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="Unsaved changes" />}
       {!t.pinned && (

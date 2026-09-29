@@ -62,20 +62,28 @@ export function Sidebar() {
         aria-current={view === id ? 'page' : undefined}
         aria-label={label}
         className={cx(
-          'group w-full flex flex-col items-center gap-1 py-2 rounded-lg text-[0.74rem] font-medium transition-colors duration-150',
-          view === id ? 'bg-accent-soft text-accent' : 'text-muted hover:text-fg hover:bg-hover',
+          'group relative w-full flex flex-col items-center gap-0.5 py-1 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
+          view === id ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
-        <span className="transition-transform duration-150 group-active:scale-90">{icon}</span>
+        {view === id && <span aria-hidden className="absolute -left-1.5 top-1.5 h-6 w-[3px] rounded-r-full bg-[image:var(--brand-gradient)]" />}
+        <span
+          className={cx(
+            'grid place-items-center h-7 w-11 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90',
+            view === id ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover',
+          )}
+        >
+          {icon}
+        </span>
         <span className="w-full truncate px-0.5 text-center leading-tight">{label}</span>
       </button>
     </Tooltip>
   );
   return (
-    <nav aria-label="Main navigation" className="w-[84px] shrink-0 border-r border-line bg-panel flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden">
+    <nav aria-label="Main navigation" className="w-[84px] shrink-0 border-r border-line bg-chrome flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden">
       {NAV.map((n, i) => (
         <div key={n.id}>
-          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-2 my-1.5 border-t border-line" />}
+          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-3 my-1 border-t border-line/70" />}
           {item(n.id, n.label, n.icon, i < 9 ? `${modKey}+Alt+${i + 1}` : undefined)}
         </div>
       ))}
@@ -207,7 +215,7 @@ export function EnvironmentPicker() {
   const dot = envObj ? (envObj.color ?? (envObj.isProduction ? 'var(--bad)' : 'var(--ok)')) : 'var(--line-strong)';
   return (
     <Tooltip content="Active environment">
-      <label className={cx('relative flex items-center h-8 rounded-md border bg-bg shadow-sm transition-colors', envObj?.isProduction ? 'border-bad/50' : 'border-line-strong hover:border-muted/50')}>
+      <label className={cx('relative flex items-center h-8 rounded-full border bg-field shadow-sm transition-colors', envObj?.isProduction ? 'border-bad/50' : 'border-line-strong hover:border-muted/50')}>
         <span className="absolute left-2.5 w-2 h-2 rounded-full pointer-events-none" style={{ background: dot }} />
         <select
           aria-label="Environment"
@@ -233,10 +241,10 @@ export function TopBar() {
   const set = useApp((s) => s.set);
   const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
   return (
-    <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-bg" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+    <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-chrome" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
       <div className="flex items-center gap-2 pr-1" style={noDrag}>
         <img src={logoUrl} alt="" className="h-7 w-7" />
-        <span className="font-semibold tracking-tight hidden md:inline">FluxPion</span>
+        <span className="font-semibold tracking-tight hidden md:inline bg-[image:var(--brand-gradient)] bg-clip-text text-transparent">FluxPion</span>
       </div>
       <span className="h-5 w-px bg-line hidden md:block" />
       <div style={noDrag}>
@@ -246,7 +254,7 @@ export function TopBar() {
         data-search-trigger
         onClick={() => set({ searchOpen: true })}
         style={noDrag}
-        className="mx-auto flex items-center gap-2 h-8 w-[min(460px,38vw)] rounded-lg border border-line bg-panel px-3 text-sm text-muted transition-colors hover:border-line-strong hover:bg-hover"
+        className="mx-auto flex items-center gap-2 h-8 w-[min(480px,38vw)] rounded-full border border-line bg-field px-3.5 text-sm text-muted shadow-sm transition-colors hover:border-line-strong hover:text-fg"
       >
         <Search size={15} />
         <span className="truncate">Search requests, tests, tools, traces…</span>
@@ -282,7 +290,7 @@ export function StatusBar() {
   const envObj = ws?.environments.find((e) => e.name === env);
   const acts = Object.values(activity);
   return (
-    <footer className="h-7 shrink-0 border-t border-line bg-panel flex items-center gap-4 px-3 text-[0.75rem] text-muted">
+    <footer className="h-7 shrink-0 border-t border-line bg-chrome flex items-center gap-4 px-3 text-[0.75rem] text-muted">
       <span className="flex items-center gap-1.5">
         <span className="w-2 h-2 rounded-full" style={{ background: envObj ? (envObj.color ?? (envObj.isProduction ? 'var(--bad)' : 'var(--ok)')) : 'var(--line-strong)' }} />
         {env ?? 'No environment'}
@@ -502,7 +510,7 @@ export function SearchDialog() {
       <div
         role="dialog"
         aria-label="Search"
-        className={cx('rounded-lg border border-line bg-bg shadow-2xl overflow-hidden', anchor ? 'absolute' : 'w-[640px] max-w-[92vw]')}
+        className={cx('rounded-xl border border-line bg-popover shadow-lg overflow-hidden', anchor ? 'absolute' : 'w-[640px] max-w-[92vw]')}
         style={anchor && { top: anchor.top, left: anchor.left, width: anchor.width }}
       >
         <div className="flex items-center gap-2 px-4 border-b border-line">

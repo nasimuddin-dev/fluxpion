@@ -118,7 +118,7 @@ export function McpView() {
 
   return (
     <>
-    <Split id="mcp-servers" initial={20} min={14}>
+    <Split id="mcp-servers" sidebar initial={20} min={14}>
       <div className="h-full flex flex-col bg-panel/50">
         <SectionTitle
           right={

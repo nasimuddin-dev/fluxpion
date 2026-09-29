@@ -67,7 +67,11 @@ module.exports = async function run(win) {
     location.reload(); true`);
   await sleep(3000);
   await js(HELPERS);
-  // a fresh profile opens on Home: go to REST explicitly
+  // a fresh profile opens on Home
+  win.webContents.sendInputEvent({ type: 'mouseMove', x: W - 5, y: H - 5 });
+  await js(`__cap.nav('Home'); true`);
+  await sleep(1200);
+  await shot('home');
   await js(`__cap.nav('REST'); true`);
   await sleep(1200);
   // keep the pointer off the navigation rail so no hover highlight ends up in the screenshots

@@ -96,7 +96,7 @@ export function HistoryView() {
               return (
               <button onDoubleClick={() => reopen(e)} onClick={() => setSel(e)} className={cx('w-full h-full text-left px-3 border-b border-line/60 flex flex-col justify-center', sel?.id === e.id ? 'bg-accent/10' : 'hover:bg-hover')}>
                 <div className="flex items-center gap-2 text-sm">
-                  {e.method && <span className={cx('mono text-[0.7rem] font-bold w-12', `method-${e.method}`)}>{e.method}</span>}
+                  {e.method && <span className={cx('mono method-badge text-[0.64rem] font-bold w-14 shrink-0', `method-${e.method}`)}>{e.method}</span>}
                   {!e.method && <Badge>{e.kind}</Badge>}
                   <span className="truncate">{e.url ?? e.name}</span>
                   {e.status !== undefined && (
