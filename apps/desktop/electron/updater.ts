@@ -56,6 +56,9 @@ function configure(onProgress: (downloaded: number, total: number | null) => voi
     debug: () => undefined,
   };
   autoUpdater.autoDownload = false;
+  // Differential downloads send multi-range requests, which GitHub's release download servers reject
+  // (HTTP 501); some networks reset the connection instead. Always download the whole (verified) file.
+  autoUpdater.disableDifferentialDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
   autoUpdater.on('download-progress', (p) => onProgress(p.transferred, p.total || null));
@@ -93,7 +96,20 @@ export function createUpdater(emit: (channel: string, payload: unknown) => void,
     async install(): Promise<void> {
       if (!canInstallInPlace()) throw new Error('This installation can’t be updated in place; download the new version instead.');
       configure(progress, log);
-      await autoUpdater.downloadUpdate();
+      // a dropped connection is retried twice before giving up
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await autoUpdater.downloadUpdate();
+          break;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          const transient = /net::ERR_|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|timed? ?out/i.test(msg);
+          if (!transient || attempt >= 2) throw e;
+          log('warn', `Update download failed (${msg}); retrying (attempt ${attempt + 2} of 3)`);
+          emit('update.progress', { downloaded: 0, total: null, retry: attempt + 1 });
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        }
+      }
       emit('update.progress', { downloaded: 1, total: 1, installing: true });
       // isSilent=false shows the installer's progress on Windows; forceRunAfter restarts the app afterwards
       setImmediate(() => autoUpdater.quitAndInstall(false, true));

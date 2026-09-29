@@ -1,5 +1,6 @@
 import { asError, bridge, call, on } from './api';
 import { ask, useApp } from './store';
+import { summariseNotes } from './lib/release-notes';
 
 const SKIP_KEY = 'aps.update.skip';
 const MB = 1024 * 1024;
@@ -28,34 +29,39 @@ function store(key: string, value: string): void {
   }
 }
 
-/** First paragraph or so of the release notes, as plain text. */
-export function summarise(notes: string): string {
-  const text = notes
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^#+\s.*$/gm, '')
-    .replace(/[*_`>]/g, '')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
-  return text.length > 500 ? text.slice(0, 500).replace(/\s+\S*$/, '') + '…' : text;
-}
-
-/** Downloads, verifies and installs the update; the app restarts into the new version. */
-async function install(version: string): Promise<void> {
-  const { set, toast } = useApp.getState();
+/**
+ * Downloads, verifies and installs the update; the app restarts into the new version. When the
+ * download fails (network reset, proxy …) the user can try again or get the installer from the website.
+ */
+async function install(version: string, downloadUrl: string): Promise<void> {
+  const { set } = useApp.getState();
   set({ progress: { title: `Updating to ${version}`, message: 'Downloading the update…', fraction: null } });
-  const off = on<{ downloaded: number; total: number | null; installing?: boolean }>('update.progress', (p) => {
+  const off = on<{ downloaded: number; total: number | null; installing?: boolean; retry?: number }>('update.progress', (p) => {
     const message = p.installing
       ? 'Verifying and installing… TestPion will restart.'
-      : `Downloading the update… ${(p.downloaded / MB).toFixed(1)}${p.total ? ` of ${(p.total / MB).toFixed(1)}` : ''} MB`;
+      : p.retry
+        ? `The connection dropped; trying again (attempt ${p.retry + 1})…`
+        : `Downloading the update… ${(p.downloaded / MB).toFixed(1)}${p.total ? ` of ${(p.total / MB).toFixed(1)}` : ''} MB`;
     useApp.getState().set({ progress: { title: `Updating to ${version}`, message, fraction: p.total && !p.installing ? p.downloaded / p.total : null } });
   });
   try {
     await call('update.install');
     // the app quits while the installer runs; if it doesn't, keep the dialog up briefly
   } catch (e) {
-    toast(`TestPion ${version} couldn't be installed; your current version is unchanged. ${(e as Error).message ?? ''}`.trim(), 'error');
     set({ progress: null });
+    const choice = await ask({
+      title: "The update couldn't be downloaded",
+      message: `TestPion ${version} wasn't installed; your current version is unchanged.`,
+      detail: `${asError(e).message}\n\nThis is usually a brief network problem. Try again, or download the installer from the website and run it: your workspaces, settings and secrets are kept either way. Details are in Logs.`,
+      buttons: [
+        { id: 'close', label: 'Close' },
+        { id: 'web', label: 'Download from Website' },
+        { id: 'retry', label: 'Try Again', variant: 'primary' },
+      ],
+      cancelId: 'close',
+    });
+    if (choice === 'retry') return install(version, downloadUrl);
+    if (choice === 'web') await call('app.openExternal', { url: downloadUrl }).catch(() => undefined);
   } finally {
     setTimeout(off, 60_000);
   }
@@ -85,12 +91,12 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   }
   if (!manual && load(SKIP_KEY) === found.version) return 'available';
 
-  const notes = summarise(found.notes);
+  const notes = summariseNotes(found.notes);
   const choice = await ask({
     title: 'Update available',
     message: `TestPion ${found.version} is available. You have ${found.current}.`,
     detail:
-      (notes ? notes + '\n\n' : '') +
+      (notes ? `What's new:\n${notes}\n\n` : '') +
       (found.installable
         ? 'Update now to download and install it. The download is verified, then it replaces your current version; your workspaces, settings and secrets are kept, and the app restarts.'
         : 'Download the new version and install it over this one; your workspaces, settings and secrets are kept.'),
@@ -103,7 +109,7 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   });
   if (choice === 'skip') store(SKIP_KEY, found.version);
   if (choice === 'install') {
-    if (found.installable) await install(found.version);
+    if (found.installable) await install(found.version, found.url);
     else await call('app.openExternal', { url: found.url }).catch((e: Error) => toast(`Couldn't open the download page: ${e.message}`, 'error'));
   }
   return 'available';

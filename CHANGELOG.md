@@ -4,6 +4,14 @@
 
 Nothing yet.
 
+## 0.6.1 — 2026-09-29
+
+- **Fixed: updates failing with `net::ERR_CONNECTION_RESET`.** The updater tried a "differential" download (many byte ranges of the new installer in one request), which GitHub's release download servers now reject. It now always downloads the whole installer (still verified with its SHA-512 checksum), retries twice when the connection drops, and if it still fails offers **Try Again** or **Download from Website** instead of a bare error.
+- **Fixed: garbled release notes in the update dialog.** The notes arrive as HTML; the dialog showed tag fragments such as `<li<strong`. It now lists the headline of each change.
+- **The TestPion wordmark replaces the T** in the app's top bar, the website's nav bar and the website's home page. The square T remains only as the app icon and favicon.
+
+**If you're on 0.5.1 and the update fails:** download `TestPion-0.6.1-windows-x64-setup.exe` from the download page and run it; it installs over your current version and keeps your workspaces, settings and secrets.
+
 ## 0.6.0 — 2026-09-29
 
 - **FluxPion is now TestPion.** New name for the app, the `testpion` CLI (`fluxpion`, `protopion` and `protolens` still work as aliases), the `@testpion/*` packages, a new logo (a gradient **T** with the sparkle) and wordmark, the documentation site (https://nasimuddin-dev.github.io/testpion/) and the GitHub repository (nasimuddin-dev/testpion). Nothing to do when upgrading: the app updates in place and keeps its settings and saved secrets, the data folder `~/.fluxpion` moves to `~/.testpion`, `FLUXPION_*` variables still work, and FluxPion workspace exports still import.
