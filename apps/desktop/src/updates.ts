@@ -4,6 +4,10 @@ import { summariseNotes } from './lib/release-notes';
 
 const SKIP_KEY = 'aps.update.skip';
 const MB = 1024 * 1024;
+/** How often a running app looks for a new release (many people keep it open for days). */
+const RECHECK_MS = 6 * 60 * 60 * 1000;
+/** Versions already offered in this session: background re-checks don't ask again after "Later". */
+const offered = new Set<string>();
 
 interface UpdateCheckResult {
   current: string;
@@ -90,7 +94,8 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
     if (manual) toast(`You're up to date. TestPion ${found.current} is the latest version.`, 'success');
     return 'current';
   }
-  if (!manual && load(SKIP_KEY) === found.version) return 'available';
+  if (!manual && (load(SKIP_KEY) === found.version || offered.has(found.version))) return 'available';
+  offered.add(found.version);
 
   const notes = summariseNotes(found.notes);
   const choice = await ask({
@@ -117,10 +122,13 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   return 'available';
 }
 
-/** Checks once each time the desktop app starts (after startup settles), when enabled in Settings. */
+/** Checks when the desktop app starts (after startup settles) and every few hours while it runs, when enabled in Settings. */
 export function scheduleUpdateCheck(): void {
   if (bridge.kind !== 'electron') return;
   const s = useApp.getState();
   if (s.settings?.checkForUpdates === false || !s.info?.packaged) return;
   setTimeout(() => void checkForUpdates({ manual: false }), 5000);
+  setInterval(() => {
+    if (useApp.getState().settings?.checkForUpdates !== false) void checkForUpdates({ manual: false });
+  }, RECHECK_MS);
 }
