@@ -1,0 +1,426 @@
+/** Running tests, suites, collections and mock servers from the command line; results, reports and exit codes. */
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
+import { Command, Option } from 'commander';
+import {
+  ApsError,
+  ChainSecretStore,
+  EnvSecretStore,
+  Logger,
+  WorkspaceManager,
+  WorkspaceStore,
+  compareToBaseline,
+  consoleSink,
+  createBaseline,
+  createEngineContext,
+  formatDuration,
+  CookieJar,
+  cookiesFromJson,
+  startMockServer,
+  type MockServer,
+  loadSuite,
+  runTests,
+  runCollection,
+  readDataset,
+  shortId,
+  streamTests,
+  writeReports,
+  loadTestsFromFile,
+  isSuiteFile,
+  DEFAULT_THRESHOLDS,
+  type ReportFormat,
+  type RunSummary,
+  type Collection,
+  type CollectionNode,
+  type Environment,
+  type DatasetRecord,
+  type RunEvent,
+  type TestCase,
+  type TestResult,
+} from '@testpion/core';
+import { EXIT, green, red, yellow, dim, bold, cyan, CliError, collectVar, openWorkspace, readImport, loadCollectionRef, cleanupFailedRun, readResults } from './shared.js';
+
+export function printResult(r: TestResult, verbose: boolean): void {
+  const icon = r.status === 'passed' ? green('✓') : r.status === 'skipped' ? yellow('○') : red('✗');
+  const meta = [r.latencyMs !== undefined ? `${Math.round(r.latencyMs)}ms` : `${r.durationMs}ms`, r.tokens ? `${r.tokens.totalTokens} tok` : '', r.attempts > 1 ? `${r.attempts} attempts` : ''].filter(Boolean).join(', ');
+  console.log(`  ${icon} ${r.name} ${dim(`(${meta})`)}`);
+  if (r.status === 'skipped' && r.metadata?.reason) console.log(dim(`      skipped: ${r.metadata.reason}`));
+  if (r.error) {
+    console.log(red(`      ${r.error.kind}: ${r.error.message}`));
+    if (r.error.why && r.error.why !== r.error.message) console.log(dim(`      why: ${r.error.why}`));
+    for (const s of r.error.suggestions.slice(0, 3)) console.log(dim(`      → ${s}`));
+  }
+  for (const ch of r.checks) {
+    if (ch.passed && !verbose) continue;
+    const tag = ch.source === 'deterministic' ? '' : dim(` [${ch.source}]`);
+    console.log(`      ${ch.passed ? green('✓') : red('✗')} ${ch.name}${tag}: ${ch.message}${ch.score !== undefined ? dim(` score=${ch.score}`) : ''}`);
+    if (!ch.passed && ch.explanation) console.log(dim(`        ${ch.explanation.slice(0, 300)}`));
+  }
+}
+
+export interface RunCliOptions {
+  workspace?: string;
+  environment?: string;
+  concurrency?: string;
+  retries?: string;
+  timeout?: string;
+  reporter: string[];
+  out?: string;
+  tags?: string;
+  grep?: string;
+  bail?: boolean;
+  resume?: string;
+  var?: Record<string, string>;
+  baseline?: string;
+  saveBaseline?: string;
+  trace: 'all' | 'failures' | 'none';
+  verbose?: boolean;
+  quiet?: boolean;
+  suite?: string;
+  failOnRegression?: boolean;
+  logLevel?: string;
+}
+
+export async function executeRun(paths: string[], o: RunCliOptions, label?: string): Promise<number> {
+  const mgr = new WorkspaceManager();
+  const settings = mgr.loadSettings();
+  const firstPath = paths[0] ? resolve(paths[0]) : undefined;
+  const { store, ephemeral } = openWorkspace(o.workspace, firstPath && existsSync(firstPath) ? dirname(firstPath) : undefined, mgr);
+  const logger = new Logger((o.logLevel?.toUpperCase() as 'INFO') ?? 'WARN');
+  if (o.logLevel) logger.addSink(consoleSink());
+  const secrets = new ChainSecretStore([new EnvSecretStore()]);
+
+  let suite: Awaited<ReturnType<typeof loadSuite>> | undefined;
+  let patterns = paths;
+  let cwd = process.cwd();
+  if (o.suite) {
+    const candidates = [o.suite, join(store.path('tests'), o.suite), join(store.path('tests'), `${o.suite}.suite.yaml`), join(store.path('tests'), `${o.suite}.suite.yml`)];
+    const file = candidates.find((p) => existsSync(p) && isSuiteFile(p));
+    if (!file) throw new CliError(`Suite "${o.suite}" not found in ${store.path('tests')}`, EXIT.CONFIG_ERROR);
+    suite = await loadSuite(file);
+    patterns = suite.tests;
+    cwd = dirname(file);
+  } else if (paths.length === 1 && isSuiteFile(paths[0]!)) {
+    suite = await loadSuite(resolve(paths[0]!));
+    patterns = suite.tests;
+    cwd = dirname(resolve(paths[0]!));
+  } else if (!paths.length) {
+    patterns = [store.path('tests')];
+  }
+
+  const environment = o.environment ?? suite?.environment ?? (store.listEnvironments().length === 1 ? store.listEnvironments()[0]!.name : undefined);
+  if (o.environment && !store.getEnvironment(o.environment))
+    throw new CliError(`Environment "${o.environment}" not found. Available: ${store.listEnvironments().map((e) => e.name).join(', ')}`, EXIT.CONFIG_ERROR);
+
+  const ctx = createEngineContext({ store, secrets, settings, environment, logger, runtimeVars: o.var });
+  const runId = o.resume ?? shortId('run-');
+  // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
+  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('testpion-results', runId) : store.runDir(runId);
+  const resultsFile = join(outDir, 'results.jsonl');
+  if (o.resume && !existsSync(resultsFile)) throw new CliError(`Cannot resume: ${resultsFile} does not exist`, EXIT.CONFIG_ERROR);
+
+  const loadList = async (list?: string[]) => {
+    const out: TestCase[] = [];
+    for (const p of list ?? []) for await (const t of loadTestsFromFile(isAbsolute(p) ? p : resolve(cwd, p))) out.push(t);
+    return out;
+  };
+
+  const name = label ?? suite?.name ?? (paths.length ? paths.map((p) => relative(process.cwd(), resolve(p)) || '.').join(', ') : store.workspace.name);
+  if (!o.quiet) {
+    console.log(bold(`TestPion — ${name}`));
+    console.log(dim(`workspace: ${ephemeral ? '(ephemeral)' : store.root}${environment ? ` · environment: ${environment}` : ''} · run: ${runId}`));
+  }
+
+  const concurrency = Number(o.concurrency ?? suite?.concurrency ?? 4);
+  const ctrl = new AbortController();
+  let interrupted = 0;
+  const onSigint = () => {
+    interrupted++;
+    if (interrupted > 1) process.exit(EXIT.EXECUTION_ERROR);
+    console.error(yellow('\nCancelling… (press Ctrl+C again to force quit). Resume later with --resume ' + runId));
+    ctrl.abort();
+  };
+  process.on('SIGINT', onSigint);
+
+  const onEvent = (e: RunEvent) => {
+    if (e.type === 'test-end' && !o.quiet) printResult(e.result, !!o.verbose);
+  };
+  let summary;
+  try {
+    summary = await runTests({
+      name,
+      runId,
+      tests: streamTests(patterns, cwd, { tags: o.tags?.split(',').map((t) => t.trim()).filter(Boolean), grep: o.grep }),
+      setup: await loadList(suite?.setup),
+      teardown: await loadList(suite?.teardown),
+      concurrency,
+      retries: Number(o.retries ?? suite?.retries ?? 0),
+      timeoutMs: o.timeout ? Number(o.timeout) : suite?.timeoutMs,
+      services: ctx.services,
+      signal: ctrl.signal,
+      resultsFile,
+      resume: !!o.resume,
+      traceMode: o.trace,
+      onTrace: (trace) => void store.saveTrace(trace, 'test', runId),
+      onEvent,
+      environment,
+      bail: o.bail,
+    });
+  } catch (e) {
+    cleanupFailedRun({ ephemeral, outDir, explicitOut: !!o.out, store });
+    throw e;
+  } finally {
+    process.off('SIGINT', onSigint);
+    await ctx.dispose();
+  }
+
+  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, rerun: `testpion test ${paths.join(' ')} --resume ${runId}` });
+}
+
+/** Write reports, compare baselines, print the summary and work out the exit code (shared by test/run/run-collection). */
+export async function finishRun(a: {
+  store: WorkspaceStore;
+  ephemeral?: string;
+  summary: RunSummary;
+  outDir: string;
+  resultsFile: string;
+  o: Pick<RunCliOptions, 'reporter' | 'baseline' | 'saveBaseline' | 'quiet' | 'failOnRegression'>;
+  rerun?: string;
+  emptyMessage?: string;
+}): Promise<number> {
+  const { store, ephemeral, summary, outDir, resultsFile, o } = a;
+  const results = () => readResults(resultsFile);
+  const formats = o.reporter.filter((r) => r !== 'console') as ReportFormat[];
+  const paths2 = formats.length ? await writeReports(outDir, summary, results, formats) : ({} as Record<string, string>);
+  writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
+  if (!ephemeral) store.meta.addRun(summary, outDir);
+
+  let regressionFailed = false;
+  if (o.baseline) {
+    const report = await compareToBaseline(store.getBaseline(o.baseline), summary, results(), DEFAULT_THRESHOLDS);
+    writeFileSync(join(outDir, 'regression.json'), JSON.stringify(report, null, 2));
+    const metricRegressions = report.summary.filter((m) => m.regressed);
+    console.log(bold(`\nRegression vs baseline "${o.baseline}": ${report.passed ? green('no regressions') : red(`${report.regressions.length + metricRegressions.length} regression(s)`)}`));
+    for (const m of metricRegressions) console.log(red(`  ✗ ${m.metric}: ${m.baseline} → ${m.current} (${m.deltaPct > 0 ? '+' : ''}${m.deltaPct}%)`));
+    for (const r of report.regressions.slice(0, 20)) console.log(red(`  ✗ ${r.id}: ${r.message}`));
+    for (const r of report.improvements.slice(0, 10)) console.log(green(`  ✓ ${r.id}: ${r.message}`));
+    regressionFailed = !report.passed;
+  }
+  if (o.saveBaseline) {
+    store.saveBaseline(await createBaseline(o.saveBaseline, summary, results()));
+    console.log(dim(`Saved baseline "${o.saveBaseline}"`));
+  }
+
+  if (!o.quiet) {
+    const ok = summary.failed + summary.errors === 0;
+    console.log(
+      `\n${ok ? green(bold('PASSED')) : red(bold('FAILED'))}  ${summary.passed} passed, ${summary.failed} failed, ${summary.errors} errors, ${summary.skipped} skipped · ${formatDuration(summary.durationMs)}`,
+    );
+    if (summary.latency.count) console.log(dim(`latency p50 ${summary.latency.p50}ms · p95 ${summary.latency.p95}ms · p99 ${summary.latency.p99}ms`));
+    if (summary.tokens.totalTokens) console.log(dim(`tokens ${summary.tokens.inputTokens} in / ${summary.tokens.outputTokens} out${summary.costUsd ? ` · est. cost $${summary.costUsd}` : ''}`));
+    for (const [k, v] of Object.entries(summary.scores)) console.log(dim(`score ${k}: ${v.mean} (${v.count})`));
+    for (const [f, p] of Object.entries(paths2)) console.log(dim(`${f} report: ${p}`));
+    if (summary.cancelled && a.rerun) console.log(yellow(`Run cancelled. Resume with: ${a.rerun}`));
+  }
+  store.close();
+  if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
+  if (summary.cancelled) return EXIT.EXECUTION_ERROR;
+  if (summary.total === 0) {
+    console.error(yellow(a.emptyMessage ?? 'No tests found.'));
+    return EXIT.CONFIG_ERROR;
+  }
+  return summary.failed + summary.errors > 0 || (o.failOnRegression && regressionFailed) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+}
+
+export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel'> {
+  iterationData?: string;
+  iterationCount?: string;
+  delayRequest?: string;
+  folder?: string[];
+  cookieJar?: string;
+  exportCookieJar?: string;
+}
+
+/** Map --folder names/ids to node ids (folders or requests), like Newman's --folder. */
+export function resolveSelection(collection: Collection, refs: string[] | undefined): string[] | undefined {
+  if (!refs?.length) return undefined;
+  const all: CollectionNode[] = [];
+  const walk = (nodes: CollectionNode[]) => nodes.forEach((n) => (all.push(n), n.kind === 'folder' && walk(n.items)));
+  walk(collection.items);
+  return refs.map((ref) => {
+    const n = all.find((x) => x.id === ref) ?? all.find((x) => x.name === ref) ?? all.find((x) => x.name.toLowerCase() === ref.toLowerCase());
+    if (!n) throw new CliError(`No folder or request "${ref}" in collection "${collection.name}"`, EXIT.CONFIG_ERROR);
+    return n.id;
+  });
+}
+
+export async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promise<number> {
+  const mgr = new WorkspaceManager();
+  const settings = mgr.loadSettings();
+  const fromFile = existsSync(ref) && statSync(ref).isFile();
+  // a collection file never touches the user's workspace: it runs in an ephemeral one unless -w is given
+  const { store, ephemeral } = openWorkspace(o.workspace, fromFile && !o.workspace ? tmpdir() : undefined, mgr);
+  const logger = new Logger((o.logLevel?.toUpperCase() as 'INFO') ?? 'WARN');
+  if (o.logLevel) logger.addSink(consoleSink());
+  const secrets = new ChainSecretStore([new EnvSecretStore()]);
+
+  let collection: Collection;
+  if (fromFile) collection = readImport(resolve(ref), 'collection');
+  else {
+    const cols = store.listCollections().filter((c) => !c.problem);
+    const found = cols.find((c) => c.id === ref) ?? cols.find((c) => c.name.toLowerCase() === ref.toLowerCase());
+    if (!found) throw new CliError(`Collection "${ref}" not found. Available: ${cols.map((c) => c.name).join(', ') || 'none'} (or pass a collection file)`, EXIT.CONFIG_ERROR);
+    collection = found;
+  }
+
+  let envFile: Environment | undefined;
+  let envName: string | undefined;
+  if (o.environment && existsSync(o.environment) && statSync(o.environment).isFile()) envFile = readImport(resolve(o.environment), 'environment');
+  else if (o.environment) {
+    if (!store.getEnvironment(o.environment)) throw new CliError(`Environment "${o.environment}" not found. Available: ${store.listEnvironments().map((e) => e.name).join(', ') || 'none'} (or pass an environment file)`, EXIT.CONFIG_ERROR);
+    envName = o.environment;
+  } else if (!fromFile && store.listEnvironments().length === 1) envName = store.listEnvironments()[0]!.name;
+
+  const selection = resolveSelection(collection, o.folder);
+  let data: DatasetRecord[] | undefined;
+  if (o.iterationData) {
+    const file = resolve(o.iterationData);
+    if (!existsSync(file)) throw new CliError(`Data file ${file} does not exist`, EXIT.CONFIG_ERROR);
+    data = [];
+    for await (const r of readDataset({ path: file, limit: 100_000 })) data.push(r);
+  }
+  const iterations = o.iterationCount ? Number(o.iterationCount) : undefined;
+  if (iterations !== undefined && !(iterations >= 1)) throw new CliError('--iteration-count must be 1 or more', EXIT.CONFIG_ERROR);
+
+  let cookieJar = new CookieJar();
+  if (o.cookieJar) {
+    try {
+      cookieJar = new CookieJar(cookiesFromJson(JSON.parse(readFileSync(resolve(o.cookieJar), 'utf8'))));
+    } catch (e) {
+      throw new CliError(`Could not read cookie jar ${o.cookieJar}: ${(e as Error).message}`, EXIT.CONFIG_ERROR);
+    }
+  }
+  const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var, cookieJar });
+  if (fromFile) ctx.vars.setScope('collection', collection.variables);
+  if (envFile) ctx.vars.setScope('environment', envFile.variables);
+  const environment = envName ?? envFile?.name;
+  const runId = shortId('run-');
+  // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
+  const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('testpion-results', runId) : store.runDir(runId);
+  const resultsFile = join(outDir, 'results.jsonl');
+
+  if (!o.quiet) {
+    console.log(bold(`TestPion — ${collection.name}`));
+    const bits = [ephemeral ? '' : `workspace: ${store.root}`, environment ? `environment: ${environment}` : '', data ? `data: ${data.length} rows` : '', `run: ${runId}`];
+    console.log(dim(bits.filter(Boolean).join(' · ')));
+  }
+
+  const ctrl = new AbortController();
+  let interrupted = 0;
+  const onSigint = () => {
+    if (++interrupted > 1) process.exit(EXIT.EXECUTION_ERROR);
+    console.error(yellow('\nCancelling… (press Ctrl+C again to force quit)'));
+    ctrl.abort();
+  };
+  process.on('SIGINT', onSigint);
+  let lastIteration = 0;
+  let summary: RunSummary;
+  try {
+    summary = await runCollection({
+      name: collection.name,
+      runId,
+      collection,
+      selection,
+      data,
+      iterations,
+      delayMs: o.delayRequest ? Number(o.delayRequest) : undefined,
+      timeoutMs: o.timeout ? Number(o.timeout) : undefined,
+      bail: o.bail,
+      services: ctx.services,
+      signal: ctrl.signal,
+      resultsFile,
+      traceMode: o.trace,
+      onTrace: (trace) => void store.saveTrace(trace, 'test', runId),
+      environment,
+      onEvent: (e: RunEvent) => {
+        if (e.type !== 'test-end' || o.quiet) return;
+        const it = Number(/@(\d+)/.exec(e.result.id)?.[1] ?? 1);
+        if (it !== lastIteration && (iterations ?? data?.length ?? 1) > 1) console.log(cyan(`\nIteration ${it}`));
+        lastIteration = it;
+        printResult(e.result, !!o.verbose);
+      },
+    });
+  } catch (e) {
+    cleanupFailedRun({ ephemeral, outDir, explicitOut: !!o.out, store });
+    throw e instanceof ApsError && e.kind === 'ValidationError' ? new CliError(e.message, EXIT.CONFIG_ERROR) : e;
+  } finally {
+    process.off('SIGINT', onSigint);
+    await ctx.dispose();
+  }
+  if (o.exportCookieJar) {
+    const file = resolve(o.exportCookieJar);
+    writeFileSync(file, JSON.stringify({ cookies: cookieJar.toJSON() }, null, 2) + '\n', { mode: 0o600 });
+    if (!o.quiet) console.log(dim(`Cookie jar written to ${file} (${cookieJar.toJSON().length} cookies; values are in plain text, keep it out of git)`));
+  }
+  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
+}
+
+/** `testpion mock`: serve saved examples until interrupted. */
+export async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }): Promise<number> {
+  const collection = loadCollectionRef(ref, o.workspace);
+  const port = o.port ? Number(o.port) : 0;
+  if (!(port >= 0 && port < 65536)) throw new CliError('--port must be between 0 and 65535', EXIT.CONFIG_ERROR);
+  let mock: MockServer;
+  try {
+    mock = await startMockServer(collection, {
+      port,
+      delayMs: o.delay ? Number(o.delay) : undefined,
+      onRequest: (e) => {
+        if (o.quiet) return;
+        const status = e.status < 400 ? green(String(e.status)) : e.example ? yellow(String(e.status)) : red(String(e.status));
+        console.log(`${dim(new Date().toLocaleTimeString())} ${e.method} ${e.path} ${status} ${e.example ? dim(e.example) : red('no matching example')}`);
+      },
+    });
+  } catch (e) {
+    throw e instanceof ApsError && e.kind === 'ConfigurationError' ? new CliError(e.message, EXIT.CONFIG_ERROR) : e;
+  }
+  if (!mock.routes.length) console.log(yellow(`"${collection.name}" has no saved examples yet: every request will get a 404.`));
+  console.log(bold(`Mock server for ${collection.name}: ${mock.url}`));
+  for (const r of mock.routes) console.log(dim(`  ${r.method.padEnd(7)} ${r.path} → ${r.example.status} ${r.example.name}`));
+  console.log(dim('Press Ctrl+C to stop.'));
+  await new Promise<void>((done) => {
+    const stop = () => {
+      process.off('SIGINT', stop);
+      process.off('SIGTERM', stop);
+      done();
+    };
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
+  });
+  await mock.close();
+  return EXIT.SUCCESS;
+}
+
+export function runOptions(cmd: Command): Command {
+  return cmd
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-e, --environment <name>', 'environment to use')
+    .option('-c, --concurrency <n>', 'parallel workers')
+    .option('--retries <n>', 'retries per failing test')
+    .option('--timeout <ms>', 'per-test timeout in ms')
+    .addOption(new Option('-r, --reporter <formats...>', 'reporters: console, junit, json, html, markdown').default(['console', 'junit', 'json', 'html', 'markdown']))
+    .option('-o, --out <dir>', 'output directory for results and reports')
+    .option('-t, --tags <tags>', 'only run tests with these tags (comma separated)')
+    .option('-g, --grep <pattern>', 'only run tests whose name/id matches')
+    .option('--bail', 'stop after the first failure')
+    .option('--resume <runId>', 'resume a cancelled/crashed run')
+    .option('--var <key=value>', 'runtime variable (repeatable)', collectVar)
+    .option('--baseline <name>', 'compare results against a saved baseline')
+    .option('--save-baseline <name>', 'save this run as a baseline')
+    .option('--fail-on-regression', 'exit 1 when the baseline comparison finds regressions')
+    .addOption(new Option('--trace <mode>', 'persist traces').choices(['all', 'failures', 'none']).default('failures'))
+    .option('-v, --verbose', 'show passing checks')
+    .option('-q, --quiet', 'only print the summary exit code')
+    .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)');
+}
