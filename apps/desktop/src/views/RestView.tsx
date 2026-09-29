@@ -1,4 +1,4 @@
-import { BookmarkPlus, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
+import { BookmarkPlus, ChevronDown, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -41,6 +41,11 @@ import { VarInput } from '../components/VarInput';
 import { Button, cx, Empty, Field, IconButton, Input, Menu, Modal, Select, Split, Tabs, Toggle, Tooltip, type MenuItem } from '../components/ui';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+/** Request tab widths; tabs that don't fit go into the "+N" overflow dropdown. */
+const TAB_WIDTH = 180;
+const PINNED_TAB_WIDTH = 150;
+/** Room kept for the new-tab and overflow buttons. */
+const TAB_STRIP_RESERVED = 100;
 
 interface RestTab {
   id: string;
@@ -290,6 +295,39 @@ export function RestView() {
 
   // pinned tabs first, in their own order
   const ordered = [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)];
+  /*
+   * Tab overflow (like Postman / VS Code): no horizontal scrolling. Pinned tabs and the most recently
+   * used tabs that fit are shown; the rest are listed in the "+N" dropdown. Picking one from the
+   * dropdown makes it recent, so it moves into the strip and the least recent tab moves out.
+   */
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => {
+    if (active) setRecent((r) => (r[0] === active ? r : [active, ...r.filter((id) => id !== active)]));
+  }, [active]);
+  const [stripWidth, setStripWidth] = useState(0);
+  // a callback ref: the strip mounts after the first render, so an effect would miss it
+  const stripObserver = useRef<ResizeObserver>(undefined);
+  const stripRef = useCallback((el: HTMLDivElement | null) => {
+    stripObserver.current?.disconnect();
+    if (!el) return;
+    stripObserver.current = new ResizeObserver(() => setStripWidth(el.clientWidth));
+    stripObserver.current.observe(el);
+    setStripWidth(el.clientWidth);
+  }, []);
+  const { shown, hidden } = useMemo(() => {
+    const pinned = ordered.filter((t) => t.pinned);
+    const rest = ordered.filter((t) => !t.pinned);
+    const room = stripWidth - TAB_STRIP_RESERVED - pinned.length * PINNED_TAB_WIDTH;
+    const slots = Math.max(1, Math.floor(room / TAB_WIDTH));
+    if (rest.length <= slots) return { shown: ordered, hidden: [] as RestTab[] };
+    const rank = (t: RestTab) => {
+      const i = recent.indexOf(t.id);
+      return i < 0 ? recent.length + rest.indexOf(t) : i;
+    };
+    const keep = new Set([...rest].sort((a, b) => rank(a) - rank(b)).slice(0, slots).map((t) => t.id));
+    return { shown: [...pinned, ...rest.filter((t) => keep.has(t.id))], hidden: rest.filter((t) => !keep.has(t.id)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabs, recent, stripWidth]);
   /** Close several tabs, asking once when any has unsaved changes. */
   const closeTabs = (ids: string[]) => {
     const closing = tabs.filter((x) => ids.includes(x.id));
@@ -510,13 +548,37 @@ export function RestView() {
         )}
       </div>
       <div className="h-full flex flex-col min-w-0">
-        <div className="flex items-end h-9 border-b border-line bg-panel/40 overflow-x-auto shrink-0" role="tablist">
-          {ordered.map((t) => (
+        <div ref={stripRef} className="flex items-end h-9 border-b border-line bg-panel/40 overflow-hidden shrink-0" role="tablist">
+          {shown.map((t) => (
             <RequestTabItem key={t.id} tab={t} active={!noTabs && t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} />
           ))}
-          <IconButton label="New request tab" className="mx-1 mb-1" onClick={newTab}>
+          <IconButton label="New request tab" className="mx-1 mb-0.5 shrink-0" onClick={newTab}>
             <Plus size={14} />
           </IconButton>
+          {hidden.length > 0 && (
+            <Menu
+              align="end"
+              width={300}
+              items={[
+                ...hidden.map((t) => ({
+                  label: `${t.name}${t.dirty ? ' •' : ''}`,
+                  icon: <span className={cx('mono method-badge text-[0.6rem] font-bold w-11', `method-${t.request.method}`)}>{t.request.method.slice(0, 6)}</span>,
+                  onSelect: () => setActive(t.id),
+                })),
+                { label: `Close ${hidden.length} hidden tab${hidden.length === 1 ? '' : 's'}`, icon: <X size={13} />, separator: true, onSelect: () => closeTabs(hidden.map((t) => t.id)) },
+              ]}
+              trigger={
+                <button
+                  aria-label={`${hidden.length} more tabs`}
+                  title={`${hidden.length} more tab${hidden.length === 1 ? '' : 's'}`}
+                  className="ml-auto mr-1.5 mb-1 shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted border border-line bg-bg hover:text-fg hover:bg-hover data-[state=open]:text-fg data-[state=open]:bg-hover"
+                >
+                  +{hidden.length}
+                  <ChevronDown size={13} />
+                </button>
+              }
+            />
+          )}
         </div>
         {noTabs ? (
           <Empty
@@ -958,14 +1020,19 @@ function RequestTabItem({ tab: t, active, menu, onSelect, onClose }: { tab: Rest
         e.preventDefault();
         setMenuOpen(true);
       }}
-      className={cx('group relative flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer max-w-56 shrink-0', active ? 'bg-bg' : 'text-muted hover:bg-hover', t.pinned && 'pr-2')}
+      style={{ width: t.pinned ? PINNED_TAB_WIDTH : TAB_WIDTH }}
+      className={cx(
+        'group relative flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer shrink-0',
+        active ? 'bg-bg text-fg after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:bg-[image:var(--brand-gradient)]' : 'text-muted hover:bg-hover hover:text-fg',
+        t.pinned && 'pr-2',
+      )}
     >
       {t.pinned && <Pin size={11} className="shrink-0 text-muted" aria-label="Pinned" />}
       <span className={cx('mono method-badge text-[0.62rem] font-bold', `method-${t.request.method}`)}>{t.request.method}</span>
-      <span className={cx('truncate', t.pinned && 'max-w-24')}>{t.name}</span>
+      <span className="truncate flex-1 min-w-0">{t.name}</span>
       {t.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="Unsaved changes" />}
       {!t.pinned && (
-        <button aria-label="Close tab" className="opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-fg" onClick={(e) => (e.stopPropagation(), onClose())}>
+        <button aria-label="Close tab" className={cx('shrink-0 rounded p-0.5 hover:text-fg hover:bg-hover focus:opacity-100', active ? 'opacity-60' : 'opacity-0 group-hover:opacity-100')} onClick={(e) => (e.stopPropagation(), onClose())}>
           <X size={12} />
         </button>
       )}

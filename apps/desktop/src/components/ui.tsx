@@ -252,7 +252,7 @@ export function Menu({
           className="z-[70] rounded-xl border border-line bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
         >
           {items.map((it, i) => (
-            <div key={it.label}>
+            <div key={`${i}-${it.label}`}>
               {it.separator && i > 0 && <MenuPrimitive.Separator className="my-1 h-px bg-line" />}
               <MenuPrimitive.Item
                 disabled={it.disabled}

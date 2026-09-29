@@ -42,7 +42,9 @@ The sidebar remembers the pane you last used.
 
 ## Tabs and history
 
-Each request opens in a tab. A dot on a tab means it has unsaved changes. Right-click a tab (or middle-click to close it) for:
+Each request opens in a tab. A dot on a tab means it has unsaved changes.
+
+When more tabs are open than fit, the tab bar doesn't scroll. It shows your pinned tabs and the tabs you used most recently, and a **+N** button on the right lists the others (as in Postman or VS Code). Pick one from the list to bring it into the tab bar; the least recently used tab moves into the list. The list also has **Close N hidden tabs**. Right-click a tab (or middle-click to close it) for:
 
 - **Pin tab:** pinned tabs move to the front, show a pin, have no close button, and are kept by the bulk close actions. Unpin from the same menu.
 - **Duplicate tab:** an unsaved copy of the request, opened next to it.
