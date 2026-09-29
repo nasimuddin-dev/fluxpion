@@ -9,9 +9,10 @@ import { Redactor } from '../util/redact.js';
 import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import type { SecretStore } from '../storage/secrets.js';
-import { createEngineContext, inheritedAuthFor } from '../engine.js';
+import { createEngineContext } from '../engine.js';
 import { executeHttp } from '../protocols/http/client.js';
-import { describeProtos, executeGrpc } from '../protocols/grpc/grpc.js';
+import { describeRoot, executeGrpc, grpcRoot, parseGrpcTarget } from '../protocols/grpc/grpc.js';
+import { reflectServer } from '../protocols/grpc/reflection.js';
 import { readFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
@@ -217,7 +218,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       name: 'grpc_call',
       write: true,
       description:
-        'Call a gRPC method described by .proto files in the workspace, or list the methods (with example requests) when no method is given. Returns the gRPC status, the response message (or the streamed messages), metadata and trailers. {{variables}} resolve from the environment.',
+        'Call a gRPC method described by .proto files in the workspace (or, without protos, by the server itself through server reflection), or list the methods (with example requests) when no method is given. Returns the gRPC status, the response message (or the streamed messages), metadata and trailers. {{variables}} resolve from the environment.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -228,17 +229,19 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           metadata: { type: 'object', additionalProperties: { type: 'string' }, description: 'Metadata (headers)' },
           environment: str('Environment name'),
         },
-        required: ['protos'],
       },
       run: async (a) => {
         const protoFiles = ((a.protos as string[]) ?? []).map((name) => ({ name, text: readFileSync(store.safePath(String(name)), 'utf8') }));
-        if (!a.method) return describeProtos(protoFiles).map((m) => ({ method: m.name, clientStreaming: m.clientStreaming, serverStreaming: m.serverStreaming, example: m.example }));
-        if (!a.target) throw new ApsError('ValidationError', 'Give the server address (target)');
         const environment = checkEnvironment(a.environment);
         const ctx = createEngineContext({ store, secrets, settings, environment });
         try {
-          const r = ctx.vars.resolveDeep({ target: String(a.target), message: a.message ?? {}, metadata: Object.entries((a.metadata as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value })) });
-          const out = await executeGrpc({ target: r.target, method: String(a.method), message: JSON.stringify(r.message), metadata: r.metadata, protoFiles, timeoutMs: settings.defaultTimeoutMs }, { redactor: ctx.redactor });
+          const r = ctx.vars.resolveDeep({ target: String(a.target ?? ''), message: a.message ?? {}, metadata: Object.entries((a.metadata as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value })) });
+          if (!protoFiles.length && !r.target) throw new ApsError('ValidationError', 'Give the server address (target), and protos unless the server offers reflection');
+          // no proto files: the server describes itself (server reflection)
+          const descriptorSet = protoFiles.length ? undefined : (await reflectServer(parseGrpcTarget(r.target), { metadata: r.metadata })).descriptorSet;
+          if (!a.method) return describeRoot(grpcRoot({ protoFiles, descriptorSet })).map((m) => ({ method: m.name, clientStreaming: m.clientStreaming, serverStreaming: m.serverStreaming, example: m.example }));
+          if (!r.target) throw new ApsError('ValidationError', 'Give the server address (target)');
+          const out = await executeGrpc({ target: r.target, method: String(a.method), message: JSON.stringify(r.message), metadata: r.metadata, protoFiles, descriptorSet, timeoutMs: settings.defaultTimeoutMs }, { redactor: ctx.redactor });
           const body = (v: unknown) => clip(ctx.redactor.redactString(JSON.stringify(v)));
           return {
             code: out.code,

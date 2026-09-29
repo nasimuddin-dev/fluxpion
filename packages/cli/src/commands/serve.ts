@@ -16,8 +16,11 @@ import {
   serveTestPionMcp,
   ENGINE_VERSION,
   type McpServerConfig,
-  describeProtos,
+  describeRoot,
   executeGrpc,
+  grpcRoot,
+  parseGrpcTarget,
+  reflectServer,
   Redactor,
 } from '@testpion/core';
 import { EXIT, dim, bold, cyan, green, red, CliError, openWorkspace } from '../shared.js';
@@ -145,27 +148,29 @@ export function registerServeCommands(program: Command): void {
     .description('call a gRPC method (or list the methods in the .proto files when no method is given)')
     .argument('<target>', 'server address: host:port, or grpcs://host:port for TLS')
     .argument('[method]', 'package.Service/Method')
-    .requiredOption('-p, --proto <files...>', '.proto files (with the files they import)')
+    .option('-p, --proto <files...>', '.proto files (with the files they import); without them the server is asked through server reflection')
     .option('-d, --data <json>', 'request message as JSON (a JSON list for client streaming), or @file.json', '{}')
     .option('-H, --metadata <key:value...>', 'metadata entries')
     .option('--tls', 'use TLS')
     .option('--timeout <ms>', 'deadline in ms', '30000')
     .option('--json', 'print the result as JSON (for scripts and AI agents)')
     .action(async (target: string, method: string | undefined, o) => {
-      const protoFiles = (o.proto as string[]).map((f) => ({ name: f.replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
-      if (!method) {
-        const methods = describeProtos(protoFiles);
-        if (o.json) console.log(JSON.stringify(methods, null, 2));
-        else for (const m of methods) console.log(`${m.name} ${dim(`${m.clientStreaming ? 'stream ' : ''}${m.requestType} → ${m.serverStreaming ? 'stream ' : ''}${m.responseType}`)}\n  ${dim(JSON.stringify(m.example))}`);
-        return;
-      }
-      const data = String(o.data).startsWith('@') ? readFileSync(String(o.data).slice(1), 'utf8') : String(o.data);
+      const protoFiles = ((o.proto as string[] | undefined) ?? []).map((f) => ({ name: f.replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
       const metadata = ((o.metadata as string[] | undefined) ?? []).map((kv) => {
         const i = kv.indexOf(':');
         if (i <= 0) throw new CliError(`--metadata expects key:value, got "${kv}"`, EXIT.CONFIG_ERROR);
         return { key: kv.slice(0, i).trim(), value: kv.slice(i + 1).trim() };
       });
-      const r = await executeGrpc({ target, method, message: data, metadata, protoFiles, tls: o.tls, timeoutMs: Number(o.timeout) }, { redactor: new Redactor() });
+      // no proto files: the server describes itself (server reflection)
+      const descriptorSet = protoFiles.length ? undefined : (await reflectServer(parseGrpcTarget(target, o.tls), { metadata })).descriptorSet;
+      if (!method) {
+        const methods = describeRoot(grpcRoot({ protoFiles, descriptorSet }));
+        if (o.json) console.log(JSON.stringify(methods, null, 2));
+        else for (const m of methods) console.log(`${m.name} ${dim(`${m.clientStreaming ? 'stream ' : ''}${m.requestType} → ${m.serverStreaming ? 'stream ' : ''}${m.responseType}`)}\n  ${dim(JSON.stringify(m.example))}`);
+        return;
+      }
+      const data = String(o.data).startsWith('@') ? readFileSync(String(o.data).slice(1), 'utf8') : String(o.data);
+      const r = await executeGrpc({ target, method, message: data, metadata, protoFiles, descriptorSet, tls: o.tls, timeoutMs: Number(o.timeout) }, { redactor: new Redactor() });
       if (o.json) console.log(JSON.stringify(r, null, 2));
       else {
         console.log(`${r.code === 0 ? green(`${r.code} ${r.codeName}`) : red(`${r.code} ${r.codeName}`)} ${dim(`${r.method} @ ${r.target} · ${Math.round(r.durationMs)} ms`)}${r.details ? ` ${r.details}` : ''}`);

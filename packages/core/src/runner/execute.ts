@@ -24,7 +24,8 @@ import type { Redactor } from '../util/redact.js';
 import type { Logger } from '../log/logger.js';
 import { executeHttp } from '../protocols/http/client.js';
 import { executeGraphQL } from '../protocols/graphql/graphql.js';
-import { executeGrpc } from '../protocols/grpc/grpc.js';
+import { executeGrpc, parseGrpcTarget } from '../protocols/grpc/grpc.js';
+import { reflectServer } from '../protocols/grpc/reflection.js';
 import { mcpResultBody, type McpManager } from '../protocols/mcp/client.js';
 import { estimateCost, renderPrompt, type ProviderRegistry } from '../ai/index.js';
 import { runAgent, type AgentTool } from '../ai/agent.js';
@@ -318,13 +319,18 @@ async function runGraphQL(test: GraphQLTest, scope: VariableScope, svc: ExecServ
 }
 
 async function runGrpc(test: GrpcTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {
-  if (!svc.readFile) throw new ApsError('ConfigurationError', 'gRPC tests need a workspace to read their .proto files from');
-  const protoFiles = test.protos.map((name) => ({ name, text: svc.readFile!(name) }));
   const r = scope.resolveDeep({ target: test.target, method: test.method, message: test.message, metadata: test.metadata });
+  // without proto files, the server describes itself (server reflection)
+  let protoFiles: Array<{ name: string; text: string }> | undefined;
+  let descriptorSet: string | undefined;
+  if (test.protos.length) {
+    if (!svc.readFile) throw new ApsError('ConfigurationError', 'gRPC tests need a workspace to read their .proto files from');
+    protoFiles = test.protos.map((name) => ({ name, text: svc.readFile!(name) }));
+  } else descriptorSet = (await reflectServer(parseGrpcTarget(r.target, test.tls), { metadata: r.metadata })).descriptorSet;
   const s = span.child(`grpc ${r.method}`, 'grpc', { input: { message: r.message } });
   try {
     const out = await executeGrpc(
-      { target: r.target, method: r.method, message: r.message === undefined ? undefined : JSON.stringify(r.message), metadata: r.metadata, protoFiles, tls: test.tls, timeoutMs: test.timeoutMs ?? svc.defaultTimeoutMs },
+      { target: r.target, method: r.method, message: r.message === undefined ? undefined : JSON.stringify(r.message), metadata: r.metadata, protoFiles, descriptorSet, tls: test.tls, timeoutMs: test.timeoutMs ?? svc.defaultTimeoutMs },
       { signal, redactor: svc.redactor },
     );
     const body = out.messages ? out.messages.map((m) => m.data) : (out.response ?? null);

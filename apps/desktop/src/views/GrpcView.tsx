@@ -1,4 +1,4 @@
-import { FileCode2, Plus, Send, Sparkles, Square, Trash2, Waypoints } from 'lucide-react';
+import { FileCode2, Plus, RefreshCw, ScanSearch, Send, Sparkles, Square, Trash2, Waypoints } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, useApp } from '../store';
@@ -47,6 +47,9 @@ const drafts = persisted('grpc', {
   protoFiles: [] as ProtoFile[],
   tls: false,
   timeoutMs: 30000,
+  /** Descriptors from server reflection (used instead of the proto files while set). */
+  descriptorSet: undefined as string | undefined,
+  reflectedFrom: undefined as string | undefined,
 });
 
 const kind = (m: MethodInfo) => (m.clientStreaming && m.serverStreaming ? 'bidi stream' : m.clientStreaming ? 'client stream' : m.serverStreaming ? 'server stream' : 'unary');
@@ -64,20 +67,21 @@ export function GrpcView() {
   const [error, setError] = useState<string>();
   const [selected, setSelected] = useState<number>();
   const [editing, setEditing] = useState<number>();
+  const [reflecting, setReflecting] = useState(false);
   const env = useApp((s) => s.environment);
   const sendingRef = useRef<string | undefined>(undefined);
   sendingRef.current = sending;
   useEffect(() => drafts.save(d), [d]);
 
-  // methods follow the proto files
+  // methods follow the proto files (or the reflected descriptors)
   useEffect(() => {
-    if (!d.protoFiles.length) {
+    if (!d.protoFiles.length && !d.descriptorSet) {
       setMethods([]);
       setProtoError(undefined);
       return;
     }
     const t = setTimeout(() => {
-      call<MethodInfo[]>('grpc.describe', { protoFiles: d.protoFiles })
+      call<MethodInfo[]>('grpc.describe', d.descriptorSet ? { descriptorSet: d.descriptorSet } : { protoFiles: d.protoFiles })
         .then((m) => {
           setMethods(m);
           setProtoError(undefined);
@@ -86,7 +90,7 @@ export function GrpcView() {
         .catch((e) => setProtoError(asError(e).message));
     }, 300);
     return () => clearTimeout(t);
-  }, [d.protoFiles]);
+  }, [d.protoFiles, d.descriptorSet]);
 
   useEffect(
     () =>
@@ -108,6 +112,21 @@ export function GrpcView() {
     setTab('protos');
   };
 
+  /** Ask the server for its services (gRPC server reflection) instead of using proto files. */
+  const reflect = async () => {
+    setReflecting(true);
+    try {
+      const r = await call<{ services: string[]; descriptorSet: string; methods: MethodInfo[] }>('grpc.reflect', { target: d.target, tls: d.tls || undefined, metadata: d.metadata, environment: env });
+      set({ descriptorSet: r.descriptorSet, reflectedFrom: d.target });
+      useApp.getState().toast(`Server reflection: ${r.services.length} services, ${r.methods.length} methods`, 'success');
+      setTab('message');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      setReflecting(false);
+    }
+  };
+
   const send = async () => {
     if (!current) return;
     const id = `grpc-${Date.now().toString(36)}`;
@@ -116,7 +135,7 @@ export function GrpcView() {
     setError(undefined);
     setSelected(undefined);
     try {
-      const r = await call<GrpcResult>('grpc.send', { id, target: d.target, method: d.method, message: d.message, metadata: d.metadata, protoFiles: d.protoFiles, tls: d.tls || undefined, timeoutMs: d.timeoutMs, environment: env });
+      const r = await call<GrpcResult>('grpc.send', { id, target: d.target, method: d.method, message: d.message, metadata: d.metadata, ...(d.descriptorSet ? { descriptorSet: d.descriptorSet } : { protoFiles: d.protoFiles }), tls: d.tls || undefined, timeoutMs: d.timeoutMs, environment: env });
       setResult(r);
       setResTab('response');
       if (r.unresolved?.length) useApp.getState().toast(`Unresolved variables: ${r.unresolved.join(', ')}`, 'error');
@@ -139,7 +158,7 @@ export function GrpcView() {
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <VarInput ariaLabel="gRPC server" className="w-72 h-8" value={d.target} onChange={(target) => set({ target })} placeholder="localhost:50051 or grpcs://api.example.com" />
         <select className="field h-8 flex-1 min-w-0 mono text-xs" aria-label="Method" value={d.method} onChange={(e) => set({ method: e.target.value })} disabled={!methods.length}>
-          {!methods.length && <option value="">Add a .proto file to choose a method</option>}
+          {!methods.length && <option value="">Add a .proto file or use server reflection to choose a method</option>}
           {methods.map((m) => (
             <option key={m.name} value={m.name}>
               {m.name} ({kind(m)})
@@ -165,7 +184,7 @@ export function GrpcView() {
               tabs={[
                 { id: 'message', label: current?.clientStreaming ? 'Messages' : 'Message' },
                 { id: 'metadata', label: 'Metadata', badge: d.metadata.length },
-                { id: 'protos', label: 'Proto files', badge: d.protoFiles.length },
+                { id: 'protos', label: d.descriptorSet ? 'Service definition' : 'Proto files', badge: d.descriptorSet ? undefined : d.protoFiles.length },
                 { id: 'settings', label: 'Settings' },
               ]}
             />
@@ -197,7 +216,30 @@ export function GrpcView() {
             )}
             {tab === 'protos' && (
               <div className="flex-1 min-h-0 flex flex-col">
-                <div className="flex items-center gap-2 px-3 h-10 border-b border-line shrink-0">
+                <div className="flex items-center gap-2 px-3 min-h-10 py-1.5 border-b border-line shrink-0 text-sm">
+                  <ScanSearch size={14} className="text-muted shrink-0" />
+                  {d.descriptorSet ? (
+                    <>
+                      <span className="truncate">
+                        Using <b>server reflection</b> from <span className="mono">{d.reflectedFrom}</span>
+                      </span>
+                      <Button size="sm" variant="ghost" className="ml-auto" icon={<RefreshCw size={12} />} loading={reflecting} onClick={() => void reflect()}>
+                        Refresh
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => set({ descriptorSet: undefined, reflectedFrom: undefined })}>
+                        Use proto files
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-muted">No proto files? If the server offers reflection, it can describe itself.</span>
+                      <Button size="sm" className="ml-auto" icon={<ScanSearch size={12} />} loading={reflecting} disabled={!d.target.trim()} onClick={() => void reflect()}>
+                        Use server reflection
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <div className={cx('flex items-center gap-2 px-3 h-10 border-b border-line shrink-0', d.descriptorSet && 'opacity-50 pointer-events-none')}>
                   <Button size="sm" icon={<FileCode2 size={12} />} onClick={() => void addProto()}>
                     Add .proto file
                   </Button>
@@ -207,7 +249,22 @@ export function GrpcView() {
                   <span className="text-xs text-muted ml-auto">{methods.length} methods</span>
                 </div>
                 {protoError && <div className="px-3 py-2 text-xs text-bad border-b border-line">{protoError}</div>}
-                {!d.protoFiles.length ? (
+                {d.descriptorSet ? (
+                  <div className="p-3 text-sm text-muted flex flex-col gap-1 overflow-auto">
+                    {[...new Set(methods.map((m) => m.service))].map((svc) => (
+                      <div key={svc}>
+                        <div className="mono text-fg">{svc}</div>
+                        {methods
+                          .filter((m) => m.service === svc)
+                          .map((m) => (
+                            <div key={m.name} className="pl-4 mono text-xs">
+                              {m.method} <span className="text-muted">({kind(m)})</span>
+                            </div>
+                          ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : !d.protoFiles.length ? (
                   <Empty icon={<Waypoints size={26} />} title="Describe the service with .proto files">
                     Add the service's .proto file and the files it imports. Imports are matched by path, so name each file as the import statement does (e.g. <span className="mono">vet/v1/common.proto</span>). Google's well-known types are built in.
                   </Empty>

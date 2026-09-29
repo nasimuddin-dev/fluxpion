@@ -24,7 +24,7 @@ testpion env list|order -w    List environments; set their order
 testpion history list|diff -w   Response history of saved requests; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
-testpion grpc <target> [method] -p <protos>   Call a gRPC method, or list the methods of .proto files
+testpion grpc <target> [method] [-p protos]   Call a gRPC method, or list the methods (.proto files or server reflection)
 testpion report <results.jsonl>              Re-generate reports
 ```
 
@@ -106,7 +106,7 @@ testpion mock-mcp mocks/customer.mcp-mock.yaml --http -p 3333   # Streamable HTT
 
 ## `grpc`
 
-Calls a [gRPC](/api-testing/grpc) method described by `.proto` files, or lists the methods (with example requests) when no method is given. The exit code is 0 for status `OK` and 1 otherwise.
+Calls a [gRPC](/api-testing/grpc) method described by `.proto` files (or, without `-p`, by the server through server reflection), or lists the methods (with example requests) when no method is given. The exit code is 0 for status `OK` and 1 otherwise.
 
 ```bash
 testpion grpc localhost:4014 -p protos/vet/v1/pets.proto                  # list methods
@@ -116,7 +116,7 @@ testpion grpc grpcs://api.example.com vet.v1.PetService/ListPets -p pets.proto -
 
 | Option | Description |
 |---|---|
-| `-p, --proto <files...>` | The `.proto` files, including the ones they import. |
+| `-p, --proto <files...>` | The `.proto` files, including the ones they import. Leave out to use server reflection. |
 | `-d, --data <json>` | The request message as JSON (a JSON list for client streaming), or `@file.json`. Default `{}`. |
 | `-H, --metadata <key:value...>` | Metadata entries. |
 | `--tls` | Use TLS (also on with a `grpcs://` address). |

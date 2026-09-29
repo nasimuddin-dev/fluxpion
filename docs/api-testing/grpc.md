@@ -7,7 +7,7 @@ description: "Call gRPC services from .proto files: unary, server-streaming, cli
 
 # gRPC
 
-The **gRPC** view calls any gRPC service described by `.proto` files.
+The **gRPC** view calls any gRPC service described by `.proto` files, or by the server itself through [server reflection](#server-reflection).
 
 1. On **Proto files**, add the service's `.proto` file and the files it imports. Imports are matched by path, so give each file the path its import statement uses, such as `vet/v1/common.proto` (rename a file by editing its path). Google's well-known types (`google/protobuf/timestamp.proto` …) are built in.
 2. Enter the server address, `host:port` (plaintext) or `grpcs://host:port` (TLS), and pick a method. Methods are listed as `package.Service/Method` with their kind (unary, server stream, client stream, bidi stream).
@@ -15,6 +15,12 @@ The **gRPC** view calls any gRPC service described by `.proto` files.
 4. Add **Metadata** (headers such as `authorization`) if the service needs it, then click **Invoke**.
 
 The response shows the gRPC status (`0 OK`, `5 NOT_FOUND` …) with its details, the time, the response message as a tree, the response **Metadata** and **Trailers**.
+
+## Server reflection
+
+Many servers describe their own services (gRPC server reflection). Enter the address and click **Use server reflection** on the **Proto files** tab: TestPion asks the server for its services and their message types, and the methods appear without any `.proto` file. **Refresh** asks again after the server changes; **Use proto files** switches back. Metadata is sent with the reflection request, for servers that require authentication.
+
+Reflection `v1` is used, with `v1alpha` as a fallback. A server without reflection says so, and then the `.proto` files are needed.
 
 ## Streaming
 
@@ -65,14 +71,13 @@ assertions:
     expected: Byron
 ```
 
-JSONPath assertions run on the response message, or on the list of messages for streaming methods (`$[0].name`). Without a `grpc-status` assertion, a test passes only with status `OK`.
+Leave `protos` empty (`protos: []`) to describe the service through server reflection. JSONPath assertions run on the response message, or on the list of messages for streaming methods (`$[0].name`). Without a `grpc-status` assertion, a test passes only with status `OK`.
 
 - From a terminal: [`testpion grpc`](../cli/reference.md#grpc) lists the methods of `.proto` files or calls one.
 - AI agents using [`testpion mcp-server`](../ai-testing/mcp-server.md) get the `grpc_call` tool.
 
 ## Limits
 
-- Server reflection isn't supported yet: the `.proto` files are needed.
 - mTLS (client certificates) isn't supported yet for gRPC.
 
 :::

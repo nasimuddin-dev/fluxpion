@@ -21,6 +21,7 @@ export * from './openapi/contract.js';
 export * from './import/workspace-import.js';
 export * from './protocols/graphql/graphql.js';
 export * from './protocols/grpc/grpc.js';
+export * from './protocols/grpc/reflection.js';
 export * from './protocols/mcp/client.js';
 export * from './protocols/websocket/websocket.js';
 export * from './protocols/registry.js';

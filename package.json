@@ -26,6 +26,7 @@
     "docs:build": "npm run build -w docs"
   },
   "devDependencies": {
+    "@grpc/reflection": "^1.0.4",
     "@types/node": "^24.0.0",
     "@types/ws": "^8.18.1",
     "typescript": "^5.9.0",

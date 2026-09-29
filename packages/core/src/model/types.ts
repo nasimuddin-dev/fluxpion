@@ -272,7 +272,10 @@ export interface GrpcTest extends TestBase {
   /** Request message; a list of messages for client-streaming methods. */
   message?: unknown;
   metadata?: KeyValue[];
-  /** .proto files (workspace paths); imports resolve by path, e.g. `import "vet/v1/common.proto"` finds `protos/vet/v1/common.proto`. */
+  /**
+   * .proto files (workspace paths); imports resolve by path, e.g. `import "vet/v1/common.proto"` finds
+   * `protos/vet/v1/common.proto`. Empty: the server is asked through gRPC server reflection.
+   */
   protos: string[];
   tls?: boolean;
 }

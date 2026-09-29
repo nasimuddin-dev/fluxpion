@@ -1,5 +1,5 @@
 /** RPC handlers: gRPC calls described by .proto files (sent as text, so they work the same in a hosted version). */
-import { describeProtos, executeGrpc, shortId, type GrpcRequestSpec, type ProtoFile } from '@testpion/core';
+import { describeRoot, executeGrpc, grpcRoot, parseGrpcTarget, reflectServer, shortId, type GrpcRequestSpec, type ProtoFile } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
 export interface GrpcSendParams extends GrpcRequestSpec {
@@ -10,8 +10,18 @@ export interface GrpcSendParams extends GrpcRequestSpec {
 
 export function grpcHandlers(be: Backend): Handlers {
   return {
-    /** Methods in the proto files, with example requests. */
-    'grpc.describe': ({ protoFiles }: { protoFiles: ProtoFile[] }) => describeProtos(protoFiles),
+    /** Methods in the proto files (or reflected descriptors), with example requests. */
+    'grpc.describe': ({ protoFiles, descriptorSet }: { protoFiles?: ProtoFile[]; descriptorSet?: string }) => describeRoot(grpcRoot({ protoFiles, descriptorSet })),
+    /** Ask the server for its services through gRPC server reflection (no proto files needed). */
+    'grpc.reflect': async (p: { target: string; tls?: boolean; metadata?: Array<{ key: string; value: string }>; environment?: string }) => {
+      const ctx = be.context({ environment: p.environment });
+      try {
+        const r = await reflectServer(parseGrpcTarget(ctx.vars.resolve(p.target), p.tls), { metadata: ctx.vars.resolveDeep(p.metadata ?? []) });
+        return { ...r, methods: describeRoot(grpcRoot({ descriptorSet: r.descriptorSet })) };
+      } finally {
+        await ctx.dispose();
+      }
+    },
     /** Call a method; streamed responses also arrive live on `grpc.messages`. Cancel with grpc.cancel. */
     'grpc.send': async (p: GrpcSendParams) => {
       const id = p.id ?? shortId('grpc-');

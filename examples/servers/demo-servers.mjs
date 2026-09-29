@@ -18,6 +18,7 @@ import { buildSchema, graphql } from 'graphql';
 import { WebSocketServer } from 'ws';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
+import { ReflectionService } from '@grpc/reflection';
 
 const json = (res, status, body, headers = {}) => {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
@@ -335,6 +336,8 @@ async function startGrpcServer(port) {
       call.on('end', () => cb(null, { checked_in: names.length, names }));
     },
   });
+  // server reflection: clients can list and call the methods without the .proto file
+  new ReflectionService(def).addToServer(server);
   await new Promise((resolve, reject) => server.bindAsync(`127.0.0.1:${port}`, grpc.ServerCredentials.createInsecure(), (e) => (e ? reject(e) : resolve())));
   return server;
 }

@@ -5,6 +5,7 @@ import { ApsError } from '../../errors.js';
 import type { KeyValue } from '../../model/types.js';
 import { assertUrlAllowed } from '../../net/policy.js';
 import type { Redactor } from '../../util/redact.js';
+import { rootFromDescriptorSet } from './reflection.js';
 
 /**
  * gRPC: calls described by .proto files (given as text, so nothing depends on local paths), with
@@ -73,7 +74,17 @@ const normalize = (p: string) => p.replace(/\\/g, '/').replace(/^\.\//, '');
 
 /** Every RPC method in the files, with an example request. */
 export function describeProtos(files: ProtoFile[]): GrpcMethodInfo[] {
-  const root = parseProtos(files);
+  return describeRoot(parseProtos(files));
+}
+
+/** The service definitions of a call: its proto files, or descriptors from server reflection. */
+export function grpcRoot(spec: { protoFiles?: ProtoFile[]; descriptorSet?: string }): protobuf.Root {
+  if (spec.descriptorSet) return rootFromDescriptorSet(spec.descriptorSet);
+  return parseProtos(spec.protoFiles ?? []);
+}
+
+/** Every RPC method of a parsed root, with an example request. */
+export function describeRoot(root: protobuf.Root): GrpcMethodInfo[] {
   const out: GrpcMethodInfo[] = [];
   const walk = (ns: protobuf.NamespaceBase) => {
     for (const obj of ns.nestedArray) {
@@ -143,7 +154,10 @@ export interface GrpcRequestSpec {
   /** The request message as JSON; for client-streaming methods, an array of messages. */
   message?: string;
   metadata?: KeyValue[];
-  protoFiles: ProtoFile[];
+  /** .proto files describing the service (or `descriptorSet`). */
+  protoFiles?: ProtoFile[];
+  /** FileDescriptorSet (base64) from server reflection, instead of proto files. */
+  descriptorSet?: string;
   /** Use TLS (default: from the target's scheme; plain `host:port` is plaintext). */
   tls?: boolean;
   /** Deadline in ms (default 30 s). */
@@ -170,7 +184,8 @@ export interface GrpcResponseData {
 
 const CODE_NAMES = Object.fromEntries(Object.entries(grpc.status).filter(([, v]) => typeof v === 'number').map(([k, v]) => [v as number, k]));
 
-function parseTarget(target: string, tls?: boolean): { address: string; tls: boolean } {
+/** Address and TLS of a target (`host:port`, `grpcs://host:port`, `grpc://…`, `https://…`). */
+export function parseGrpcTarget(target: string, tls?: boolean): { address: string; tls: boolean } {
   const t = target.trim();
   const m = /^(grpcs?|https?):\/\/([^/]+)\/?$/i.exec(t);
   if (m) {
@@ -201,15 +216,15 @@ function parseMessage(text: string | undefined, what: string): unknown {
 export async function executeGrpc(spec: GrpcRequestSpec, opts: { signal?: AbortSignal; redactor?: Redactor; onMessage?: (data: unknown, atMs: number) => void } = {}): Promise<GrpcResponseData> {
   const t0 = performance.now();
   const ms = () => Math.round((performance.now() - t0) * 100) / 100;
-  const { address, tls } = parseTarget(spec.target, spec.tls);
+  const { address, tls } = parseGrpcTarget(spec.target, spec.tls);
   await assertUrlAllowed(new URL(`${tls ? 'https' : 'http'}://${address}`));
 
-  const methods = describeProtos(spec.protoFiles);
+  const root = grpcRoot(spec);
+  const methods = describeRoot(root);
   const name = spec.method.replace(/^\//, '');
   const info = methods.find((m) => m.name === name || `${m.service.split('.').pop()}/${m.method}` === name);
   if (!info) throw new ApsError('ValidationError', `Method "${spec.method}" is not in the proto files`, { suggestions: [`Available: ${methods.map((m) => m.name).slice(0, 10).join(', ') || 'none'}`] });
 
-  const root = parseProtos(spec.protoFiles);
   const pkg = grpc.loadPackageDefinition(protoLoader.fromJSON(root.toJSON(), LOADER_OPTIONS));
   const Ctor = info.service.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], pkg) as grpc.ServiceClientConstructor | undefined;
   if (!Ctor) throw new ApsError('ValidationError', `Service ${info.service} could not be loaded`);
