@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, promptText, useApp, persisted } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
-import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedExample, SavedHttpRequest } from '../types';
+import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedExample, SavedHttpRequest, SseEvent } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
 import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
@@ -36,6 +36,7 @@ import { CodeEditor } from '../components/CodeEditor';
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
 import { COMMON_HEADERS, KeyValueEditor } from '../components/KeyValueEditor';
 import { ResponseViewer } from '../components/ResponseViewer';
+import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
 import { pickTextFile } from '../lib/files';
@@ -132,6 +133,8 @@ export function RestView() {
     setActive(t.id);
   };
   const streams = useRef<Record<string, string>>({});
+  /** Server-Sent Events arriving for requests still being sent, by send id (shown live). */
+  const [liveEvents, setLiveEvents] = useState<Record<string, SseEvent[]>>({});
 
   useEffect(() => drafts.save({ tabs, active }), [tabs, active]);
   const loadCollections = useCallback(() => call<Collection[]>('col.list').then(setCollections), []);
@@ -143,6 +146,17 @@ export function RestView() {
       on<Array<{ id: string; chunk: string }>>('http.chunks', (items) => {
         for (const it of items) streams.current[it.id] = (streams.current[it.id] ?? '') + it.chunk;
       }),
+    [],
+  );
+  useEffect(
+    () =>
+      on<Array<{ id: string; event: SseEvent }>>('http.sse', (items) =>
+        setLiveEvents((cur) => {
+          const next = { ...cur };
+          for (const it of items) next[it.id] = [...(next[it.id] ?? []), it.event];
+          return next;
+        }),
+      ),
     [],
   );
 
@@ -247,6 +261,11 @@ export function RestView() {
       setResults((rs) => ({ ...rs, [tabId]: { error: asError(e) } }));
     } finally {
       delete streams.current[id];
+      setLiveEvents((cur) => {
+        const next = { ...cur };
+        delete next[id];
+        return next;
+      });
       useApp.getState().setActivity(id);
       setSending((s) => {
         const n = { ...s };
@@ -706,7 +725,9 @@ export function RestView() {
         <Split id="rest-req-res" direction="vertical" initial={45}>
           <RequestEditor tab={tab} update={update} setReq={setReq} setParams={setParams} setExamples={setExamples} />
           <div className="h-full min-h-0 flex flex-col">
-            {sending[tab.id] ? (
+            {sending[tab.id] && liveEvents[sending[tab.id]!] ? (
+              <SseEvents events={liveEvents[sending[tab.id]!]!} live onStop={cancel} />
+            ) : sending[tab.id] ? (
               <div className="h-full grid place-items-center text-muted text-sm">
                 <div className="flex flex-col items-center gap-2">
                   <div className="relative w-40 h-1 bg-panel2 overflow-hidden rounded indeterminate" />

@@ -97,6 +97,20 @@ export interface HttpResponseData {
   timeline: Array<{ name: string; startMs: number; durationMs: number }>;
   url: string;
   json?: unknown;
+  /** Server-Sent Events of a text/event-stream response. */
+  events?: SseEvent[];
+  eventsDropped?: number;
+  /** The user stopped the stream (the response holds what arrived until then). */
+  streamStopped?: boolean;
+}
+
+export interface SseEvent {
+  event: string;
+  data: string;
+  id?: string;
+  retry?: number;
+  /** Milliseconds from the start of the request. */
+  atMs: number;
 }
 
 export interface SavedExample {

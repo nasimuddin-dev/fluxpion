@@ -70,7 +70,17 @@ The status, duration, size, headers, cookies and a timeline (prepare â†’ TTFB â†
 - **Raw** is a virtualised text view with search.
 - **Preview** renders HTML in a sandboxed frame.
 
-The full body is streamed to `payloads/` on disk. The viewer only holds a preview, 2 MB by default and configurable in Settings. Larger bodies show a *truncated* badge; **Save response** exports the complete file. Streaming responses (`text/event-stream`) appear incrementally on the **Stream** tab.
+The full body is streamed to `payloads/` on disk. The viewer only holds a preview, 2 MB by default and configurable in Settings. Larger bodies show a *truncated* badge; **Save response** exports the complete file.
+
+## Server-Sent Events
+
+A `text/event-stream` response (live feeds, notifications, streaming LLM APIs) is shown **event by event while it arrives**: time, event type, id and data, newest at the bottom. Click an event to see its data in full (JSON as a tree), and filter by type, id or data.
+
+- The stream stays open for as long as the server sends it: the request timeout applies only until the response starts.
+- **Stop** ends the stream and keeps the events received so far, marked *stopped*.
+- When the response ends, it opens on the **Events** tab. The raw text is on **Body**.
+- Up to 10,000 events are kept per response.
+- AI agents using [`testpion mcp-server`](/cli/reference#mcp-server) get the parsed events from `send_request`.
 
 ## Response history and compare
 

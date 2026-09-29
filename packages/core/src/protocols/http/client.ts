@@ -7,6 +7,10 @@ import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelineP
 import { ApsError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
 import { digestAuthorization, parseDigestChallenge, signAwsV4 } from './signing.js';
+import { isEventStream, SseParser, type SseEvent } from './sse.js';
+
+/** Events kept per SSE response (the stream itself can be endless). */
+const MAX_SSE_EVENTS = 10_000;
 import type { Redactor } from '../../util/redact.js';
 import { shortId } from '../../util/ids.js';
 import type { CookieJar } from '../../cookies/cookie-jar.js';
@@ -20,6 +24,10 @@ export interface HttpExecOptions extends AuthContext {
   maxPreviewBytes?: number;
   /** Receives decoded chunks while the body streams (SSE, chunked responses). */
   onChunk?: (chunk: string) => void;
+  /** Called once the final response's status and headers have arrived, before the body is read. */
+  onResponseStart?: (status: number, headers: Headers) => void;
+  /** Receives each Server-Sent Event as it arrives (text/event-stream responses). */
+  onSseEvent?: (event: SseEvent) => void;
   redactor?: Redactor;
   /** Skip body preview decoding entirely (load testing). */
   discardBody?: boolean;
@@ -268,6 +276,7 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
     if (jar) setJarCookies(headers, jar, current, explicitCookie);
   }
   mark('waiting (TTFB)', tSend);
+  opts.onResponseStart?.(res.status, res.headers);
 
   const tDown = performance.now();
   const maxPreview = opts.maxPreviewBytes ?? s.maxPreviewBytes ?? DEFAULT_MAX_PREVIEW;
@@ -277,13 +286,34 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
   let file: WriteStream | undefined;
   let payloadPath: string | undefined;
   const decoder = opts.onChunk ? new TextDecoder() : undefined;
+  // Server-Sent Events: parsed as they arrive; stopping the request keeps the events received so far
+  const sse = !opts.discardBody && isEventStream(res.headers.get('content-type')) ? { parser: new SseParser(), decoder: new TextDecoder(), events: [] as SseEvent[], total: 0 } : undefined;
+  let streamStopped = false;
 
   if (res.body && method !== 'HEAD') {
     const reader = res.body.getReader();
     try {
       for (;;) {
-        const { done, value } = await reader.read();
+        let step;
+        try {
+          step = await reader.read();
+        } catch (e) {
+          if (sse && opts.signal?.aborted) {
+            streamStopped = true;
+            break;
+          }
+          throw e;
+        }
+        const { done, value } = step;
         if (done) break;
+        if (sse) {
+          const atMs = round(performance.now() - t0);
+          for (const ev of sse.parser.push(sse.decoder.decode(value, { stream: true }), atMs)) {
+            sse.total++;
+            if (sse.events.length < MAX_SSE_EVENTS) sse.events.push(ev);
+            opts.onSseEvent?.(ev);
+          }
+        }
         size += value.byteLength;
         if (opts.discardBody) continue;
         if (kept < maxPreview) {
@@ -346,6 +376,11 @@ export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions =
     redirected: hops > 0 || res.redirected,
     json,
   };
+  if (sse) {
+    response.events = sse.events;
+    if (sse.total > sse.events.length) response.eventsDropped = sse.total - sse.events.length;
+  }
+  if (streamStopped) response.streamStopped = true;
   return { response, prepared };
 }
 

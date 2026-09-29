@@ -24,6 +24,7 @@ Key facts for agents:
 ## API testing
 
 - [REST and HTTP](https://nasimuddin-dev.github.io/testpion/api-testing/rest): requests, responses, `pm.*` scripts, console, tabs and history
+- [Server-Sent Events](https://nasimuddin-dev.github.io/testpion/api-testing/rest#server-sent-events): text/event-stream responses parsed event by event (live, Stop keeps events); MCP send_request returns them
 - [Authentication](https://nasimuddin-dev.github.io/testpion/api-testing/authentication): API key, Basic, Bearer, JWT, OAuth 2.0, AWS Signature v4, Digest, mTLS
 - [Environments and variables](https://nasimuddin-dev.github.io/testpion/api-testing/environments): scopes and precedence, secrets, quick look, export
 - [Cookies](https://nasimuddin-dev.github.io/testpion/api-testing/cookies): the workspace cookie jar, `pm.cookies.jar()`, CLI cookie jar files

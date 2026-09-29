@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useState } from 'react';
 import { call, visualizationUrl } from '../api';
 import type { CheckResult, HttpResponseData, Trace } from '../types';
+import { SseEvents } from './SseEvents';
 import { formatBytes, formatMs } from '../lib/format';
 import { useApp } from '../store';
 import { CheckList } from './Results';
@@ -12,7 +13,7 @@ import { TraceView } from './TraceView';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
 
-type Tab = 'body' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream' | 'history';
+type Tab = 'body' | 'events' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream' | 'history';
 
 export function ResponseViewer({
   response,
@@ -49,7 +50,8 @@ export function ResponseViewer({
   /** Ask the AI assistant to explain this (error) response. */
   onExplain?(): void;
 }) {
-  const [tab, setTab] = useState<Tab>(() => (checks?.some((c) => !c.passed) ? 'tests' : 'body'));
+  // an event stream opens on its events
+  const [tab, setTab] = useState<Tab>(() => (checks?.some((c) => !c.passed) ? 'tests' : response.events ? 'events' : 'body'));
   // a response with a visualization opens on it, like Postman's Visualize view
   const [mode, setMode] = useState<'pretty' | 'raw' | 'preview' | 'visualize'>(() => (visualizer ? 'visualize' : 'pretty'));
   useEffect(() => {
@@ -115,6 +117,7 @@ export function ResponseViewer({
         value={tab}
         onChange={setTab}
         tabs={[
+          ...(response.events ? [{ id: 'events' as Tab, label: 'Events', badge: response.events.length }] : []),
           { id: 'body', label: 'Body' },
           { id: 'headers', label: 'Headers', badge: response.headers.length },
           { id: 'cookies', label: 'Cookies', badge: response.cookies.length },
@@ -196,6 +199,7 @@ export function ResponseViewer({
           </div>
         )}
         {tab === 'stream' && <RawView text={stream ?? ''} />}
+        {tab === 'events' && response.events && <SseEvents events={response.events} stopped={response.streamStopped} dropped={response.eventsDropped} />}
         {tab === 'trace' && (trace ? <TraceView trace={trace} /> : <Empty title="Loading trace…" />)}
         {tab === 'code' && <RawView text={curl ?? ''} />}
       </div>

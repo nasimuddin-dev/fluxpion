@@ -113,6 +113,12 @@ export interface HttpResponseData {
   redirected: boolean;
   /** Parsed JSON body when the preview is complete and parses. */
   json?: unknown;
+  /** Server-Sent Events of a text/event-stream response, in arrival order. */
+  events?: Array<{ event: string; data: string; id?: string; retry?: number; atMs: number }>;
+  /** Events not kept because the stream exceeded the limit. */
+  eventsDropped?: number;
+  /** The stream was stopped by the user (the response holds what arrived until then). */
+  streamStopped?: boolean;
 }
 
 /* ------------------------------------------------------------------ graphql */

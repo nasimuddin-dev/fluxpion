@@ -154,7 +154,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       name: 'send_request',
       write: true,
       description:
-        'Send an HTTP request and return status, headers, body and timing. Either name a saved request (collection + request: its scripts and assertions run too) or give method + url (+ headers, body) for an ad-hoc request. {{variables}} resolve from the environment.',
+        'Send an HTTP request and return status, headers, body and timing. Either name a saved request (collection + request: its scripts and assertions run too) or give method + url (+ headers, body) for an ad-hoc request. {{variables}} resolve from the environment. Server-Sent Events responses (text/event-stream) also return their parsed events.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -196,6 +196,14 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             url: response.url,
             headers: Object.fromEntries(ctx.redactor.redact(response.headers)),
             body: clip(ctx.redactor.redactString(response.bodyPreview)),
+            // Server-Sent Events, parsed (an endless stream stops at the timeout and keeps what arrived)
+            ...(response.events
+              ? {
+                  eventCount: response.events.length + (response.eventsDropped ?? 0),
+                  events: response.events.slice(0, 100).map((e) => ({ event: e.event, ...(e.id !== undefined ? { id: e.id } : {}), data: clip(ctx.redactor.redactString(e.data)), atMs: e.atMs })),
+                  ...(response.streamStopped ? { streamStopped: true } : {}),
+                }
+              : {}),
             unresolvedVariables: ctx.vars.unresolved.size ? [...ctx.vars.unresolved] : undefined,
           };
         } finally {

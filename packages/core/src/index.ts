@@ -16,6 +16,7 @@ export * from './trace/tracer.js';
 export * from './protocols/http/client.js';
 export * from './protocols/http/auth.js';
 export * from './protocols/http/signing.js';
+export * from './protocols/http/sse.js';
 export * from './protocols/graphql/graphql.js';
 export * from './protocols/mcp/client.js';
 export * from './protocols/websocket/websocket.js';

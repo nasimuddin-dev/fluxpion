@@ -23,6 +23,7 @@ import {
   WorkspaceSearch,
   WorkspaceStore,
   batcher,
+  isEventStream,
   createEngineContext,
   estimateCost,
   executeHttp,
@@ -477,6 +478,7 @@ export class Backend {
     const tracer = new Tracer(p.name ?? `${p.request.method} ${p.request.url}`, ctx.redactor);
     const root = tracer.start(p.name ?? 'request', 'http');
     const chunks = this.batched<unknown>('http.chunks', 80);
+    const sseEvents = this.batched<unknown>('http.sse', 100);
     let scriptLogs: string[] = [];
     let preLogCount: number | undefined;
     const scriptSender = scriptRequestSender({ redactor: ctx.redactor, cookieJar: ctx.services.cookieJar, signal: ctrl.signal, timeoutMs: this.settings.defaultTimeoutMs });
@@ -523,10 +525,16 @@ export class Backend {
           openExternal: this.host.openExternal?.bind(this.host),
           cookieJar: ctx.services.cookieJar,
           onChunk: /event-stream|stream/i.test(JSON.stringify(spec.headers ?? '')) || p.stream ? (c) => chunks.push({ id, chunk: c }) : undefined,
+          // an event stream may stay open for as long as the user wants: the timeout covers only its start
+          onResponseStart: (_status, headers) => {
+            if (isEventStream(headers.get('content-type'))) clearTimeout(timeout);
+          },
+          onSseEvent: (event) => sseEvents.push({ id, event: { ...event, data: ctx.redactor.redactString(event.data) } }),
         });
       } finally {
         clearTimeout(timeout);
         chunks.flush();
+        sseEvents.flush();
       }
       const { response, prepared } = result;
       root.setAttributes({ status: response.status, url: prepared.url, size: response.size });
