@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -8,7 +8,10 @@ import { formatMs, uid } from '../lib/format';
 import { AssertionEditor } from '../components/AssertionEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { JsonSchemaForm } from '../components/JsonSchemaForm';
-import { JsonTree } from '../components/JsonView';
+import { JsonTree, RawView } from '../components/JsonView';
+import { Markdown } from '../components/Markdown';
+import { useSticky } from '../lib/sticky';
+import { downloadContent } from '../lib/files';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
@@ -62,7 +65,7 @@ export function McpView() {
   const [events, setEvents] = useState<Record<string, McpEvent[]>>({});
   const [connecting, setConnecting] = useState<string>();
   const [connError, setConnError] = useState<NormalizedError>();
-  const [tab, setTab] = useState<Tab>('tools');
+  const [tab, setTab] = useSticky<Tab>('mcp:tab', 'tools');
   const env = useApp((s) => s.environment);
   const load = useCallback(async () => {
     const s = await call<McpServerConfig[]>('mcp.servers');
@@ -367,18 +370,28 @@ function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerC
 }
 
 function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
-  const [sel, setSel] = useState(tools[0]?.name);
+  // kept while the app runs: switching tabs, servers or views doesn't lose arguments or results
+  const k = `mcp:${serverId}:`;
+  const [sel, setSel] = useSticky<string | undefined>(`${k}tool`, tools[0]?.name);
   const [filter, setFilter] = useState('');
-  const [args, setArgs] = useState<Record<string, Record<string, unknown>>>({});
-  const [raw, setRaw] = useState(false);
-  const [rawText, setRawText] = useState('{}');
-  const [assertions, setAssertions] = useState<CheckConfig[]>([{ type: 'status', expected: 'success' }]);
-  const [result, setResult] = useState<{ isError: boolean; content: unknown[]; structuredContent?: unknown; durationMs: number; checks: CheckResult[]; body: unknown } | { error: NormalizedError }>();
+  const [args, setArgs] = useSticky<Record<string, Record<string, unknown>>>(`${k}args`, {});
+  const [raw, setRaw] = useSticky(`${k}raw`, false);
+  const [rawText, setRawText] = useSticky(`${k}rawText`, '{}');
+  const [assertions, setAssertions] = useSticky<CheckConfig[]>(`${k}assertions`, [{ type: 'status', expected: 'success' }]);
+  const [results, setResults] = useSticky<Record<string, ToolRun>>(`${k}results`, {});
+  const result = sel ? results[sel] : undefined;
+  const setResult = (r: ToolRun | undefined) => sel && setResults((all) => ({ ...all, [sel]: r! }));
   const [running, setRunning] = useState(false);
-  const [sub, setSub] = useState<'form' | 'schema' | 'tests'>('form');
+  const [sub, setSub] = useSticky<'form' | 'schema' | 'tests'>(`${k}sub`, 'form');
   const tool = tools.find((t) => t.name === sel);
   const value = (sel && args[sel]) || {};
-  useEffect(() => setRawText(JSON.stringify(value, null, 2)), [sel]); // eslint-disable-line react-hooks/exhaustive-deps
+  const firstSel = useRef(sel);
+  useEffect(() => {
+    // keep a draft of raw JSON across tab switches; start from the form values when another tool is picked
+    if (firstSel.current === sel) return;
+    firstSel.current = sel;
+    setRawText(JSON.stringify(value, null, 2));
+  }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const exec = async () => {
     if (!tool) return;
     let a = value;
@@ -417,7 +430,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
           {tools
             .filter((t) => !filter || t.name.toLowerCase().includes(filter.toLowerCase()))
             .map((t) => (
-              <button key={t.name} onClick={() => (setSel(t.name), setResult(undefined))} className={cx('w-full text-left px-3 py-2 border-b border-line/60', sel === t.name ? 'bg-accent/10' : 'hover:bg-hover')}>
+              <button key={t.name} onClick={() => setSel(t.name)} className={cx('w-full text-left px-3 py-2 border-b border-line/60', sel === t.name ? 'bg-accent/10' : 'hover:bg-hover')}>
                 <div className="flex items-center gap-1.5 text-sm font-medium mono">
                   <Wrench size={12} className="text-muted" />
                   {t.name}
@@ -470,7 +483,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
               {sub === 'tests' && <AssertionEditor checks={assertions} onChange={setAssertions} groups={['Response', 'Body']} />}
             </div>
           </div>
-          <div className="h-full min-h-0">{result ? 'error' in result ? <ErrorPanel error={result.error} context={{ tool: tool.name }} /> : <ToolResult r={result} /> : <Empty title="Execute the tool to see its result" />}</div>
+          <div className="h-full min-h-0">{result ? 'error' in result ? <ErrorPanel error={result.error} context={{ tool: tool.name }} /> : <ToolResult r={result} name={tool.name} /> : <Empty title="Execute the tool to see its result" />}</div>
         </Split>
       ) : (
         <Empty title="This server exposes no tools" />
@@ -479,13 +492,50 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
   );
 }
 
-function ToolResult({ r }: { r: { isError: boolean; content: unknown[]; structuredContent?: unknown; durationMs: number; checks: CheckResult[] } }) {
+type ToolRun = { isError: boolean; content: unknown[]; structuredContent?: unknown; durationMs: number; checks: CheckResult[]; body: unknown } | { error: NormalizedError };
+type ContentItem = { type: string; text?: string; data?: string; mimeType?: string };
+type ViewMode = 'pretty' | 'raw' | 'markdown';
+
+const jsonOf = (text: string | undefined): unknown => {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
+
+function ToolResult({ r, name }: { r: Extract<ToolRun, { content: unknown[] }>; name: string }) {
   const [tab, setTab] = useState<'content' | 'structured' | 'tests'>(r.checks.some((c) => !c.passed) ? 'tests' : 'content');
+  const items = r.content as ContentItem[];
+  const text = items.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n\n');
+  const looksMarkdown = /(^|\n)(#{1,6} |[-*] |\d+\. |```)|\[[^\]]+\]\([^)]+\)/.test(text) && jsonOf(text) === undefined;
+  // display options, like the REST response: Pretty (JSON as a tree), Raw, Markdown (rendered)
+  const [mode, setMode] = useSticky<ViewMode>('mcp:resultMode', 'pretty');
+  const effective: ViewMode = mode === 'markdown' && !text ? 'pretty' : mode;
+  const copy = () => void navigator.clipboard.writeText(text || JSON.stringify(r.content, null, 2)).then(() => useApp.getState().toast('Copied the result'));
+  const save = () => downloadContent(`${name}-result.${jsonOf(text) !== undefined ? 'json' : looksMarkdown ? 'md' : 'txt'}`, text || JSON.stringify(r.content, null, 2));
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm">
         <Badge tone={r.isError ? 'bad' : 'ok'}>{r.isError ? 'isError' : 'success'}</Badge>
         <span className="text-muted">{formatMs(r.durationMs)}</span>
+        {text && <span className="text-muted">{text.length.toLocaleString()} chars</span>}
+        <div className="ml-auto flex items-center gap-1">
+          <div className="flex rounded-md border border-line overflow-hidden text-xs" role="group" aria-label="Display">
+            {(['pretty', 'raw', 'markdown'] as const).map((m) => (
+              <button key={m} type="button" className={cx('px-2 py-0.5 capitalize', effective === m ? 'bg-accent-soft text-fg' : 'text-muted hover:text-fg', m === 'markdown' && !text && 'opacity-40 pointer-events-none')} onClick={() => (setMode(m), setTab('content'))}>
+                {m}
+              </button>
+            ))}
+          </div>
+          <IconButton label="Copy result" onClick={copy}>
+            <Copy size={13} />
+          </IconButton>
+          <IconButton label="Save result" onClick={save}>
+            <Download size={13} />
+          </IconButton>
+        </div>
       </div>
       <Tabs
         value={tab}
@@ -497,8 +547,11 @@ function ToolResult({ r }: { r: { isError: boolean; content: unknown[]; structur
         ]}
       />
       <div className="flex-1 min-h-0 overflow-auto">
+        {tab === 'content' && effective === 'raw' && <RawView text={text || JSON.stringify(r.content, null, 2)} />}
+        {tab === 'content' && effective === 'markdown' && <Markdown className="p-4" source={text} />}
         {tab === 'content' &&
-          (r.content as Array<{ type: string; text?: string; data?: string; mimeType?: string }>).map((c, i) => {
+          effective === 'pretty' &&
+          items.map((c, i) => {
             let parsed: unknown;
             if (c.type === 'text' && c.text) {
               try {
@@ -533,8 +586,8 @@ function ToolResult({ r }: { r: { isError: boolean; content: unknown[]; structur
 }
 
 function ResourcesPanel({ serverId, disc }: { serverId: string; disc: Discovery }) {
-  const [uri, setUri] = useState(disc.resources[0]?.uri ?? '');
-  const [content, setContent] = useState<{ contents: Array<{ uri: string; mimeType?: string; text?: string; blob?: string }>; durationMs: number } | { error: NormalizedError }>();
+  const [uri, setUri] = useSticky(`mcp:${serverId}:resource`, disc.resources[0]?.uri ?? '');
+  const [content, setContent] = useSticky<{ contents: Array<{ uri: string; mimeType?: string; text?: string; blob?: string }>; durationMs: number } | { error: NormalizedError } | undefined>(`mcp:${serverId}:resourceContent`, undefined);
   const [loading, setLoading] = useState(false);
   const read = async (u = uri) => {
     setLoading(true);
@@ -610,9 +663,9 @@ function ResourcesPanel({ serverId, disc }: { serverId: string; disc: Discovery 
 }
 
 function PromptsPanel({ serverId, prompts }: { serverId: string; prompts: Discovery['prompts'] }) {
-  const [sel, setSel] = useState(prompts[0]?.name);
-  const [args, setArgs] = useState<Record<string, string>>({});
-  const [out, setOut] = useState<{ messages: unknown[]; description?: string } | { error: NormalizedError }>();
+  const [sel, setSel] = useSticky(`mcp:${serverId}:prompt`, prompts[0]?.name);
+  const [args, setArgs] = useSticky<Record<string, string>>(`mcp:${serverId}:promptArgs`, {});
+  const [out, setOut] = useSticky<{ messages: unknown[]; description?: string } | { error: NormalizedError } | undefined>(`mcp:${serverId}:promptOut`, undefined);
   const p = prompts.find((x) => x.name === sel);
   return (
     <Split id="mcp-prompts" initial={30}>
