@@ -89,7 +89,7 @@ Response bodies come from the payload files in the workspace (up to 2 MB each ar
 
 Pre-request and post-response scripts use the Postman script API under two names: **`tp`** (TestPion's name) and **`pm`** (Postman's). They are the same object, so write whichever you prefer, or mix them: `tp.test(...)`, `pm.test(...)`, `tp.environment.set(...)` all work. Scripts from imported Postman collections run unchanged. They run in a [sandbox](../security/privacy.md#script-sandbox) without file or network access. The **Snippets** list next to the editor inserts common scripts (written with `tp`), and the editor autocompletes both `tp.` and `pm.`.
 
-- **Import from Postman:** scripts are kept as they are (`pm.*`).
+- **Import from Postman:** scripts are kept as they are (`pm.*`). To switch a whole collection to `tp.*`, right-click it (or use its **⋯**) and choose **Convert scripts to tp.\***; **Convert scripts to pm.\*** goes back. You see how many scripts change before anything is saved. The CLI equivalent is `testpion scripts convert --to tp -w <workspace> [--collection <name>] [--dry-run] --json`.
 - **Export to Postman** (and `testpion export`): `tp.*` is converted to `pm.*`, because Postman only knows `pm`. Only code changes; text in strings and comments, regular expressions and properties such as `obj.tp` are left alone. A script that declares its own `tp` variable is exported unchanged.
 
 Pre-request:

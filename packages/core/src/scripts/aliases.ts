@@ -160,3 +160,43 @@ export function renameScriptGlobal(code: string, from: 'tp' | 'pm', to: 'tp' | '
 export function toPostmanScript(code: string | undefined): string | undefined {
   return code === undefined ? undefined : renameScriptGlobal(code, 'tp', 'pm').code;
 }
+
+export interface ScriptConversion<C> {
+  collection: C;
+  /** Scripts that were rewritten. */
+  changed: number;
+  /** Individual `pm.`/`tp.` uses rewritten. */
+  replacements: number;
+  /** Scripts left as they are, with the reason (e.g. they declare their own `tp`). */
+  skipped: Array<{ where: string; reason: string }>;
+}
+
+type ScriptHolder = { name?: string; preRequestScript?: string; testScript?: string; items?: ScriptHolder[]; kind?: string };
+
+/**
+ * Rewrite every script in a collection (collection, folders and requests) from `from` to `to`,
+ * e.g. Postman's `pm.*` to TestPion's `tp.*`. Returns a new collection; the input is not changed.
+ */
+export function convertCollectionScripts<C extends ScriptHolder>(collection: C, from: 'tp' | 'pm', to: 'tp' | 'pm'): ScriptConversion<C> {
+  let changed = 0;
+  let replacements = 0;
+  const skipped: Array<{ where: string; reason: string }> = [];
+  const fix = (code: string | undefined, where: string): string | undefined => {
+    if (!code) return code;
+    const r = renameScriptGlobal(code, from, to);
+    if (r.skipped) skipped.push({ where, reason: r.skipped });
+    if (r.changed) {
+      changed++;
+      replacements += r.changed;
+    }
+    return r.code;
+  };
+  const walk = <T extends ScriptHolder>(n: T, path: string): T => {
+    const out: T = { ...n };
+    if (n.preRequestScript !== undefined) out.preRequestScript = fix(n.preRequestScript, `${path} (pre-request)`);
+    if (n.testScript !== undefined) out.testScript = fix(n.testScript, `${path} (post-response)`);
+    if (n.items) out.items = n.items.map((c) => walk(c, `${path} / ${c.name ?? '?'}`));
+    return out;
+  };
+  return { collection: walk(collection, collection.name ?? 'collection'), changed, replacements, skipped };
+}

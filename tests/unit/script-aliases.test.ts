@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { exportPostmanCollection, renameScriptGlobal, runScript, toPostmanScript, type Collection } from '../../packages/core/src/index.js';
+import { convertCollectionScripts, exportPostmanCollection, renameScriptGlobal, runScript, toPostmanScript, type Collection } from '../../packages/core/src/index.js';
 
 const response = { status: 200, headers: [['content-type', 'application/json']] as Array<[string, string]>, body: '{"id":7}', time: 5 };
 
@@ -77,5 +77,24 @@ describe('converting between tp and pm', () => {
     expect(json).toContain('pm.test(\\"ok\\", () => pm.response.to.have.status(200));');
     expect(json).toContain('tp.stays');
     expect(json).not.toMatch(/(^|[^.\w"])tp\.(test|variables|response)/);
+  });
+
+  it('converts every script of a collection, reporting skipped ones', () => {
+    const col = {
+      name: 'C',
+      preRequestScript: 'pm.variables.set("a", 1);',
+      items: [
+        { kind: 'folder', name: 'F', testScript: 'pm.test("f", () => {});', items: [{ kind: 'http', name: 'R', testScript: 'const tp = 1; pm.test("r", () => {});' }] },
+        { kind: 'http', name: 'S', preRequestScript: 'console.log("no api");' },
+      ],
+    };
+    const r = convertCollectionScripts(col, 'pm', 'tp');
+    expect(r.changed).toBe(2);
+    expect(r.replacements).toBe(2);
+    expect(r.skipped).toEqual([{ where: 'C / F / R (post-response)', reason: 'the script declares its own "tp"' }]);
+    expect(r.collection.preRequestScript).toBe('tp.variables.set("a", 1);');
+    expect(r.collection.items[0]!.testScript).toBe('tp.test("f", () => {});');
+    expect(col.preRequestScript).toBe('pm.variables.set("a", 1);'); // input unchanged
+    expect(convertCollectionScripts(r.collection, 'tp', 'pm').collection.preRequestScript).toBe(col.preRequestScript);
   });
 });

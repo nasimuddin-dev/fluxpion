@@ -75,6 +75,7 @@ import {
   summarizeSchema,
   prepareHttpRequest,
   parseCurl,
+  convertCollectionScripts,
   compareHistory,
   historyResponse,
   renderVisualizer,
@@ -659,6 +660,13 @@ export class Backend {
         this.ws.saveCollection(withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, () => p.examples));
         this.refreshMock(p.collectionId);
         return p.examples;
+      },
+      /** Rewrite a collection's scripts between tp.* and pm.*; `dryRun` only counts. */
+      'col.convertScripts': ({ collectionId, to, dryRun }: { collectionId: string; to: 'tp' | 'pm'; dryRun?: boolean }) => {
+        const c = this.ws.getCollection(collectionId);
+        const r = convertCollectionScripts(c, to === 'tp' ? 'pm' : 'tp', to);
+        if (!dryRun && r.changed) this.ws.saveCollection(r.collection);
+        return { changed: r.changed, replacements: r.replacements, skipped: r.skipped, collection: dryRun ? r.collection : undefined };
       },
       'col.import': ({ text }: { text: string }) => {
         if (isRequestSnippet(text)) {

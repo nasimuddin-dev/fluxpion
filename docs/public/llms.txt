@@ -8,7 +8,7 @@ Key facts for agents:
 - Postman v2.1 collections and environments import and export losslessly where the formats overlap.
 - To let an agent use a workspace, register the MCP server: `testpion mcp-server -w <workspace>` (stdio). Tools: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request`, `run_collection`, `parse_request_snippet`, `save_request`, `reorder_environments`. Add `--read-only` to disable sending and saving.
 - A request copied as cURL (bash or cmd), fetch or PowerShell can be parsed (`parse_request_snippet`), sent (`send_request` with `snippet`) or saved (`save_request`, or CLI `testpion import <file|-> -w <ws> --json`). Secrets in it are replaced by `{{variables}}` listed in `placeholders`; they are never written to workspace files.
-- Scripts use the Postman API as `tp.*` (TestPion's name) or `pm.*` (Postman's): the same object, both always work. Exports to Postman convert `tp.*` to `pm.*`.
+- Scripts use the Postman API as `tp.*` (TestPion's name) or `pm.*` (Postman's): the same object, both always work. Exports to Postman convert `tp.*` to `pm.*`; `testpion scripts convert --to tp|pm --json` rewrites a workspace's scripts.
 - Test scripts can call `pm.visualizer.set(template, data)` (Handlebars); run results include the rendered `visualization.html` and `scriptLogs`.
 - Response history: `testpion history list --request <name> --json` / `testpion history diff <before> <after> --json`, or MCP `request_history` / `compare_responses`, show what changed between two runs of a request (field-by-field JSON diff; secrets masked).
 - `testpion env list --json` and `testpion env order <names...>` read and set the environment order.

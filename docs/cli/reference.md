@@ -139,6 +139,15 @@ pbpaste | testpion import - -w my-workspace
 
 Secrets in a copied request (the `Authorization` header and other sensitive headers, auth credentials, cookies, and sensitive query or body fields) are not written to the workspace. They are replaced by `{{variables}}`, and the output lists them (`placeholders` with `--json`) so you can add them as secret environment variables.
 
+## `scripts convert`
+
+```bash
+testpion scripts convert --to tp -w my-workspace --dry-run --json   # what would change
+testpion scripts convert --to tp -w my-workspace --collection "Checkout API"
+```
+
+Rewrites collection, folder and request scripts from Postman's `pm.*` to TestPion's `tp.*` (or back with `--to pm`). Both names always run in TestPion; only code changes, not strings or comments, and scripts that declare their own `tp` are skipped and listed.
+
 ## `history`
 
 ```bash

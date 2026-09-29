@@ -19,6 +19,7 @@ import {
   importAny,
   importRequestSnippet,
   compareHistory,
+  convertCollectionScripts,
   redactDiff,
   isRequestSnippet,
   Redactor,
@@ -750,6 +751,37 @@ export function buildProgram(): Command {
         if (r.environment) store.saveEnvironment(r.environment);
         if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name }, null, 2));
         else console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
+      } finally {
+        store.close();
+      }
+    });
+
+  program
+    .command('scripts')
+    .description('script tools')
+    .command('convert')
+    .description("rewrite collection scripts between Postman's pm.* and TestPion's tp.* (both always work)")
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .requiredOption('--to <tp|pm>', 'the name to use')
+    .option('--collection <nameOrId>', 'only this collection (default: all)')
+    .option('--dry-run', 'only report what would change')
+    .option('--json', 'print the result as JSON')
+    .action((o) => {
+      if (o.to !== 'tp' && o.to !== 'pm') throw new CliError('--to must be tp or pm', EXIT.CONFIG_ERROR);
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const want = o.collection ? String(o.collection).toLowerCase() : undefined;
+        const cols = store.listCollections().filter((c) => !c.problem && (!want || c.id.toLowerCase() === want || c.name.toLowerCase() === want));
+        if (want && !cols.length) throw new CliError(`No collection "${o.collection}"`, EXIT.CONFIG_ERROR);
+        const results = cols.map((c) => {
+          const r = convertCollectionScripts(c, o.to === 'tp' ? 'pm' : 'tp', o.to);
+          if (!o.dryRun && r.changed) store.saveCollection(r.collection);
+          return { collection: c.name, changed: r.changed, replacements: r.replacements, skipped: r.skipped };
+        });
+        if (o.json) console.log(JSON.stringify({ to: o.to, dryRun: !!o.dryRun, results }, null, 2));
+        else
+          for (const r of results)
+            console.log(`${r.changed ? green(`${o.dryRun ? 'Would convert' : 'Converted'} ${r.changed} script(s)`) : dim('No change')} in "${r.collection}"${r.skipped.length ? yellow(` (${r.skipped.length} skipped: ${r.skipped.map((s) => s.where).join(', ')})`) : ''}`);
       } finally {
         store.close();
       }

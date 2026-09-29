@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Convert a collection's scripts between `pm.*` and `tp.*`.** Right-click a collection (or **⋯**): **Convert scripts to tp.\*** / **to pm.\***, with a preview of how many scripts change. CLI: `testpion scripts convert --to tp|pm [--collection] [--dry-run] --json`.
 - **Response history and compare.** Saved requests get a **History** tab in the response panel: earlier responses, newest first. View any of them, or compare two to see exactly what changed: status and time, header changes (ignoring headers such as `date` that change every time) and a field-by-field body diff with JSON paths (`$.items[2]` added, `$.total` 2 → 3), or a line diff for text. For agents and scripts: `testpion history list|diff --json` and the MCP tools `request_history` and `compare_responses` (sensitive values masked).
 
 ## 0.6.3 — 2026-09-29

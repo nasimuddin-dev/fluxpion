@@ -1,4 +1,4 @@
-import { Braces, ChevronDown, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
@@ -76,6 +76,30 @@ export function CollectionTree({
     { label: 'Copy as fetch', icon: <Braces size={14} />, onSelect: () => void copyAs(c, n, 'fetch', 'as fetch') },
     { label: 'More code snippets…', icon: <Code2 size={14} />, onSelect: () => useApp.getState().openIntent('rest', { collectionId: c.id, requestId: n.id, showCode: true }) },
   ];
+  /** Rewrite the collection's scripts between Postman's pm.* and TestPion's tp.* (both always work). */
+  const convertScripts = async (c: Collection, to: 'tp' | 'pm') => {
+    const from = to === 'tp' ? 'pm' : 'tp';
+    try {
+      const r = await call<{ changed: number; replacements: number; skipped: Array<{ where: string; reason: string }>; collection?: Collection }>('col.convertScripts', { collectionId: c.id, to, dryRun: true });
+      const skippedNote = r.skipped.length ? `\n\n${r.skipped.length} script${r.skipped.length === 1 ? '' : 's'} left as they are: ${r.skipped.slice(0, 3).map((s) => `${s.where} (${s.reason})`).join('; ')}${r.skipped.length > 3 ? ' …' : ''}` : '';
+      if (!r.changed || !r.collection) {
+        useApp.getState().toast(`No scripts in "${c.name}" use ${from}.*${r.skipped.length ? ` (${r.skipped.length} skipped)` : ''}`, 'success');
+        return;
+      }
+      const ok = await confirmAction({
+        title: `Convert scripts to ${to}.*`,
+        message: `${r.changed} script${r.changed === 1 ? '' : 's'} in "${c.name}" use ${from}.* (${r.replacements} place${r.replacements === 1 ? '' : 's'}).`,
+        detail: `They will use ${to}.* instead. Both names always work in TestPion, and exports to Postman always use pm.*. Only code changes, not text in strings or comments.${skippedNote}`,
+        confirmLabel: 'Convert',
+        tone: 'question',
+      });
+      if (!ok) return;
+      onChange(r.collection);
+      useApp.getState().toast(`Converted ${r.changed} script${r.changed === 1 ? '' : 's'} to ${to}.*`, 'success');
+    } catch (e) {
+      useApp.getState().toast(`Couldn't convert the scripts: ${asError(e).message}`, 'error');
+    }
+  };
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     try {
       return JSON.parse(localStorage.getItem('aps.tree.open') ?? '{}');
@@ -194,7 +218,14 @@ export function CollectionTree({
         const isOpen = open[c.id] ?? true;
         return (
           <div key={c.id}>
-            <div className="group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors">
+            <div
+              className={cx('group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors', menuFor === c.id && 'bg-hover')}
+              onContextMenu={(e) => {
+                if (c.problem) return;
+                e.preventDefault();
+                setMenuFor(c.id);
+              }}
+            >
               <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
@@ -203,6 +234,12 @@ export function CollectionTree({
               </button>
               {!c.problem && (
                 <NodeMenu
+                  open={menuFor === c.id}
+                  onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
+                  extraItems={[
+                    { label: 'Convert scripts to tp.*', icon: <Wand2 size={14} />, onSelect: () => void convertScripts(c, 'tp') },
+                    { label: 'Convert scripts to pm.*', icon: <Undo2 size={14} />, onSelect: () => void convertScripts(c, 'pm') },
+                  ]}
                   onNewRequest={() => onNewRequest(c)}
                   onRun={onRun && (() => onRun(c))}
                   runLabel="Run collection"
@@ -240,6 +277,7 @@ function NodeMenu({
   runLabel = 'Run',
   onOpen,
   copyItems,
+  extraItems,
   open,
   onOpenChange,
 }: {
@@ -257,6 +295,8 @@ function NodeMenu({
   onOpen?(): void;
   /** Copy URL / Copy as cURL … (requests only). */
   copyItems?: MenuItem[];
+  /** More items (e.g. collection tools), after a separator. */
+  extraItems?: MenuItem[];
   /** Controlled open state, so a right-click on the row can open the menu. */
   open?: boolean;
   onOpenChange?(open: boolean): void;
@@ -272,6 +312,7 @@ function NodeMenu({
   add('Duplicate', <CopyPlus size={14} />, onDuplicate);
   add(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite);
   copyItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));
+  extraItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));
   add('Delete', <Trash2 size={14} />, onDelete, { danger: true, separator: true });
   return (
     <Menu
