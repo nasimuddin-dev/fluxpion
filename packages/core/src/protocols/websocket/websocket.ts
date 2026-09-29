@@ -1,3 +1,7 @@
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { lookup } from 'node:dns/promises';
+import { connect } from 'node:net';
 import { assertUrlAllowed } from '../../net/policy.js';
 import { WebSocket as UndiciWebSocket } from 'undici';
 import { ApsError } from '../../errors.js';
@@ -102,9 +106,17 @@ export class WebSocketSession {
       });
       ws.addEventListener('error', (ev) => {
         clearTimeout(timer);
-        const msg = (ev as unknown as { error?: Error; message?: string }).error?.message ?? 'WebSocket error';
-        this.emit('system', `Error: ${msg}`);
-        if (this.status === 'connecting') reject(new ApsError('NetworkError', msg));
+        const e = ev as unknown as { error?: Error & { cause?: unknown }; message?: string };
+        const msg = e.error?.message || e.message || '';
+        if (this.status !== 'connecting') {
+          this.emit('system', `Error: ${msg || 'the connection failed'}`);
+          return;
+        }
+        // undici reports failed handshakes without a message: find out what went wrong
+        void diagnoseWebSocketFailure(this.url, msg || (e.error?.cause ? String(e.error.cause) : '')).then((err) => {
+          this.emit('system', `Error: ${err.message}`);
+          reject(err);
+        });
       });
       ws.addEventListener('close', (ev) => {
         clearTimeout(timer);
@@ -123,4 +135,64 @@ export class WebSocketSession {
   close(code = 1000, reason = ''): void {
     this.ws?.close(code, reason);
   }
+}
+
+/**
+ * Why a WebSocket handshake failed, in words: the server's name doesn't resolve, nothing listens on
+ * the port, TLS fails, or the server answered with HTTP instead of switching to WebSocket.
+ */
+export async function diagnoseWebSocketFailure(url: string, hint = ''): Promise<ApsError> {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch (e) {
+    return new ApsError('ConfigurationError', `Invalid WebSocket URL: ${(e as Error).message}`);
+  }
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  const port = Number(u.port || (u.protocol === 'wss:' ? 443 : 80));
+  try {
+    await lookup(host);
+  } catch {
+    return new ApsError('NetworkError', `Can't find the server "${host}" (its name doesn't resolve)`, {
+      suggestions: ['Check the address for typos.', 'Public echo services come and go: try another one, or the local demo server (ws://127.0.0.1:4013).', 'Check your internet connection or VPN.'],
+    });
+  }
+  const reachable = await new Promise<boolean | string>((ok) => {
+    const s = connect({ host, port, timeout: 5000 });
+    s.once('connect', () => (s.destroy(), ok(true)));
+    s.once('timeout', () => (s.destroy(), ok('timeout')));
+    s.once('error', (e: NodeJS.ErrnoException) => ok(e.code ?? e.message));
+  });
+  if (reachable !== true)
+    return new ApsError('NetworkError', reachable === 'ECONNREFUSED' ? `Nothing is listening on ${host}:${port} (connection refused)` : `Can't reach ${host}:${port} (${reachable === 'timeout' ? 'no answer' : reachable})`, {
+      suggestions: ['Check that the server is running and the port is right.', u.protocol === 'wss:' ? 'If the server has no TLS, use ws:// instead of wss://.' : 'If the server uses TLS, use wss:// instead of ws://.'],
+    });
+  // the server is there: ask it over HTTP what it thinks of the upgrade request
+  // (node:http, since fetch won't send Connection / Upgrade headers)
+  const probe = await new Promise<{ status?: number; statusText?: string; error?: NodeJS.ErrnoException }>((ok) => {
+    const req = (u.protocol === 'wss:' ? httpsRequest : httpRequest)(
+      { host, port, path: `${u.pathname}${u.search}`, method: 'GET', timeout: 5000, headers: { connection: 'Upgrade', upgrade: 'websocket', 'sec-websocket-version': '13', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', host: u.host } },
+      (res) => {
+        res.resume();
+        req.destroy();
+        ok({ status: res.statusCode, statusText: res.statusMessage });
+      },
+    );
+    req.on('upgrade', (res, socket) => {
+      socket.destroy();
+      ok({ status: res.statusCode });
+    });
+    req.on('timeout', () => req.destroy(Object.assign(new Error('no answer'), { code: 'TIMEOUT' })));
+    req.on('error', (error: NodeJS.ErrnoException) => ok({ error }));
+    req.end();
+  });
+  if (probe.status && probe.status !== 101)
+    return new ApsError('ProtocolError', `The server answered HTTP ${probe.status}${probe.statusText ? ` ${probe.statusText}` : ''} instead of opening a WebSocket`, {
+      suggestions: [probe.status === 401 || probe.status === 403 ? 'The server wants credentials: add them under Handshake headers (e.g. Authorization) or in the URL.' : probe.status === 404 ? 'Check the path: this URL is not a WebSocket endpoint.' : 'Check the URL, path and subprotocols the server expects.'],
+    });
+  if (probe.error && /wrong version number|packet length too long/i.test(probe.error.message))
+    return new ApsError('NetworkError', `${u.host} doesn't use TLS on this port, but the URL starts with wss://`, { suggestions: ['Use ws:// instead of wss://.'] });
+  if (probe.error?.code && /CERT|SSL|TLS|EPROTO/i.test(probe.error.code))
+    return new ApsError('NetworkError', `TLS failed: ${probe.error.message.split('\n')[0]}`, { suggestions: ['Check the server certificate, or use ws:// if the server has no TLS.'] });
+  return new ApsError('NetworkError', `The WebSocket connection to ${u.host} failed${hint ? `: ${hint}` : ''}`, { suggestions: ['Check the URL, subprotocols and handshake headers.'] });
 }

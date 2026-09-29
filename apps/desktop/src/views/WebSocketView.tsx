@@ -51,7 +51,13 @@ export function WebSocketView() {
       setStatus('open');
     } catch (e) {
       setStatus('closed');
-      useApp.getState().toast(asError(e).message, 'error');
+      const err = asError(e);
+      const text = `Could not connect: ${err.message || 'the connection failed'}${err.suggestions?.length ? `\n${err.suggestions.map((s) => `→ ${s}`).join('\n')}` : ''}`;
+      // the reason stays in the message list (a toast disappears)
+      const line: WsMessage = { id: `err-${Date.now()}`, time: Date.now(), direction: 'system', data: text, size: text.length };
+      setMessages((m) => [...m, line]);
+      setSelected(line);
+      useApp.getState().toast(`Could not connect: ${err.message || 'the connection failed'}`, 'error');
     }
   };
   const disconnect = () => session && call('wsock.close', { id: session }).then(() => setStatus('closed'));
