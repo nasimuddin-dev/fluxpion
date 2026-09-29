@@ -1,4 +1,4 @@
-import { BookOpen, ChevronLeft, Play, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, FlaskConical, Play, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, type NormalizedError } from '../api';
@@ -15,7 +15,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { JsonTree, RawView } from '../components/JsonView';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
-import { Badge, Button, cx, Empty, Input, Select, Split, statusTone, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, Input, Select, Split, statusTone, Tabs, Tooltip } from '../components/ui';
 
 interface SchemaType {
   name: string;
@@ -63,6 +63,26 @@ export function GraphQLView() {
   const [sdl, setSdl] = useState<string>();
   const [introspecting, setIntrospecting] = useState(false);
   const [schemaError, setSchemaError] = useState<NormalizedError>();
+  const [mockUrl, setMockUrl] = useState<string>();
+  useEffect(() => void call<{ url: string } | null>('gql.mock.status').then((r) => setMockUrl(r?.url)), []);
+  /** Serve fake data for the introspected schema on localhost, so a front end can work without the real API. */
+  const toggleMock = async () => {
+    try {
+      if (mockUrl) {
+        await call('gql.mock.stop');
+        setMockUrl(undefined);
+        useApp.getState().toast('GraphQL mock stopped', 'success');
+        return;
+      }
+      if (!sdl) return useApp.getState().toast('Introspect the schema first, then mock it', 'error');
+      const r = await call<{ url: string }>('gql.mock.start', { sdl });
+      setMockUrl(r.url);
+      await navigator.clipboard.writeText(r.url).catch(() => undefined);
+      useApp.getState().toast(`GraphQL mock running at ${r.url} (copied). Every valid query gets fake, correctly typed data.`, 'success');
+    } catch (e) {
+      useApp.getState().toast(`Couldn't start the mock: ${asError(e).message}`, 'error');
+    }
+  };
   const [running, setRunning] = useState<string>();
   const [result, setResult] = useState<{ response?: HttpResponseData; errors?: unknown[]; checks?: CheckResult[]; error?: NormalizedError; operationType?: string }>();
   const [sub, setSub] = useState<'variables' | 'headers' | 'auth' | 'tests'>('variables');
@@ -167,6 +187,11 @@ export function GraphQLView() {
         <Button icon={<RefreshCw size={13} className={introspecting ? 'spin' : ''} />} onClick={introspectNow} disabled={introspecting}>
           Introspect
         </Button>
+        <Tooltip content={mockUrl ? `Mock running at ${mockUrl}: click to stop` : sdl ? 'Serve fake data for this schema on localhost' : 'Introspect a schema first'}>
+          <Button variant={mockUrl ? 'soft' : 'default'} icon={<FlaskConical size={13} />} onClick={() => void toggleMock()} disabled={!mockUrl && !sdl}>
+            {mockUrl ? 'Mock on' : 'Mock'}
+          </Button>
+        </Tooltip>
         {operations.length > 1 && (
           <Select aria-label="Operation" value={d.operationName ?? operations[0]?.name ?? ''} onChange={(e) => set({ operationName: e.target.value })}>
             {operations.map((o) => (

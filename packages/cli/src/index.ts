@@ -19,6 +19,9 @@ import {
   importAny,
   importRequestSnippet,
   compareHistory,
+  startGraphQLMockServer,
+  schemaFromText,
+  introspect,
   setNetworkPolicy,
   convertCollectionScripts,
   redactDiff,
@@ -677,6 +680,31 @@ export function buildProgram(): Command {
     .option('-q, --quiet', 'do not log requests')
     .action(async (ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }) => {
       process.exitCode = await executeMock(ref, o);
+    });
+
+  program
+    .command('mock-graphql')
+    .description('serve fake, correctly typed data for any query against a GraphQL schema, on localhost until Ctrl+C')
+    .option('--schema <file>', 'schema file: SDL (.graphql) or an introspection result (.json)')
+    .option('--endpoint <url>', 'or: introspect this GraphQL endpoint')
+    .option('-p, --port <port>', 'port to listen on (default: any free port)')
+    .option('--overrides <file>', 'JSON file with fixed values per type, e.g. {"Patient": {"name": "Rex"}}')
+    .option('--list-length <n>', 'items in every list', '2')
+    .option('--delay <ms>', 'delay every response by this many ms')
+    .action(async (o: { schema?: string; endpoint?: string; port?: string; overrides?: string; listLength?: string; delay?: string }) => {
+      if (!o.schema === !o.endpoint) throw new CliError('Give --schema <file> or --endpoint <url>', EXIT.CONFIG_ERROR);
+      const schema = o.schema ? schemaFromText(readFileSync(o.schema, 'utf8')) : (await introspect({ endpoint: o.endpoint! })).schema;
+      const overrides = o.overrides ? (JSON.parse(readFileSync(o.overrides, 'utf8')) as Record<string, Record<string, unknown>>) : undefined;
+      const server = await startGraphQLMockServer(schema, { port: o.port ? Number(o.port) : 0, overrides, listLength: Number(o.listLength) || 2, delayMs: o.delay ? Number(o.delay) : undefined });
+      console.log(bold(`GraphQL mock: ${server.url}`));
+      console.log(dim(`Queries: ${Object.keys(schema.getQueryType()?.getFields() ?? {}).join(', ') || 'none'}. Press Ctrl+C to stop.`));
+      await new Promise<void>((done) => {
+        const stop = () => {
+          process.off('SIGINT', stop);
+          void server.close().then(done);
+        };
+        process.on('SIGINT', stop);
+      });
     });
 
   program

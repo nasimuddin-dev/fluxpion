@@ -13,6 +13,6 @@ Enter the endpoint (variables allowed), then write the operation in the Monaco e
 - Responses appear as a JSON tree. GraphQL `errors` are counted and can be asserted on.
 - Subscriptions need a WebSocket transport (graphql-ws), which this release does not include. You can test them manually in the WebSocket view.
 
-See [schema explorer](./schema-explorer.md) and [testing](./testing.md).
+See [schema explorer](./schema-explorer.md), [testing](./testing.md) and the [GraphQL mock server](./mocking.md).
 
 :::

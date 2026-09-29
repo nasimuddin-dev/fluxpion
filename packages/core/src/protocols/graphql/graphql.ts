@@ -97,6 +97,15 @@ export async function introspect(spec: Omit<GraphQLRequestSpec, 'query'>, opts: 
   return { schema, sdl: printSchema(schema), introspection: json.data };
 }
 
+/** A schema from a file's text: SDL, or an introspection result (`{ data: { __schema } }` or `{ __schema }`). */
+export function schemaFromText(text: string): GraphQLSchema {
+  if (/^\s*[{[]/.test(text)) {
+    const json = JSON.parse(text) as { data?: IntrospectionQuery } & Partial<IntrospectionQuery>;
+    return buildClientSchema((json.data ?? json) as IntrospectionQuery);
+  }
+  return schemaFromSdl(text);
+}
+
 export function schemaFromSdl(sdl: string): GraphQLSchema {
   try {
     return buildSchema(sdl);

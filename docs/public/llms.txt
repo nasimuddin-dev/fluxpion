@@ -33,6 +33,7 @@ Key facts for agents:
 ## GraphQL and MCP
 
 - [GraphQL overview](https://nasimuddin-dev.github.io/testpion/graphql/overview)
+- [GraphQL mock server](https://nasimuddin-dev.github.io/testpion/graphql/mocking): `testpion mock-graphql --schema schema.graphql` serves fake, typed, deterministic data for any valid query
 - [GraphQL testing](https://nasimuddin-dev.github.io/testpion/graphql/testing)
 - [MCP overview](https://nasimuddin-dev.github.io/testpion/mcp/overview): test MCP servers (stdio, Streamable HTTP, SSE)
 - [MCP tools](https://nasimuddin-dev.github.io/testpion/mcp/tools)

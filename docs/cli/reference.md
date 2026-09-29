@@ -11,6 +11,7 @@ description: "Reference for the testpion command-line interface."
 testpion test [paths...]      Run test files, directories, globs or a *.suite.yaml
 testpion run --suite <name>   Run tests/<name>.suite.yaml from a workspace
 testpion run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
+testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
 testpion docs <collection>    Write Markdown documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)

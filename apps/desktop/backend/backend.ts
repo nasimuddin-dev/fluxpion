@@ -75,6 +75,9 @@ import {
   summarizeSchema,
   prepareHttpRequest,
   parseCurl,
+  schemaFromText,
+  startGraphQLMockServer,
+  type GraphQLMockServer,
   convertCollectionScripts,
   compareHistory,
   historyResponse,
@@ -183,6 +186,8 @@ export class Backend {
   private wsSessions = new Map<string, WebSocketSession>();
   /** Running mock servers by collection id. */
   private mocks = new Map<string, MockServer>();
+  /** The GraphQL mock started from the GraphQL view (one at a time). */
+  private gqlMock?: GraphQLMockServer;
   readonly handlers: Record<string, Handler>;
 
   constructor(host: BackendHost) {
@@ -228,6 +233,8 @@ export class Backend {
     this.mcpSessions.clear();
     for (const m of this.mocks.values()) void m.close();
     this.mocks.clear();
+    void this.gqlMock?.close();
+    this.gqlMock = undefined;
     this.store = WorkspaceStore.open(path);
     this.currentValues = new CurrentValues(join(this.host.appDir, 'current-values', `${this.store.id}.json`), this.secrets, this.store.id);
     void this.cookieStore?.flush().catch(() => undefined);
@@ -800,6 +807,21 @@ export class Backend {
         return { sdl, summary: summarizeSchema(schema) };
       },
       'gql.send': (p: GqlSendParams) => this.gqlSend(p),
+      /** Serve fake data for a schema on localhost (restarts with the new schema when already running). */
+      'gql.mock.start': async ({ sdl, port, overrides }: { sdl: string; port?: number; overrides?: Record<string, Record<string, unknown>> }) => {
+        const schema = schemaFromText(sdl);
+        if (this.gqlMock) {
+          this.gqlMock.update(schema, { overrides });
+          return { url: this.gqlMock.url };
+        }
+        this.gqlMock = await startGraphQLMockServer(schema, { port: port ?? 0, overrides });
+        return { url: this.gqlMock.url };
+      },
+      'gql.mock.stop': async () => {
+        await this.gqlMock?.close();
+        this.gqlMock = undefined;
+      },
+      'gql.mock.status': () => (this.gqlMock ? { url: this.gqlMock.url } : null),
 
       /* ---------------------------------------------------------------- MCP */
       'mcp.servers': () => this.ws.getMcpServers().map((s) => ({ ...s, connected: !!this.mcpSessions.get(s.id)?.connected })),

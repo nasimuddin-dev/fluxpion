@@ -47,6 +47,7 @@ export * from './report/collection-docs.js';
 
 export * from './load/load.js';
 export * from './mock/mock-server.js';
+export * from './mock/graphql-mock.js';
 export * from './mcp-server/testpion-mcp.js';
 
 export * from './storage/fsutil.js';
