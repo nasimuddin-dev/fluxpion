@@ -1,6 +1,6 @@
 ---
 title: Features
-description: Everything TestPion does — REST, GraphQL, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
+description: Everything TestPion does — REST, GraphQL, gRPC, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
 ---
 
 # Features
@@ -34,6 +34,15 @@ TestPion combines an API client, a GraphQL playground, an MCP inspector, an LLM 
 Introspect a schema to get autocomplete, validation and hover docs in the editor, plus a browsable schema explorer. Run operations with variables and assert on data, GraphQL errors and latency.
 
 [GraphQL guide](/graphql/overview)
+
+## gRPC
+
+- Calls services described by `.proto` files; imports and Google's well-known types resolve.
+- Unary, server-streaming, client-streaming and bidirectional methods, with example messages.
+- Metadata, TLS (`grpcs://`) and deadlines.
+- Streamed responses appear live; **Stop** keeps what arrived.
+
+See [gRPC](./api-testing/grpc.md).
 
 ## MCP inspector
 

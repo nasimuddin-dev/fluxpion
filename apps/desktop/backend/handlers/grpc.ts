@@ -1,0 +1,41 @@
+/** RPC handlers: gRPC calls described by .proto files (sent as text, so they work the same in a hosted version). */
+import { describeProtos, executeGrpc, shortId, type GrpcRequestSpec, type ProtoFile } from '@testpion/core';
+import type { Backend, Handlers } from '../backend.js';
+
+export interface GrpcSendParams extends GrpcRequestSpec {
+  /** Call id, for grpc.cancel. */
+  id?: string;
+  environment?: string;
+}
+
+export function grpcHandlers(be: Backend): Handlers {
+  return {
+    /** Methods in the proto files, with example requests. */
+    'grpc.describe': ({ protoFiles }: { protoFiles: ProtoFile[] }) => describeProtos(protoFiles),
+    /** Call a method; streamed responses also arrive live on `grpc.messages`. Cancel with grpc.cancel. */
+    'grpc.send': async (p: GrpcSendParams) => {
+      const id = p.id ?? shortId('grpc-');
+      const ctrl = new AbortController();
+      be.controllers.set(id, ctrl);
+      const ctx = be.context({ environment: p.environment });
+      const live = be.batched<unknown>('grpc.messages', 100);
+      try {
+        const spec: GrpcRequestSpec = {
+          ...p,
+          target: ctx.vars.resolve(p.target),
+          message: p.message !== undefined ? ctx.vars.resolve(p.message) : undefined,
+          metadata: ctx.vars.resolveDeep(p.metadata ?? []),
+          timeoutMs: p.timeoutMs ?? be.settings.defaultTimeoutMs,
+        };
+        const r = await executeGrpc(spec, { signal: ctrl.signal, redactor: ctx.redactor, onMessage: (data, atMs) => live.push({ id, data, atMs }) });
+        be.logger.info(`gRPC ${r.method} → ${r.codeName}`, { target: r.target, ms: r.durationMs });
+        return { ...r, unresolved: ctx.vars.unresolved.size ? [...ctx.vars.unresolved] : undefined };
+      } finally {
+        live.flush();
+        be.controllers.delete(id);
+        await ctx.dispose();
+      }
+    },
+    'grpc.cancel': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
+  };
+}

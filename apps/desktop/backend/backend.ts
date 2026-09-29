@@ -92,6 +92,7 @@ import { requestsHandlers } from './handlers/requests.js';
 import { mcpHandlers } from './handlers/mcp.js';
 import { aiHandlers } from './handlers/ai.js';
 import { testingHandlers } from './handlers/testing.js';
+import { grpcHandlers } from './handlers/grpc.js';
 
 export interface BackendHost {
   appDir: string;
@@ -453,7 +454,7 @@ export class Backend {
    */
   private buildHandlers(): Handlers {
     const all: Handlers = {};
-    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, mcpHandlers, aiHandlers, testingHandlers]) {
+    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers]) {
       for (const [name, fn] of Object.entries(group(this))) {
         if (name in all) throw new Error(`RPC method ${name} is defined twice`);
         all[name] = fn;

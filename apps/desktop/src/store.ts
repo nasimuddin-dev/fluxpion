@@ -8,6 +8,7 @@ export type ViewId =
   | 'rest'
   | 'graphql'
   | 'websocket'
+  | 'grpc'
   | 'mcp'
   | 'ai'
   | 'evaluations'

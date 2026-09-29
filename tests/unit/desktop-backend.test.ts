@@ -23,7 +23,7 @@ afterAll(async () => {
 describe('desktop backend', () => {
   it('exposes every domain through one RPC table', () => {
     const domains = new Set(Object.keys(be.handlers).map((m) => m.split('.')[0]));
-    for (const d of ['app', 'settings', 'ws', 'env', 'col', 'http', 'gql', 'mcp', 'ai', 'tests', 'runs', 'load', 'wsock']) expect(domains).toContain(d);
+    for (const d of ['app', 'settings', 'ws', 'env', 'col', 'http', 'gql', 'mcp', 'ai', 'tests', 'runs', 'load', 'wsock', 'grpc']) expect(domains).toContain(d);
     expect(Object.keys(be.handlers).length).toBeGreaterThan(100);
   });
 

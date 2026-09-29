@@ -9,12 +9,15 @@
  *   GraphQL         http://127.0.0.1:4011/graphql
  *   Mock LLM        http://127.0.0.1:4012/v1  (OpenAI-compatible: chat completions, streaming, tools, embeddings)
  *   WebSocket echo  ws://127.0.0.1:4013
+ *   gRPC            127.0.0.1:4014        (vet.v1.PetService, examples/veterinary-workspace/protos/vet/v1/pets.proto)
  */
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { buildSchema, graphql } from 'graphql';
 import { WebSocketServer } from 'ws';
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
 
 const json = (res, status, body, headers = {}) => {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
@@ -293,6 +296,49 @@ export function createWsServer(port) {
   return wss;
 }
 
+/** gRPC: the veterinary PetService (unary, server streaming, client streaming). */
+async function startGrpcServer(port) {
+  const proto = fileURLToPath(new URL('../veterinary-workspace/protos/vet/v1/pets.proto', import.meta.url));
+  const def = protoLoader.loadSync(proto, { keepCase: true, longs: String, enums: String, defaults: true });
+  const { vet } = grpc.loadPackageDefinition(def);
+  const pets = [
+    { id: '1', name: 'Byron', species: 'CAT', owner_id: '123', born: { seconds: '1577923200', nanos: 0 } },
+    { id: '2', name: 'Biscuit', species: 'DOG', owner_id: '123', born: { seconds: '1609459200', nanos: 0 } },
+    { id: '3', name: 'Clover', species: 'RABBIT', owner_id: '456', born: { seconds: '1640995200', nanos: 0 } },
+  ];
+  const server = new grpc.Server();
+  server.addService(vet.v1.PetService.service, {
+    GetPet: (call, cb) => {
+      const pet = pets.find((p) => p.id === String(call.request.id));
+      if (!pet) return cb({ code: grpc.status.NOT_FOUND, details: `No pet with id ${call.request.id}` });
+      cb(null, pet);
+    },
+    ListPets: (call) => {
+      for (const p of pets) if (call.request.species === 'SPECIES_UNSPECIFIED' || p.species === call.request.species) call.write(p);
+      call.end();
+    },
+    StreamVitals: (call) => {
+      let n = 0;
+      const max = call.request.readings || 20;
+      const t = setInterval(() => {
+        call.write({ pet_id: call.request.pet_id, temperature_c: Math.round((38 + Math.random()) * 10) / 10, heart_rate: 110 + Math.round(Math.random() * 30) });
+        if (++n >= max) {
+          clearInterval(t);
+          call.end();
+        }
+      }, 200);
+      call.on('cancelled', () => clearInterval(t));
+    },
+    CheckIn: (call, cb) => {
+      const names = [];
+      call.on('data', (p) => names.push(p.name));
+      call.on('end', () => cb(null, { checked_in: names.length, names }));
+    },
+  });
+  await new Promise((resolve, reject) => server.bindAsync(`127.0.0.1:${port}`, grpc.ServerCredentials.createInsecure(), (e) => (e ? reject(e) : resolve())));
+  return server;
+}
+
 export async function startAll(base = 4010) {
   const rest = await listen(createRestServer(), base);
   const gql = await listen(createGraphQLServer(), base + 1);
@@ -302,12 +348,15 @@ export async function startAll(base = 4010) {
     ws.once('listening', resolve);
     ws.once('error', reject);
   });
+  const grpcServer = await startGrpcServer(base + 4);
   return {
     rest,
     gql,
     llm,
     ws,
+    grpc: grpcServer,
     close: async () => {
+      grpcServer.forceShutdown();
       for (const s of [rest, gql, llm]) {
         s.closeAllConnections?.();
         await new Promise((r) => s.close(r));
@@ -326,5 +375,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   console.log(`GraphQL    http://127.0.0.1:${base + 1}/graphql`);
   console.log(`Mock LLM   http://127.0.0.1:${base + 2}/v1   (OpenAI-compatible)`);
   console.log(`WebSocket  ws://127.0.0.1:${base + 3}`);
+  console.log(`gRPC       127.0.0.1:${base + 4}   (vet.v1.PetService; proto: examples/veterinary-workspace/protos/vet/v1/pets.proto)`);
   console.log('MCP        node examples/servers/mcp-server.mjs   (stdio)');
 }

@@ -1,0 +1,38 @@
+// Demo gRPC service of the veterinary example (served by examples/servers/demo-servers.mjs on 127.0.0.1:4014).
+syntax = "proto3";
+
+package vet.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum Species {
+  SPECIES_UNSPECIFIED = 0;
+  CAT = 1;
+  DOG = 2;
+  RABBIT = 3;
+}
+
+message Pet {
+  int64 id = 1;
+  string name = 2;
+  Species species = 3;
+  string owner_id = 4;
+  google.protobuf.Timestamp born = 5;
+}
+
+message GetPetRequest { int64 id = 1; }
+message ListPetsRequest { Species species = 1; }
+message VitalsRequest { int64 pet_id = 1; int32 readings = 2; }
+message Vital { int64 pet_id = 1; double temperature_c = 2; int32 heart_rate = 3; }
+message CheckInSummary { int32 checked_in = 1; repeated string names = 2; }
+
+service PetService {
+  // Unary: one pet (NOT_FOUND for unknown ids).
+  rpc GetPet(GetPetRequest) returns (Pet);
+  // Server streaming: every pet, optionally of one species.
+  rpc ListPets(ListPetsRequest) returns (stream Pet);
+  // Server streaming: live vital signs, one reading every 200 ms.
+  rpc StreamVitals(VitalsRequest) returns (stream Vital);
+  // Client streaming: check in several pets at once.
+  rpc CheckIn(stream Pet) returns (CheckInSummary);
+}

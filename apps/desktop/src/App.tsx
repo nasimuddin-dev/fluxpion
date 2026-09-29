@@ -17,6 +17,7 @@ const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
   rest: view(() => import('./views/RestView'), 'RestView'),
   graphql: view(() => import('./views/GraphQLView'), 'GraphQLView'),
   websocket: view(() => import('./views/WebSocketView'), 'WebSocketView'),
+  grpc: view(() => import('./views/GrpcView'), 'GrpcView'),
   mcp: view(() => import('./views/McpView'), 'McpView'),
   ai: view(() => import('./views/AiLabView'), 'AiLabView'),
   evaluations: view(() => import('./views/EvaluationsView'), 'EvaluationsView'),
