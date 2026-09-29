@@ -5,10 +5,9 @@
  * engine the CLI uses — so the UI thread never performs network or test execution.
  */
 import { randomBytes } from 'node:crypto';
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { basename, join, dirname, resolve as resolvePath } from 'node:path';
-import { stringify as toYaml } from 'yaml';
+import { join, dirname } from 'node:path';
 import {
   ApsError,
   ChainSecretStore,
@@ -24,20 +23,14 @@ import {
   WorkspaceSearch,
   WorkspaceStore,
   batcher,
-  compareToBaseline,
-  createBaseline,
   createEngineContext,
-  defaultSettings,
   estimateCost,
   executeHttp,
   executeGraphQL,
   expandDataset,
   fileSink,
-  importAny,
   inheritedAuthFor,
-  introspect,
   loadSuite,
-  loadTestsFromFile,
   normalizeError,
   readResultsFile,
   runChecks,
@@ -48,71 +41,39 @@ import {
   CurrentValues,
   CookieJarStore,
   responseCookies,
-  exampleFromResponse,
-  startMockServer,
   collectMockRoutes,
-  WORKSPACE_FORMATS,
-  collectionMarkdown,
-  parseGeneratedRequest,
-  generatedTestScript,
-  exportPostmanCollection,
-  exportPostmanEnvironment,
   type MockRoute,
   type MockServer,
-  withRequestExamples,
-  type SavedExample,
   applyCookieJarOps,
   folderChain,
   folderVariables,
   scriptRequestSender,
-  type CookieInput,
   runTests,
   runCollection,
   collectionRequests,
   readDataset,
-  secretKeys,
   shortId,
   streamTests,
-  summarizeSchema,
   prepareHttpRequest,
-  parseCurl,
-  dumpMcpMock,
-  mockFromDiscovery,
-  schemaFromText,
-  startGraphQLMockServer,
   type GraphQLMockServer,
-  convertCollectionScripts,
-  compareHistory,
-  historyResponse,
   renderVisualizer,
-  parseRequestSnippet,
-  importRequestSnippet,
-  isRequestSnippet,
-  detectRequestSnippet,
   generateCode,
-  CODE_LANGUAGES,
   type SnippetRequest,
   tryParseJson,
   validateSchema,
   writeReports,
-  templateVariables,
   renderPrompt,
   isSuiteFile,
-  checkTypes,
   DEFAULT_BASE_URLS,
-  ENGINE_VERSION,
   type AppSettings,
   type CheckConfig,
   type CheckContext,
-  type Collection,
   type CollectionNode,
-  type Environment,
   type GraphQLRequestSpec,
   type HttpRequestSpec,
   type LoadTestConfig,
   type LogRecord,
   type McpServerConfig,
-  type ProviderConfig,
   type ResponseFormat,
   type RunEvent,
   type RunOptions,
@@ -122,9 +83,14 @@ import {
   type SecretStore,
   type TestCase,
   type TestResult,
-  type WorkspaceBundle,
-  type ModelRef,
 } from '@testpion/core';
+import { appHandlers } from './handlers/app.js';
+import { workspaceHandlers } from './handlers/workspace.js';
+import { collectionsHandlers } from './handlers/collections.js';
+import { requestsHandlers } from './handlers/requests.js';
+import { mcpHandlers } from './handlers/mcp.js';
+import { aiHandlers } from './handlers/ai.js';
+import { testingHandlers } from './handlers/testing.js';
 
 export interface BackendHost {
   appDir: string;
@@ -136,7 +102,9 @@ export interface BackendHost {
   openPath?(path: string): void | Promise<unknown>;
 }
 
-type Handler = (params: any) => Promise<unknown> | unknown;
+export type Handler = (params: any) => Promise<unknown> | unknown;
+/** A domain's RPC methods by name (see handlers/). */
+export type Handlers = Record<string, Handler>;
 
 interface RunState {
   ctrl: AbortController;
@@ -168,32 +136,32 @@ export interface ConsoleEntry {
 }
 
 export class Backend {
-  private host: BackendHost;
-  private manager: WorkspaceManager;
-  private settings: AppSettings;
-  private store?: WorkspaceStore;
-  private currentValues?: CurrentValues;
-  private cookieStore?: CookieJarStore;
-  private search?: WorkspaceSearch;
-  private secrets: SecretStore;
-  private logger: Logger;
-  private logBuffer: LogRecord[] = [];
+  host: BackendHost;
+  manager: WorkspaceManager;
+  settings: AppSettings;
+  store?: WorkspaceStore;
+  currentValues?: CurrentValues;
+  cookieStore?: CookieJarStore;
+  search?: WorkspaceSearch;
+  secrets: SecretStore;
+  logger: Logger;
+  logBuffer: LogRecord[] = [];
   /** Postman-style console: recent requests with their details and script output. */
-  private consoleBuffer: ConsoleEntry[] = [];
+  consoleBuffer: ConsoleEntry[] = [];
   /** Redactors of connected MCP servers and WebSocket sessions, for their console entries. */
-  private mcpRedactors = new Map<string, Redactor>();
-  private wsConsole = new Map<string, { url: string; redactor: Redactor; counts: { sent: number; received: number; opened: number } }>();
-  private controllers = new Map<string, AbortController>();
-  private runs = new Map<string, RunState>();
-  private mcpSessions = new Map<string, McpSession>();
-  private wsSessions = new Map<string, WebSocketSession>();
+  mcpRedactors = new Map<string, Redactor>();
+  wsConsole = new Map<string, { url: string; redactor: Redactor; counts: { sent: number; received: number; opened: number } }>();
+  controllers = new Map<string, AbortController>();
+  runs = new Map<string, RunState>();
+  mcpSessions = new Map<string, McpSession>();
+  wsSessions = new Map<string, WebSocketSession>();
   /** Running mock servers by collection id. */
-  private mocks = new Map<string, MockServer>();
+  mocks = new Map<string, MockServer>();
   /** Rendered pm.visualizer pages by id (served on an isolated origin: tpviz:// or /__aps/viz/). */
   private vizPages = new Map<string, string>();
   /** The GraphQL mock started from the GraphQL view (one at a time). */
-  private gqlMock?: GraphQLMockServer;
-  readonly handlers: Record<string, Handler>;
+  gqlMock?: GraphQLMockServer;
+  readonly handlers: Handlers;
 
   constructor(host: BackendHost) {
     this.host = host;
@@ -232,7 +200,7 @@ export class Backend {
     }
   }
 
-  private openStore(path: string): void {
+  openStore(path: string): void {
     this.store?.close();
     for (const s of this.mcpSessions.values()) void s.close();
     this.mcpSessions.clear();
@@ -249,13 +217,13 @@ export class Backend {
     this.logger.info(`Opened workspace ${this.store.workspace.name}`, { migrations: this.store.migrationsApplied });
   }
 
-  private jar() {
+  jar() {
     if (!this.cookieStore) throw new ApsError('ConfigurationError', 'No workspace is open');
     return this.cookieStore.jar;
   }
 
   /** A running mock server follows its collection: new or edited examples are served straight away. */
-  private refreshMock(collectionId: string): void {
+  refreshMock(collectionId: string): void {
     const m = this.mocks.get(collectionId);
     if (!m) return;
     try {
@@ -266,7 +234,7 @@ export class Backend {
   }
 
   /** Status of a collection's mock server; when stopped, the routes it would serve. */
-  private mockInfo(collectionId: string) {
+  mockInfo(collectionId: string) {
     const m = this.mocks.get(collectionId);
     const view = (routes: MockRoute[]) => routes.map((r) => ({ method: r.method, path: r.path, status: r.example.status, example: r.example.name, request: r.requestName, requestId: r.requestId }));
     if (m) return { running: true, url: m.url, port: m.port, routes: view(m.routes) };
@@ -280,7 +248,7 @@ export class Backend {
   }
 
   /** Console entry for an MCP or WebSocket action; bodies are redacted and clipped. */
-  private consoleProtocol(
+  consoleProtocol(
     kind: 'mcp' | 'websocket',
     redactor: Redactor,
     e: { name: string; method: string; url: string; status?: string; durationMs?: number; request?: unknown; response?: unknown; error?: string; failedChecks?: number; logs?: string[] },
@@ -309,17 +277,17 @@ export class Backend {
   }
 
   /** Where an MCP server runs, for the console: the URL or the command line, redacted. */
-  private mcpTarget(cfg: McpServerConfig, redactor: Redactor): string {
+  mcpTarget(cfg: McpServerConfig, redactor: Redactor): string {
     if (cfg.transport === 'mock') return `mock ${cfg.mockFile}`;
     return cfg.transport === 'stdio' ? redactor.redactString([cfg.command, ...(cfg.args ?? [])].join(' ')) : redactor.redactUrl(cfg.url);
   }
 
-  private mcpRedactor(serverId: string): Redactor {
+  mcpRedactor(serverId: string): Redactor {
     return this.mcpRedactors.get(serverId) ?? this.logger.redactor;
   }
 
   /** Run an MCP read or prompt request and log it to the console. */
-  private async mcpLogged<T>(serverId: string, method: string, what: string, request: unknown, fn: () => Promise<T>): Promise<T> {
+  async mcpLogged<T>(serverId: string, method: string, what: string, request: unknown, fn: () => Promise<T>): Promise<T> {
     const name = this.session(serverId).config.name;
     const redactor = this.mcpRedactor(serverId);
     const started = Date.now();
@@ -344,7 +312,7 @@ export class Backend {
    * choose; without one (browser bridge, cloud) the content is returned for the UI to download.
    * Resolves to `{ path }`, `{ download }`, or `{}` when the dialog was cancelled.
    */
-  private async saveOrDownload(
+  async saveOrDownload(
     name: string,
     filters: Array<{ name: string; extensions: string[] }> | undefined,
     write: (dest: string) => void,
@@ -426,7 +394,7 @@ export class Backend {
     });
   }
 
-  private get ws(): WorkspaceStore {
+  get ws(): WorkspaceStore {
     if (!this.store) throw new ApsError('ConfigurationError', 'No workspace is open');
     return this.store;
   }
@@ -446,7 +414,7 @@ export class Backend {
     }
   }
 
-  private context(opts: { environment?: string; collectionId?: string }) {
+  context(opts: { environment?: string; collectionId?: string }) {
     const ctx = createEngineContext({
       store: this.ws,
       secrets: this.secrets,
@@ -474,670 +442,26 @@ export class Backend {
   }
 
   /** Emit high-frequency events in batches so the renderer is not flooded (spec §22). */
-  private batched<T>(channel: string, intervalMs = 50) {
+  batched<T>(channel: string, intervalMs = 50) {
     return batcher<T>((items) => this.host.emit(channel, items), intervalMs);
   }
 
-  private buildHandlers(): Record<string, Handler> {
-    return {
-      /* ---------------------------------------------------------------- app */
-      'app.info': () => ({
-        version: ENGINE_VERSION,
-        /** Native open/save dialogs (desktop). Without them (browser bridge, cloud) the UI uploads and downloads. */
-        nativeDialogs: !!this.host.saveDialog && !!this.host.openDialog,
-        platform: process.platform,
-        appDir: this.host.appDir,
-        secretBackend: this.secrets.kind,
-        metaBackend: this.store?.meta.backend,
-        checkTypes: checkTypes(),
-        node: process.versions.node,
-        electron: process.versions.electron,
-      }),
-      'settings.get': () => this.settings,
-      'settings.save': (s: AppSettings) => {
-        this.settings = this.manager.saveSettings({ ...defaultSettings(), ...s, telemetry: false });
-        this.logger.setLevel(this.settings.logLevel);
-        this.logger.redactor.setFields(this.settings.redactFields);
-        return this.settings;
-      },
-      'logs.recent': () => this.logBuffer,
-      'console.recent': () => this.consoleBuffer,
-      'console.clear': () => {
-        this.consoleBuffer = [];
-      },
-      'app.openExternal': ({ url }: { url: string }) => {
-        if (!/^https?:\/\//.test(url)) throw new ApsError('ValidationError', 'Only http(s) URLs can be opened');
-        return this.host.openExternal?.(url);
-      },
-      'app.openPath': ({ path }: { path: string }) => this.host.openPath?.(path),
-
-      /* ---------------------------------------------------------------- workspaces */
-      'ws.list': () => this.manager.list(),
-      'ws.current': () =>
-        this.store && {
-          ...this.store.workspace,
-          path: this.store.root,
-          environments: this.store.listEnvironments(),
-          migrations: this.store.migrationsApplied,
-        },
-      'ws.create': ({ name }: { name: string }) => {
-        const s = this.manager.create(name);
-        s.saveProviders([{ id: 'offline', name: 'Offline mock', kind: 'mock', baseUrl: DEFAULT_BASE_URLS.mock! }]);
-        const root = s.root;
-        s.close();
-        this.openStore(root);
-        return this.handlers['ws.current']!({});
-      },
-      'ws.open': async ({ ref }: { ref?: string }) => {
-        let path = ref ? this.manager.resolve(ref) : undefined;
-        if (!ref && this.host.openDialog) {
-          const dir = await this.host.openDialog({ directory: true });
-          if (!dir) return null;
-          path = dir;
-          const s = this.manager.loadSettings();
-          if (!s.workspacePaths.includes(dir)) this.settings = this.manager.saveSettings({ ...s, workspacePaths: [...s.workspacePaths, dir] });
-        }
-        if (!ref && !this.host.openDialog) throw new ApsError('ValidationError', 'There is no folder picker here: give the path of the workspace folder');
-        if (!path) throw new ApsError('ConfigurationError', `Workspace ${ref} not found`);
-        this.openStore(path);
-        return this.handlers['ws.current']!({});
-      },
-      'ws.update': ({ name, description, variables }: { name?: string; description?: string; variables?: Array<{ key: string; value: string; enabled?: boolean; secret?: boolean }> }) => {
-        const ws = this.ws;
-        let vars = variables;
-        if (vars)
-          vars = vars.map((v) => {
-            if (v.secret && v.value) void this.secrets.set(secretKeys.workspaceVar(ws.id, v.key), v.value);
-            return v.secret ? { ...v, value: '' } : v;
-          });
-        return ws.updateWorkspace({ ...(name ? { name } : {}), ...(description !== undefined ? { description } : {}), ...(vars ? { variables: vars } : {}) });
-      },
-      'ws.duplicate': ({ ref, name }: { ref: string; name: string }) => this.manager.duplicate(ref, name),
-      /** A workspace with counts (collections, environments, tests) and whether deleting removes its files. */
-      'ws.details': ({ ref }: { ref: string }) => ({ ...this.manager.details(ref), current: !!this.store && resolvePath(this.manager.details(ref).path) === resolvePath(this.store.root) }),
-      /** Rename any workspace; the open one goes through its store so the UI state stays in sync. */
-      'ws.rename': ({ ref, name }: { ref: string; name: string }) => {
-        const p = this.manager.resolve(ref);
-        if (p && this.store && resolvePath(p) === resolvePath(this.store.root)) return this.ws.updateWorkspace({ name: name.trim() });
-        return this.manager.rename(ref, name);
-      },
-      /**
-       * Delete a workspace (or, for a folder the user opened, remove it from the list). Deleting the open
-       * workspace switches to another one first; the last workspace can't be deleted.
-       */
-      'ws.delete': ({ ref }: { ref: string }) => {
-        const p = this.manager.resolve(ref);
-        if (!p) throw new ApsError('ConfigurationError', `Workspace "${ref}" not found`);
-        let switchedTo: string | undefined;
-        if (this.store && resolvePath(p) === resolvePath(this.store.root)) {
-          const other = this.manager.list().find((w) => resolvePath(w.path) !== resolvePath(p));
-          if (!other) throw new ApsError('ValidationError', 'This is your only workspace. Create another workspace first, then delete this one.');
-          this.openStore(other.path);
-          switchedTo = other.name;
-        }
-        const r = this.manager.delete(p);
-        return { ...r, switchedTo, list: this.manager.list() };
-      },
-      'ws.export': async ({ ref }: { ref?: string } = {}) => {
-        // any workspace can be exported; one that isn't open is read without opening it in the app
-        const p = ref ? this.manager.resolve(ref) : undefined;
-        const other = p && this.store && resolvePath(p) !== resolvePath(this.store.root) ? WorkspaceStore.open(p) : undefined;
-        try {
-          const store = other ?? this.ws;
-          const bundle = store.exportBundle();
-          const dest = await this.host.saveDialog?.({ defaultPath: `${store.workspace.name}.apsworkspace.json`, filters: [{ name: 'Workspace', extensions: ['json'] }] });
-          if (dest) writeFileSync(dest, JSON.stringify(bundle, null, 2));
-          return { path: dest, bundle: dest ? undefined : bundle };
-        } finally {
-          other?.close();
-        }
-      },
-      'ws.import': ({ bundle, name }: { bundle: WorkspaceBundle; name?: string }) => {
-        const s = this.manager.importBundle(bundle, name);
-        const root = s.root;
-        s.close();
-        this.openStore(root);
-        return this.handlers['ws.current']!({});
-      },
-      /**
-       * "Import…" from the workspace menu: a TestPion workspace export becomes a new workspace; anything the
-       * collection importer understands (Postman, OpenAPI, HAR, TestPion collections) is added to the open one.
-       */
-      'ws.importFile': ({ text }: { text: string }) => {
-        let data: { format?: string } | undefined;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          /* YAML (OpenAPI) or not JSON: the collection importer decides */
-        }
-        if (data?.format && WORKSPACE_FORMATS.has(data.format)) {
-          const s = this.manager.importBundle(data as unknown as WorkspaceBundle);
-          const root = s.root;
-          s.close();
-          this.openStore(root);
-          return { kind: 'workspace', name: this.ws.workspace.name };
-        }
-        const r = this.handlers['col.import']!({ text }) as { format: string; collection?: string; environment?: string };
-        return { kind: 'collection', ...r, workspace: this.ws.workspace.name };
-      },
-      'ws.search': ({ query }: { query: string }) => this.search?.search(query, 60) ?? [],
-
-      /* ---------------------------------------------------------------- environments & secrets */
-      'env.list': () => this.ws.listEnvironments(),
-      'env.save': async ({ env, secrets }: { env: Environment; secrets?: Record<string, string> }) => {
-        for (const [k, v] of Object.entries(secrets ?? {})) if (v) await this.secrets.set(secretKeys.envVar(env.id, k), v);
-        return this.ws.saveEnvironment(env);
-      },
-      'env.delete': ({ id }: { id: string }) => this.ws.deleteEnvironment(id),
-      'env.reorder': ({ ids }: { ids: string[] }) => this.ws.reorderEnvironments(ids),
-      'currentValues.summary': () => this.currentValues?.summary(),
-      'currentValues.get': ({ scope, owner }: { scope: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => {
-        const values = this.currentValues?.get(scope, owner ?? '') ?? {};
-        // never send secret values to the UI: mask sensitive keys
-        return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, this.logger.redactor.isSensitiveKey(k) ? '••••••' : v]));
-      },
-      'currentValues.reset': ({ scope, owner }: { scope?: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => this.currentValues?.reset(scope, owner),
-      /** Postman's environment "quick look": initial and current values of the active environment and globals, secrets masked. */
-      'env.quickLook': ({ environment }: { environment?: string }) => {
-        const mask = '••••••';
-        const r = this.logger.redactor;
-        const rows = (vars: Array<{ key: string; value: string; enabled?: boolean; secret?: boolean }>, current: Record<string, unknown>) => {
-          const keys = [...new Set([...vars.map((v) => v.key), ...Object.keys(current)])].filter(Boolean);
-          return keys.map((key) => {
-            const v = vars.find((x) => x.key === key);
-            const sensitive = !!v?.secret || r.isSensitiveKey(key);
-            const show = (x: unknown) => (x === undefined ? undefined : sensitive ? mask : typeof x === 'string' ? x : JSON.stringify(x));
-            return { key, initial: v ? (v.secret ? mask : show(v.value)) : undefined, current: show(current[key]), secret: sensitive, enabled: v?.enabled !== false };
-          });
-        };
-        const env = environment ? this.ws.getEnvironment(environment) : undefined;
-        return {
-          environment: env ? { id: env.id, name: env.name, isProduction: !!env.isProduction, variables: rows(env.variables, this.currentValues?.get('environment', env.name) ?? {}) } : undefined,
-          globals: rows(this.settings.globalVariables ?? [], this.currentValues?.get('globals', '') ?? {}),
-        };
-      },
-
-      /* ---------------------------------------------------------------- cookies (kept on this machine, encrypted) */
-      'cookies.list': () => ({ cookies: this.cookieStore?.jar.list() ?? [], persistent: this.cookieStore?.persistent ?? false }),
-      'cookies.set': ({ cookie, replace }: { cookie: CookieInput; replace?: { name: string; domain: string; path?: string } }) => {
-        const jar = this.jar();
-        if (replace) jar.remove(replace.domain, replace.name, replace.path);
-        return jar.set(cookie);
-      },
-      'cookies.delete': ({ domain, name, path }: { domain: string; name: string; path?: string }) => this.jar().remove(domain, name, path),
-      'cookies.clear': ({ domain }: { domain?: string }) => this.jar().clear(domain),
-      'env.secretStatus': ({ envId, keys }: { envId: string; keys: string[] }) => Object.fromEntries(keys.map((k) => [k, !!this.secrets.get(secretKeys.envVar(envId, k))])),
-      'vars.inspect': ({ environment, collectionId, template }: { environment?: string; collectionId?: string; template?: string }) => {
-        const ctx = this.context({ environment, collectionId });
-        const names = template ? templateVariables(template) : Object.keys(ctx.vars.toObject());
-        return names.map((n) => {
-          const d = ctx.vars.describe(n);
-          return { name: n, scope: d?.scope, value: d ? (d.secret ? '••••••' : String(typeof d.value === 'object' ? JSON.stringify(d.value) : d.value)) : undefined, secret: d?.secret };
-        });
-      },
-
-      /* ---------------------------------------------------------------- collections */
-      'col.list': () => this.ws.listCollections(),
-      'col.save': (c: Collection) => {
-        const r = this.ws.saveCollection(c);
-        this.refreshMock(c.id);
-        return r;
-      },
-
-      /* ---------------------------------------------------------------- mock servers (saved examples on localhost) */
-      'mock.start': async ({ collectionId, port, delayMs }: { collectionId: string; port?: number; delayMs?: number }) => {
-        await this.mocks.get(collectionId)?.close();
-        this.mocks.delete(collectionId);
-        const c = this.ws.getCollection(collectionId);
-        const m = await startMockServer(c, { port: port ?? 0, delayMs, onRequest: (e) => this.host.emit('mock.request', { collectionId, ...e, time: new Date().toISOString() }) });
-        this.mocks.set(collectionId, m);
-        this.logger.info(`Mock server for ${c.name} listening on ${m.url}`, { routes: m.routes.length });
-        return this.mockInfo(collectionId);
-      },
-      'mock.stop': async ({ collectionId }: { collectionId: string }) => {
-        await this.mocks.get(collectionId)?.close();
-        this.mocks.delete(collectionId);
-      },
-      'mock.status': ({ collectionId }: { collectionId: string }) => this.mockInfo(collectionId),
-      'col.delete': ({ id }: { id: string }) => {
-        void this.mocks.get(id)?.close();
-        this.mocks.delete(id);
-        return this.ws.deleteCollection(id);
-      },
-      /** Save a response as an example of a saved request (sensitive headers and values are masked). */
-      'col.addExample': (p: { collectionId: string; requestId: string; name: string; environment?: string; response: Parameters<typeof exampleFromResponse>[0]; request?: SavedExample['request'] }) => {
-        const ctx = this.context({ environment: p.environment, collectionId: p.collectionId });
-        const example = exampleFromResponse(p.response, { name: p.name, redactor: ctx.redactor, request: p.request });
-        const c = withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, (list) => [...list, example]);
-        this.ws.saveCollection(c);
-        this.refreshMock(p.collectionId);
-        return example;
-      },
-      /** Markdown documentation of a collection (the given draft, or the saved one), with secrets masked. */
-      'col.docs': ({ id, collection, environment }: { id?: string; collection?: Collection; environment?: string }) => {
-        const c = collection ?? this.ws.getCollection(id!);
-        const ctx = this.context({ environment, collectionId: collection ? undefined : c.id });
-        return collectionMarkdown(c, { redactor: ctx.redactor });
-      },
-      /** Replace a saved request's examples (rename, edit, delete). */
-      'col.setExamples': (p: { collectionId: string; requestId: string; examples: SavedExample[] }) => {
-        this.ws.saveCollection(withRequestExamples(this.ws.getCollection(p.collectionId), p.requestId, () => p.examples));
-        this.refreshMock(p.collectionId);
-        return p.examples;
-      },
-      /** Rewrite a collection's scripts between tp.* and pm.*; `dryRun` only counts. */
-      'col.convertScripts': ({ collectionId, to, dryRun }: { collectionId: string; to: 'tp' | 'pm'; dryRun?: boolean }) => {
-        const c = this.ws.getCollection(collectionId);
-        const r = convertCollectionScripts(c, to === 'tp' ? 'pm' : 'tp', to);
-        if (!dryRun && r.changed) this.ws.saveCollection(r.collection);
-        return { changed: r.changed, replacements: r.replacements, skipped: r.skipped, collection: dryRun ? r.collection : undefined };
-      },
-      'col.import': ({ text }: { text: string }) => {
-        if (isRequestSnippet(text)) {
-          // a copied cURL / fetch / PowerShell request goes into the "Imported" collection; secrets become {{variables}}
-          const r = importRequestSnippet(this.ws.listCollections().filter((c) => !c.problem), text, this.logger.redactor);
-          const saved = this.ws.saveCollection(r.collection);
-          return { format: r.format, collection: saved.name, collectionId: saved.id, request: r.node.name, placeholders: r.placeholders };
-        }
-        const r = importAny(text);
-        if (r.collection) this.ws.saveCollection(r.collection);
-        if (r.environment) this.ws.saveEnvironment(r.environment);
-        return { format: r.format, collection: r.collection?.name, environment: r.environment?.name };
-      },
-      'col.importFile': async () => {
-        const f = await this.host.openDialog?.({ filters: [{ name: 'API definitions', extensions: ['json', 'yaml', 'yml', 'har'] }] });
-        if (!f) return null;
-        return this.handlers['col.import']!({ text: readFileSync(f, 'utf8') });
-      },
-      'col.run': (p: CollectionRunParams) => this.startCollectionRun(p),
-      /**
-       * A data file uploaded from the browser (no native file picker): it is stored in the workspace's
-       * datasets/uploads folder and previewed like a picked file.
-       */
-      'col.uploadDataFile': async ({ name, text }: { name: string; text: string }) => {
-        if (text.length > 50 * 1024 * 1024) throw new ApsError('ValidationError', 'The data file is larger than 50 MB');
-        const safe = basename(name).replace(/[^\w.-]+/g, '_').slice(0, 120) || 'data.csv';
-        if (!/\.(csv|json|jsonl)$/i.test(safe)) throw new ApsError('ValidationError', 'Use a .csv, .json or .jsonl file');
-        const dir = this.ws.path('datasets', 'uploads');
-        mkdirSync(dir, { recursive: true });
-        const dest = join(dir, safe);
-        writeFileSync(dest, text);
-        return this.handlers['col.previewDataFile']!({ path: dest });
-      },
-      /** Pick a CSV/JSON data file for a collection run; returns a preview of its rows. */
-      'col.pickDataFile': async () => {
-        const f = await this.host.openDialog?.({ filters: [{ name: 'Data files', extensions: ['csv', 'json', 'jsonl'] }] });
-        return f ? this.handlers['col.previewDataFile']!({ path: f }) : null;
-      },
-      'col.previewDataFile': async ({ path }: { path: string }) => {
-        const rows = await this.readRunData(path);
-        const columns = [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))];
-        return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
-      },
-      /** Export a collection as TestPion JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
-      'col.export': async ({ id, format = 'testpion' }: { id: string; format?: 'testpion' | 'postman' }) => {
-        const c = this.ws.getCollection(id);
-        const { collection, notes } = format === 'postman' ? exportPostmanCollection(c) : { collection: c as unknown as Record<string, unknown>, notes: [] as string[] };
-        const name = format === 'postman' ? `${c.name}.postman_collection.json` : `${c.name}.collection.json`;
-        const dest = await this.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Collection', extensions: ['json'] }] });
-        if (dest) writeFileSync(dest, JSON.stringify(collection, null, 2));
-        return { path: dest, collection: dest ? undefined : collection, name, notes };
-      },
-      /** Export an environment in Postman's format (secret values are never included). */
-      'env.export': async ({ id }: { id: string }) => {
-        const env = this.ws.getEnvironment(id);
-        if (!env) throw new ApsError('ConfigurationError', `Environment "${id}" not found`);
-        const out = exportPostmanEnvironment(env);
-        const name = `${env.name}.postman_environment.json`;
-        const dest = await this.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Environment', extensions: ['json'] }] });
-        if (dest) writeFileSync(dest, JSON.stringify(out, null, 2));
-        return { path: dest, environment: dest ? undefined : out, name };
-      },
-
-      /* ---------------------------------------------------------------- HTTP */
-      'http.send': (p: HttpSendParams) => this.httpSend(p),
-      'http.cancel': ({ id }: { id: string }) => this.controllers.get(id)?.abort(),
-      'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => this.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
-      'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => this.codeSnippet(p),
-      'http.codeLanguages': () => CODE_LANGUAGES,
-      /**
-       * "Copy as …" for a saved request: code (or `url`) with variables resolved and secret values
-       * included, like Postman's and the browser's Copy as cURL; `containsSecrets` lets the UI say so.
-       */
-      'http.copyCode': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string }) => {
-        const text = await this.codeSnippet({ ...p, revealSecrets: true });
-        const masked = await this.codeSnippet({ ...p, revealSecrets: false });
-        return { text, containsSecrets: masked !== text };
-      },
-      'http.parseCurl': ({ text }: { text: string }) => parseCurl(text),
-      /** Paste-to-request: cURL (bash/cmd), fetch, fetch (Node.js) or PowerShell from browser devtools. */
-      'http.parseSnippet': ({ text }: { text: string }) => ({ format: detectRequestSnippet(text), request: parseRequestSnippet(text) }),
-      'http.saveBody': async ({ payloadPath, name }: { payloadPath: string; name?: string }) => {
-        if (!payloadPath || !payloadPath.startsWith(this.ws.path('payloads'))) throw new ApsError('ValidationError', 'Unknown payload');
-        return this.saveOrDownload(name ?? 'response.bin', undefined, (dest) => copyFileSync(payloadPath, dest), () => readFileSync(payloadPath));
-      },
-      'history.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => this.ws.meta.listHistory(q),
-      'history.get': ({ id }: { id: string }) => this.ws.meta.getHistory(id),
-      'history.delete': ({ id }: { id: string }) => this.ws.meta.deleteHistory(id),
-      'history.clear': () => this.ws.meta.clearHistory(),
-      /** Earlier responses of a saved request, newest first (response history). */
-      'history.forRequest': ({ requestId, limit }: { requestId: string; limit?: number }) =>
-        this.ws.meta.listHistory({ requestId, kind: 'http', limit: Math.min(limit ?? 50, 200) }).items,
-      /** One response from history, with its body (from the saved payload) for viewing. */
-      'history.response': ({ id }: { id: string }) => {
-        const h = this.ws.meta.getHistory(id);
-        if (!h) throw new ApsError('ConfigurationError', 'That response is no longer in the history');
-        return { entry: h, ...historyResponse(this.ws, h) };
-      },
-      /** Compare two responses from history (`before`, `after` are history ids). */
-      'history.compare': ({ before, after }: { before: string; after: string }) => compareHistory(this.ws, before, after),
-
-      /* ---------------------------------------------------------------- GraphQL */
-      'gql.introspect': async ({ request, environment }: { request: Omit<GraphQLRequestSpec, 'query'>; environment?: string }) => {
-        const ctx = this.context({ environment });
-        const { sdl, schema } = await introspect(ctx.vars.resolveDeep(request), { redactor: ctx.redactor });
-        return { sdl, summary: summarizeSchema(schema) };
-      },
-      'gql.send': (p: GqlSendParams) => this.gqlSend(p),
-      /** Serve fake data for a schema on localhost (restarts with the new schema when already running). */
-      'gql.mock.start': async ({ sdl, port, overrides }: { sdl: string; port?: number; overrides?: Record<string, Record<string, unknown>> }) => {
-        const schema = schemaFromText(sdl);
-        if (this.gqlMock) {
-          this.gqlMock.update(schema, { overrides });
-          return { url: this.gqlMock.url };
-        }
-        this.gqlMock = await startGraphQLMockServer(schema, { port: port ?? 0, overrides });
-        return { url: this.gqlMock.url };
-      },
-      'gql.mock.stop': async () => {
-        await this.gqlMock?.close();
-        this.gqlMock = undefined;
-      },
-      'gql.mock.status': () => (this.gqlMock ? { url: this.gqlMock.url } : null),
-
-      /* ---------------------------------------------------------------- MCP */
-      'mcp.servers': () => this.ws.getMcpServers().map((s) => ({ ...s, connected: !!this.mcpSessions.get(s.id)?.connected })),
-      'mcp.saveServers': ({ servers }: { servers: McpServerConfig[] }) => {
-        this.ws.saveMcpServers(servers);
-        return servers;
-      },
-      'mcp.connect': async ({ serverId, environment }: { serverId: string; environment?: string }) => {
-        await this.mcpSessions.get(serverId)?.close();
-        const cfg = this.ws.getMcpServers().find((s) => s.id === serverId);
-        if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
-        const ctx = this.context({ environment });
-        const resolved = this.ws.resolveMcpServer(ctx.vars.resolveDeep(cfg));
-        const session = new McpSession(resolved, ctx.redactor, { cookieJar: ctx.services.cookieJar });
-        const b = this.batched<unknown>('mcp.events');
-        session.onEvent((e) => b.push({ serverId, event: e }));
-        this.mcpSessions.set(serverId, session);
-        this.mcpRedactors.set(serverId, ctx.redactor);
-        const started = Date.now();
-        const target = `${cfg.name} › ${this.mcpTarget(resolved, ctx.redactor)}`;
-        try {
-          await session.connect();
-          this.consoleProtocol('mcp', ctx.redactor, { name: cfg.name, method: 'CONNECT', url: target, status: 'ok', durationMs: Date.now() - started, logs: [`transport: ${cfg.transport}`] });
-        } catch (e) {
-          const err = normalizeError(e);
-          this.consoleProtocol('mcp', ctx.redactor, { name: cfg.name, method: 'CONNECT', url: target, status: err.kind, durationMs: Date.now() - started, error: err.message });
-          throw e;
-        } finally {
-          b.flush();
-        }
-        return { discovery: await session.discover(), events: session.events };
-      },
-      /**
-       * Record the connected server as a mock: its tools, resources and prompts, plus the tool calls made
-       * in this session (as seen in the protocol trace, already redacted), saved as mocks/<name>.mcp-mock.yaml.
-       * With `addServer`, a server entry that runs the mock in-process is added too.
-       */
-      'mcp.mock.save': async ({ serverId, addServer }: { serverId: string; addServer?: boolean }) => {
-        const s = this.session(serverId);
-        const discovery = await s.discover();
-        const requests = new Map<unknown, { tool: string; args: Record<string, unknown> }>();
-        const calls: Array<{ tool: string; args: Record<string, unknown>; result: { content?: unknown[]; isError?: boolean } }> = [];
-        for (const e of s.events) {
-          const msg = (e.request ?? {}) as { method?: string; params?: { name?: string; arguments?: Record<string, unknown> } };
-          if (e.kind === 'request' && e.method === 'tools/call') {
-            const params = msg.params ?? (e.request as { name?: string; arguments?: Record<string, unknown> });
-            if (params?.name) requests.set(e.rpcId, { tool: params.name, args: params.arguments ?? {} });
-          } else if (e.kind === 'response' && requests.has(e.rpcId)) {
-            const res = (e.response ?? {}) as { result?: { content?: unknown[]; isError?: boolean }; content?: unknown[]; isError?: boolean };
-            calls.push({ ...requests.get(e.rpcId)!, result: res.result ?? res });
-            requests.delete(e.rpcId);
-          }
-        }
-        const texts: Record<string, string> = {};
-        for (const r of discovery.resources.slice(0, 20)) {
-          try {
-            const c = (await s.readResource(r.uri)).contents as Array<{ text?: string }>;
-            if (typeof c[0]?.text === 'string') texts[r.uri] = this.logger.redactor.redactString(c[0].text.slice(0, 100_000));
-          } catch {
-            /* unreadable resource: listed without text */
-          }
-        }
-        const name = `${s.config.name}-mock`;
-        const def = mockFromDiscovery(name, discovery, calls, texts);
-        const rel = `mocks/${s.config.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.mcp-mock.yaml`;
-        mkdirSync(this.ws.path('mocks'), { recursive: true });
-        writeFileSync(this.ws.path(rel), dumpMcpMock(def));
-        if (addServer) {
-          const servers = this.ws.getMcpServers().filter((x) => !(x.transport === 'mock' && x.mockFile === rel));
-          this.ws.saveMcpServers([...servers, { id: shortId('mcp-'), name: `${s.config.name} (mock)`, transport: 'mock', mockFile: rel }]);
-        }
-        return { path: rel, tools: def.tools?.length ?? 0, calls: calls.length, resources: Object.keys(texts).length };
-      },
-      'mcp.disconnect': async ({ serverId }: { serverId: string }) => {
-        await this.mcpSessions.get(serverId)?.close();
-        this.mcpSessions.delete(serverId);
-        this.mcpRedactors.delete(serverId);
-      },
-      'mcp.events': ({ serverId }: { serverId: string }) => this.mcpSessions.get(serverId)?.events ?? [],
-      'mcp.call': async ({ serverId, tool, args, assertions }: { serverId: string; tool: string; args: Record<string, unknown>; assertions?: CheckConfig[] }) => {
-        const s = this.session(serverId);
-        const tracer = new Tracer(`tools/call ${tool}`, this.logger.redactor);
-        const span = tracer.start(`tools/call ${tool}`, 'mcp', { attributes: { server: s.config.name, tool }, input: args });
-        try {
-          const r = await s.callTool(tool, args);
-          span.end({ status: r.isError ? 'error' : 'ok', output: r.raw });
-          const { mcpResultBody } = await import('@testpion/core');
-          const { body, text } = mcpResultBody(r);
-          const checks = await runChecks(assertions, { testType: 'mcp', body, text, isError: r.isError, latencyMs: r.durationMs });
-          const trace = tracer.finish();
-          this.ws.saveTrace(trace, 'mcp');
-          this.consoleProtocol('mcp', this.mcpRedactor(serverId), {
-            name: `${s.config.name} · ${tool}`,
-            method: 'CALL',
-            url: `${s.config.name} › tools/call ${tool}`,
-            status: r.isError ? 'error' : 'ok',
-            durationMs: r.durationMs,
-            request: args,
-            response: r.raw,
-            failedChecks: checks.filter((c) => !c.passed).length,
-          });
-          this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'mcp', name: `${s.config.name} · ${tool}`, status: r.isError ? 'error' : 'ok', durationMs: r.durationMs, request: { serverId, tool, args }, traceId: trace.traceId });
-          return { ...r, body, checks, traceId: trace.traceId };
-        } catch (e) {
-          span.fail(e);
-          this.ws.saveTrace(tracer.finish('error'), 'mcp');
-          const err = normalizeError(e);
-          this.consoleProtocol('mcp', this.mcpRedactor(serverId), { name: `${s.config.name} · ${tool}`, method: 'CALL', url: `${s.config.name} › tools/call ${tool}`, status: err.kind, request: args, error: err.message });
-          throw e;
-        }
-      },
-      'mcp.read': ({ serverId, uri }: { serverId: string; uri: string }) =>
-        this.mcpLogged(serverId, 'READ', `resources/read ${uri}`, undefined, () => this.session(serverId).readResource(uri)),
-      'mcp.prompt': ({ serverId, name, args }: { serverId: string; name: string; args: Record<string, string> }) =>
-        this.mcpLogged(serverId, 'PROMPT', `prompts/get ${name}`, args, () => this.session(serverId).getPrompt(name, args)),
-      'mcp.ping': async ({ serverId }: { serverId: string }) => this.session(serverId).ping(),
-      'mcp.saveTest': ({ serverId, tool, args, assertions, name }: { serverId: string; tool: string; args: Record<string, unknown>; assertions: CheckConfig[]; name: string }) => {
-        const cfg = this.ws.getMcpServers().find((s) => s.id === serverId);
-        const rel = `mcp/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.yaml`;
-        this.ws.writeTestFile(rel, toYaml({ name, type: 'mcp', server: cfg?.name ?? serverId, tool, arguments: args, assertions: assertions.length ? assertions : [{ type: 'status', expected: 'success' }] }));
-        return rel;
-      },
-
-      /* ---------------------------------------------------------------- AI */
-      'ai.providers': () => this.ws.getProviders().map((p) => ({ ...p, hasKey: !!this.secrets.get(secretKeys.provider(p.id)) || !!(p.apiKey && !p.apiKey.includes('$secret')) })),
-      'ai.saveProviders': async ({ providers, keys }: { providers: ProviderConfig[]; keys?: Record<string, string> }) => {
-        for (const [id, key] of Object.entries(keys ?? {})) if (key) await this.secrets.set(secretKeys.provider(id), key);
-        const clean = providers.map((p) => ({ ...p, apiKey: p.apiKey && /\{\{/.test(p.apiKey) ? p.apiKey : keys?.[p.id] || this.secrets.get(secretKeys.provider(p.id)) ? `{{$secret.${secretKeys.provider(p.id)}}}` : undefined }));
-        this.ws.saveProviders(clean);
-        return clean;
-      },
-      'ai.models': async ({ providerId, environment }: { providerId: string; environment?: string }) => {
-        const ctx = this.context({ environment });
-        const p = ctx.services.providers.get(providerId);
-        return (await p.listModels?.()) ?? [];
-      },
-      'ai.chat': (p: AiChatParams) => this.aiChat(p),
-      'ai.cancel': ({ id }: { id: string }) => this.controllers.get(id)?.abort(),
-      'ai.compare': async (p: AiChatParams & { models: ModelRef[] }) => {
-        const results = await Promise.all(
-          p.models.map(async (m, i) => {
-            try {
-              return await this.aiChat({ ...p, provider: m.provider, model: m.name ?? '', requestId: `${p.requestId}-${i}`, stream: false });
-            } catch (e) {
-              return { error: normalizeError(e), provider: m.provider, model: m.name };
-            }
-          }),
-        );
-        return results;
-      },
-
-      /* ---------------------------------------------------------------- tests & runs */
-      'tests.tree': () => this.ws.testTree(),
-      'tests.read': ({ path }: { path: string }) => this.ws.readTestFile(path),
-      'tests.write': ({ path, content }: { path: string; content: string }) => this.ws.writeTestFile(path, content),
-      'tests.delete': ({ path }: { path: string }) => this.ws.deleteTestFile(path),
-      'tests.preview': async ({ path }: { path: string }) => {
-        const out: Array<{ id?: string; name: string; type: string; tags?: string[] }> = [];
-        const abs = join(this.ws.path('tests'), path);
-        if (isSuiteFile(abs)) return { suite: await loadSuite(abs), tests: [] };
-        for await (const t of loadTestsFromFile(abs)) {
-          out.push({ id: t.id, name: t.name, type: t.type, tags: t.tags });
-          if (out.length >= 500) break;
-        }
-        return { tests: out };
-      },
-      'tests.run': (p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[] }) => this.startTestRun(p),
-      'eval.run': (p: EvalRunParams) => this.startEvalRun(p),
-      'runs.cancel': ({ runId }: { runId: string }) => this.runs.get(runId)?.ctrl.abort(),
-      'runs.list': (q: { query?: string; limit?: number; offset?: number }) => this.ws.meta.listRuns(q),
-      'runs.summary': ({ runId }: { runId: string }) => {
-        const f = join(this.ws.runDir(runId), 'summary.json');
-        return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null;
-      },
-      'runs.results': (q: { runId: string; offset?: number; limit?: number; status?: string; query?: string }) => this.pageResults(q),
-      'runs.openReport': ({ runId, format }: { runId: string; format: 'html' | 'markdown' | 'junit' | 'json' }) => {
-        const file = { html: 'report.html', markdown: 'report.md', junit: 'junit.xml', json: 'report.json' }[format];
-        const p = join(this.ws.runDir(runId), file);
-        if (!existsSync(p)) throw new ApsError('ConfigurationError', 'Report not found');
-        if (this.host.openPath) {
-          void this.host.openPath(p);
-          return { path: p };
-        }
-        // no desktop shell (browser, cloud): the UI shows the report itself
-        return { path: p, view: { name: file, content: readFileSync(p).toString('base64'), encoding: 'base64', type: format === 'html' ? 'text/html' : 'text/plain' } };
-      },
-      'runs.exportReport': async ({ runId, format }: { runId: string; format: 'html' | 'markdown' | 'junit' | 'json' }) => {
-        const file = { html: 'report.html', markdown: 'report.md', junit: 'junit.xml', json: 'report.json' }[format];
-        const src = join(this.ws.runDir(runId), file);
-        return this.saveOrDownload(file, undefined, (dest) => copyFileSync(src, dest), () => readFileSync(src));
-      },
-      'baselines.list': () => this.ws.listBaselines(),
-      'baselines.save': async ({ runId, name }: { runId: string; name: string }) => {
-        const summary = await this.handlers['runs.summary']!({ runId });
-        const b = await createBaseline(name, summary as never, this.results(runId));
-        this.ws.saveBaseline(b);
-        return { name, tests: Object.keys(b.tests).length };
-      },
-      'baselines.compare': async ({ runId, name, thresholds }: { runId: string; name: string; thresholds?: { latencyPct: number; tokensPct: number; scoreDrop: number } }) => {
-        const summary = await this.handlers['runs.summary']!({ runId });
-        return compareToBaseline(this.ws.getBaseline(name), summary as never, this.results(runId), thresholds);
-      },
-
-      /* ---------------------------------------------------------------- traces */
-      'traces.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => this.ws.meta.listTraces(q),
-      'traces.get': ({ id }: { id: string }) => this.ws.loadTrace(id),
-
-      /* ---------------------------------------------------------------- load testing */
-      'load.start': (p: { config: LoadTestConfig; environment?: string }) => this.startLoad(p),
-      'load.stop': ({ id }: { id: string }) => this.controllers.get(id)?.abort(),
-
-      /* ---------------------------------------------------------------- WebSocket */
-      'wsock.connect': async ({ url, protocols, headers, environment }: { url: string; protocols?: string[]; headers?: Array<{ key: string; value: string }>; environment?: string }) => {
-        const ctx = this.context({ environment });
-        const s = new WebSocketSession(ctx.vars.resolve(url), { protocols, headers: ctx.vars.resolveDeep(headers), cookieJar: ctx.services.cookieJar });
-        const shown = ctx.redactor.redactUrl(ctx.vars.resolve(url));
-        const b = this.batched<unknown>('wsock.messages');
-        // the console gets connect, send and close (with message counts), not every received frame
-        const counts = { sent: 0, received: 0, opened: 0 };
-        s.onMessage((m) => {
-          b.push({ id: s.id, message: m });
-          if (m.direction === 'received') counts.received++;
-        });
-        s.onStatus((st) => {
-          this.host.emit('wsock.status', { id: s.id, status: st });
-          if (st === 'closed' && counts.opened)
-            this.consoleProtocol('websocket', ctx.redactor, { name: shown, method: 'CLOSE', url: shown, status: 'closed', durationMs: Date.now() - counts.opened, logs: [`${counts.sent} sent · ${counts.received} received`] });
-        });
-        this.wsSessions.set(s.id, s);
-        this.wsConsole.set(s.id, { url: shown, redactor: ctx.redactor, counts });
-        const started = Date.now();
-        try {
-          await s.connect();
-        } catch (e) {
-          const err = normalizeError(e);
-          this.consoleProtocol('websocket', ctx.redactor, { name: shown, method: 'CONNECT', url: shown, status: err.kind, durationMs: Date.now() - started, error: err.message });
-          throw e;
-        }
-        counts.opened = Date.now();
-        this.consoleProtocol('websocket', ctx.redactor, {
-          name: shown,
-          method: 'CONNECT',
-          url: shown,
-          status: 'open',
-          durationMs: counts.opened - started,
-          request: headers?.length || protocols?.length ? { protocols, headers: ctx.vars.resolveDeep(headers) } : undefined,
-        });
-        return { id: s.id };
-      },
-      'wsock.send': ({ id, data }: { id: string; data: string }) => {
-        const s = this.wsSessions.get(id);
-        s?.send(data);
-        const c = this.wsConsole.get(id);
-        if (s && c) {
-          c.counts.sent++;
-          this.consoleProtocol('websocket', c.redactor, { name: c.url, method: 'SEND', url: c.url, status: 'sent', request: data, logs: [`${data.length} characters`] });
-        }
-      },
-      'wsock.close': ({ id }: { id: string }) => {
-        this.wsSessions.get(id)?.close();
-        this.wsSessions.delete(id);
-        this.wsConsole.delete(id);
-      },
-
-      /* ---------------------------------------------------------------- AI assistant */
-      'assistant.ask': (p: { task: string; context: unknown; question?: string; environment?: string }) => this.assistant(p),
-      /** Natural language → an HTTP request (shown to the user before anything is sent). */
-      'ai.generateRequest': async ({ description, environment }: { description: string; environment?: string }) => {
-        const r = await this.assistant({ task: 'generate-request', context: {}, question: description, environment });
-        return { ...parseGeneratedRequest(r.text), model: `${r.provider}/${r.model}` };
-      },
-      /** pm tests for a response, labelled as AI-generated. */
-      'ai.generateTests': async ({ request, response, environment }: { request: unknown; response: unknown; environment?: string }) => {
-        const r = await this.assistant({ task: 'generate-pm-tests', context: { request, response }, environment });
-        return { script: generatedTestScript(r.text, `${r.provider}/${r.model}`), model: `${r.provider}/${r.model}` };
-      },
-
-      /* ---------------------------------------------------------------- misc */
-      'schema.validate': ({ schema, data }: { schema: unknown; data: unknown }) => validateSchema(schema, data),
-      'prompt.variables': ({ template }: { template: string }) => templateVariables(template),
-    };
+  /**
+   * The RPC surface, one module per domain (handlers/*.ts). Every host (Electron IPC, the web bridge, a
+   * future cloud server) calls the same methods by name. A name defined twice is a bug, not an override.
+   */
+  private buildHandlers(): Handlers {
+    const all: Handlers = {};
+    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, mcpHandlers, aiHandlers, testingHandlers]) {
+      for (const [name, fn] of Object.entries(group(this))) {
+        if (name in all) throw new Error(`RPC method ${name} is defined twice`);
+        all[name] = fn;
+      }
+    }
+    return all;
   }
 
-  private session(serverId: string): McpSession {
+  session(serverId: string): McpSession {
     const s = this.mcpSessions.get(serverId);
     if (!s?.connected) throw new ApsError('ConfigurationError', 'MCP server is not connected', { suggestions: ['Click Connect first.'] });
     return s;
@@ -1145,7 +469,7 @@ export class Backend {
 
   /* ------------------------------------------------------------------ HTTP */
 
-  private async httpSend(p: HttpSendParams) {
+  async httpSend(p: HttpSendParams) {
     const id = p.id ?? shortId('req-');
     const ctrl = new AbortController();
     this.controllers.set(id, ctrl);
@@ -1324,7 +648,7 @@ export class Backend {
   }
 
   /** Code snippet for a request, with variables and auth resolved. Secrets are masked unless revealSecrets. */
-  private async codeSnippet(p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) {
+  async codeSnippet(p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) {
     const ctx = this.context({ environment: p.environment, collectionId: p.collectionId });
     let request = p.request;
     if ((!request.auth || request.auth.type === 'inherit') && ctx.collection)
@@ -1352,7 +676,7 @@ export class Backend {
     return masked.split('[REDACTED]').join('<secret>');
   }
 
-  private async gqlSend(p: GqlSendParams) {
+  async gqlSend(p: GqlSendParams) {
     const id = p.id ?? shortId('gql-');
     const ctrl = new AbortController();
     this.controllers.set(id, ctrl);
@@ -1406,7 +730,7 @@ export class Backend {
 
   /* ------------------------------------------------------------------ AI */
 
-  private async aiChat(p: AiChatParams) {
+  async aiChat(p: AiChatParams) {
     const id = p.requestId ?? shortId('ai-');
     const ctrl = new AbortController();
     this.controllers.set(id, ctrl);
@@ -1479,7 +803,7 @@ export class Backend {
     }
   }
 
-  private async assistant(p: { task: string; context: unknown; question?: string; environment?: string }) {
+  async assistant(p: { task: string; context: unknown; question?: string; environment?: string }) {
     const providerRef = this.settings.assistantProvider;
     if (!providerRef)
       throw new ApsError('ConfigurationError', 'No AI assistant model configured', { suggestions: ['Choose an assistant provider and model in Settings → AI Assistant (a local model works offline).'] });
@@ -1520,14 +844,14 @@ export class Backend {
 
   /* ------------------------------------------------------------------ runs */
 
-  private results(runId: string): AsyncGenerator<TestResult> {
+  results(runId: string): AsyncGenerator<TestResult> {
     const file = join(this.ws.runDir(runId), 'results.jsonl');
     return (async function* () {
       for await (const r of await readResultsFile(file)) yield r;
     })();
   }
 
-  private async pageResults(q: { runId: string; offset?: number; limit?: number; status?: string; query?: string }) {
+  async pageResults(q: { runId: string; offset?: number; limit?: number; status?: string; query?: string }) {
     const file = join(this.ws.runDir(q.runId), 'results.jsonl');
     const items: TestResult[] = [];
     let total = 0;
@@ -1608,7 +932,7 @@ export class Backend {
     return { runId };
   }
 
-  private startTestRun(p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[] }) {
+  startTestRun(p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[] }) {
     const base = this.ws.path('tests');
     const suitePath = p.paths.length === 1 && isSuiteFile(p.paths[0]!) ? join(base, p.paths[0]!) : undefined;
     const store = this.ws;
@@ -1621,13 +945,13 @@ export class Backend {
     return this.startRun(p.name ?? (p.paths.join(', ') || 'All tests'), tests, p);
   }
 
-  private async readRunData(path: string): Promise<DatasetRecord[]> {
+  async readRunData(path: string): Promise<DatasetRecord[]> {
     const rows: DatasetRecord[] = [];
     for await (const r of readDataset({ path, limit: 100_000 })) rows.push(r);
     return rows;
   }
 
-  private startCollectionRun(p: CollectionRunParams) {
+  startCollectionRun(p: CollectionRunParams) {
     const collection = this.ws.getCollection(p.collectionId);
     const count = collectionRequests(collection, p.selection).length;
     if (!count) throw new ApsError('ValidationError', 'Nothing to run: the selection has no requests');
@@ -1645,7 +969,7 @@ export class Backend {
     );
   }
 
-  private startEvalRun(p: EvalRunParams) {
+  startEvalRun(p: EvalRunParams) {
     const base = this.ws.path('datasets');
     mkdirSync(base, { recursive: true });
     let dataset: Record<string, unknown>;
@@ -1659,7 +983,7 @@ export class Backend {
     return this.startRun(p.name ?? String(p.template.name ?? 'Evaluation'), tests, { environment: p.environment, concurrency: p.concurrency, retries: p.retries, traceMode: 'all' });
   }
 
-  private async startLoad(p: { config: LoadTestConfig; environment?: string }) {
+  async startLoad(p: { config: LoadTestConfig; environment?: string }) {
     const id = shortId('load-');
     const ctrl = new AbortController();
     this.controllers.set(id, ctrl);
@@ -1690,6 +1014,7 @@ export class Backend {
     for (const s of this.mcpSessions.values()) await s.close();
     for (const s of this.wsSessions.values()) s.close();
     for (const m of this.mocks.values()) await m.close();
+    await this.gqlMock?.close();
     await this.cookieStore?.flush().catch(() => undefined);
     this.store?.close();
   }

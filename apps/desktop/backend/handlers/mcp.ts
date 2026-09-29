@@ -1,0 +1,141 @@
+/** RPC handlers: MCP servers: connect, discover, call tools, read resources, prompts, tests and mocks. */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { stringify as toYaml } from 'yaml';
+import {
+  ApsError,
+  McpSession,
+  Tracer,
+  normalizeError,
+  runChecks,
+  shortId,
+  dumpMcpMock,
+  mockFromDiscovery,
+  type CheckConfig,
+  type McpServerConfig,
+} from '@testpion/core';
+import type { Backend, Handlers } from '../backend.js';
+
+export function mcpHandlers(be: Backend): Handlers {
+  return {
+    'mcp.servers': () => be.ws.getMcpServers().map((s) => ({ ...s, connected: !!be.mcpSessions.get(s.id)?.connected })),
+    'mcp.saveServers': ({ servers }: { servers: McpServerConfig[] }) => {
+      be.ws.saveMcpServers(servers);
+      return servers;
+    },
+    'mcp.connect': async ({ serverId, environment }: { serverId: string; environment?: string }) => {
+      await be.mcpSessions.get(serverId)?.close();
+      const cfg = be.ws.getMcpServers().find((s) => s.id === serverId);
+      if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
+      const ctx = be.context({ environment });
+      const resolved = be.ws.resolveMcpServer(ctx.vars.resolveDeep(cfg));
+      const session = new McpSession(resolved, ctx.redactor, { cookieJar: ctx.services.cookieJar });
+      const b = be.batched<unknown>('mcp.events');
+      session.onEvent((e) => b.push({ serverId, event: e }));
+      be.mcpSessions.set(serverId, session);
+      be.mcpRedactors.set(serverId, ctx.redactor);
+      const started = Date.now();
+      const target = `${cfg.name} › ${be.mcpTarget(resolved, ctx.redactor)}`;
+      try {
+        await session.connect();
+        be.consoleProtocol('mcp', ctx.redactor, { name: cfg.name, method: 'CONNECT', url: target, status: 'ok', durationMs: Date.now() - started, logs: [`transport: ${cfg.transport}`] });
+      } catch (e) {
+        const err = normalizeError(e);
+        be.consoleProtocol('mcp', ctx.redactor, { name: cfg.name, method: 'CONNECT', url: target, status: err.kind, durationMs: Date.now() - started, error: err.message });
+        throw e;
+      } finally {
+        b.flush();
+      }
+      return { discovery: await session.discover(), events: session.events };
+    },
+    /**
+     * Record the connected server as a mock: its tools, resources and prompts, plus the tool calls made
+     * in this session (as seen in the protocol trace, already redacted), saved as mocks/<name>.mcp-mock.yaml.
+     * With `addServer`, a server entry that runs the mock in-process is added too.
+     */
+    'mcp.mock.save': async ({ serverId, addServer }: { serverId: string; addServer?: boolean }) => {
+      const s = be.session(serverId);
+      const discovery = await s.discover();
+      const requests = new Map<unknown, { tool: string; args: Record<string, unknown> }>();
+      const calls: Array<{ tool: string; args: Record<string, unknown>; result: { content?: unknown[]; isError?: boolean } }> = [];
+      for (const e of s.events) {
+        const msg = (e.request ?? {}) as { method?: string; params?: { name?: string; arguments?: Record<string, unknown> } };
+        if (e.kind === 'request' && e.method === 'tools/call') {
+          const params = msg.params ?? (e.request as { name?: string; arguments?: Record<string, unknown> });
+          if (params?.name) requests.set(e.rpcId, { tool: params.name, args: params.arguments ?? {} });
+        } else if (e.kind === 'response' && requests.has(e.rpcId)) {
+          const res = (e.response ?? {}) as { result?: { content?: unknown[]; isError?: boolean }; content?: unknown[]; isError?: boolean };
+          calls.push({ ...requests.get(e.rpcId)!, result: res.result ?? res });
+          requests.delete(e.rpcId);
+        }
+      }
+      const texts: Record<string, string> = {};
+      for (const r of discovery.resources.slice(0, 20)) {
+        try {
+          const c = (await s.readResource(r.uri)).contents as Array<{ text?: string }>;
+          if (typeof c[0]?.text === 'string') texts[r.uri] = be.logger.redactor.redactString(c[0].text.slice(0, 100_000));
+        } catch {
+          /* unreadable resource: listed without text */
+        }
+      }
+      const name = `${s.config.name}-mock`;
+      const def = mockFromDiscovery(name, discovery, calls, texts);
+      const rel = `mocks/${s.config.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.mcp-mock.yaml`;
+      mkdirSync(be.ws.path('mocks'), { recursive: true });
+      writeFileSync(be.ws.path(rel), dumpMcpMock(def));
+      if (addServer) {
+        const servers = be.ws.getMcpServers().filter((x) => !(x.transport === 'mock' && x.mockFile === rel));
+        be.ws.saveMcpServers([...servers, { id: shortId('mcp-'), name: `${s.config.name} (mock)`, transport: 'mock', mockFile: rel }]);
+      }
+      return { path: rel, tools: def.tools?.length ?? 0, calls: calls.length, resources: Object.keys(texts).length };
+    },
+    'mcp.disconnect': async ({ serverId }: { serverId: string }) => {
+      await be.mcpSessions.get(serverId)?.close();
+      be.mcpSessions.delete(serverId);
+      be.mcpRedactors.delete(serverId);
+    },
+    'mcp.events': ({ serverId }: { serverId: string }) => be.mcpSessions.get(serverId)?.events ?? [],
+    'mcp.call': async ({ serverId, tool, args, assertions }: { serverId: string; tool: string; args: Record<string, unknown>; assertions?: CheckConfig[] }) => {
+      const s = be.session(serverId);
+      const tracer = new Tracer(`tools/call ${tool}`, be.logger.redactor);
+      const span = tracer.start(`tools/call ${tool}`, 'mcp', { attributes: { server: s.config.name, tool }, input: args });
+      try {
+        const r = await s.callTool(tool, args);
+        span.end({ status: r.isError ? 'error' : 'ok', output: r.raw });
+        const { mcpResultBody } = await import('@testpion/core');
+        const { body, text } = mcpResultBody(r);
+        const checks = await runChecks(assertions, { testType: 'mcp', body, text, isError: r.isError, latencyMs: r.durationMs });
+        const trace = tracer.finish();
+        be.ws.saveTrace(trace, 'mcp');
+        be.consoleProtocol('mcp', be.mcpRedactor(serverId), {
+          name: `${s.config.name} · ${tool}`,
+          method: 'CALL',
+          url: `${s.config.name} › tools/call ${tool}`,
+          status: r.isError ? 'error' : 'ok',
+          durationMs: r.durationMs,
+          request: args,
+          response: r.raw,
+          failedChecks: checks.filter((c) => !c.passed).length,
+        });
+        be.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'mcp', name: `${s.config.name} · ${tool}`, status: r.isError ? 'error' : 'ok', durationMs: r.durationMs, request: { serverId, tool, args }, traceId: trace.traceId });
+        return { ...r, body, checks, traceId: trace.traceId };
+      } catch (e) {
+        span.fail(e);
+        be.ws.saveTrace(tracer.finish('error'), 'mcp');
+        const err = normalizeError(e);
+        be.consoleProtocol('mcp', be.mcpRedactor(serverId), { name: `${s.config.name} · ${tool}`, method: 'CALL', url: `${s.config.name} › tools/call ${tool}`, status: err.kind, request: args, error: err.message });
+        throw e;
+      }
+    },
+    'mcp.read': ({ serverId, uri }: { serverId: string; uri: string }) =>
+      be.mcpLogged(serverId, 'READ', `resources/read ${uri}`, undefined, () => be.session(serverId).readResource(uri)),
+    'mcp.prompt': ({ serverId, name, args }: { serverId: string; name: string; args: Record<string, string> }) =>
+      be.mcpLogged(serverId, 'PROMPT', `prompts/get ${name}`, args, () => be.session(serverId).getPrompt(name, args)),
+    'mcp.ping': async ({ serverId }: { serverId: string }) => be.session(serverId).ping(),
+    'mcp.saveTest': ({ serverId, tool, args, assertions, name }: { serverId: string; tool: string; args: Record<string, unknown>; assertions: CheckConfig[]; name: string }) => {
+      const cfg = be.ws.getMcpServers().find((s) => s.id === serverId);
+      const rel = `mcp/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.yaml`;
+      be.ws.writeTestFile(rel, toYaml({ name, type: 'mcp', server: cfg?.name ?? serverId, tool, arguments: args, assertions: assertions.length ? assertions : [{ type: 'status', expected: 'success' }] }));
+      return rel;
+    },
+  };
+}

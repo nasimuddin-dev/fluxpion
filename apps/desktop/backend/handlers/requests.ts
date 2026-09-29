@@ -1,0 +1,135 @@
+/** RPC handlers: Sending requests: HTTP (with response history), GraphQL and WebSocket. */
+import { copyFileSync, readFileSync } from 'node:fs';
+import {
+  ApsError,
+  WebSocketSession,
+  introspect,
+  normalizeError,
+  summarizeSchema,
+  parseCurl,
+  schemaFromText,
+  startGraphQLMockServer,
+  compareHistory,
+  parseRequestSnippet,
+  detectRequestSnippet,
+  CODE_LANGUAGES,
+  type GraphQLRequestSpec,
+  type HttpRequestSpec,
+  historyResponse,
+} from '@testpion/core';
+import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
+
+export function requestsHandlers(be: Backend): Handlers {
+  return {
+    'http.send': (p: HttpSendParams) => be.httpSend(p),
+    'http.cancel': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
+    'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => be.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
+    'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => be.codeSnippet(p),
+    'http.codeLanguages': () => CODE_LANGUAGES,
+    /**
+     * "Copy as …" for a saved request: code (or `url`) with variables resolved and secret values
+     * included, like Postman's and the browser's Copy as cURL; `containsSecrets` lets the UI say so.
+     */
+    'http.copyCode': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string }) => {
+      const text = await be.codeSnippet({ ...p, revealSecrets: true });
+      const masked = await be.codeSnippet({ ...p, revealSecrets: false });
+      return { text, containsSecrets: masked !== text };
+    },
+    'http.parseCurl': ({ text }: { text: string }) => parseCurl(text),
+    /** Paste-to-request: cURL (bash/cmd), fetch, fetch (Node.js) or PowerShell from browser devtools. */
+    'http.parseSnippet': ({ text }: { text: string }) => ({ format: detectRequestSnippet(text), request: parseRequestSnippet(text) }),
+    'http.saveBody': async ({ payloadPath, name }: { payloadPath: string; name?: string }) => {
+      if (!payloadPath || !payloadPath.startsWith(be.ws.path('payloads'))) throw new ApsError('ValidationError', 'Unknown payload');
+      return be.saveOrDownload(name ?? 'response.bin', undefined, (dest) => copyFileSync(payloadPath, dest), () => readFileSync(payloadPath));
+    },
+    'history.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listHistory(q),
+    'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
+    'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
+    'history.clear': () => be.ws.meta.clearHistory(),
+    /** Earlier responses of a saved request, newest first (response history). */
+    'history.forRequest': ({ requestId, limit }: { requestId: string; limit?: number }) =>
+      be.ws.meta.listHistory({ requestId, kind: 'http', limit: Math.min(limit ?? 50, 200) }).items,
+    /** One response from history, with its body (from the saved payload) for viewing. */
+    'history.response': ({ id }: { id: string }) => {
+      const h = be.ws.meta.getHistory(id);
+      if (!h) throw new ApsError('ConfigurationError', 'That response is no longer in the history');
+      return { entry: h, ...historyResponse(be.ws, h) };
+    },
+    /** Compare two responses from history (`before`, `after` are history ids). */
+    'history.compare': ({ before, after }: { before: string; after: string }) => compareHistory(be.ws, before, after),
+
+    'gql.introspect': async ({ request, environment }: { request: Omit<GraphQLRequestSpec, 'query'>; environment?: string }) => {
+      const ctx = be.context({ environment });
+      const { sdl, schema } = await introspect(ctx.vars.resolveDeep(request), { redactor: ctx.redactor });
+      return { sdl, summary: summarizeSchema(schema) };
+    },
+    'gql.send': (p: GqlSendParams) => be.gqlSend(p),
+    /** Serve fake data for a schema on localhost (restarts with the new schema when already running). */
+    'gql.mock.start': async ({ sdl, port, overrides }: { sdl: string; port?: number; overrides?: Record<string, Record<string, unknown>> }) => {
+      const schema = schemaFromText(sdl);
+      if (be.gqlMock) {
+        be.gqlMock.update(schema, { overrides });
+        return { url: be.gqlMock.url };
+      }
+      be.gqlMock = await startGraphQLMockServer(schema, { port: port ?? 0, overrides });
+      return { url: be.gqlMock.url };
+    },
+    'gql.mock.stop': async () => {
+      await be.gqlMock?.close();
+      be.gqlMock = undefined;
+    },
+    'gql.mock.status': () => (be.gqlMock ? { url: be.gqlMock.url } : null),
+
+    'wsock.connect': async ({ url, protocols, headers, environment }: { url: string; protocols?: string[]; headers?: Array<{ key: string; value: string }>; environment?: string }) => {
+      const ctx = be.context({ environment });
+      const s = new WebSocketSession(ctx.vars.resolve(url), { protocols, headers: ctx.vars.resolveDeep(headers), cookieJar: ctx.services.cookieJar });
+      const shown = ctx.redactor.redactUrl(ctx.vars.resolve(url));
+      const b = be.batched<unknown>('wsock.messages');
+      // the console gets connect, send and close (with message counts), not every received frame
+      const counts = { sent: 0, received: 0, opened: 0 };
+      s.onMessage((m) => {
+        b.push({ id: s.id, message: m });
+        if (m.direction === 'received') counts.received++;
+      });
+      s.onStatus((st) => {
+        be.host.emit('wsock.status', { id: s.id, status: st });
+        if (st === 'closed' && counts.opened)
+          be.consoleProtocol('websocket', ctx.redactor, { name: shown, method: 'CLOSE', url: shown, status: 'closed', durationMs: Date.now() - counts.opened, logs: [`${counts.sent} sent · ${counts.received} received`] });
+      });
+      be.wsSessions.set(s.id, s);
+      be.wsConsole.set(s.id, { url: shown, redactor: ctx.redactor, counts });
+      const started = Date.now();
+      try {
+        await s.connect();
+      } catch (e) {
+        const err = normalizeError(e);
+        be.consoleProtocol('websocket', ctx.redactor, { name: shown, method: 'CONNECT', url: shown, status: err.kind, durationMs: Date.now() - started, error: err.message });
+        throw e;
+      }
+      counts.opened = Date.now();
+      be.consoleProtocol('websocket', ctx.redactor, {
+        name: shown,
+        method: 'CONNECT',
+        url: shown,
+        status: 'open',
+        durationMs: counts.opened - started,
+        request: headers?.length || protocols?.length ? { protocols, headers: ctx.vars.resolveDeep(headers) } : undefined,
+      });
+      return { id: s.id };
+    },
+    'wsock.send': ({ id, data }: { id: string; data: string }) => {
+      const s = be.wsSessions.get(id);
+      s?.send(data);
+      const c = be.wsConsole.get(id);
+      if (s && c) {
+        c.counts.sent++;
+        be.consoleProtocol('websocket', c.redactor, { name: c.url, method: 'SEND', url: c.url, status: 'sent', request: data, logs: [`${data.length} characters`] });
+      }
+    },
+    'wsock.close': ({ id }: { id: string }) => {
+      be.wsSessions.get(id)?.close();
+      be.wsSessions.delete(id);
+      be.wsConsole.delete(id);
+    },
+  };
+}

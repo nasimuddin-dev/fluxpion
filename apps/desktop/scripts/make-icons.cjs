@@ -185,7 +185,6 @@ app.whenReady().then(async () => {
     <text x="82" y="182" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="8" letter-spacing="1.6" fill="#d7ddf5">CONNECT EVERY PROTOCOL</text></svg>`;
   const sideBmp = await bmp(svgUrl(side), 164, 314);
   write(join(build, 'installerSidebar.bmp'), sideBmp);
-  write(join(build, 'uninstallerSidebar.bmp'), sideBmp);
 
   app.quit();
 });
