@@ -1,4 +1,4 @@
-import { BookmarkPlus, ChevronDown, Code2, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
+import { BookmarkPlus, ChevronDown, Code2, MoreHorizontal, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { promptText, useApp, persisted } from '../store';
@@ -44,8 +44,8 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 /** Request tab widths; tabs that don't fit go into the "+N" overflow dropdown. */
 const TAB_WIDTH = 180;
 const PINNED_TAB_WIDTH = 150;
-/** Room kept for the new-tab and overflow buttons. */
-const TAB_STRIP_RESERVED = 100;
+/** Room kept for the new-tab, tab-actions and overflow buttons. */
+const TAB_STRIP_RESERVED = 140;
 
 interface RestTab {
   id: string;
@@ -199,6 +199,7 @@ export function RestView() {
   };
 
   useIntent('rest', async (p) => {
+    if (p?.tabCommand) return runTabCommand(p.tabCommand);
     if (p?.newTab) {
       const t = blankRequest();
       setTabs((ts) => [...ts, t]);
@@ -345,6 +346,15 @@ export function RestView() {
     }
   };
   const closeTab = (id: string) => closeTabs([id]);
+  /** File menu / command palette / tab bar ⋯: pinned tabs are kept by the bulk commands. */
+  const runTabCommand = (command: string) => {
+    const unpinned = ordered.filter((x) => !x.pinned).map((x) => x.id);
+    if (command === 'close') {
+      const cur = tabs.find((x) => x.id === active);
+      if (cur && !cur.pinned) closeTab(cur.id);
+    } else if (command === 'closeOthers') closeTabs(unpinned.filter((id) => id !== active));
+    else if (command === 'closeAll') closeTabs(unpinned);
+  };
   const duplicateTab = (t: RestTab) => {
     const copy: RestTab = { ...structuredClone(t), id: uid('tab-'), name: `${t.name} copy`, collectionId: undefined, requestId: undefined, examples: undefined, pinned: false, dirty: true };
     setTabs((ts) => {
@@ -556,6 +566,21 @@ export function RestView() {
           <IconButton label="New request tab" className="mx-1 mb-0.5 shrink-0" onClick={newTab}>
             <Plus size={14} />
           </IconButton>
+          <Menu
+            align="end"
+            width={230}
+            items={[
+              { label: 'New request tab', icon: <Plus size={13} />, shortcut: 'Ctrl+T', onSelect: newTab },
+              { label: 'Close tab', icon: <X size={13} />, shortcut: 'Ctrl+W', separator: true, disabled: noTabs || !!tabs.find((x) => x.id === active)?.pinned, onSelect: () => runTabCommand('close') },
+              { label: 'Close other tabs', disabled: ordered.filter((x) => !x.pinned && x.id !== active).length === 0, onSelect: () => runTabCommand('closeOthers') },
+              { label: 'Close all tabs', shortcut: 'Ctrl+Shift+W', disabled: !ordered.some((x) => !x.pinned), onSelect: () => runTabCommand('closeAll') },
+            ]}
+            trigger={
+              <button aria-label="Tab actions" title="Tab actions: close tab, close other tabs, close all tabs" className={cx('ml-auto mb-1 shrink-0 grid place-items-center h-7 w-7 rounded-md text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover', hidden.length ? 'mr-1' : 'mr-1.5')}>
+                <MoreHorizontal size={15} />
+              </button>
+            }
+          />
           {hidden.length > 0 && (
             <Menu
               align="end"
@@ -572,7 +597,7 @@ export function RestView() {
                 <button
                   aria-label={`${hidden.length} more tabs`}
                   title={`${hidden.length} more tab${hidden.length === 1 ? '' : 's'}`}
-                  className="ml-auto mr-1.5 mb-1 shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted border border-line bg-bg hover:text-fg hover:bg-hover data-[state=open]:text-fg data-[state=open]:bg-hover"
+                  className="mr-1.5 mb-1 shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted border border-line bg-bg hover:text-fg hover:bg-hover data-[state=open]:text-fg data-[state=open]:bg-hover"
                 >
                   +{hidden.length}
                   <ChevronDown size={13} />

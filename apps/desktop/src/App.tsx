@@ -78,9 +78,12 @@ export default function App() {
     })();
     const off = on('run.error', (p: { error: { message: string } }) => useApp.getState().toast(`Run failed: ${p.error.message}`, 'error'));
     const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
+    // File menu: request tab commands (handled by the REST view)
+    const offTabs = on<{ command: string }>('tabs.command', ({ command }) => useApp.getState().openIntent('rest', command === 'new' ? { newTab: true } : { tabCommand: command }));
     return () => {
       off();
       offUpdate();
+      offTabs();
     };
   }, []);
 
@@ -134,6 +137,9 @@ export default function App() {
       { id: 'open-settings', label: 'Open Settings', hint: `${'Ctrl'}+,`, run: () => s.setView('settings') },
       { id: 'export-results', label: 'Export Results', hint: 'Tests', run: () => s.openIntent('tests', { exportLatest: true }) },
       { id: 'search', label: 'Search Workspace', hint: 'Ctrl+Shift+F', run: () => s.set({ searchOpen: true }) },
+      { id: 'tab-close', label: 'Close Tab', hint: 'Ctrl+W', run: () => s.openIntent('rest', { tabCommand: 'close' }) },
+      { id: 'tab-close-others', label: 'Close Other Tabs', hint: 'Requests', run: () => s.openIntent('rest', { tabCommand: 'closeOthers' }) },
+      { id: 'tab-close-all', label: 'Close All Tabs', hint: 'Ctrl+Shift+W', run: () => s.openIntent('rest', { tabCommand: 'closeAll' }) },
       { id: 'toggle-console', label: 'Show Console', hint: 'Ctrl+Alt+C', run: () => s.set({ logsOpen: true, bottomTab: 'console' }) },
       { id: 'toggle-logs', label: 'Show Application Logs', run: () => s.set({ logsOpen: true, bottomTab: 'logs' }) },
       { id: 'assistant', label: 'Ask AI Assistant', run: () => s.set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } }) },

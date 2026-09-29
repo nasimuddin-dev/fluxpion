@@ -161,7 +161,18 @@ function start(): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
-      { role: 'fileMenu' },
+      {
+        label: 'File',
+        submenu: [
+          { label: 'New Request Tab', accelerator: 'CmdOrCtrl+T', click: () => emit('tabs.command', { command: 'new' }) },
+          { type: 'separator' },
+          { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => emit('tabs.command', { command: 'close' }) },
+          { label: 'Close Other Tabs', click: () => emit('tabs.command', { command: 'closeOthers' }) },
+          { label: 'Close All Tabs', accelerator: 'CmdOrCtrl+Shift+W', click: () => emit('tabs.command', { command: 'closeAll' }) },
+          { type: 'separator' },
+          process.platform === 'darwin' ? { role: 'close', label: 'Close Window', accelerator: 'CmdOrCtrl+Alt+W' } : { role: 'quit', label: 'Exit' },
+        ],
+      },
       { role: 'editMenu' },
       {
         label: 'View',

@@ -50,6 +50,14 @@ When more tabs are open than fit, the tab bar doesn't scroll. It shows your pinn
 - **Duplicate tab:** an unsaved copy of the request, opened next to it.
 - **Close tab**, **Close other tabs**, **Close tabs to the right**, **Close all tabs:** you are asked once if any of the closed tabs has unsaved changes.
 
+**Close several tabs at once** from any of these:
+
+- **File** menu: **Close Tab** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>W</kbd>), **Close Other Tabs**, **Close All Tabs** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>), and **New Request Tab** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>T</kbd>).
+- The **⋯** button at the right end of the tab bar.
+- The command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>): *Close Tab*, *Close Other Tabs*, *Close All Tabs*.
+
+Pinned tabs are kept by these commands; you are asked once if any closed tab has unsaved changes. On macOS, **Close Window** in the File menu is <kbd>⌘</kbd>+<kbd>⌥</kbd>+<kbd>W</kbd>.
+
 Open tabs, including pins, are restored when the app starts. You can close every tab: the editor then shows **New request** and **Describe with AI**, and stays empty after a restart until you open something.
 
 **History** lists every request you sent, newest first, grouped by day (*Today*, *Yesterday*, weekday, then date). Search by name, URL, method or status, filter by kind, and double-click an entry (or click **Open**) to open it in a new tab. History stores redacted request metadata only.

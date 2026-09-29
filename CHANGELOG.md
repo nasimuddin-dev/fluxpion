@@ -4,6 +4,12 @@
 
 Nothing yet.
 
+## 0.6.2 — 2026-09-29
+
+- **The TestPion logo everywhere, no more "T".** The app, taskbar, title-bar and desktop-shortcut icon, the macOS and Linux icons and the website favicon now show the TestPion name ("Test" over "Pion", with the sparkle). The Windows installer shows the TestPion wordmark in its header and on the welcome and finish pages.
+- **Close all request tabs from the File menu.** New **File** menu items: **New Request Tab** (Ctrl/Cmd+T), **Close Tab** (Ctrl/Cmd+W), **Close Other Tabs** and **Close All Tabs** (Ctrl/Cmd+Shift+W), also in the command palette and a new **⋯** menu at the right end of the tab bar. Pinned tabs are kept. On macOS, Close Window moves to Cmd+Option+W.
+- **New Design page** in the documentation: principles, brand, colours, layout, components, the core architecture and the life of a request, with diagrams.
+
 ## 0.6.1 — 2026-09-29
 
 - **Fixed: updates failing with `net::ERR_CONNECTION_RESET`.** The updater tried a "differential" download (many byte ranges of the new installer in one request), which GitHub's release download servers now reject. It now always downloads the whole installer (still verified with its SHA-512 checksum), retries twice when the connection drops, and if it still fails offers **Try Again** or **Download from Website** instead of a bare error.

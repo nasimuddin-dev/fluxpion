@@ -1,5 +1,5 @@
 // Generates every TestPion icon and logo size from two sources, using Chromium's renderer:
-//   build/logo.svg       the square app mark (gradient "T" + sparkle)
+//   build/logo.svg       the square app icon ("Test" over "Pion" + sparkle)
 //   build/wordmark.svg   the TestPion wordmark ("Connect every protocol")
 //
 // Desktop (apps/desktop/build):
@@ -80,6 +80,45 @@ app.whenReady().then(async () => {
 
   const mark = (size) => render(markSvg(size), size, size);
 
+  /** Render an image to a 24-bit BMP (what the NSIS installer's header and side images must be). */
+  const bmp = async (src, w, h) => {
+    const b64 = await win.webContents.executeJavaScript(
+      `new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas'); c.width = ${w}; c.height = ${h};
+          const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, ${w}, ${h});
+          const d = g.getImageData(0, 0, ${w}, ${h}).data; let s = '';
+          for (let i = 0; i < d.length; i += 8192) s += String.fromCharCode.apply(null, d.subarray(i, i + 8192));
+          resolve(btoa(s));
+        };
+        img.onerror = () => reject(new Error('could not load image'));
+        img.src = ${JSON.stringify(src)};
+      })`,
+    );
+    const rgba = Buffer.from(b64, 'base64');
+    const row = Math.ceil((w * 3) / 4) * 4;
+    const out = Buffer.alloc(54 + row * h);
+    out.write('BM', 0);
+    out.writeUInt32LE(out.length, 2);
+    out.writeUInt32LE(54, 10);
+    out.writeUInt32LE(40, 14);
+    out.writeInt32LE(w, 18);
+    out.writeInt32LE(h, 22); // positive height: rows bottom-up
+    out.writeUInt16LE(1, 26);
+    out.writeUInt16LE(24, 28);
+    out.writeUInt32LE(row * h, 34);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const s = (y * w + x) * 4;
+        const o = 54 + (h - 1 - y) * row + x * 3;
+        out[o] = rgba[s + 2];
+        out[o + 1] = rgba[s + 1];
+        out[o + 2] = rgba[s];
+      }
+    return out;
+  };
+
   /** An .ico file whose entries are PNG images (supported since Windows Vista). */
   const ico = (pngs) => {
     const header = Buffer.alloc(6 + 16 * pngs.length);
@@ -127,6 +166,26 @@ app.whenReady().then(async () => {
   const navPng = await render('data:image/svg+xml;base64,' + Buffer.from(nav).toString('base64'), 600, 150);
   write(join(site, 'wordmark-nav.png'), navPng);
   write(join(build, 'wordmark-nav.png'), navPng);
+
+  // Windows installer (NSIS): the wordmark in the header (150×57) and on the welcome/finish pages (164×314)
+  const navData = 'data:image/png;base64,' + navPng.toString('base64');
+  const svgUrl = (svg) => 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+  const header = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="150" height="57" viewBox="0 0 150 57">
+    <rect width="150" height="57" fill="#0c1440"/>
+    <image xlink:href="${navData}" href="${navData}" x="11" y="12" width="128" height="32"/></svg>`;
+  write(join(build, 'installerHeader.bmp'), await bmp(svgUrl(header), 150, 57));
+  const side = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="164" height="314" viewBox="0 0 164 314">
+    <defs>
+      <radialGradient id="bg" cx="0.5" cy="0.4" r="0.9"><stop offset="0" stop-color="#172a6b"/><stop offset="0.55" stop-color="#0c1440"/><stop offset="1" stop-color="#070b26"/></radialGradient>
+      <linearGradient id="rule" x1="0" x2="1"><stop offset="0" stop-color="#1e88ff" stop-opacity="0"/><stop offset="0.5" stop-color="#8b5cff"/><stop offset="1" stop-color="#f04fe0" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="164" height="314" fill="url(#bg)"/>
+    <image xlink:href="${navData}" href="${navData}" x="10" y="118" width="144" height="36"/>
+    <rect x="22" y="166" width="120" height="1.5" fill="url(#rule)"/>
+    <text x="82" y="182" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="8" letter-spacing="1.6" fill="#d7ddf5">CONNECT EVERY PROTOCOL</text></svg>`;
+  const sideBmp = await bmp(svgUrl(side), 164, 314);
+  write(join(build, 'installerSidebar.bmp'), sideBmp);
+  write(join(build, 'uninstallerSidebar.bmp'), sideBmp);
 
   app.quit();
 });

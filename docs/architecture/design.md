@@ -31,9 +31,9 @@ This page shows how TestPion is designed, from the brand and the interface down 
     The logo everywhere a name is shown: the app's top bar, the website, the README. "Test" uses the brand gradient, "Pion" is white, and the sparkle sits top right.
   </div>
   <div class="ds-card">
-    <div class="ds-card-title">App mark</div>
-    <div class="ds-logo-dark"><img src="/logo.svg" alt="TestPion app mark" style="height:56px" /></div>
-    Only where a square icon is required: the app, taskbar and dock icon, and the favicon. It is never used next to the wordmark.
+    <div class="ds-card-title">App icon</div>
+    <div class="ds-logo-dark"><img src="/icon-192.png" alt="TestPion app icon" style="height:64px" /></div>
+    The same logo, stacked to fit a square: the app, taskbar, title bar, installer and dock icon, and the favicon.
   </div>
   <div class="ds-card">
     <div class="ds-card-title">Brand gradient</div>
@@ -54,12 +54,12 @@ This page shows how TestPion is designed, from the brand and the interface down 
     <ul>
       <li>Recolour "Pion" or the gradient, or place the wordmark on a light background without the badge.</li>
       <li>Stretch it, add effects, or type the name as the logo in another font.</li>
-      <li>Use the square app mark as a logo beside the name.</li>
+      <li>Use the square app icon where there is room for the wordmark.</li>
     </ul>
   </div>
 </div>
 
-Sources: `apps/desktop/build/logo.svg` (app mark), `apps/desktop/build/wordmark.svg` (wordmark with tagline) and `apps/desktop/build/wordmark-nav.svg` (wordmark without tagline).
+Sources: `apps/desktop/build/logo.svg` (square app icon), `apps/desktop/build/wordmark.svg` (wordmark with tagline) and `apps/desktop/build/wordmark-nav.svg` (wordmark without tagline).
 
 ## Colour
 

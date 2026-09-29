@@ -152,7 +152,7 @@ export class McpSession {
     readonly config: McpServerConfig,
     private redactor?: Redactor,
   ) {
-    this.client = new Client({ name: 'testpion', version: '0.6.1' }, { capabilities: {} });
+    this.client = new Client({ name: 'testpion', version: '0.6.2' }, { capabilities: {} });
   }
 
   onEvent(l: McpEventListener): () => void {

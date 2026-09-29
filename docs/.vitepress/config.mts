@@ -163,7 +163,7 @@ export default defineConfig({
   markdown: { theme: { light: 'github-light-high-contrast', dark: 'github-dark' } },
   sitemap: { hostname: SITE, transformItems: (items) => items.filter((i) => !/(^|\/)404$/.test(i.url)) },
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}logo.svg` }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '192x192', href: `${BASE}icon-192.png` }],
     ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
     ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
     ['link', { rel: 'manifest', href: `${BASE}site.webmanifest` }],
