@@ -56,8 +56,35 @@ kbd {
   white-space: nowrap;
 }
 
-/* nav bar: the TestPion wordmark (600×150 image) instead of the square icon and a text title */
+/* nav bar: the TestPion wordmark (600×150 image, white "Pion") instead of the square icon and a text title */
 .VPNavBarTitle .logo {
   height: 30px;
   width: auto;
+}
+/* light mode: the wordmark sits on a navy badge so the white "Pion" stays visible */
+html:not(.dark) .VPNavBarTitle .logo {
+  height: 34px;
+  padding: 4px 9px;
+  border-radius: 9px;
+  background: #0c1440;
+}
+
+/* home hero: the full TestPion wordmark (3:1, navy background) instead of the square icon */
+.VPHero .image-container {
+  width: 100%;
+  max-width: 560px;
+  height: auto;
+  transform: none;
+}
+.VPHero .image-src {
+  position: static;
+  transform: none;
+  width: 100%;
+  max-width: 560px;
+  max-height: none;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px -20px rgb(47 123 255 / 0.45);
+}
+.VPHero .image-bg {
+  opacity: 0.5;
 }

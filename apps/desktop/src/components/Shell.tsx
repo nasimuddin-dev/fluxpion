@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
-import logoUrl from '../../build/logo.svg';
+import wordmarkUrl from '../../build/wordmark-nav.png';
 import { ConsolePanel } from './ConsolePanel';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
@@ -126,8 +126,10 @@ export function TopBar() {
   return (
     <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-chrome" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
       <div className="flex items-center gap-2 pr-1" style={noDrag}>
-        <img src={logoUrl} alt="" className="h-7 w-7" />
-        <span className="font-semibold tracking-tight hidden md:inline bg-[image:var(--brand-gradient)] bg-clip-text text-transparent">TestPion</span>
+        {/* the TestPion wordmark; on the light theme it sits on a navy badge so the white "Pion" stays visible */}
+        <span className="inline-flex items-center rounded-lg bg-[#0c1440] px-2 py-1 dark:bg-transparent dark:px-0 dark:py-0">
+          <img src={wordmarkUrl} alt="TestPion" className="h-6 w-auto select-none" draggable={false} />
+        </span>
       </div>
       <span className="h-5 w-px bg-line hidden md:block" />
       <div style={noDrag}>

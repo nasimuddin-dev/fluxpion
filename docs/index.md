@@ -5,12 +5,11 @@ titleTemplate: API, MCP and AI Testing Tool
 description: TestPion is a free, local-first desktop app and CLI for testing and debugging REST, GraphQL and WebSocket APIs, MCP servers, LLM APIs, RAG pipelines and AI agents on Windows, macOS and Linux.
 
 hero:
-  name: TestPion
   text: Test and debug APIs, MCP servers and AI systems in one place
   tagline: REST, GraphQL, WebSocket, MCP, LLMs, RAG and agents — with a test runner, evaluation lab and trace viewer. Local-first, private, and the same engine in your CI.
   image:
-    src: /logo.svg
-    alt: TestPion logo
+    src: /images/testpion-wordmark.png
+    alt: TestPion — Connect every protocol
   actions:
     - theme: brand
       text: Download

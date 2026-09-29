@@ -120,10 +120,13 @@ app.whenReady().then(async () => {
   mkdirSync(join(site, 'images'), { recursive: true });
   write(join(site, 'images', 'testpion-wordmark.png'), await render(wordmark, 1200, 400));
   write(join(site, 'images', 'social-preview.jpg'), await render(wordmark, 1280, 640, { fit: true, type: 'image/jpeg' }));
-  // nav bar wordmark (transparent, rendered so the font is the same on every visitor's machine)
-  const nav = readFileSync(join(build, 'wordmark-nav.svg'), 'utf8');
-  for (const [file, pion] of [['wordmark-nav-dark.png', '#f4f6ff'], ['wordmark-nav-light.png', '#0c1440']])
-    write(join(site, file), await render('data:image/svg+xml;base64,' + Buffer.from(nav.replaceAll('PION_COLOR', pion)).toString('base64'), 600, 150));
+  // the TestPion wordmark without the tagline (gradient "Test", white "Pion", sparkle) for the app's top bar
+  // and the website's nav bar; rendered to PNG so the font is the same on every machine. On light
+  // backgrounds it sits on a navy badge (CSS), so "Pion" stays white everywhere.
+  const nav = readFileSync(join(build, 'wordmark-nav.svg'), 'utf8').replaceAll('PION_COLOR', '#f4f6ff');
+  const navPng = await render('data:image/svg+xml;base64,' + Buffer.from(nav).toString('base64'), 600, 150);
+  write(join(site, 'wordmark-nav.png'), navPng);
+  write(join(build, 'wordmark-nav.png'), navPng);
 
   app.quit();
 });
