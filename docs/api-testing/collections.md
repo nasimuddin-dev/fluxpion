@@ -34,7 +34,7 @@ Copied commands include the request's real header and token values, so they run 
 
 **Import** accepts:
 
-- OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, and security schemes map to auth.
+- OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, and security schemes map to auth. The document is kept in the workspace's `specs/` folder and every request gets a [**Matches OpenAPI contract**](../test-runner/assertions.md#openapi-contract-testing) check, so running the collection tests the API against its own contract (`testpion import --no-contract-checks` leaves the checks out).
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
 - HAR files.
 - TestPion collections and workspace exports.

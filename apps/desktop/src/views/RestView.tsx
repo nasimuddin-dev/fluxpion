@@ -1033,7 +1033,7 @@ function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { co
 export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): void }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }> } | null>) => {
+  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }>; specPath?: string; contractChecks?: number } | null>) => {
     setBusy(true);
     try {
       const r = await fn();
@@ -1043,7 +1043,11 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
             `Imported ${r.format} request "${r.request}" into "${r.collection}"${r.placeholders?.length ? `. Secrets were replaced by variables: set ${r.placeholders.map((p) => p.variable).join(', ')} as secret environment variables` : ''}`,
             'success',
           );
-        else useApp.getState().toast(`Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (environment ${r.environment})` : ''}`, 'success');
+        else
+          useApp.getState().toast(
+            `Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (environment ${r.environment})` : ''}${r.contractChecks ? `. Each request checks the OpenAPI contract (${r.specPath})` : ''}`,
+            'success',
+          );
         onDone();
         await useApp.getState().refreshWorkspace();
         onClose();

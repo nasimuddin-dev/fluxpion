@@ -151,7 +151,8 @@ pbpaste | testpion import - -w my-workspace
 | `--collection <name>` | For a copied request: the collection to add it to, created if needed (default **Imported**). |
 | `--folder <path>` | For a copied request: folder path inside the collection, such as `"Auth / Tokens"`. |
 | `--name <name>` | For a copied request: its name (default: the method and path, e.g. `POST /v1/owners`). |
-| `--json` | Print the result as JSON, for scripts and AI agents. |
+| `--no-contract-checks` | For an OpenAPI / Swagger document: don't add `openapi` contract checks to the imported requests (the document is still kept in `specs/`). |
+| `--json` | Print the result as JSON, for scripts and AI agents (includes `specPath` and `contractChecks` for OpenAPI imports). |
 
 Secrets in a copied request (the `Authorization` header and other sensitive headers, auth credentials, cookies, and sensitive query or body fields) are not written to the workspace. They are replaced by `{{variables}}`, and the output lists them (`placeholders` with `--json`) so you can add them as secret environment variables.
 

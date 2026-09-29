@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
   ApsError,
-  importAny,
+  importIntoWorkspace,
   exampleFromResponse,
   startMockServer,
   collectionMarkdown,
@@ -80,10 +80,9 @@ export function collectionsHandlers(be: Backend): Handlers {
         const saved = be.ws.saveCollection(r.collection);
         return { format: r.format, collection: saved.name, collectionId: saved.id, request: r.node.name, placeholders: r.placeholders };
       }
-      const r = importAny(text);
-      if (r.collection) be.ws.saveCollection(r.collection);
-      if (r.environment) be.ws.saveEnvironment(r.environment);
-      return { format: r.format, collection: r.collection?.name, environment: r.environment?.name };
+      // an OpenAPI document is kept in specs/ and its requests get an openapi contract check
+      const r = importIntoWorkspace(be.ws, text);
+      return { format: r.format, collection: r.collection?.name, environment: r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks };
     },
     'col.importFile': async () => {
       const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions', extensions: ['json', 'yaml', 'yml', 'har'] }] });

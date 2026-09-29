@@ -5,7 +5,6 @@ import { Command, Option } from 'commander';
 import {
   WorkspaceManager,
   formatDuration,
-  importAny,
   importRequestSnippet,
   compareHistory,
   convertCollectionScripts,
@@ -16,6 +15,7 @@ import {
   exportPostmanCollection,
   exportPostmanEnvironment,
   type CollectionNode,
+  importIntoWorkspace,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
 
@@ -80,6 +80,7 @@ export function registerDataCommands(program: Command): void {
     .option('--collection <name>', 'for a cURL / fetch / PowerShell request: the collection to add it to (created if needed)', 'Imported')
     .option('--folder <path>', 'for a request: folder path inside the collection, e.g. "Auth / Tokens"')
     .option('--name <name>', 'for a request: its name (default: method and path)')
+    .option('--no-contract-checks', 'for an OpenAPI document: do not add openapi contract checks to the requests')
     .option('--json', 'print the result as JSON (for scripts and AI agents)')
     .action(async (file: string, o) => {
       const mgr = new WorkspaceManager();
@@ -98,11 +99,12 @@ export function registerDataCommands(program: Command): void {
           }
           return;
         }
-        const r = importAny(text);
-        if (r.collection) store.saveCollection(r.collection);
-        if (r.environment) store.saveEnvironment(r.environment);
-        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name }, null, 2));
-        else console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
+        const r = importIntoWorkspace(store, text, { contractChecks: o.contractChecks !== false });
+        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks }, null, 2));
+        else {
+          console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
+          if (r.specPath) console.log(dim(`Kept the document as ${r.specPath}${r.contractChecks ? `; ${r.contractChecks} requests check the OpenAPI contract` : ''}`));
+        }
       } finally {
         store.close();
       }
