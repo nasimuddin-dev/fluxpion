@@ -15,6 +15,7 @@ This page shows how TestPion is designed, from the brand and the interface down 
   <div class="ds-card"><div class="ds-card-title">AI-first</div>Every feature is usable by AI agents (CLI with <code>--json</code>, MCP tools, <code>llms.txt</code>) and reviewable by people. AI output is always labelled and shown before it runs.</div>
   <div class="ds-card"><div class="ds-card-title">Safe by default</div>Secrets live in the OS credential store, are redacted from logs, traces, the console and exports, and are never written to workspace files.</div>
   <div class="ds-card"><div class="ds-card-title">Friendly</div>Clear surfaces, colour that carries meaning (methods, status), plain-language messages, and a next step in every empty state and error.</div>
+  <div class="ds-card"><div class="ds-card-title">Cloud-ready</div>A hosted, multi-user version is planned. The UI only talks to the engine through RPC, the engine is host-agnostic behind storage and secret interfaces, and anything that sends requests or runs code must be safe on a shared server.</div>
   <div class="ds-card"><div class="ds-card-title">Postman-familiar</div>Collections, environments, <code>pm.*</code> scripts, the runner and the console work the way Postman users expect, and import and export losslessly.</div>
 </div>
 
@@ -304,6 +305,15 @@ More detail: [Architecture overview](./overview.md) and [Execution engine](./exe
 </figure>
 
 The same steps run for a request sent from a tab, by the Collection Runner, by `testpion run-collection` in CI, or by an AI agent through the MCP server.
+
+## Cloud-ready design
+
+TestPion runs on your desktop today, and the same code is meant to run as an online, multi-user service later. Rules for new features:
+
+- **The UI talks to the engine only through RPC** (`call(...)`). No Node or Electron APIs in `apps/desktop/src`. Desktop-only features (menus, native dialogs, the updater) sit behind backend handlers and have a browser fallback, such as upload and download instead of file dialogs. The browser build (`dev.mjs --web`) must keep working.
+- **The engine is host-agnostic.** Files, metadata and secrets go through the `WorkspaceStore`, `MetaStore` and `SecretStore` interfaces, so a server can plug in a database and object storage. Context such as the workspace and user is passed explicitly, not held in process-wide globals.
+- **Data is multi-user ready:** stable ids, a `schemaVersion` on every file, and no assumption of one user per machine. Per-user secrets, sharing and permissions are considered when data is added.
+- **Safe on a shared server.** Anything that sends requests, runs scripts or starts processes has limits, a sandbox, and guards for private networks and local processes that a hosted version can switch on.
 
 ## AI-first design
 
