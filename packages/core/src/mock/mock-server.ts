@@ -10,6 +10,10 @@ export interface MockRoute {
   path: string;
   /** Query parameters the example was saved with (used to pick between examples). */
   query: Record<string, string>;
+  /** Request body the example was saved with (used to pick between examples). */
+  body?: string;
+  /** Request headers the example was saved with (for `x-mock-match-request-headers`). */
+  headers?: Array<{ key: string; value: string }>;
   requestId: string;
   requestName: string;
   example: SavedExample;
@@ -52,7 +56,16 @@ export function collectMockRoutes(collection: Collection): MockRoute[] {
 
 function route(n: SavedHttpRequest, ex: SavedExample): MockRoute {
   const { path, query } = mockPathOf(ex.request?.url ?? n.request.url);
-  return { method: (ex.request?.method ?? n.request.method ?? 'GET').toUpperCase(), path, query, requestId: n.id, requestName: n.name, example: ex };
+  return {
+    method: (ex.request?.method ?? n.request.method ?? 'GET').toUpperCase(),
+    path,
+    query,
+    body: ex.request?.body?.trim() ? ex.request.body : undefined,
+    headers: ex.request?.headers?.filter((h) => h.key && h.enabled !== false).map((h) => ({ key: h.key, value: h.value })),
+    requestId: n.id,
+    requestName: n.name,
+    example: ex,
+  };
 }
 
 const isWild = (seg: string) => seg.startsWith(':') || /^\{\{[^}]+\}\}$/.test(seg) || seg === '*';
@@ -81,9 +94,11 @@ function pathScore(pattern: string, actual: string, loose = false): number {
  * Pick the example for a request, like Postman's mock servers:
  * 1. method and path must match (`:id` / `{{var}}` segments match anything; literal segments score higher);
  * 2. `x-mock-response-name` or `x-mock-response-code` headers select an example;
- * 3. otherwise matching query parameters score higher, and 2xx examples win ties.
+ * 3. otherwise matching query parameters and request bodies score higher, and 2xx examples win ties;
+ * 4. `x-mock-match-request-body: true` only accepts examples whose saved body matches, and
+ *    `x-mock-match-request-headers: a, b` only those whose saved headers a and b match.
  */
-export function matchMockRoute(routes: MockRoute[], req: { method: string; path: string; query?: Record<string, string>; headers?: Record<string, string | string[] | undefined> }): MockRoute | undefined {
+export function matchMockRoute(routes: MockRoute[], req: { method: string; path: string; query?: Record<string, string>; headers?: Record<string, string | string[] | undefined>; body?: string }): MockRoute | undefined {
   // exact paths first; then saved ids (`/patients/1`) also answer other ids (`/patients/7`)
   return pick(routes, req, false) ?? pick(routes, req, true);
 }
@@ -96,6 +111,11 @@ function pick(routes: MockRoute[], req: Parameters<typeof matchMockRoute>[1], lo
   };
   const wantName = h('x-mock-response-name');
   const wantCode = h('x-mock-response-code');
+  const strictBody = /^(true|1|yes)$/i.test(h('x-mock-match-request-body') ?? '');
+  const matchHeaders = (h('x-mock-match-request-headers') ?? '')
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
   let best: { r: MockRoute; score: number } | undefined;
   for (const r of routes) {
     if (r.method !== method && !(method === 'HEAD' && r.method === 'GET')) continue;
@@ -108,6 +128,13 @@ function pick(routes: MockRoute[], req: Parameters<typeof matchMockRoute>[1], lo
     }
     const q = req.query ?? {};
     for (const [k, v] of Object.entries(r.query)) score += q[k] === v ? 3 : k in q ? 1 : -1;
+    const body = bodyMatch(r.body, req.body);
+    if (strictBody && body !== 'equal' && body !== 'subset' && !(body === 'none' && !req.body?.trim())) continue;
+    score += body === 'equal' ? 6 : body === 'subset' ? 4 : body === 'differs' ? -3 : 0;
+    if (matchHeaders.length) {
+      const saved = new Map((r.headers ?? []).map((x) => [x.key.toLowerCase(), x.value]));
+      if (!matchHeaders.every((name) => saved.get(name) === h(name))) continue;
+    }
     if (r.example.status >= 200 && r.example.status < 300) score += 1;
     if (!best || score > best.score) best = { r, score };
   }
@@ -135,6 +162,64 @@ export interface MockServer {
 const HOP_HEADERS = /^(content-length|transfer-encoding|connection|keep-alive|content-encoding)$/i;
 
 /** Serve a collection's saved examples over HTTP on localhost. */
+/** How a request body compares with the body an example was saved with. */
+export function bodyMatch(saved: string | undefined, actual: string | undefined): 'none' | 'equal' | 'subset' | 'differs' {
+  if (saved === undefined) return 'none';
+  if (actual === undefined || !actual.trim()) return 'differs';
+  const parse = (s: string) => {
+    try {
+      return { ok: true as const, v: JSON.parse(s) as unknown };
+    } catch {
+      return { ok: false as const };
+    }
+  };
+  const a = parse(saved);
+  const b = parse(actual);
+  if (a.ok && b.ok) {
+    if (deepEqual(a.v, b.v)) return 'equal';
+    return contains(b.v, a.v) ? 'subset' : 'differs';
+  }
+  // form bodies: same fields in any order
+  const form = (s: string) => new URLSearchParams(s.trim()).toString().split('&').sort().join('&');
+  if (/^[^=&\s]+=/.test(saved.trim()) && /^[^=&\s]+=/.test(actual.trim())) return form(saved) === form(actual) ? 'equal' : 'differs';
+  return saved.trim() === actual.trim() ? 'equal' : 'differs';
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || !a || !b || Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  return ka.length === kb.length && ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+/** Every field of `part` is in `whole` with the same value (objects recursively; arrays must be equal). */
+function contains(whole: unknown, part: unknown): boolean {
+  if (typeof part !== 'object' || part === null || Array.isArray(part)) return deepEqual(whole, part);
+  if (typeof whole !== 'object' || whole === null || Array.isArray(whole)) return false;
+  return Object.entries(part).every(([k, v]) => k in whole && contains((whole as Record<string, unknown>)[k], v));
+}
+
+const MAX_MATCH_BODY = 1024 * 1024;
+
+/** Read the request body for matching (up to 1 MB; the rest is drained). */
+function readBody(req: IncomingMessage): Promise<string | undefined> {
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    req.resume();
+    return Promise.resolve(undefined);
+  }
+  return new Promise((ok) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (c: Buffer) => {
+      if (size < MAX_MATCH_BODY) chunks.push(c);
+      size += c.length;
+    });
+    req.on('end', () => ok(Buffer.concat(chunks).subarray(0, MAX_MATCH_BODY).toString('utf8')));
+    req.on('error', () => ok(undefined));
+  });
+}
+
 export async function startMockServer(collection: Collection, opts: MockServerOptions = {}): Promise<MockServer> {
   const host = opts.host ?? '127.0.0.1';
   if (!LOCAL_HOSTS.has(host)) throw new ApsError('ConfigurationError', `The mock server only listens on localhost, not ${host}`);
@@ -148,8 +233,8 @@ export async function startMockServer(collection: Collection, opts: MockServerOp
       return res.end();
     }
     const query = Object.fromEntries(u.searchParams);
-    const r = matchMockRoute(routes, { method: req.method ?? 'GET', path: u.pathname, query, headers: req.headers });
-    req.resume();
+    const body = await readBody(req);
+    const r = matchMockRoute(routes, { method: req.method ?? 'GET', path: u.pathname, query, headers: req.headers, body });
     if (opts.delayMs) await new Promise((ok) => setTimeout(ok, opts.delayMs));
     if (!r) {
       const body = JSON.stringify(

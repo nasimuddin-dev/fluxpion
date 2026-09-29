@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { collectMockRoutes, matchMockRoute, mockPathOf, startMockServer, type Collection, type MockServer } from '../../packages/core/src/index.js';
+import { bodyMatch, collectMockRoutes, matchMockRoute, mockPathOf, startMockServer, type Collection, type MockServer } from '../../packages/core/src/index.js';
 
 const collection: Collection = {
   schemaVersion: '1.0',
@@ -103,5 +103,62 @@ describe('mock server', () => {
 
   it('only listens on localhost', async () => {
     await expect(startMockServer(collection, { host: '0.0.0.0' })).rejects.toThrow(/localhost/);
+  });
+});
+
+describe('mock server: matching on the request body and headers', () => {
+  const login: Collection = {
+    schemaVersion: '1.0',
+    id: 'l',
+    name: 'Auth',
+    version: 1,
+    variables: [],
+    updatedAt: '',
+    items: [
+      {
+        kind: 'http',
+        id: 'login',
+        name: 'Login',
+        request: { method: 'POST', url: '{{baseUrl}}/login' },
+        examples: [
+          { id: 'ok', name: 'Success', status: 200, headers: [], body: '{"token":"t"}', request: { method: 'POST', url: '{{baseUrl}}/login', body: '{"user":"ann","password":"right"}', headers: [{ key: 'X-Tenant', value: 'a' }] } },
+          { id: 'bad', name: 'Wrong password', status: 401, headers: [], body: '{"error":"invalid"}', request: { method: 'POST', url: '{{baseUrl}}/login', body: '{"user":"ann","password":"wrong"}', headers: [{ key: 'X-Tenant', value: 'b' }] } },
+          { id: 'form', name: 'Form login', status: 200, headers: [], body: 'ok', request: { method: 'POST', url: '{{baseUrl}}/login', body: 'user=bob&password=x' } },
+        ],
+      },
+    ],
+  };
+  const routes = collectMockRoutes(login);
+  const pick = (body?: string, headers: Record<string, string> = {}) => matchMockRoute(routes, { method: 'POST', path: '/login', body, headers })?.example.name;
+
+  it('compares bodies: equal, JSON subset, form fields in any order', () => {
+    expect(bodyMatch('{"a":1,"b":[1,2]}', '{ "b": [1,2], "a": 1 }')).toBe('equal');
+    expect(bodyMatch('{"user":"ann"}', '{"user":"ann","extra":true}')).toBe('subset');
+    expect(bodyMatch('{"user":"ann"}', '{"user":"bob"}')).toBe('differs');
+    expect(bodyMatch('a=1&b=2', 'b=2&a=1')).toBe('equal');
+    expect(bodyMatch(undefined, '{}')).toBe('none');
+  });
+
+  it('picks the example whose saved body matches the request', () => {
+    expect(pick('{"password":"wrong","user":"ann"}')).toBe('Wrong password');
+    expect(pick('{"user":"ann","password":"right","remember":true}')).toBe('Success');
+    expect(pick('password=x&user=bob')).toBe('Form login');
+  });
+
+  it('honours x-mock-match-request-body and x-mock-match-request-headers', () => {
+    expect(pick('{"user":"zed"}', { 'x-mock-match-request-body': 'true' })).toBeUndefined();
+    expect(pick('{"user":"zed"}')).toBeDefined(); // without the header the best guess still answers
+    expect(pick('{"user":"ann","password":"right"}', { 'x-mock-match-request-headers': 'x-tenant', 'x-tenant': 'b' })).toBe('Wrong password');
+  });
+
+  it('reads the body over HTTP', async () => {
+    const m = await startMockServer(login, { port: 0 });
+    try {
+      const r = await fetch(`${m.url}/login`, { method: 'POST', body: '{"user":"ann","password":"wrong"}', headers: { 'content-type': 'application/json' } });
+      expect(r.status).toBe(401);
+      expect(r.headers.get('x-mock-example')).toBe('Wrong%20password');
+    } finally {
+      await m.close();
+    }
   });
 });

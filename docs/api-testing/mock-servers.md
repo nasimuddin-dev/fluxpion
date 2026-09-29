@@ -36,7 +36,11 @@ Every example is a route: the method and path of the example's request (or of th
 2. **Pick an example explicitly** with a request header:
    - `x-mock-response-name: Patient not found` selects the example with that name.
    - `x-mock-response-code: 404` selects an example with that status.
-3. **Otherwise the best match wins.** Query parameters equal to the example's score higher, and a 2xx example wins a tie.
+3. **Otherwise the best match wins.** Query parameters and the **request body** equal to the example's score higher, and a 2xx example wins a tie.
+   - Bodies are compared as JSON when they are JSON (key order doesn't matter). A request body that contains every field of the example's body (and maybe more) is a good match too. Form bodies match with their fields in any order.
+   - So a `POST /login` can answer with the *Success* example or the *Wrong password* example depending on the password sent, when you saved one example of each.
+   - `x-mock-match-request-body: true` accepts only examples whose saved body matches; otherwise the mock answers `404`.
+   - `x-mock-match-request-headers: X-Tenant, X-Version` accepts only examples whose saved request has the same values for those headers.
 4. **Ids are flexible.** If nothing matches exactly, id-like segments in saved URLs (`/patients/1`, UUIDs, long hex ids) match any value. `/patients/42` is then answered by the `/patients/1` example.
 
 The response has the example's status, headers and body, plus `x-mock-example: <name>` and permissive CORS headers so a browser app on another port can call it. A request that matches no example gets `404` with a JSON list of the available routes.
