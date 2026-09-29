@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -111,6 +111,16 @@ export function McpView() {
     });
     void load();
   };
+  /** Record the connected server (tools, resources, prompts and the calls made so far) as a mock server. */
+  const saveMock = async (id: string) => {
+    try {
+      const r = await call<{ path: string; tools: number; calls: number; resources: number }>('mcp.mock.save', { serverId: id, addServer: true });
+      useApp.getState().toast(`Saved ${r.path}: ${r.tools} tools, ${r.calls} recorded calls. Added as a mock server.`, 'success');
+      await load();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
   const saveServers = async (list: McpServerConfig[]) => {
     await call('mcp.saveServers', { servers: list.map(({ connected: _c, ...s }) => s) });
     await load();
@@ -139,12 +149,12 @@ export function McpView() {
                   <Pencil size={12} />
                 </IconButton>
               </div>
-              <div className="text-xs text-muted truncate mono pl-4">{s.transport === 'stdio' ? `${s.command} ${(s.args ?? []).join(' ')}` : s.url}</div>
+              <div className="text-xs text-muted truncate mono pl-4">{serverSummary(s)}</div>
             </div>
           ))}
           {!servers.length && (
             <Empty title="No MCP servers">
-              Add a server using stdio (a local command), Streamable HTTP or legacy SSE.
+              Add a server using stdio (a local command), Streamable HTTP, legacy SSE or a mock definition.
               <Button className="mt-2" onClick={() => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-everything'] })}>
                 Add server
               </Button>
@@ -170,6 +180,11 @@ export function McpView() {
                     <Button size="sm" onClick={() => call<number>('mcp.ping', { serverId: server.id }).then((ms) => useApp.getState().toast(`Ping ${ms} ms`))}>
                       Ping
                     </Button>
+                    {server.transport !== 'mock' && (
+                      <Button size="sm" icon={<Copy size={12} />} title="Record this server's tools, resources, prompts and the calls made so far as a mock server" onClick={() => saveMock(server.id)}>
+                        Save as mock
+                      </Button>
+                    )}
                     <Button size="sm" icon={<Unplug size={12} />} onClick={() => disconnect(server.id)}>
                       Disconnect
                     </Button>
@@ -245,6 +260,12 @@ export function McpView() {
   );
 }
 
+function serverSummary(s: McpServerConfig): string {
+  if (s.transport === 'stdio') return `${s.command} ${(s.args ?? []).join(' ')}`;
+  if (s.transport === 'mock') return `mock · ${s.mockFile}`;
+  return s.url;
+}
+
 function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerConfig; onClose(): void; onSave(s: McpServerConfig): void; onDelete?(): void }) {
   const [s, setS] = useState<McpServerConfig>(server);
   const [json, setJson] = useState(false);
@@ -294,12 +315,19 @@ function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerC
                 value={s.transport}
                 onChange={(e) => {
                   const t = e.target.value as McpServerConfig['transport'];
-                  setS(t === 'stdio' ? { id: s.id, name: s.name, transport: 'stdio', command: 'node', args: [] } : { id: s.id, name: s.name, transport: t, url: 'http://127.0.0.1:3000/mcp', headers: [] });
+                  setS(
+                    t === 'stdio'
+                      ? { id: s.id, name: s.name, transport: 'stdio', command: 'node', args: [] }
+                      : t === 'mock'
+                        ? { id: s.id, name: s.name, transport: 'mock', mockFile: 'mocks/server.mcp-mock.yaml' }
+                        : { id: s.id, name: s.name, transport: t, url: 'http://127.0.0.1:3000/mcp', headers: [] },
+                  );
                 }}
               >
                 <option value="stdio">stdio (local process)</option>
                 <option value="streamable-http">Streamable HTTP</option>
                 <option value="sse">SSE (legacy)</option>
+                <option value="mock">Mock (definition file)</option>
               </Select>
             </Field>
           </div>
@@ -318,6 +346,10 @@ function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerC
                 <KeyValueEditor rows={envRows} onChange={(rows) => setS({ ...s, env: Object.fromEntries(rows.filter((r) => r.key).map((r) => [r.key, r.value])) })} />
               </Field>
             </>
+          ) : s.transport === 'mock' ? (
+            <Field label="Mock definition" hint="A *.mcp-mock.yaml file in this workspace, with tools and their canned responses, resources and prompts. Connect to a real server and use Save as mock to record one.">
+              <Input className="mono" value={s.mockFile} onChange={(e) => setS({ ...s, mockFile: e.target.value })} />
+            </Field>
           ) : (
             <>
               <Field label="URL">

@@ -128,7 +128,9 @@ export interface GraphQLRequestSpec {
 export type McpTransportConfig =
   | { transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
   | { transport: 'streamable-http'; url: string; headers?: KeyValue[] }
-  | { transport: 'sse'; url: string; headers?: KeyValue[] };
+  | { transport: 'sse'; url: string; headers?: KeyValue[] }
+  /** An MCP mock running in-process from a definition file (`mocks/*.mcp-mock.yaml`, relative to the workspace). */
+  | { transport: 'mock'; mockFile: string };
 
 export type McpServerConfig = { id: string; name: string } & McpTransportConfig;
 

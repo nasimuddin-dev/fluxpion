@@ -19,6 +19,9 @@ import {
   importAny,
   importRequestSnippet,
   compareHistory,
+  loadMcpMock,
+  serveMcpMockStdio,
+  startMcpMockHttp,
   startGraphQLMockServer,
   schemaFromText,
   introspect,
@@ -680,6 +683,32 @@ export function buildProgram(): Command {
     .option('-q, --quiet', 'do not log requests')
     .action(async (ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }) => {
       process.exitCode = await executeMock(ref, o);
+    });
+
+  program
+    .command('mock-mcp')
+    .description('serve a fake MCP server from a mock definition (*.mcp-mock.yaml): over stdio for AI agents, or --http on localhost')
+    .argument('<file>', 'mock definition (YAML or JSON)')
+    .option('--http', 'serve Streamable HTTP on localhost instead of stdio')
+    .option('-p, --port <port>', 'port for --http (default: any free port)')
+    .action(async (file: string, o: { http?: boolean; port?: string }) => {
+      const def = loadMcpMock(readFileSync(file, 'utf8'));
+      if (!o.http) {
+        // stdout carries the MCP protocol: messages go to stderr
+        console.error(dim(`MCP mock "${def.name}" on stdio: ${(def.tools ?? []).length} tools`));
+        await serveMcpMockStdio(def);
+        return;
+      }
+      const server = await startMcpMockHttp(def, { port: o.port ? Number(o.port) : 0 });
+      console.log(bold(`MCP mock "${def.name}": ${server.url}`));
+      console.log(dim(`Tools: ${(def.tools ?? []).map((t) => t.name).join(', ') || 'none'}. Press Ctrl+C to stop.`));
+      await new Promise<void>((done) => {
+        const stop = () => {
+          process.off('SIGINT', stop);
+          void server.close().then(done);
+        };
+        process.on('SIGINT', stop);
+      });
     });
 
   program

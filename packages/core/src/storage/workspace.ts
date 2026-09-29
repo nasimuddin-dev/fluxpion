@@ -248,6 +248,14 @@ export class WorkspaceStore {
     return readJson<{ servers: McpServerConfig[] }>(this.path('mcp-servers.json'), { servers: [] }).servers;
   }
 
+  /** A server config ready to connect: a mock's definition file becomes an absolute path in this workspace. */
+  resolveMcpServer(cfg: McpServerConfig): McpServerConfig {
+    if (cfg.transport !== 'mock') return cfg;
+    const file = resolve(this.root, cfg.mockFile);
+    if (!file.startsWith(resolve(this.root))) throw new ApsError('ConfigurationError', `The MCP mock file must be inside the workspace: ${cfg.mockFile}`);
+    return { ...cfg, mockFile: file };
+  }
+
   saveMcpServers(servers: McpServerConfig[]): void {
     writeJson(this.path('mcp-servers.json'), { schemaVersion: SCHEMA_VERSION, servers });
   }

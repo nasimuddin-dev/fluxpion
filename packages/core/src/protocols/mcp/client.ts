@@ -1,3 +1,6 @@
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { readFileSync } from 'node:fs';
+import { createMcpMockServer, loadMcpMock } from '../../mcp-server/mcp-mock.js';
 import { assertProcessesAllowed, assertUrlAllowed } from '../../net/policy.js';
 import type { CookieJar } from '../../cookies/cookie-jar.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -207,6 +210,13 @@ export class McpSession {
           this.emit({ id: shortId(), timestamp: Date.now(), direction: 'incoming', method: 'stderr', kind: 'stderr', response: this.redactor?.redactString(text) ?? text });
         });
         return t;
+      }
+      case 'mock': {
+        // in-process: the mock server and this client are joined by an in-memory channel
+        const def = loadMcpMock(readFileSync(c.mockFile, 'utf8'));
+        const [client, server] = InMemoryTransport.createLinkedPair();
+        void createMcpMockServer(def).connect(server);
+        return client;
       }
       case 'streamable-http':
         return new StreamableHTTPClientTransport(new URL(c.url), { requestInit: { headers: headersOf(c.headers) }, fetch: jarFetch });

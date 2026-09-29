@@ -13,6 +13,7 @@ testpion run --suite <name>   Run tests/<name>.suite.yaml from a workspace
 testpion run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
+testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
 testpion docs <collection>    Write Markdown documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)
 testpion export-environment <name>   Export an environment in Postman's format
@@ -87,6 +88,20 @@ testpion mock api.postman_collection.json      # Postman saved responses work to
 | `-p, --port <port>` | Port to listen on (default: any free port; the URL is printed). |
 | `--delay <ms>` | Delay every response. |
 | `-q, --quiet` | Don't log requests. |
+
+## `mock-mcp`
+
+Serves an [MCP mock](/mcp/mocking) (`*.mcp-mock.yaml`: tools with canned responses, resources, prompts). By default it speaks MCP over stdio, so AI agents can start it as a command; logs go to stderr.
+
+```bash
+testpion mock-mcp mocks/customer.mcp-mock.yaml
+testpion mock-mcp mocks/customer.mcp-mock.yaml --http -p 3333   # Streamable HTTP on 127.0.0.1
+```
+
+| Option | Description |
+|---|---|
+| `--http` | Serve over Streamable HTTP on `127.0.0.1` instead of stdio (the URL is printed). |
+| `-p, --port <port>` | Port for `--http` (default: any free port). |
 
 ## `docs`
 

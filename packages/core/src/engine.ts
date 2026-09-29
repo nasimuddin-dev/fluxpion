@@ -71,7 +71,7 @@ export function createEngineContext(opts: ContextOptions): EngineContext {
   }
   if (opts.runtimeVars) vars.setScope('runtime', opts.runtimeVars);
 
-  const mcpServers = store.getMcpServers();
+  const mcpServers = store.getMcpServers().map((s) => store.resolveMcpServer(s));
   const resolveMcp = (ref: string | McpServerConfig): McpServerConfig | undefined => {
     if (typeof ref !== 'string') return vars.resolveDeep(ref);
     const r = ref.toLowerCase();

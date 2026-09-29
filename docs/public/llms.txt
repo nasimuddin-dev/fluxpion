@@ -37,6 +37,7 @@ Key facts for agents:
 - [GraphQL testing](https://nasimuddin-dev.github.io/testpion/graphql/testing)
 - [MCP overview](https://nasimuddin-dev.github.io/testpion/mcp/overview): test MCP servers (stdio, Streamable HTTP, SSE)
 - [MCP tools](https://nasimuddin-dev.github.io/testpion/mcp/tools)
+- [MCP mock server](https://nasimuddin-dev.github.io/testpion/mcp/mocking): fake MCP servers from `*.mcp-mock.yaml` (or recorded from a real server with Save as mock); `testpion mock-mcp <file>` serves one over stdio or `--http` for agents
 
 ## AI testing
 

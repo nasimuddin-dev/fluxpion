@@ -76,6 +76,8 @@ import {
   summarizeSchema,
   prepareHttpRequest,
   parseCurl,
+  dumpMcpMock,
+  mockFromDiscovery,
   schemaFromText,
   startGraphQLMockServer,
   type GraphQLMockServer,
@@ -308,6 +310,7 @@ export class Backend {
 
   /** Where an MCP server runs, for the console: the URL or the command line, redacted. */
   private mcpTarget(cfg: McpServerConfig, redactor: Redactor): string {
+    if (cfg.transport === 'mock') return `mock ${cfg.mockFile}`;
     return cfg.transport === 'stdio' ? redactor.redactString([cfg.command, ...(cfg.args ?? [])].join(' ')) : redactor.redactUrl(cfg.url);
   }
 
@@ -863,7 +866,7 @@ export class Backend {
         const cfg = this.ws.getMcpServers().find((s) => s.id === serverId);
         if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
         const ctx = this.context({ environment });
-        const resolved = ctx.vars.resolveDeep(cfg);
+        const resolved = this.ws.resolveMcpServer(ctx.vars.resolveDeep(cfg));
         const session = new McpSession(resolved, ctx.redactor, { cookieJar: ctx.services.cookieJar });
         const b = this.batched<unknown>('mcp.events');
         session.onEvent((e) => b.push({ serverId, event: e }));
@@ -882,6 +885,47 @@ export class Backend {
           b.flush();
         }
         return { discovery: await session.discover(), events: session.events };
+      },
+      /**
+       * Record the connected server as a mock: its tools, resources and prompts, plus the tool calls made
+       * in this session (as seen in the protocol trace, already redacted), saved as mocks/<name>.mcp-mock.yaml.
+       * With `addServer`, a server entry that runs the mock in-process is added too.
+       */
+      'mcp.mock.save': async ({ serverId, addServer }: { serverId: string; addServer?: boolean }) => {
+        const s = this.session(serverId);
+        const discovery = await s.discover();
+        const requests = new Map<unknown, { tool: string; args: Record<string, unknown> }>();
+        const calls: Array<{ tool: string; args: Record<string, unknown>; result: { content?: unknown[]; isError?: boolean } }> = [];
+        for (const e of s.events) {
+          const msg = (e.request ?? {}) as { method?: string; params?: { name?: string; arguments?: Record<string, unknown> } };
+          if (e.kind === 'request' && e.method === 'tools/call') {
+            const params = msg.params ?? (e.request as { name?: string; arguments?: Record<string, unknown> });
+            if (params?.name) requests.set(e.rpcId, { tool: params.name, args: params.arguments ?? {} });
+          } else if (e.kind === 'response' && requests.has(e.rpcId)) {
+            const res = (e.response ?? {}) as { result?: { content?: unknown[]; isError?: boolean }; content?: unknown[]; isError?: boolean };
+            calls.push({ ...requests.get(e.rpcId)!, result: res.result ?? res });
+            requests.delete(e.rpcId);
+          }
+        }
+        const texts: Record<string, string> = {};
+        for (const r of discovery.resources.slice(0, 20)) {
+          try {
+            const c = (await s.readResource(r.uri)).contents as Array<{ text?: string }>;
+            if (typeof c[0]?.text === 'string') texts[r.uri] = this.logger.redactor.redactString(c[0].text.slice(0, 100_000));
+          } catch {
+            /* unreadable resource: listed without text */
+          }
+        }
+        const name = `${s.config.name}-mock`;
+        const def = mockFromDiscovery(name, discovery, calls, texts);
+        const rel = `mocks/${s.config.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.mcp-mock.yaml`;
+        mkdirSync(this.ws.path('mocks'), { recursive: true });
+        writeFileSync(this.ws.path(rel), dumpMcpMock(def));
+        if (addServer) {
+          const servers = this.ws.getMcpServers().filter((x) => !(x.transport === 'mock' && x.mockFile === rel));
+          this.ws.saveMcpServers([...servers, { id: shortId('mcp-'), name: `${s.config.name} (mock)`, transport: 'mock', mockFile: rel }]);
+        }
+        return { path: rel, tools: def.tools?.length ?? 0, calls: calls.length, resources: Object.keys(texts).length };
       },
       'mcp.disconnect': async ({ serverId }: { serverId: string }) => {
         await this.mcpSessions.get(serverId)?.close();
