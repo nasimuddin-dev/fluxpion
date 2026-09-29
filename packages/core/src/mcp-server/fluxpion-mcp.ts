@@ -12,6 +12,8 @@ import { createEngineContext, inheritedAuthFor } from '../engine.js';
 import { executeHttp } from '../protocols/http/client.js';
 import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
+import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
+import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
 
 /**
  * `fluxpion mcp-server`: the FluxPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
@@ -76,7 +78,28 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
     error: r.error?.message,
     failedChecks: r.checks.filter((c) => !c.passed).map((c) => `${c.name ?? c.type}: ${c.message ?? 'failed'}`),
     passedChecks: r.checks.filter((c) => c.passed).length,
+    // console.log output of the scripts and the pm.visualizer rendering, when there is one
+    scriptLogs: (r.metadata as { scriptLogs?: string[] } | undefined)?.scriptLogs?.map((l) => redactor.redactString(l)),
+    visualization: (r.metadata as { visualizer?: { html?: string; error?: string } } | undefined)?.visualizer,
   });
+  /** A request from `snippet` (cURL / fetch / PowerShell) or from method + url + headers + body. */
+  const requestFrom = (a: Record<string, unknown>): { request: HttpRequestSpec; format?: string } => {
+    if (typeof a.snippet === 'string' && a.snippet.trim()) {
+      const format = detectRequestSnippet(a.snippet);
+      if (!format) throw new ApsError('ValidationError', 'snippet is not a cURL, fetch or PowerShell (Invoke-WebRequest / Invoke-RestMethod) command');
+      return { request: parseRequestSnippet(a.snippet), format };
+    }
+    if (!a.url) throw new ApsError('ValidationError', 'Give snippet, or url (+ method, headers, body)');
+    const body = typeof a.body === 'string' && a.body ? { type: /^\s*[{[]/.test(a.body) ? ('json' as const) : ('text' as const), content: a.body } : undefined;
+    return {
+      request: {
+        method: String(a.method ?? 'GET').toUpperCase(),
+        url: String(a.url),
+        headers: Object.entries((a.headers as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value: String(value) })),
+        body,
+      },
+    };
+  };
 
   const all: Tool[] = [
     {
@@ -138,6 +161,7 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
           url: str('URL for an ad-hoc request; may use {{variables}}'),
           headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Headers for an ad-hoc request' },
           body: str('Raw body for an ad-hoc request (JSON is detected)'),
+          snippet: str('Or: a cURL / fetch / PowerShell command to send as an ad-hoc request'),
           environment: str('Environment name'),
         },
       },
@@ -156,16 +180,10 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
           if (!result) throw new ApsError('ProtocolError', 'The request did not run');
           return { ...summarizeResult(result), output: result.output && clip(result.output) };
         }
-        if (!a.url) throw new ApsError('ValidationError', 'Give collection + request for a saved request, or url for an ad-hoc one');
+        if (!a.url && !a.snippet) throw new ApsError('ValidationError', 'Give collection + request for a saved request, or url (or snippet) for an ad-hoc one');
         const ctx = createEngineContext({ store, secrets, settings, environment });
         try {
-          const body = typeof a.body === 'string' && a.body ? { type: /^\s*[{[]/.test(a.body) ? ('json' as const) : ('text' as const), content: a.body } : undefined;
-          const spec: HttpRequestSpec = ctx.vars.resolveDeep({
-            method: String(a.method ?? 'GET').toUpperCase(),
-            url: String(a.url),
-            headers: Object.entries((a.headers as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value: String(value) })),
-            body,
-          });
+          const spec: HttpRequestSpec = ctx.vars.resolveDeep(requestFrom(a).request);
           const { response } = await executeHttp({ ...spec, settings: { timeoutMs: settings.defaultTimeoutMs } }, { redactor: ctx.redactor, maxPreviewBytes: 1024 * 1024, cookieJar: ctx.services.cookieJar });
           return {
             status: response.status,
@@ -180,6 +198,77 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
         } finally {
           await ctx.dispose();
         }
+      },
+    },
+    {
+      name: 'parse_request_snippet',
+      description:
+        'Turn a request copied from browser devtools or docs (cURL for bash or cmd, fetch, fetch (Node.js), or PowerShell Invoke-WebRequest / Invoke-RestMethod) into a structured FluxPion request: method, URL, params, headers, cookies, body and auth. Nothing is sent or saved. Secret values (tokens, keys, cookies, passwords) are replaced by {{variables}} listed in `placeholders`.',
+      inputSchema: { type: 'object', properties: { snippet: str('The copied command or code') }, required: ['snippet'] },
+      run: (a) => {
+        const { request, format } = requestFrom({ snippet: a.snippet });
+        // same rewrite as save_request: cookies, tokens and keys become {{variables}}, never values
+        const { request: safe, placeholders } = externalizeSecrets(request, redactor);
+        return { format, request: redactor.redact(safe), placeholders };
+      },
+    },
+    {
+      name: 'save_request',
+      write: true,
+      description:
+        'Save a request into a collection (and folder path such as "Auth / Tokens"). Give a snippet (cURL / fetch / PowerShell) or method + url (+ headers, body). Secret values (Authorization and other sensitive headers, auth credentials, cookies, sensitive query or body fields) are NOT written to the workspace: they are replaced by {{variables}}, listed in `placeholders`, and should be set as secret environment variables by the user.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          collection: str('Collection name or id'),
+          create: { type: 'boolean', description: 'Create the collection when it does not exist (default false)' },
+          folder: str('Folder path inside the collection, e.g. "Auth / Tokens" (created as needed)'),
+          name: str('Request name (default: method and URL)'),
+          description: str('Markdown documentation for the request'),
+          snippet: str('cURL / fetch / PowerShell command to import'),
+          method: str('HTTP method (when no snippet)'),
+          url: str('URL, may use {{variables}} (when no snippet)'),
+          headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Headers (when no snippet)' },
+          body: str('Raw body (when no snippet; JSON is detected)'),
+        },
+        required: ['collection'],
+      },
+      run: (a) => {
+        const { request, format } = requestFrom(a);
+        const { request: safe, placeholders } = externalizeSecrets(request, redactor);
+        const { collection, node, created } = addRequestToCollection(collections(), {
+          collection: String(a.collection),
+          create: a.create === true,
+          folder: typeof a.folder === 'string' ? a.folder : undefined,
+          name: typeof a.name === 'string' ? a.name : '',
+          description: typeof a.description === 'string' ? a.description : undefined,
+          request: safe,
+        });
+        const saved = store.saveCollection(collection);
+        return {
+          saved: { collection: saved.name, collectionId: saved.id, createdCollection: created, request: node.name, requestId: node.id, method: safe.method, url: safe.url },
+          format,
+          placeholders,
+          next: placeholders.length
+            ? `Ask the user to add ${placeholders.map((p) => p.variable).join(', ')} as secret variables of an environment (Environments view, or they stay unresolved).`
+            : undefined,
+        };
+      },
+    },
+    {
+      name: 'reorder_environments',
+      write: true,
+      description: 'Set the display order of environments (the order of the environment picker). Environments not listed keep their order after the listed ones.',
+      inputSchema: { type: 'object', properties: { order: { type: 'array', items: { type: 'string' }, description: 'Environment names or ids, first to last' } }, required: ['order'] },
+      run: (a) => {
+        const refs = Array.isArray(a.order) ? a.order.map((x) => String(x)) : [];
+        const envs = store.listEnvironments();
+        const ids = refs.map((r) => {
+          const e = envs.find((x) => x.id === r) ?? envs.find((x) => x.name.toLowerCase() === r.toLowerCase());
+          if (!e) throw new ApsError('ConfigurationError', `No environment "${r}". Available: ${envs.map((x) => x.name).join(', ') || 'none'}`);
+          return e.id;
+        });
+        return store.reorderEnvironments(ids).map((e) => e.name);
       },
     },
     {
@@ -217,7 +306,7 @@ export function createFluxPionMcpServer(opts: FluxPionMcpOptions): Server {
     { name: 'fluxpion', version: opts.version ?? '0.5.1' },
     {
       capabilities: { tools: {} },
-      instructions: `FluxPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. Values of secrets are never returned.`,
+      instructions: `FluxPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. parse_request_snippet reads a cURL / fetch / PowerShell command${opts.readOnly ? '' : ' and save_request stores it in a collection (secrets become {{variables}})'}. Values of secrets are never returned.`,
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));

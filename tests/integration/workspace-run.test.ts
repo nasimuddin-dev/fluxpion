@@ -214,7 +214,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['collection_docs', 'get_request', 'list_collections', 'list_environments', 'list_requests', 'run_collection', 'send_request']);
+      expect(names).toEqual(['collection_docs', 'get_request', 'list_collections', 'list_environments', 'list_requests', 'parse_request_snippet', 'reorder_environments', 'run_collection', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -238,6 +238,28 @@ describe('example workspace (end-to-end)', () => {
       expect(prod.isError).toBe(true);
       expect(prod.text).toMatch(/production/);
       expect((await text('collection_docs', { collection: 'Veterinary API' })).text).toContain('# Veterinary API');
+
+      // AI agents can turn a copied cURL command into a request and save it without writing secrets
+      const snippet = `curl 'https://api.test/v1/pets?limit=5&api_key=k-LEAK-1' -H 'Authorization: Bearer tok-LEAK-2' -H 'accept: application/json' -b 'sid=sess-LEAK-3'`;
+      const parsed = JSON.parse((await text('parse_request_snippet', { snippet })).text);
+      expect(parsed).toMatchObject({ format: 'curl', request: { method: 'GET', url: 'https://api.test/v1/pets' } });
+      expect(JSON.stringify(parsed)).not.toMatch(/LEAK/);
+      const saveR = JSON.parse((await text('save_request', { collection: 'Imported', create: true, folder: 'Pets / Search', name: 'Search pets', snippet })).text);
+      expect(saveR.saved).toMatchObject({ collection: 'Imported', createdCollection: true, request: 'Search pets', method: 'GET' });
+      expect(saveR.placeholders.map((p: { variable: string }) => p.variable).sort()).toEqual(['accessToken', 'apiKey', 'sid']);
+      const onDisk = readFileSync(join(ws.root, 'collections', `${saveR.saved.collectionId}.json`), 'utf8');
+      expect(onDisk).not.toMatch(/LEAK/);
+      expect(onDisk).toContain('{{accessToken}}');
+      expect((await text('list_requests', { collection: 'Imported' })).text).toContain('Search pets');
+      expect((await text('save_request', { collection: 'Nope', url: 'https://x.test' })).isError).toBe(true);
+      // environment order
+      expect(JSON.parse((await text('reorder_environments', { order: ['Production', 'Development'] })).text).slice(0, 2)).toEqual(['Production', 'Development']);
+      expect((await text('reorder_environments', { order: ['Nope'] })).isError).toBe(true);
+      // run results include script logs and the pm.visualizer rendering (List patients has one)
+      const pats = JSON.parse((await text('run_collection', { collection: 'Veterinary API', folder: 'Patients', environment: 'Development' })).text);
+      const list = pats.results.find((r: { name: string }) => r.name.endsWith('List patients'));
+      if (!list) throw new Error(JSON.stringify(pats.results.map((r: { name: string }) => r.name)));
+      expect(list.visualization.html).toContain('<table>');
     } finally {
       await s.close();
     }
@@ -249,6 +271,31 @@ describe('example workspace (end-to-end)', () => {
     } finally {
       await ro.close();
     }
+  });
+
+  it('CLI: `fluxpion import` takes a copied request and `fluxpion env` lists and orders environments (--json)', async () => {
+    const cli = resolve('packages/cli/bin/fluxpion.js');
+    const env = { ...process.env, FLUXPION_HOME: join(dir, 'home') };
+    const file = join(dir, 'copied.ps1');
+    writeFileSync(file, 'Invoke-RestMethod -Uri "https://api.test/v1/owners" -Method "POST" -Headers @{ "x-api-key" = "key-LEAK-9" } -ContentType "application/json" -Body \'{"name":"Ada","password":"pw-LEAK-8"}\'');
+    const r = await run([cli, 'import', file, '-w', ws.root, '--collection', 'From CLI', '--folder', 'Owners', '--json'], env);
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out).toMatchObject({ format: 'powershell', collection: 'From CLI', createdCollection: true, request: 'POST /v1/owners', method: 'POST' });
+    expect(out.placeholders.map((p: { variable: string }) => p.variable).sort()).toEqual(['password', 'xApiKey']);
+    const saved = readFileSync(join(ws.root, 'collections', `${out.collectionId}.json`), 'utf8');
+    expect(saved).not.toMatch(/LEAK/);
+    expect(saved).toContain('{{xApiKey}}');
+
+    const order = await run([cli, 'env', 'order', 'Development', 'Production', '-w', ws.root, '--json'], env);
+    expect(order.status).toBe(0);
+    expect(JSON.parse(order.stdout).slice(0, 2)).toEqual(['Development', 'Production']);
+    const list = await run([cli, 'env', 'list', '-w', ws.root, '--json'], env);
+    const envs = JSON.parse(list.stdout) as Array<{ name: string; variables: string[] }>;
+    expect(envs[0]!.name).toBe('Development');
+    expect(list.stdout).not.toContain('demo-secret');
+    expect((await run([cli, 'env', 'order', 'Nope', '-w', ws.root], env)).status).not.toBe(0);
   });
 
   it('CLI: `fluxpion docs` writes Markdown documentation with examples and no secrets', async () => {

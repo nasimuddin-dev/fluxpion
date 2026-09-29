@@ -23,6 +23,7 @@ To keep frequently used endpoints close at hand, choose **Add to favorites** fro
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
 - HAR files.
 - FluxPion collections and workspace exports.
+- A single request copied as cURL (bash or cmd), fetch or PowerShell. It is saved to the **Imported** collection, named after its method and path. Secrets in it (tokens, API keys, cookies, passwords) are replaced by `{{variables}}`, and a message lists the ones to add as secret environment variables. To just try the request without saving it, paste it into the REST view instead (see [paste a request](/api-testing/rest#paste-a-request-from-the-browser)).
 
 A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
 

@@ -17,7 +17,8 @@ fluxpion export <collection>  Export a collection as Postman v2.1 (or FluxPion J
 fluxpion export-environment <name>   Export an environment in Postman's format
 fluxpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 fluxpion load <url>           Safeguarded load test
-fluxpion import <file> -w     Import OpenAPI/Swagger, Postman, HAR or collections
+fluxpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
+fluxpion env list|order -w    List environments; set their order
 fluxpion workspace list|create|export
 fluxpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 fluxpion report <results.jsonl>              Re-generate reports
@@ -117,6 +118,34 @@ fluxpion export-environment Staging -o staging.postman_environment.json
 | `-o, --out <file>` | Write to a file instead of standard output. |
 
 Parts that Postman can't represent are listed on standard error as `not exported: …`. Secret environment values are never written.
+
+## `import`
+
+```bash
+fluxpion import openapi.yaml -w my-workspace
+# a request copied from browser devtools (cURL for bash or cmd, fetch, PowerShell), from a file or stdin
+fluxpion import copied-request.txt -w my-workspace --collection "Checkout API" --folder "Cart" --json
+pbpaste | fluxpion import - -w my-workspace
+```
+
+| Option | Description |
+|---|---|
+| `-w, --workspace` | Workspace name or directory (required). |
+| `--collection <name>` | For a copied request: the collection to add it to, created if needed (default **Imported**). |
+| `--folder <path>` | For a copied request: folder path inside the collection, such as `"Auth / Tokens"`. |
+| `--name <name>` | For a copied request: its name (default: the method and path, e.g. `POST /v1/owners`). |
+| `--json` | Print the result as JSON, for scripts and AI agents. |
+
+Secrets in a copied request (the `Authorization` header and other sensitive headers, auth credentials, cookies, and sensitive query or body fields) are not written to the workspace. They are replaced by `{{variables}}`, and the output lists them (`placeholders` with `--json`) so you can add them as secret environment variables.
+
+## `env`
+
+```bash
+fluxpion env list -w my-workspace --json          # environments in display order, variable names only
+fluxpion env order Development Staging Production -w my-workspace
+```
+
+`env order` sets the order of the environment picker. Environments you don't name keep their order after the named ones. Both commands take `--json`.
 
 ## `mcp-server`
 

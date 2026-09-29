@@ -17,6 +17,9 @@ import {
   formatBytes,
   formatDuration,
   importAny,
+  importRequestSnippet,
+  isRequestSnippet,
+  Redactor,
   CookieJar,
   cookiesFromJson,
   startMockServer,
@@ -716,17 +719,76 @@ export function buildProgram(): Command {
 
   program
     .command('import')
-    .description('import OpenAPI/Swagger, Postman, HAR or collection files into a workspace')
-    .argument('<file>')
+    .description('import OpenAPI/Swagger, Postman, HAR or collection files, or a copied cURL / fetch / PowerShell request, into a workspace')
+    .argument('<file>', 'file to import, or - to read stdin (e.g. a cURL command from the clipboard)')
     .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--collection <name>', 'for a cURL / fetch / PowerShell request: the collection to add it to (created if needed)', 'Imported')
+    .option('--folder <path>', 'for a request: folder path inside the collection, e.g. "Auth / Tokens"')
+    .option('--name <name>', 'for a request: its name (default: method and path)')
+    .option('--json', 'print the result as JSON (for scripts and AI agents)')
     .action(async (file: string, o) => {
       const mgr = new WorkspaceManager();
       const { store } = openWorkspace(o.workspace, undefined, mgr);
-      const r = importAny(readFileSync(file, 'utf8'));
-      if (r.collection) store.saveCollection(r.collection);
-      if (r.environment) store.saveEnvironment(r.environment);
-      console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
-      store.close();
+      try {
+        const text = file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
+        if (isRequestSnippet(text)) {
+          // secrets in the command (tokens, keys, cookies) become {{variables}}; they are never written to disk
+          const r = importRequestSnippet(store.listCollections().filter((c) => !c.problem), text, new Redactor(mgr.loadSettings().redactFields), { collection: o.collection, folder: o.folder, name: o.name });
+          const saved = store.saveCollection(r.collection);
+          const out = { format: r.format, collection: saved.name, collectionId: saved.id, createdCollection: r.created, request: r.node.name, requestId: r.node.id, method: r.node.request.method, url: r.node.request.url, placeholders: r.placeholders };
+          if (o.json) console.log(JSON.stringify(out, null, 2));
+          else {
+            console.log(green(`Imported ${r.format} request "${r.node.name}" into collection "${saved.name}"`));
+            if (r.placeholders.length) console.log(yellow(`Secrets were replaced by variables; set them as secret environment variables: ${r.placeholders.map((p) => `${p.variable} (${p.where})`).join(', ')}`));
+          }
+          return;
+        }
+        const r = importAny(text);
+        if (r.collection) store.saveCollection(r.collection);
+        if (r.environment) store.saveEnvironment(r.environment);
+        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name }, null, 2));
+        else console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environment ? ` environment "${r.environment.name}"` : ''}`));
+      } finally {
+        store.close();
+      }
+    });
+
+  const envCmd = program.command('env').description('list environments and set their order');
+  envCmd
+    .command('list')
+    .description('list environments in display order, with variable names (never values)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const envs = store.listEnvironments().map((e) => ({ id: e.id, name: e.name, production: !!e.isProduction, variables: e.variables.filter((v) => v.enabled !== false).map((v) => (v.secret ? `${v.key} (secret)` : v.key)) }));
+        if (o.json) console.log(JSON.stringify(envs, null, 2));
+        else for (const e of envs) console.log(`${e.name}${e.production ? red(' (production)') : ''}\t${dim(e.variables.join(', '))}`);
+      } finally {
+        store.close();
+      }
+    });
+  envCmd
+    .command('order')
+    .description('set the display order of environments (names or ids, first to last; others follow)')
+    .argument('<environments...>')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print the new order as JSON')
+    .action((refs: string[], o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const envs = store.listEnvironments();
+        const ids = refs.map((r) => {
+          const e = envs.find((x) => x.id === r) ?? envs.find((x) => x.name.toLowerCase() === r.toLowerCase());
+          if (!e) throw new CliError(`No environment "${r}". Available: ${envs.map((x) => x.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+          return e.id;
+        });
+        const names = store.reorderEnvironments(ids).map((e) => e.name);
+        console.log(o.json ? JSON.stringify(names) : names.join('\n'));
+      } finally {
+        store.close();
+      }
     });
 
   const ws = program.command('workspace').description('manage workspaces');

@@ -29,6 +29,7 @@ import { runAgent, type AgentTool } from '../ai/agent.js';
 import type { ChatMessage } from '../ai/types.js';
 import { runChecks, type CheckContext } from '../eval/checks.js';
 import { runScript } from '../scripts/sandbox.js';
+import { renderVisualizer } from '../scripts/visualizer.js';
 import { applyScriptOutput, scriptRequestSender, scriptScopes, type PersistVariable } from '../scripts/bridge.js';
 import { query, tryParseJson } from '../util/jsonpath.js';
 import { withTimeout } from '../util/concurrency.js';
@@ -166,6 +167,11 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
     for (const t of s.tests) scriptChecks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
     if (s.error) scriptChecks.push({ type: 'script', name: 'test script', passed: false, source: 'deterministic', message: s.error });
     if (s.logs.length) metadata.scriptLogs = s.logs.slice(0, 100);
+    if (s.visualizer) {
+      // pm.visualizer output (redacted HTML) for reports, the MCP server and the CLI's --json output
+      const v = renderVisualizer(s.visualizer.template, s.visualizer.data);
+      metadata.visualizer = { html: v.html === undefined ? undefined : svc.redactor.redactString(v.html.slice(0, 200_000)), error: v.error };
+    }
     if (s.sentRequests?.length) metadata.sentRequests = [...((metadata.sentRequests as unknown[]) ?? []), ...s.sentRequests.map((r) => ({ ...r, url: svc.redactor.redactUrl(r.url) }))];
   }
 

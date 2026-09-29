@@ -953,12 +953,17 @@ function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { co
 export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): void }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string } | null>) => {
+  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }> } | null>) => {
     setBusy(true);
     try {
       const r = await fn();
       if (r) {
-        useApp.getState().toast(`Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (environment ${r.environment})` : ''}`, 'success');
+        if (r.request)
+          useApp.getState().toast(
+            `Imported ${r.format} request "${r.request}" into "${r.collection}"${r.placeholders?.length ? `. Secrets were replaced by variables: set ${r.placeholders.map((p) => p.variable).join(', ')} as secret environment variables` : ''}`,
+            'success',
+          );
+        else useApp.getState().toast(`Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (environment ${r.environment})` : ''}`, 'success');
         onDone();
         await useApp.getState().refreshWorkspace();
         onClose();
@@ -983,7 +988,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
         </>
       }
     >
-      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, or FluxPion collections.</p>
+      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, FluxPion collections, or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
       <textarea className="field mono w-full h-64 text-xs" placeholder="Paste a document here…" value={text} onChange={(e) => setText(e.target.value)} />
     </Modal>
   );

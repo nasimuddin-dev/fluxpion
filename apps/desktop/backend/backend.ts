@@ -77,6 +77,8 @@ import {
   parseCurl,
   renderVisualizer,
   parseRequestSnippet,
+  importRequestSnippet,
+  isRequestSnippet,
   detectRequestSnippet,
   generateCode,
   CODE_LANGUAGES,
@@ -625,6 +627,12 @@ export class Backend {
         return p.examples;
       },
       'col.import': ({ text }: { text: string }) => {
+        if (isRequestSnippet(text)) {
+          // a copied cURL / fetch / PowerShell request goes into the "Imported" collection; secrets become {{variables}}
+          const r = importRequestSnippet(this.ws.listCollections().filter((c) => !c.problem), text, this.logger.redactor);
+          const saved = this.ws.saveCollection(r.collection);
+          return { format: r.format, collection: saved.name, collectionId: saved.id, request: r.node.name, placeholders: r.placeholders };
+        }
         const r = importAny(text);
         if (r.collection) this.ws.saveCollection(r.collection);
         if (r.environment) this.ws.saveEnvironment(r.environment);
