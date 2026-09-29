@@ -6,7 +6,7 @@ interface CheckDef {
   type: string;
   label: string;
   group: string;
-  fields: Array<'path' | 'expected' | 'max' | 'min' | 'threshold' | 'header' | 'tool' | 'schema' | 'criteria' | 'judge' | 'method' | 'values'>;
+  fields: Array<'path' | 'expected' | 'max' | 'min' | 'threshold' | 'header' | 'tool' | 'schema' | 'criteria' | 'judge' | 'method' | 'values' | 'spec' | 'operationId'>;
   hint?: string;
 }
 
@@ -26,6 +26,7 @@ export const CHECK_DEFS: CheckDef[] = [
   { type: 'threshold', label: 'Number within', group: 'Body', fields: ['path', 'min', 'max'] },
   { type: 'json-schema', label: 'JSON Schema', group: 'Body', fields: ['path', 'schema'] },
   { type: 'is-json', label: 'Is valid JSON', group: 'Body', fields: [] },
+  { type: 'openapi', label: 'Matches OpenAPI contract', group: 'Response', fields: ['spec', 'operationId'], hint: 'status, content type and body checked against the operation in the OpenAPI document' },
   { type: 'graphql-no-errors', label: 'No GraphQL errors', group: 'GraphQL', fields: [] },
   { type: 'graphql-errors', label: 'GraphQL error contains', group: 'GraphQL', fields: ['expected'] },
   { type: 'exact-match', label: 'Exact match', group: 'AI', fields: ['path', 'expected'] },
@@ -121,6 +122,24 @@ export function AssertionEditor({ checks, onChange, groups }: { checks: CheckCon
                   const [provider, ...rest] = e.target.value.split('/');
                   set(i, { judge: { provider, name: rest.join('/') || undefined, temperature: 0 } });
                 }}
+              />
+            )}
+            {def.fields.includes('spec') && (
+              <input
+                className="field h-7 min-h-7 mono flex-1 min-w-48"
+                placeholder="OpenAPI file in the workspace, e.g. openapi.yaml"
+                title={def.hint}
+                value={typeof c.spec === 'string' ? c.spec : ''}
+                onChange={(e) => set(i, { spec: e.target.value })}
+              />
+            )}
+            {def.fields.includes('operationId') && (
+              <input
+                className="field h-7 min-h-7 mono w-44"
+                placeholder="operationId (optional)"
+                title="By default the operation is found from the request's method and URL"
+                value={String(c.operationId ?? '')}
+                onChange={(e) => set(i, { operationId: e.target.value || undefined })}
               />
             )}
             {def.fields.includes('schema') && (

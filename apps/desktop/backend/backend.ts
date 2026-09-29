@@ -541,7 +541,16 @@ export class Backend {
       root.span.input = { method: prepared.method, headers: prepared.headers, body: prepared.bodyPreview };
       root.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers } });
 
-      const cctx: CheckContext = { testType: 'http', status: response.status, headers: response.headers, body: response.json ?? response.bodyPreview, text: response.bodyPreview, latencyMs: response.durationMs };
+      const cctx: CheckContext = {
+        testType: 'http',
+        status: response.status,
+        headers: response.headers,
+        body: response.json ?? response.bodyPreview,
+        text: response.bodyPreview,
+        latencyMs: response.durationMs,
+        request: { method: prepared.method, url: prepared.url },
+        readFile: ctx.services.readFile,
+      };
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), cctx);
       // pm.visualizer.set in any test script (collection, folders, request); the last call wins
       let visual: { template: string; data: unknown } | null | undefined;

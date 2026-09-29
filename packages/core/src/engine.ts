@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { AppSettings, AuthConfig, Collection, CollectionNode, Environment, McpServerConfig } from './model/types.js';
 import { defaultSettings } from './model/types.js';
 import { VariableScope } from './vars/variables.js';
@@ -12,6 +13,11 @@ import { CookieJar } from './cookies/cookie-jar.js';
 
 export interface ContextOptions {
   store: WorkspaceStore;
+  /**
+   * Directory that relative file paths in checks (OpenAPI documents) resolve against, and may not
+   * leave. Defaults to the workspace root; the CLI passes the working directory when it runs without one.
+   */
+  fileRoot?: string;
   secrets: SecretStore;
   settings?: AppSettings;
   environment?: string;
@@ -95,6 +101,7 @@ export function createEngineContext(opts: ContextOptions): EngineContext {
     inheritedAuth: collection?.auth,
     openExternal: opts.openExternal,
     cookieJar: opts.cookieJar === false ? undefined : (opts.cookieJar ?? new CookieJar()),
+    readFile: (path: string) => readFileSync(store.safePath(path, opts.fileRoot ?? store.root), 'utf8'),
   };
   return { services, vars, redactor, environment, collection, dispose: () => mcp.close() };
 }

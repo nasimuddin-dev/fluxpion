@@ -113,7 +113,7 @@ export async function executeRun(paths: string[], o: RunCliOptions, label?: stri
   if (o.environment && !store.getEnvironment(o.environment))
     throw new CliError(`Environment "${o.environment}" not found. Available: ${store.listEnvironments().map((e) => e.name).join(', ')}`, EXIT.CONFIG_ERROR);
 
-  const ctx = createEngineContext({ store, secrets, settings, environment, logger, runtimeVars: o.var });
+  const ctx = createEngineContext({ store, secrets, settings, environment, logger, runtimeVars: o.var, fileRoot: ephemeral ? process.cwd() : undefined });
   const runId = o.resume ?? shortId('run-');
   // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
   const outDir = o.out ? resolve(o.out) : ephemeral ? resolve('testpion-results', runId) : store.runDir(runId);
@@ -301,7 +301,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
       throw new CliError(`Could not read cookie jar ${o.cookieJar}: ${(e as Error).message}`, EXIT.CONFIG_ERROR);
     }
   }
-  const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var, cookieJar });
+  const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var, cookieJar, fileRoot: ephemeral ? process.cwd() : undefined });
   if (fromFile) ctx.vars.setScope('collection', collection.variables);
   if (envFile) ctx.vars.setScope('environment', envFile.variables);
   const environment = envName ?? envFile?.name;

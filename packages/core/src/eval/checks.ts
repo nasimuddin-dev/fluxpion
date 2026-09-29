@@ -29,6 +29,10 @@ export interface CheckContext {
   isError?: boolean;
   /** HTTP: cookies for `pm.cookies` (name → value). */
   cookies?: Record<string, string>;
+  /** HTTP: the request that was sent (for contract checks such as `openapi`). */
+  request?: { method: string; url: string };
+  /** Reads a workspace file (relative to the workspace root), e.g. an OpenAPI document. */
+  readFile?: (path: string) => string;
   graphqlErrors?: unknown[];
   toolCalls?: Array<{ name: string; arguments: Record<string, unknown> }>;
   toolSchemas?: Record<string, Record<string, unknown>>;

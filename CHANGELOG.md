@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **OpenAPI contract testing.** A new `openapi` check verifies a response against the API's OpenAPI 3 or Swagger 2 document: the operation is found from the request (server base paths, path templates), and the status, content type and body schema (`$ref`, `nullable`, enums, formats) must match what is documented, with every violation listed. Available in the app (**Matches OpenAPI contract**), in test files and from the CLI.
 - **Server-Sent Events, event by event.** `text/event-stream` responses (live feeds, streaming LLM APIs) are shown live as a table of events (time, type, id, data), with a detail view (JSON as a tree) and a filter. The stream stays open past the request timeout, **Stop** keeps the events received so far, and the MCP `send_request` tool returns the parsed events to AI agents.
 - **AWS Signature and Digest auth.** Two new auth types, as in Postman. *AWS Signature* (Version 4) signs requests to API Gateway, S3, Lambda function URLs or any AWS API when they are sent, with optional session tokens for temporary credentials. *Digest* answers the server's challenge (MD5 or SHA-256). Both import from Postman collections and from cURL (`--aws-sigv4`, `--digest`), export back to Postman, and keep their secrets redacted.
 

@@ -52,6 +52,8 @@ export interface ExecServices {
   persistVariable?: PersistVariable;
   /** Cookie jar shared by the HTTP/GraphQL requests of a run (Postman's cookie jar). */
   cookieJar?: CookieJar;
+  /** Reads a workspace file by relative path (OpenAPI documents for contract checks); never outside the workspace. */
+  readFile?: (path: string) => string;
 }
 
 export interface ExecutionOutcome {
@@ -272,6 +274,8 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
         text: response.bodyPreview,
         latencyMs: response.durationMs,
         cookies: responseCookies(response.cookies, svc.cookieJar, response.url),
+        request: { method: prepared.method, url: prepared.url },
+        readFile: svc.readFile,
       },
       partial: { input: `${prepared.method} ${prepared.url}`, output: summarize(svc.redactor.redact(response.json ?? response.bodyPreview)) },
       metadata: { url: prepared.url, method: prepared.method, size: response.size, truncated: response.truncated },
