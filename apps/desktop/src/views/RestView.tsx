@@ -1,7 +1,7 @@
-import { BookmarkPlus, ChevronDown, Code2, MoreHorizontal, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
+import { ArrowRightToLine, BookmarkPlus, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
-import { promptText, useApp, persisted } from '../store';
+import { confirmAction, promptText, useApp, persisted } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { BodyConfig, CheckConfig, CheckResult, Collection, CollectionNode, HttpRequestSpec, HttpResponseData, KeyValue, SavedExample, SavedHttpRequest } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
@@ -210,6 +210,8 @@ export function RestView() {
       const c = cols.find((x) => x.id === p.collectionId);
       const n = c && findNode(c.items, p.requestId);
       if (c && n) openRequest(c, n);
+      // "More code snippets…" in the collection tree
+      if (c && n && p.showCode) setShowCode(true);
     } else if (p?.request) {
       const t: RestTab = { ...blankRequest(), name: p.name ?? 'From history', request: fromEngineRequest(p.request) };
       setTabs((ts) => [...ts, t]);
@@ -331,11 +333,21 @@ export function RestView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs, recent, stripWidth]);
   /** Close several tabs, asking once when any has unsaved changes. */
-  const closeTabs = (ids: string[]) => {
+  const closeTabs = async (ids: string[]) => {
     const closing = tabs.filter((x) => ids.includes(x.id));
     if (!closing.length) return;
     const dirty = closing.filter((x) => x.dirty);
-    if (dirty.length && !confirm(dirty.length === 1 ? `Discard unsaved changes to "${dirty[0]!.name}"?` : `Discard unsaved changes in ${dirty.length} tabs?`)) return;
+    if (
+      dirty.length &&
+      !(await confirmAction({
+        title: 'Unsaved changes',
+        message: dirty.length === 1 ? `"${dirty[0]!.name}" has unsaved changes.` : `${dirty.length} of the tabs you are closing have unsaved changes.`,
+        detail: 'Close anyway and discard them? Save with Ctrl+S to keep them.',
+        confirmLabel: 'Discard changes',
+        danger: true,
+      }))
+    )
+      return;
     // closing the last tab leaves none (Postman-style), not a new blank request
     const rest = tabs.filter((x) => !ids.includes(x.id));
     setTabs(rest);
@@ -372,9 +384,9 @@ export function RestView() {
       { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, onSelect: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))) },
       { label: 'Duplicate tab', icon: <Copy size={13} />, onSelect: () => duplicateTab(t) },
       { label: 'Close tab', icon: <X size={13} />, separator: true, onSelect: () => closeTab(t.id), shortcut: 'Middle-click' },
-      { label: 'Close other tabs', disabled: !others.length, onSelect: () => closeTabs(others) },
-      { label: 'Close tabs to the right', disabled: !right.length, onSelect: () => closeTabs(right) },
-      { label: 'Close all tabs', disabled: !unpinned.length, onSelect: () => closeTabs(unpinned) },
+      { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: !others.length, onSelect: () => closeTabs(others) },
+      { label: 'Close tabs to the right', icon: <ArrowRightToLine size={13} />, disabled: !right.length, onSelect: () => closeTabs(right) },
+      { label: 'Close all tabs', icon: <ListX size={13} />, disabled: !unpinned.length, onSelect: () => closeTabs(unpinned) },
     ];
   };
 
@@ -572,8 +584,8 @@ export function RestView() {
             items={[
               { label: 'New request tab', icon: <Plus size={13} />, shortcut: 'Ctrl+T', onSelect: newTab },
               { label: 'Close tab', icon: <X size={13} />, shortcut: 'Ctrl+W', separator: true, disabled: noTabs || !!tabs.find((x) => x.id === active)?.pinned, onSelect: () => runTabCommand('close') },
-              { label: 'Close other tabs', disabled: ordered.filter((x) => !x.pinned && x.id !== active).length === 0, onSelect: () => runTabCommand('closeOthers') },
-              { label: 'Close all tabs', shortcut: 'Ctrl+Shift+W', disabled: !ordered.some((x) => !x.pinned), onSelect: () => runTabCommand('closeAll') },
+              { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: ordered.filter((x) => !x.pinned && x.id !== active).length === 0, onSelect: () => runTabCommand('closeOthers') },
+              { label: 'Close all tabs', icon: <ListX size={13} />, shortcut: 'Ctrl+Shift+W', disabled: !ordered.some((x) => !x.pinned), onSelect: () => runTabCommand('closeAll') },
             ]}
             trigger={
               <button aria-label="Tab actions" title="Tab actions: close tab, close other tabs, close all tabs" className={cx('ml-auto mb-1 shrink-0 grid place-items-center h-7 w-7 rounded-md text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover', hidden.length ? 'mr-1' : 'mr-1.5')}>
@@ -591,7 +603,7 @@ export function RestView() {
                   icon: <span className={cx('mono method-badge text-[0.6rem] font-bold w-11', `method-${t.request.method}`)}>{t.request.method.slice(0, 6)}</span>,
                   onSelect: () => setActive(t.id),
                 })),
-                { label: `Close ${hidden.length} hidden tab${hidden.length === 1 ? '' : 's'}`, icon: <X size={13} />, separator: true, onSelect: () => closeTabs(hidden.map((t) => t.id)) },
+                { label: `Close ${hidden.length} hidden tab${hidden.length === 1 ? '' : 's'}`, icon: <ListX size={13} />, separator: true, onSelect: () => closeTabs(hidden.map((t) => t.id)) },
               ]}
               trigger={
                 <button
@@ -626,17 +638,37 @@ export function RestView() {
         ) : (
         <>
         <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
-          <Select aria-label="Method" className={cx('mono font-bold w-28', `method-${tab.request.method}`)} value={METHODS.includes(tab.request.method) ? tab.request.method : 'CUSTOM'} onChange={async (e) => {
-            if (e.target.value !== 'CUSTOM') return setReq({ method: e.target.value });
-            const m = await promptText('Custom HTTP method', { value: 'PROPFIND', okLabel: 'Use' });
-            if (m) setReq({ method: m.toUpperCase() });
-          }}>
-            {METHODS.map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-            {!METHODS.includes(tab.request.method) && <option value="CUSTOM">{tab.request.method}</option>}
-            <option value="CUSTOM">Custom…</option>
-          </Select>
+          {/* the app's own menu instead of a native <select>: the desktop app's native popup didn't let people pick a method */}
+          <Menu
+            align="start"
+            width={150}
+            items={[
+              ...[...METHODS, ...(METHODS.includes(tab.request.method) ? [] : [tab.request.method])].map((m) => ({
+                label: m,
+                icon: <span aria-hidden className={cx('block w-2 h-2 rounded-full bg-current', `method-${m}`)} />,
+                onSelect: () => setReq({ method: m }),
+              })),
+              {
+                label: 'Custom…',
+                icon: <Pencil size={13} />,
+                separator: true,
+                onSelect: async () => {
+                  const m = await promptText('Custom HTTP method', { message: 'Any method name, e.g. PROPFIND, PURGE or LINK.', value: 'PROPFIND', okLabel: 'Use' });
+                  if (m) setReq({ method: m.toUpperCase() });
+                },
+              },
+            ]}
+            trigger={
+              <button
+                aria-label="Method"
+                aria-haspopup="menu"
+                className={cx('field mono font-bold w-28 inline-flex items-center justify-between gap-1 text-left', `method-${tab.request.method}`)}
+              >
+                <span className="truncate">{tab.request.method}</span>
+                <ChevronDown size={13} className="shrink-0 text-muted" />
+              </button>
+            }
+          />
           <VarInput
             ariaLabel="Request URL"
             className="flex-1 h-8"

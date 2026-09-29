@@ -38,9 +38,14 @@ export interface DialogButton {
   variant?: 'primary' | 'default' | 'danger';
 }
 
+/** What kind of message a dialog is; sets its icon and colour (see the Design docs page). */
+export type DialogTone = 'info' | 'question' | 'warning' | 'danger' | 'success';
+
 export interface DialogRequest {
   title: string;
   message: string;
+  /** Icon and colour; defaults to "question" when there are several buttons, else "info". */
+  tone?: DialogTone;
   detail?: string;
   buttons: DialogButton[];
   cancelId: string;
@@ -175,6 +180,24 @@ export function ask(req: Omit<DialogRequest, 'resolve'>): Promise<string> {
       },
     }),
   );
+}
+
+/**
+ * Standard confirmation (replaces window.confirm(), which shows an unstyled OS box). Resolves true
+ * when the user confirms. `danger` makes it a destructive confirmation with a red button.
+ */
+export function confirmAction(opts: { title: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; tone?: DialogTone }): Promise<boolean> {
+  return ask({
+    title: opts.title,
+    message: opts.message,
+    detail: opts.detail,
+    tone: opts.tone ?? (opts.danger ? 'danger' : 'question'),
+    buttons: [
+      { id: 'cancel', label: opts.cancelLabel ?? 'Cancel' },
+      { id: 'ok', label: opts.confirmLabel ?? 'OK', variant: opts.danger ? 'danger' : 'primary' },
+    ],
+    cancelId: 'cancel',
+  }).then((id) => id === 'ok');
 }
 
 /**

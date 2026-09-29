@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronRight, Copy, FilePlus2, Folder, FolderCog, FolderPlus, MoreHorizontal, Pencil, Play, Star, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import type { Collection, CollectionFolder, CollectionNode } from '../types';
+import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
+import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';
-import { promptText } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import { uid } from '../lib/format';
 import { FolderEditor } from './FolderEditor';
 import { matchesCollectionNode } from '../lib/collection-filter';
@@ -55,6 +56,26 @@ export function CollectionTree({
   /** Show starred requests while retaining their containing folders for context. */
   favoritesOnly?: boolean;
 }) {
+  const [menuFor, setMenuFor] = useState<string>();
+  const environment = useApp((s) => s.environment);
+  /** Copy a saved request as its URL or as code, with variables resolved from the active environment. */
+  const copyAs = async (c: Collection, n: SavedHttpRequest, language: string, what: string) => {
+    try {
+      const r = await call<{ text: string; containsSecrets: boolean }>('http.copyCode', { request: n.request, environment, collectionId: c.id, requestId: n.id, language });
+      await navigator.clipboard.writeText(r.text);
+      useApp.getState().toast(`Copied ${what}${r.containsSecrets ? ' (it includes secret values such as tokens)' : ''}`, 'success');
+    } catch (e) {
+      useApp.getState().toast(`Couldn't copy: ${asError(e).message}`, 'error');
+    }
+  };
+  const copyMenu = (c: Collection, n: SavedHttpRequest): MenuItem[] => [
+    { label: 'Copy URL', icon: <Link2 size={14} />, onSelect: () => void copyAs(c, n, 'url', 'the URL') },
+    { label: 'Copy as cURL (bash)', icon: <Terminal size={14} />, onSelect: () => void copyAs(c, n, 'curl', 'as cURL (bash)') },
+    { label: 'Copy as cURL (cmd)', icon: <SquareTerminal size={14} />, onSelect: () => void copyAs(c, n, 'curl-windows', 'as cURL (cmd)') },
+    { label: 'Copy as PowerShell', icon: <TerminalSquare size={14} />, onSelect: () => void copyAs(c, n, 'powershell', 'as PowerShell') },
+    { label: 'Copy as fetch', icon: <Braces size={14} />, onSelect: () => void copyAs(c, n, 'fetch', 'as fetch') },
+    { label: 'More code snippets…', icon: <Code2 size={14} />, onSelect: () => useApp.getState().openIntent('rest', { collectionId: c.id, requestId: n.id, showCode: true }) },
+  ];
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     try {
       return JSON.parse(localStorage.getItem('aps.tree.open') ?? '{}');
@@ -91,7 +112,7 @@ export function CollectionTree({
                   const name = await promptText('Rename folder', { value: n.name, okLabel: 'Rename' });
                   if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
                 }}
-                onDelete={() => confirm(`Delete folder "${n.name}" and its requests?`) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
+                onDelete={async () => (await confirmAction({ title: 'Delete folder', message: `Delete the folder "${n.name}" and all requests in it?`, detail: 'This cannot be undone.', confirmLabel: 'Delete folder', danger: true })) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
                 onNewRequest={() => onNewRequest(c, n.id)}
                 onRun={onRun && (() => onRun(c, n.id))}
                 runLabel="Run folder"
@@ -111,7 +132,14 @@ export function CollectionTree({
       const examplesOpen = !!open[exKey];
       return (
         <div key={n.id}>
-        <div className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover')} style={pad}>
+        <div
+          className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuFor === n.id && 'bg-hover')}
+          style={pad}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenuFor(n.id);
+          }}
+        >
           {examples.length > 0 && (
             <button className="shrink-0 -mr-3.5 w-3.5 text-muted hover:text-fg" aria-label={examplesOpen ? 'Hide examples' : `Show ${examples.length} examples`} aria-expanded={examplesOpen} onClick={() => toggle(exKey)}>
               {examplesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -122,11 +150,15 @@ export function CollectionTree({
             <span className="truncate">{n.name}</span>
           </button>
           <NodeMenu
+            open={menuFor === n.id}
+            onOpenChange={(o) => setMenuFor(o ? n.id : undefined)}
+            onOpen={() => onOpen(c, n)}
+            copyItems={n.kind === 'http' ? copyMenu(c, n) : undefined}
             onRename={async () => {
               const name = await promptText('Rename request', { value: n.name, okLabel: 'Rename' });
               if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
             }}
-            onDelete={() => confirm(`Delete "${n.name}"?`) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
+            onDelete={async () => (await confirmAction({ title: 'Delete request', message: `Delete the request "${n.name}"?`, detail: 'Its saved examples are deleted too. This cannot be undone.', confirmLabel: 'Delete request', danger: true })) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
             onDuplicate={() => onChange({ ...c, items: mapNodes(c.items, (x) => x).flatMap((x) => (x.id === n.id ? [x, { ...x, id: uid('req-'), name: `${x.name} copy` }] : [x])) })}
             onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}
             favorite={!!n.favorite}
@@ -206,6 +238,10 @@ function NodeMenu({
   favorite,
   onRun,
   runLabel = 'Run',
+  onOpen,
+  copyItems,
+  open,
+  onOpenChange,
 }: {
   onEdit?(): void;
   onRename?(): void;
@@ -217,20 +253,32 @@ function NodeMenu({
   favorite?: boolean;
   onRun?(): void;
   runLabel?: string;
+  /** Open the request (in a tab). */
+  onOpen?(): void;
+  /** Copy URL / Copy as cURL … (requests only). */
+  copyItems?: MenuItem[];
+  /** Controlled open state, so a right-click on the row can open the menu. */
+  open?: boolean;
+  onOpenChange?(open: boolean): void;
 }) {
   const items: MenuItem[] = [];
   const add = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}) => fn && items.push({ label, icon, onSelect: fn, ...extra });
+  add('Open in tab', <ExternalLink size={14} />, onOpen);
   add(runLabel, <Play size={14} />, onRun);
   add('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit, { separator: !!onRun });
   add('New request', <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
   add('New folder', <FolderPlus size={14} />, onNewFolder);
   add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });
-  add('Duplicate', <Copy size={14} />, onDuplicate);
+  add('Duplicate', <CopyPlus size={14} />, onDuplicate);
   add(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite);
+  copyItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));
   add('Delete', <Trash2 size={14} />, onDelete, { danger: true, separator: true });
   return (
     <Menu
       items={items}
+      width={230}
+      open={open}
+      onOpenChange={onOpenChange}
       trigger={
         <button aria-label="More actions" className="p-1 rounded-md text-muted opacity-0 group-hover:opacity-100 hover:bg-panel2 hover:text-fg focus:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-panel2 transition-opacity">
           <MoreHorizontal size={15} />

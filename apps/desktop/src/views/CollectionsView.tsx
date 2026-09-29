@@ -1,7 +1,7 @@
-import { Download, FilePlus2, FolderPlus, FolderTree, Play, Trash2, Upload } from 'lucide-react';
+import { Download, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Send, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
-import { promptText, useApp } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Collection, CollectionNode } from '../types';
 import { download, timeAgo, uid } from '../lib/format';
@@ -128,8 +128,8 @@ export function CollectionsView() {
                   }
                   width={230}
                   items={[
-                    { label: 'TestPion collection (.json)', onSelect: () => void exportAs(draft.id, 'testpion') },
-                    { label: 'Postman collection v2.1', onSelect: () => void exportAs(draft.id, 'postman') },
+                    { label: 'TestPion collection (.json)', icon: <FileJson size={14} />, onSelect: () => void exportAs(draft.id, 'testpion') },
+                    { label: 'Postman collection v2.1', icon: <Send size={14} />, onSelect: () => void exportAs(draft.id, 'postman') },
                   ]}
                 />
                 <Button size="sm" variant="primary" onClick={() => save(draft)}>
@@ -141,7 +141,7 @@ export function CollectionsView() {
                   className="text-bad"
                   icon={<Trash2 size={12} />}
                   onClick={async () => {
-                    if (!confirm(`Delete collection "${draft.name}"? This cannot be undone.`)) return;
+                    if (!(await confirmAction({ title: 'Delete collection', message: `Delete the collection "${draft.name}" and all its requests?`, detail: 'This cannot be undone. Export it first if you may need it.', confirmLabel: 'Delete collection', danger: true }))) return;
                     await call('col.delete', { id: draft.id });
                     setSel(undefined);
                     await load();

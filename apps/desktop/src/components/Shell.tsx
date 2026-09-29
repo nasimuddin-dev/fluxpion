@@ -1,15 +1,20 @@
 import {
   Activity,
+  AlertOctagon,
+  AlertTriangle,
   BookOpen,
   Bot,
   Boxes,
+  CheckCircle2,
   Cpu,
   FlaskConical,
   FolderTree,
   Gauge,
   GitBranch,
+  HelpCircle,
   History,
   House,
+  Info,
   KeyRound,
   Network,
   Plug,
@@ -29,7 +34,7 @@ import wordmarkUrl from '../../build/wordmark-nav.png';
 import { ConsolePanel } from './ConsolePanel';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
-import { useApp, type ViewId, type DialogRequest } from '../store';
+import { useApp, type ViewId, type DialogRequest, type DialogTone } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
@@ -519,22 +524,37 @@ export function DialogHost() {
   return d ? <DialogView key={d.title + d.message} d={d} /> : null;
 }
 
+/** Icon and colour per dialog tone: the one visual language for every message box in the app. */
+const DIALOG_TONES: Record<DialogTone, { icon: ReactNode; className: string }> = {
+  info: { icon: <Info size={18} />, className: 'bg-accent/12 text-accent ring-accent/20' },
+  question: { icon: <HelpCircle size={18} />, className: 'bg-accent/12 text-accent ring-accent/20' },
+  warning: { icon: <AlertTriangle size={18} />, className: 'bg-warn/12 text-warn ring-warn/25' },
+  danger: { icon: <AlertOctagon size={18} />, className: 'bg-bad/12 text-bad ring-bad/25' },
+  success: { icon: <CheckCircle2 size={18} />, className: 'bg-ok/12 text-ok ring-ok/25' },
+};
+
 function DialogView({ d }: { d: DialogRequest }) {
   const [value, setValue] = useState(d.input?.value ?? '');
-  const primary = d.buttons.find((b) => b.variant === 'primary');
+  const primary = d.buttons.find((b) => b.variant === 'primary' || b.variant === 'danger');
+  const tone = DIALOG_TONES[d.tone ?? (d.input ? 'question' : d.buttons.length > 1 ? 'question' : 'info')];
   return (
     <Modal
       title={d.title}
       onClose={() => d.resolve(d.cancelId, value)}
-      width={d.input ? 440 : 520}
+      width={d.input ? 460 : 520}
       footer={d.buttons.map((b) => (
-        <Button key={b.id} variant={b.variant ?? 'default'} autoFocus={!d.input && b.variant === 'primary'} disabled={!!d.input && b === primary && !value.trim()} onClick={() => d.resolve(b.id, value)}>
+        <Button key={b.id} variant={b.variant ?? 'default'} autoFocus={!d.input && b === primary} disabled={!!d.input && b === primary && !value.trim()} onClick={() => d.resolve(b.id, value)}>
           {b.label}
         </Button>
       ))}
     >
-      {d.message && <p className="text-sm font-medium">{d.message}</p>}
-      {d.detail && <p className="text-sm text-muted whitespace-pre-line mt-3 max-h-72 overflow-auto">{d.detail}</p>}
+      <div className="flex gap-3.5">
+        <span className={cx('grid place-items-center h-9 w-9 shrink-0 rounded-full ring-1', tone.className)} aria-hidden>
+          {tone.icon}
+        </span>
+        <div className="min-w-0 flex-1 pt-1.5">
+      {d.message && <p className="text-sm font-medium leading-relaxed">{d.message}</p>}
+      {d.detail && <p className="text-sm text-muted whitespace-pre-line mt-2 max-h-72 overflow-auto leading-relaxed">{d.detail}</p>}
       {d.input && (
         <Input
           autoFocus
@@ -549,6 +569,8 @@ function DialogView({ d }: { d: DialogRequest }) {
           }}
         />
       )}
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -558,12 +580,19 @@ export function ProgressHost() {
   const p = useApp((s) => s.progress);
   if (!p) return null;
   return (
-    <div className="fixed inset-0 z-[70] bg-black/40 grid place-items-center" role="alertdialog" aria-label={p.title}>
-      <div className="w-[420px] rounded-lg border border-line bg-bg p-5 shadow-2xl">
-        <div className="font-semibold">{p.title}</div>
-        <div className="text-sm text-muted mt-1">{p.message}</div>
-        <div className="mt-4 h-2 rounded bg-panel2 relative overflow-hidden">
-          {p.fraction === null ? <div className="absolute inset-0 indeterminate" /> : <div className="h-full bg-accent transition-all" style={{ width: `${Math.round(p.fraction * 100)}%` }} />}
+    <div className="fixed inset-0 z-[70] bg-[var(--overlay)] backdrop-blur-[2px] grid place-items-center animate-in fade-in-0 duration-200" role="alertdialog" aria-label={p.title}>
+      <div className="w-[460px] max-w-[94vw] rounded-2xl border border-line bg-popover shadow-lg px-5 py-4">
+        <div className="flex gap-3.5">
+          <span className={cx('grid place-items-center h-9 w-9 shrink-0 rounded-full ring-1', DIALOG_TONES.info.className)} aria-hidden>
+            <Spinner size={17} />
+          </span>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="font-semibold text-[1.05rem]">{p.title}</div>
+            <div className="text-sm text-muted mt-1">{p.message}</div>
+            <div className="mt-3.5 h-2 rounded-full bg-panel2 relative overflow-hidden">
+              {p.fraction === null ? <div className="absolute inset-0 indeterminate" /> : <div className="h-full rounded-full bg-[image:var(--brand-gradient)] transition-all" style={{ width: `${Math.round(p.fraction * 100)}%` }} />}
+            </div>
+          </div>
         </div>
       </div>
     </div>

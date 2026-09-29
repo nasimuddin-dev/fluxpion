@@ -263,7 +263,8 @@ export function Menu({
                   it.danger ? 'text-bad data-[highlighted]:bg-bad/10' : 'text-fg',
                 )}
               >
-                {it.icon && <span className={cx('shrink-0', it.danger ? 'text-bad' : 'text-muted')}>{it.icon}</span>}
+                {/* every row keeps the icon column so labels line up */}
+                {(it.icon || items.some((x) => x.icon)) && <span className={cx('shrink-0 grid place-items-center w-4', it.danger ? 'text-bad' : 'text-muted')}>{it.icon}</span>}
                 <span className="flex-1 truncate">{it.label}</span>
                 {it.shortcut && <span className="text-xs text-muted">{it.shortcut}</span>}
               </MenuPrimitive.Item>

@@ -1,7 +1,7 @@
 import { AlertTriangle, Gauge, Play, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
-import { persisted, useApp } from '../store';
+import { confirmAction, persisted, useApp } from '../store';
 import type { KeyValue, LatencyStats, ProviderConfig } from '../types';
 import { formatBytes, formatCost, formatMs } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -107,7 +107,7 @@ export function LoadView() {
   const start = async () => {
     setError(undefined);
     setSnap(undefined);
-    if (d.allowRemote && !confirm('You are about to generate load against a non-local host. Only continue if you own this system or are explicitly authorised to load test it.')) return;
+    if (d.allowRemote && !(await confirmAction({ title: 'Load test a remote host', message: 'You are about to generate load against a host that is not on this computer.', detail: 'Only continue if you own this system or are explicitly authorised to load test it.', confirmLabel: 'Start load test', tone: 'warning' }))) return;
     try {
       const target =
         d.kind === 'http'

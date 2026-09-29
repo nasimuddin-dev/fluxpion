@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
-import { promptText, useApp } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, McpServerConfig } from '../types';
 import { formatMs, uid } from '../lib/format';
@@ -226,8 +226,8 @@ export function McpView() {
           onClose={() => setEditing(null)}
           onDelete={
             servers.some((s) => s.id === editing.id)
-              ? () => {
-                  if (!confirm(`Remove "${editing.name}"?`)) return;
+              ? async () => {
+                  if (!(await confirmAction({ title: 'Remove MCP server', message: `Remove the MCP server "${editing.name}"?`, detail: 'Saved tests that call it will fail until you add it again.', confirmLabel: 'Remove server', danger: true }))) return;
                   void saveServers(servers.filter((s) => s.id !== editing.id));
                   setEditing(null);
                 }
@@ -411,7 +411,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
               <Button size="sm" icon={<Save size={12} />} onClick={saveTest}>
                 Save as test
               </Button>
-              <Button size="sm" variant="primary" icon={<Play size={12} />} loading={running} onClick={() => (destructive && !confirm('This tool is marked destructive. Execute anyway?') ? undefined : exec())}>
+              <Button size="sm" variant="primary" icon={<Play size={12} />} loading={running} onClick={async () => (destructive && !(await confirmAction({ title: 'Run a destructive tool', message: 'This tool is marked destructive by the server.', detail: 'It may change or delete data. Run it only if you mean to.', confirmLabel: 'Execute anyway', tone: 'warning' })) ? undefined : exec())}>
                 Execute
               </Button>
             </div>

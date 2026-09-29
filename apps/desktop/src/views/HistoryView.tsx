@@ -1,7 +1,7 @@
 import { History, RotateCcw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
-import { useApp } from '../store';
+import { confirmAction, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { HttpRequestSpec } from '../types';
 import { formatBytes, formatMs, groupByDay } from '../lib/format';
@@ -70,7 +70,7 @@ export function HistoryView() {
             variant="ghost"
             icon={<Trash2 size={13} />}
             onClick={async () => {
-              if (!confirm('Clear all history for this workspace?')) return;
+              if (!(await confirmAction({ title: 'Clear history', message: 'Clear the request history of this workspace?', detail: 'Saved requests, collections and run reports are not affected.', confirmLabel: 'Clear history', danger: true }))) return;
               await call('history.clear');
               void load(true);
             }}

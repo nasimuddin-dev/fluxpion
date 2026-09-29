@@ -1,7 +1,7 @@
 import { Cookie, Lock, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { asError, call } from '../api';
-import { promptText, useApp } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Modal, Toggle } from './ui';
 
 export interface JarCookie {
@@ -97,7 +97,7 @@ export function CookiesModal({ initialDomain, onClose }: { initialDomain?: strin
             <Lock size={12} />
             {persistent ? 'Kept on this machine only, encrypted with the OS credential store. Never written to workspace files.' : 'No OS credential store available: cookies are kept in memory until the app closes. Never written to workspace files.'}
           </span>
-          <Button variant="ghost" disabled={!cookies.length} onClick={() => confirm('Delete all cookies of this workspace?') && void act(() => call('cookies.clear', {}), 'All cookies deleted')}>
+          <Button variant="ghost" disabled={!cookies.length} onClick={async () => (await confirmAction({ title: 'Delete all cookies', message: 'Delete every cookie saved for this workspace?', detail: 'Sites will ask you to sign in again where a cookie kept you signed in.', confirmLabel: 'Delete all cookies', danger: true })) && void act(() => call('cookies.clear', {}), 'All cookies deleted')}>
             Clear all
           </Button>
           <Button variant="primary" onClick={onClose}>

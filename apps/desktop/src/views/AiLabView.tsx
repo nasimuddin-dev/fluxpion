@@ -2,7 +2,7 @@ import { KeyRound, Play, Plus, RefreshCw, Save, Square, Trash2, WifiOff } from '
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { stringifyYaml } from '../lib/yaml';
 import { asError, call, on, type NormalizedError } from '../api';
-import { persisted, promptText, useApp } from '../store';
+import { confirmAction, persisted, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, ProviderConfig } from '../types';
 import { formatCost, formatMs, templateVars, uid } from '../lib/format';
@@ -647,7 +647,7 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
               <Button onClick={test} loading={testing}>
                 Test connection
               </Button>
-              <Button variant="ghost" className="ml-auto text-bad" icon={<Trash2 size={13} />} onClick={() => confirm(`Remove ${p.name}?`) && setList(list.filter((x) => x.id !== p.id))}>
+              <Button variant="ghost" className="ml-auto text-bad" icon={<Trash2 size={13} />} onClick={async () => (await confirmAction({ title: 'Remove provider', message: `Remove the provider "${p.name}"?`, detail: 'Tests and prompts that use it will fail until you choose another provider.', confirmLabel: 'Remove provider', danger: true })) && setList(list.filter((x) => x.id !== p.id))}>
                 Remove
               </Button>
             </div>

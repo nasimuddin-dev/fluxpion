@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fixed: the HTTP method couldn't be changed** in the desktop app (the native drop-down didn't open properly). The method is now picked from TestPion's own menu, with each method's colour, and **Custom…** for other methods.
+- **Copy a request from the collection tree.** The request menu (right-click or **⋯**) has **Copy URL**, **Copy as cURL (bash)**, **cURL (cmd)**, **PowerShell**, **fetch** and **More code snippets…**, with variables resolved from the active environment. Right-click now opens the menu on any request.
+- **One design for every dialog.** All confirmations use TestPion's dialog instead of the operating system's plain boxes: a tone icon (info, question, warning, danger, success), a clear message and detail, and buttons that say what they do (**Delete collection**, **Discard changes** …). The update progress box uses the same design.
+- **Icons on every menu item**, and menu labels line up.
 - **`tp.*` scripts.** Scripts can use `tp` (TestPion's name) or `pm` (Postman's) for the script API; they are the same object, so either works, even mixed in one script. Snippets and the editor's hints use `tp`, and autocomplete knows both. Postman imports keep `pm.*`; exports to Postman convert `tp.*` to `pm.*` so Postman and Newman can run them (only code is changed, not strings or comments).
 
 ## 0.6.2 — 2026-09-29

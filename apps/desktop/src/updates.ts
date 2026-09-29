@@ -51,6 +51,7 @@ async function install(version: string, downloadUrl: string): Promise<void> {
     set({ progress: null });
     const choice = await ask({
       title: "The update couldn't be downloaded",
+      tone: 'warning',
       message: `TestPion ${version} wasn't installed; your current version is unchanged.`,
       detail: `${asError(e).message}\n\nThis is usually a brief network problem. Try again, or download the installer from the website and run it: your workspaces, settings and secrets are kept either way. Details are in Logs.`,
       buttons: [
@@ -94,6 +95,7 @@ export async function checkForUpdates({ manual }: { manual: boolean }): Promise<
   const notes = summariseNotes(found.notes);
   const choice = await ask({
     title: 'Update available',
+    tone: 'info',
     message: `TestPion ${found.version} is available. You have ${found.current}.`,
     detail:
       (notes ? `What's new:\n${notes}\n\n` : '') +

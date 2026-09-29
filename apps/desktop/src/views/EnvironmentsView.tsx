@@ -1,7 +1,7 @@
 import { Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
-import { promptText, useApp } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Environment, KeyValue } from '../types';
 import { download, uid } from '../lib/format';
@@ -209,7 +209,7 @@ export function EnvironmentsView() {
                       className="text-bad"
                       icon={<Trash2 size={13} />}
                       onClick={async () => {
-                        if (!confirm(`Delete environment "${draft.name}"?`)) return;
+                        if (!(await confirmAction({ title: 'Delete environment', message: `Delete the environment "${draft.name}"?`, detail: 'Its variables and saved secret values are removed.', confirmLabel: 'Delete environment', danger: true }))) return;
                         await call('env.delete', { id: draft.id });
                         setSel(undefined);
                         await load();

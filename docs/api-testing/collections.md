@@ -15,6 +15,21 @@ Each collection is a versioned JSON file under `collections/` in the workspace, 
 
 To keep frequently used endpoints close at hand, choose **Add to favorites** from a REST or GraphQL request's **⋯** menu. In the REST view, select the star beside **Filter requests** to show only favorites. Their parent folders stay visible so the request's place in the collection remains clear. Favorites are stored with the request in the collection JSON and can be removed from the same menu.
 
+## Request menu
+
+Right-click a request in the tree, or click its **⋯** button:
+
+| Item | What it does |
+|---|---|
+| **Open in tab** | Open the request. |
+| **Rename**, **Duplicate**, **Add to favorites** | Manage the request. |
+| **Copy URL** | The URL with `{{variables}}` resolved from the active environment. |
+| **Copy as cURL (bash)**, **cURL (cmd)**, **PowerShell**, **fetch** | A runnable command or code, like the browser's *Copy as …*, with variables resolved and inherited auth applied. `fetch` code also runs in Node.js 18+. |
+| **More code snippets…** | Open the request with the code generator (Python, Go, Java, C#, HTTPie and more). |
+| **Delete** | Delete the request after a confirmation. |
+
+Copied commands include the request's real header and token values, so they run as they are, like Postman's *Copy as cURL*. When they do, the confirmation message says so. Folders have their own menu (Run, Edit folder, New request, New folder, Rename, Delete).
+
 ## Import
 
 **Import** accepts:

@@ -1,7 +1,7 @@
 import { BookmarkPlus, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { asError, call } from '../api';
-import { promptText, useApp } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import type { SavedExample } from '../types';
 import { CodeEditor } from './CodeEditor';
 import { Badge, cx, Empty, IconButton, statusTone } from './ui';
@@ -83,7 +83,7 @@ export function ExamplesPanel({ collectionId, requestId, examples, onChange }: {
             >
               <Pencil size={14} />
             </IconButton>
-            <IconButton label="Delete example" onClick={() => confirm(`Delete the example "${current.name}"?`) && void persist(examples.filter((e) => e.id !== current.id))}>
+            <IconButton label="Delete example" onClick={async () => (await confirmAction({ title: 'Delete example', message: `Delete the example "${current.name}"?`, detail: 'Mock servers stop serving it.', confirmLabel: 'Delete example', danger: true })) && void persist(examples.filter((e) => e.id !== current.id))}>
               <Trash2 size={14} />
             </IconButton>
           </div>

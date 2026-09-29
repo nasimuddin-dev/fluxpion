@@ -712,6 +712,15 @@ export class Backend {
       'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => this.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
       'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => this.codeSnippet(p),
       'http.codeLanguages': () => CODE_LANGUAGES,
+      /**
+       * "Copy as …" for a saved request: code (or `url`) with variables resolved and secret values
+       * included, like Postman's and the browser's Copy as cURL; `containsSecrets` lets the UI say so.
+       */
+      'http.copyCode': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string }) => {
+        const text = await this.codeSnippet({ ...p, revealSecrets: true });
+        const masked = await this.codeSnippet({ ...p, revealSecrets: false });
+        return { text, containsSecrets: masked !== text };
+      },
       'http.parseCurl': ({ text }: { text: string }) => parseCurl(text),
       /** Paste-to-request: cURL (bash/cmd), fetch, fetch (Node.js) or PowerShell from browser devtools. */
       'http.parseSnippet': ({ text }: { text: string }) => ({ format: detectRequestSnippet(text), request: parseRequestSnippet(text) }),
@@ -1174,7 +1183,8 @@ export class Backend {
       body: body && body.type !== 'multipart' && body.type !== 'binary' && body.type !== 'none' ? prepared.bodyPreview : body?.type === 'binary' ? `@${body.filePath}` : undefined,
       form: body?.type === 'multipart' ? body.fields.filter((f) => f.enabled !== false && f.key).map((f) => ({ key: f.key, value: f.value, file: f.kind === 'file' })) : undefined,
     };
-    const code = generateCode(snippet, p.language);
+    // "url": the resolved URL only (Copy URL); otherwise code in the chosen language
+    const code = p.language === 'url' ? snippet.url : generateCode(snippet, p.language);
     if (p.revealSecrets) return code;
     // mask secret values and sensitive headers
     let masked = ctx.redactor.redactString(code);

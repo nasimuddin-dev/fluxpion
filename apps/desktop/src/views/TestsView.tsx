@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, Layers, Play, Save, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
-import { promptText, useApp } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
@@ -103,7 +103,7 @@ export function TestsView() {
   }, [loadTree, loadRuns]);
 
   const openFile = async (path: string) => {
-    if (content !== saved && file && !confirm('Discard unsaved changes?')) return;
+    if (content !== saved && file && !(await confirmAction({ title: 'Unsaved changes', message: `tests/${file} has unsaved changes.`, detail: 'Open the other file and discard them? Save with Ctrl+S to keep them.', confirmLabel: 'Discard changes', danger: true }))) return;
     const text = await call<string>('tests.read', { path });
     setFile(path);
     setContent(text);
@@ -262,7 +262,7 @@ export function TestsView() {
                 <IconButton
                   label="Delete file"
                   onClick={async () => {
-                    if (!confirm(`Delete tests/${file}?`)) return;
+                    if (!(await confirmAction({ title: 'Delete test file', message: `Delete tests/${file}?`, detail: 'This cannot be undone (unless the workspace is in git).', confirmLabel: 'Delete file', danger: true }))) return;
                     await call('tests.delete', { path: file });
                     setFile(undefined);
                     void loadTree();

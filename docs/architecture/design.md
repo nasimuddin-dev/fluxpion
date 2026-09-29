@@ -218,8 +218,9 @@ Shared primitives live in `apps/desktop/src/components/ui.tsx` (Radix UI + Tailw
 | `Button` (primary, default, soft, ghost, danger) | Primary uses the brand gradient; one per area. Danger is only for destructive confirmations. |
 | `Badge` | Status and counts: `ok`, `warn`, `bad`, `accent`, `judge` (AI evaluations). |
 | `Tabs` | Sections of a view; the active tab has the gradient underline and counts in a pill. |
-| `Menu` | Dropdown and right-click menus; destructive items are red and last. |
-| `Modal` | Confirmations and forms. Say what will happen, and use a danger button for irreversible actions. |
+| `Menu` | Dropdown and right-click menus. Every item has an icon; destructive items are red and last, after a separator. The same menu opens from **⋯** and from a right-click. |
+| `Modal` | Forms and custom dialogs. Say what will happen, and use a danger button for irreversible actions. |
+| `confirmAction()`, `ask()`, `promptText()` | Every confirmation, question and text prompt (never the browser's `confirm` / `prompt`). A tone icon (info, question, warning, danger, success), a bold message, a muted detail, and buttons named for the action (**Delete collection**, not **OK**). |
 | `Empty` | Every empty state: an accent icon, one sentence, and the next action. |
 | `Split` (`sidebar`) | Resizable panes; the sidebar pane gets the panel surface. |
 | `Tooltip`, `IconButton` | Every icon-only button has a label and a tooltip. |
