@@ -67,4 +67,4 @@ export * from './import/postman-export.js';
 export * from './codegen/codegen.js';
 export * from './engine.js';
 
-export const ENGINE_VERSION = '0.6.3';
+export { ENGINE_VERSION } from './version.js';

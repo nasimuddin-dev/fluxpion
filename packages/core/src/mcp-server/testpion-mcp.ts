@@ -1,3 +1,4 @@
+import { ENGINE_VERSION } from '../version.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -325,7 +326,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
   const tools = all.filter((t) => !(opts.readOnly && t.write));
 
   const server = new Server(
-    { name: 'testpion', version: opts.version ?? '0.6.3' },
+    { name: 'testpion', version: opts.version ?? ENGINE_VERSION },
     {
       capabilities: { tools: {} },
       instructions: `TestPion workspace "${store.workspace.name}". Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. parse_request_snippet reads a cURL / fetch / PowerShell command${opts.readOnly ? '' : ' and save_request stores it in a collection (secrets become {{variables}})'}. Values of secrets are never returned.`,

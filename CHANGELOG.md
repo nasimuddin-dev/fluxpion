@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.7.0 — 2026-09-29
+
 - **Faster startup.** The code editor (Monaco, several MB) now loads the first time an editor is shown, and in the background right after startup, instead of before the first screen: the startup bundle went from 1.8 MB to 0.3 MB.
 - **Sturdier RPC for the browser version (and the planned online version).** The web bridge rejects malformed or oversized (over 64 MB) requests with a clear error instead of stopping, keeps non-ASCII text intact in large requests, compares its access token in constant time, and every error from the desktop app and the bridge keeps its kind and suggestions.
 - **Internal: easier to extend.** The desktop backend's RPC methods and the CLI's commands are split into one module per area (`apps/desktop/backend/handlers/`, `packages/cli/src/commands/`), with a first test of the backend's RPC surface.

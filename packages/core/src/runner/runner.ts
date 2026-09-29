@@ -1,3 +1,4 @@
+import { ENGINE_VERSION } from '../version.js';
 import { createReadStream, createWriteStream, existsSync, mkdirSync, type WriteStream } from 'node:fs';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -322,7 +323,7 @@ export async function runTests(opts: RunOptions): Promise<RunSummary> {
     cancelled,
     environment: opts.environment,
     reproducibility: {
-      engineVersion: '0.6.3',
+      engineVersion: ENGINE_VERSION,
       node: process.version,
       platform: process.platform,
       concurrency,

@@ -1,3 +1,4 @@
+import { ENGINE_VERSION } from '../../version.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { readFileSync } from 'node:fs';
 import { createMcpMockServer, loadMcpMock } from '../../mcp-server/mcp-mock.js';
@@ -159,7 +160,7 @@ export class McpSession {
     /** `cookieJar`: HTTP transports send its cookies and store the ones the server sets. */
     private opts: { cookieJar?: CookieJar } = {},
   ) {
-    this.client = new Client({ name: 'testpion', version: '0.6.3' }, { capabilities: {} });
+    this.client = new Client({ name: 'testpion', version: ENGINE_VERSION }, { capabilities: {} });
   }
 
   onEvent(l: McpEventListener): () => void {
