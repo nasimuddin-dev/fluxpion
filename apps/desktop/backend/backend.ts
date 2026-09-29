@@ -75,6 +75,7 @@ import {
   summarizeSchema,
   prepareHttpRequest,
   parseCurl,
+  renderVisualizer,
   parseRequestSnippet,
   detectRequestSnippet,
   generateCode,
@@ -1006,6 +1007,8 @@ export class Backend {
 
       const cctx: CheckContext = { testType: 'http', status: response.status, headers: response.headers, body: response.json ?? response.bodyPreview, text: response.bodyPreview, latencyMs: response.durationMs };
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), cctx);
+      // pm.visualizer.set in any test script (collection, folders, request); the last call wins
+      let visual: { template: string; data: unknown } | null | undefined;
       for (const script of [ctx.collection?.testScript, ...folders.map((f) => f.testScript), p.testScript]) {
         if (!script?.trim()) continue;
         const out = await runScript(script, {
@@ -1017,6 +1020,7 @@ export class Backend {
           info: { requestName: p.name, requestId: p.requestId },
         }, { sendRequest: scriptSender });
         scriptLogs.push(...out.logs, ...sentLogs(out));
+        if (out.visualizer !== undefined) visual = out.visualizer;
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
         for (const t of out.tests) checks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
@@ -1085,7 +1089,8 @@ export class Backend {
         logs: logsOf(),
         failedChecks: checks.filter((c) => !c.passed).length,
       });
-      return { id, response, prepared, checks, scriptLogs, unresolved: [...ctx.vars.unresolved], traceId: trace.traceId, historyId };
+      const visualizer = visual ? renderVisualizer(visual.template, visual.data) : undefined;
+      return { id, response, prepared, checks, scriptLogs, visualizer, unresolved: [...ctx.vars.unresolved], traceId: trace.traceId, historyId };
     } catch (e) {
       const err = normalizeError(ctrl.signal.reason instanceof ApsError ? ctrl.signal.reason : e);
       root.fail(e);

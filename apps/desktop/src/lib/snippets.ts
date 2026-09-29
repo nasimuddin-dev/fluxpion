@@ -32,6 +32,15 @@ export const SNIPPETS: Snippet[] = [
   { kind: 'pre', label: 'HMAC signature header', code: `const body = pm.request.body.toString();\nconst signature = CryptoJS.HmacSHA256(body, pm.environment.get("secret")).toString(CryptoJS.enc.Base64);\npm.request.headers.upsert({ key: "X-Signature", value: signature });` },
   { kind: 'both', label: 'Log to the console', code: `console.log(pm.variables.toObject());` },
   { kind: 'test', label: 'Collection runner: go to a request next', code: `postman.setNextRequest("Request name");` },
+  { kind: 'test', label: 'Visualize the response as a table', code: `const template = \`
+<table>
+  <tr><th>Name</th><th>Email</th></tr>
+  {{#each response}}
+    <tr><td>{{name}}</td><td>{{email}}</td></tr>
+  {{/each}}
+</table>\`;
+// Handlebars template + data; open Body › Visualize to see it
+pm.visualizer.set(template, { response: pm.response.json() });` },
 ];
 
 /** Type declarations for Monaco so the script editor autocompletes the pm API. */
@@ -72,6 +81,8 @@ declare const pm: {
   info: { requestName: string; requestId: string; iteration: number; iterationCount: number; eventName: 'prerequest' | 'test' };
   cookies: { get(name: string): string | undefined; has(name: string): boolean; toObject(): Record<string, string>; jar(): PmCookieJar };
   execution: { setNextRequest(name: string | null): void; skipRequest(): void };
+  /** Show the response as HTML: a Handlebars template rendered with \`data\` in Body › Visualize. */
+  visualizer: { set(template: string, data?: any, options?: any): void; clear(): void };
   /** Send another HTTP request from a script. The callback runs with the response (or an error). */
   sendRequest(
     request: string | { url: string; method?: string; header?: Array<{ key: string; value: string }> | Record<string, string>; body?: { mode: 'raw'; raw: string } | { mode: 'urlencoded'; urlencoded: Array<{ key: string; value: string }> } },

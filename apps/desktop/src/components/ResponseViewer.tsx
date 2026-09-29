@@ -1,4 +1,5 @@
 import { BookmarkPlus, Download, ExternalLink, Sparkles } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import type { CheckResult, HttpResponseData, Trace } from '../types';
@@ -18,6 +19,7 @@ export function ResponseViewer({
   curl,
   stream,
   scriptLogs,
+  visualizer,
   onSuggestAssertions,
   onSaveExample,
   onGenerateTests,
@@ -29,6 +31,8 @@ export function ResponseViewer({
   curl?: string;
   stream?: string;
   scriptLogs?: string[];
+  /** Output of `pm.visualizer.set(template, data)`, rendered by the backend. */
+  visualizer?: { html?: string; error?: string };
   onSuggestAssertions?(): void;
   /** Save this response as an example of the request. */
   onSaveExample?(): void;
@@ -38,7 +42,13 @@ export function ResponseViewer({
   onExplain?(): void;
 }) {
   const [tab, setTab] = useState<Tab>(() => (checks?.some((c) => !c.passed) ? 'tests' : 'body'));
-  const [mode, setMode] = useState<'pretty' | 'raw' | 'preview'>('pretty');
+  // a response with a visualization opens on it, like Postman's Visualize view
+  const [mode, setMode] = useState<'pretty' | 'raw' | 'preview' | 'visualize'>(() => (visualizer ? 'visualize' : 'pretty'));
+  useEffect(() => {
+    if (visualizer) setMode('visualize');
+    else setMode((m) => (m === 'visualize' ? 'pretty' : m));
+  }, [visualizer]);
+  const visualHtml = useMemo(() => (visualizer?.html !== undefined ? visualPage(visualizer.html) : undefined), [visualizer]);
   const [trace, setTrace] = useState<Trace>();
   const isJson = response.json !== undefined;
   const isHtml = /html/i.test(response.contentType);
@@ -109,7 +119,7 @@ export function ResponseViewer({
         right={
           tab === 'body' && (
             <div className="flex rounded-md border border-line overflow-hidden text-xs">
-              {(['pretty', 'raw', ...(isHtml ? ['preview'] : [])] as const).map((m) => (
+              {(['pretty', 'raw', ...(isHtml ? ['preview'] : []), ...(visualizer ? ['visualize'] : [])] as const).map((m) => (
                 <button key={m} className={cx('px-2 h-6 capitalize', mode === m ? 'bg-accent text-white' : 'hover:bg-hover')} onClick={() => setMode(m as typeof mode)}>
                   {m}
                 </button>
@@ -124,6 +134,11 @@ export function ResponseViewer({
             <Empty title="Empty body" />
           ) : mode === 'pretty' && isJson ? (
             <JsonTree data={response.json} />
+          ) : mode === 'visualize' && visualizer ? (
+            <div className="h-full flex flex-col">
+              {visualizer.error && <div className="px-3 py-2 text-sm text-bad border-b border-line">{visualizer.error}</div>}
+              {visualHtml !== undefined && <iframe title="Visualization" sandbox="" className="flex-1 w-full bg-white" srcDoc={visualHtml} />}
+            </div>
           ) : mode === 'preview' ? (
             <iframe title="HTML preview" sandbox="" className="w-full h-full bg-white" srcDoc={response.bodyPreview} />
           ) : (
@@ -209,4 +224,16 @@ function Timeline({ phases, url }: { phases: Array<{ name: string; startMs: numb
       </p>
     </div>
   );
+}
+
+/**
+ * A visualization page for the sandboxed frame: sanitised (no scripts, event handlers or remote
+ * frames) and given a readable default style. The frame has no script or same-origin rights either.
+ */
+function visualPage(html: string): string {
+  const clean = DOMPurify.sanitize(html, { WHOLE_DOCUMENT: false, FORCE_BODY: true, ADD_TAGS: ['style'], FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'base', 'meta', 'link'] });
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+body{font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2230;margin:16px}
+table{border-collapse:collapse}th,td{border:1px solid #d9dbe3;padding:4px 10px;text-align:left}th{background:#f3f4f8}
+</style></head><body>${clean}</body></html>`;
 }

@@ -96,7 +96,7 @@ pm.environment.set('patientId', pm.response.json().items[0].id);
 | Response | `pm.response.code`, `.status`, `.responseTime`, `.headers.get()`, `.json()`, `.text()`, `pm.response.to.have.status/header/body/jsonBody`, `pm.response.to.be.ok/success/error/json`, legacy `responseCode`, `responseBody` |
 | Request | `pm.request.method`, `.url.toString()/update()`, `.headers.add/upsert/remove/get`, `.body.toString()/update()` |
 | Variables | `pm.variables`, `pm.environment`, `pm.collectionVariables`, `pm.globals` (`get/set/unset/has/clear/toObject/replaceIn`), `pm.iterationData` |
-| Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `pm.sendRequest`, `postman.setNextRequest`, `postman.setEnvironmentVariable`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `console.log` |
+| Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `pm.sendRequest`, `pm.visualizer.set/clear`, `postman.setNextRequest`, `postman.setEnvironmentVariable`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `console.log` |
 
 **`pm.sendRequest`** sends another HTTP request from a pre-request or test script, for example to fetch a token first:
 
@@ -117,6 +117,27 @@ pm.sendRequest({
 - The response has `code`, `status`, `responseTime`, `headers`, `json()` and `text()`. On a network error, the callback gets `err` and `null`.
 - Requests share the run's cookie jar, time out like other requests, and appear in the [Console](#console) under the script's request, whether the request was sent from a tab or by a run (they are also recorded as `sentRequests` in the run's results).
 - **How it works:** the sandbox is synchronous, so the script runs, its requests are sent, then the script runs again from the start with the responses, and callbacks run immediately. Only the last run's variables, tests and logs count. So a request made inside a callback also has its callback run inside, before later callbacks. Keep scripts deterministic around `pm.sendRequest` (avoid a random URL per run). A script may send at most 20 requests.
+
+### Visualize responses (`pm.visualizer`)
+
+As in Postman, a test (post-response) script can turn a response into an HTML view with a [Handlebars](https://handlebarsjs.com/guide/) template:
+
+```js
+const template = `
+<table>
+  <tr><th>Name</th><th>Species</th></tr>
+  {{#each items}}
+    <tr><td>{{name}}</td><td>{{species}}</td></tr>
+  {{/each}}
+</table>`;
+pm.visualizer.set(template, pm.response.json());
+```
+
+After you send, the response body opens on **Visualize** (next to Pretty and Raw). The example workspace's **List patients** request has one; the **Snippets** list has *Visualize the response as a table*.
+
+- `pm.visualizer.set(template, data)` renders `template` with `data` (anything JSON-serialisable). If several scripts (collection, folder, request) call it, the last call wins. `pm.visualizer.clear()` removes it.
+- Handlebars' built-in helpers work (`#each`, `#if`, `#with`, `lookup`, …), plus `{{json value}}` to print a value as JSON. `{{…}}` output is HTML-escaped. Use `{{{…}}}` only for HTML you trust.
+- **Security:** the template is rendered by the engine, the HTML is sanitised, and it is shown in a sandboxed frame. Scripts, event handlers, forms, and remote frames and stylesheets are removed. So tables, lists and `<style>` work, but chart libraries loaded with `<script>` (and Postman's `pm.getData()` inside the template) do not.
 
 **Current values:** values set with `pm.environment.set`, `pm.collectionVariables.set` or `pm.globals.set` are kept on this machine as *current values* and override the stored values. They're never written to workspace files. Sensitive ones (tokens, passwords, secret variables) are encrypted. You can see and reset them under **Environments**.
 

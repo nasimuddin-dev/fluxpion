@@ -13,7 +13,7 @@ const __out = {
   vars: {}, unset: [], tests: [], logs: [], request: __in.request || null, error: null,
   scopeSets: { environment: {}, globals: {}, collectionVariables: {} },
   scopeUnsets: { environment: [], globals: [], collectionVariables: [] },
-  nextRequest: undefined, jarOps: [],
+  nextRequest: undefined, jarOps: [], visualizer: undefined,
 };
 const __fmt = (v) => { try { return v === undefined ? 'undefined' : JSON.stringify(v); } catch (e) { return String(v); } };
 const __deepEq = (a, b) => {
@@ -361,6 +361,15 @@ const pm = {
   cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}), jar: __cookieJar },
   sendRequest: __sendRequest,
   execution: { setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); }, skipRequest: () => { __out.skipRequest = true; } },
+  // Postman Visualizer: a Handlebars template and its data, rendered by the host (Visualize tab)
+  visualizer: {
+    set: (template, data, options) => {
+      let d = data === undefined ? {} : data;
+      try { d = JSON.parse(JSON.stringify(d)); } catch (e) { throw new Error('pm.visualizer.set: data must be JSON-serialisable'); }
+      __out.visualizer = { template: String(template), data: d, options: options === undefined ? undefined : options };
+    },
+    clear: () => { __out.visualizer = null; },
+  },
   uuid: () => __host_uuid(),
   crypto: {
     sha256: (s) => __host_hash('sha256', String(s)),

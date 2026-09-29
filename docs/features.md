@@ -20,7 +20,7 @@ FluxPion combines an API client, a GraphQL playground, an MCP inspector, an LLM 
 - Save responses as examples of a request (success and error cases), with secrets masked. Postman saved responses import as examples.
 - Mock servers on localhost serve a collection's examples, from the app or with `fluxpion mock`.
 - Markdown docs for every request and a generated documentation page per collection, exportable as Markdown or with `fluxpion docs`.
-- Pre-request and test scripts in a sandbox, assertions, highlighted variables, one-click cURL export, paste-to-request from browser devtools (cURL, fetch, PowerShell), and a console with every request and its script output.
+- Pre-request and test scripts in a sandbox, assertions, highlighted variables, one-click cURL export, a response Visualizer (`pm.visualizer`), paste-to-request from browser devtools (cURL, fetch, PowerShell), and a console with every request and its script output.
 - Star frequently used REST or GraphQL requests from their **⋯** menu, then use the star button beside the collection filter to focus the REST sidebar on favorites. Favorites are saved in the collection file and retain their folder context.
 
 [REST guide](/api-testing/rest) · [Authentication](/api-testing/authentication) · [Collections & import](/api-testing/collections)

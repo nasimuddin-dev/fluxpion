@@ -51,6 +51,8 @@ export interface ScriptOutput {
   jarOps?: CookieJarOp[];
   /** `pm.sendRequest` calls the host has not answered yet (internal to the replay loop). */
   pendingRequests?: Array<{ key: string; request: ScriptHttpRequest }>;
+  /** `pm.visualizer.set(template, data)`: undefined = not called, null = `pm.visualizer.clear()`. */
+  visualizer?: { template: string; data: unknown; options?: unknown } | null;
   /** Requests sent through `pm.sendRequest`, for logs and the console. */
   sentRequests?: Array<{ method: string; url: string; status?: number; error?: string; durationMs?: number }>;
   error?: string;

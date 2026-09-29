@@ -44,6 +44,7 @@
           "id": "req-list",
           "name": "List patients",
           "request": { "method": "GET", "url": "{{baseUrl}}/patients", "auth": { "type": "inherit" } },
+          "testScript": "// Body › Visualize shows the patients as a table (Postman Visualizer)\nconst template = `\n<h3>{{total}} patients</h3>\n<table>\n  <tr><th>ID</th><th>Name</th><th>Species</th><th>Owner</th></tr>\n  {{#each items}}\n    <tr><td>{{id}}</td><td>{{name}}</td><td>{{species}}</td><td>{{ownerId}}</td></tr>\n  {{/each}}\n</table>`;\npm.visualizer.set(template, pm.response.json());",
           "assertions": [
             { "type": "status", "expected": 200 },
             { "type": "exists", "path": "$.items[0].id" },
