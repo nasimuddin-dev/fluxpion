@@ -57,10 +57,28 @@ export function isCurlCommand(text: string): boolean {
   return /^\s*curl(\.exe)?\s/i.test(text);
 }
 
-/** Parse a `curl` command (e.g. from browser devtools "Copy as cURL") into a request. */
+/**
+ * Undo cmd.exe caret escaping as produced by Chrome's "Copy as cURL (cmd)": `^"` quotes, `^X`
+ * escaped characters, `^` + newline continuations and `^` + blank line for newlines inside strings.
+ */
+export function unescapeCmd(input: string): string {
+  return input
+    .replace(/\^\r?\n\r?\n/g, '\u0000')
+    .replace(/\^\r?\n/g, ' ')
+    .replace(/\^(.)/g, '$1')
+    .replace(/\u0000/g, '\n');
+}
+
+/** Parse a `curl` command (e.g. from browser devtools "Copy as cURL", bash or cmd) into a request. */
 export function parseCurl(command: string): HttpRequestSpec {
-  const args = shellSplit(command.trim());
+  const text = command.trim();
+  const args = shellSplit(/\^"/.test(text) ? unescapeCmd(text) : text);
   if (!args.length || !/^curl(\.exe)?$/i.test(args[0]!)) throw new ApsError('ValidationError', 'Not a curl command');
+  return parseCurlArgs(args);
+}
+
+/** Build a request from curl-style arguments (`args[0]` is the program name). */
+export function parseCurlArgs(args: string[]): HttpRequestSpec {
   let method: string | undefined;
   let url = '';
   const headers: KeyValue[] = [];

@@ -26,7 +26,7 @@ import {
   TerminalSquare,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
 import logoUrl from '../../build/logo.svg';
 import { ConsolePanel } from './ConsolePanel';
@@ -243,6 +243,7 @@ export function TopBar() {
         <WorkspaceMenu />
       </div>
       <button
+        data-search-trigger
         onClick={() => set({ searchOpen: true })}
         style={noDrag}
         className="mx-auto flex items-center gap-2 h-8 w-[min(460px,38vw)] rounded-lg border border-line bg-panel px-3 text-sm text-muted transition-colors hover:border-line-strong hover:bg-hover"
@@ -443,6 +444,20 @@ export function SearchDialog() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [idx, setIdx] = useState(0);
   const seq = useRef(0);
+  // drop down from the top-bar search box (like a command center) instead of floating mid-screen
+  const [anchor, setAnchor] = useState<{ top: number; left: number; width: number }>();
+  useLayoutEffect(() => {
+    const place = () => {
+      const r = document.querySelector('[data-search-trigger]')?.getBoundingClientRect();
+      if (!r || !r.width) return setAnchor(undefined);
+      const width = Math.min(640, window.innerWidth * 0.92);
+      const left = Math.max(8, Math.min(window.innerWidth - width - 8, r.left + r.width / 2 - width / 2));
+      setAnchor({ top: r.top, left, width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, []);
   useEffect(() => {
     const n = ++seq.current;
     const t = setTimeout(async () => {
@@ -483,8 +498,13 @@ export function SearchDialog() {
     run: <Boxes size={14} />,
   };
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-start justify-center pt-[12vh]" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div role="dialog" aria-label="Search" className="w-[640px] max-w-[92vw] rounded-lg border border-line bg-bg shadow-2xl overflow-hidden">
+    <div className={cx('fixed inset-0 z-50 bg-black/30', !anchor && 'flex items-start justify-center pt-[12vh]')} onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div
+        role="dialog"
+        aria-label="Search"
+        className={cx('rounded-lg border border-line bg-bg shadow-2xl overflow-hidden', anchor ? 'absolute' : 'w-[640px] max-w-[92vw]')}
+        style={anchor && { top: anchor.top, left: anchor.left, width: anchor.width }}
+      >
         <div className="flex items-center gap-2 px-4 border-b border-line">
           <Search size={16} className="text-muted" />
           <input

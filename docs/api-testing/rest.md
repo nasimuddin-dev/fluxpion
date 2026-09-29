@@ -15,6 +15,21 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Body types:** JSON, XML, text, HTML, form URL-encoded, multipart (text and file fields), and binary file. Files are streamed from disk.
 - **Settings:** timeout, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS).
 
+## Paste a request from the browser
+
+In the browser's devtools, right-click a request on the **Network** tab, choose **Copy**, and pick any of:
+
+- **Copy as cURL (bash)** or **Copy as cURL (cmd)**
+- **Copy as fetch** or **Copy as fetch (Node.js)**
+- **Copy as PowerShell** (`Invoke-WebRequest`, also `Invoke-RestMethod`)
+
+Then paste it into FluxPion:
+
+- **Into the URL bar:** the current tab is replaced with the pasted request.
+- **Anywhere else in the REST view** (with no text field focused), for example right after opening a new tab with **Ctrl/Cmd+V**: an unchanged new tab is filled, otherwise the request opens in a new tab named after its method and path, such as `POST /v1/pets`.
+
+The method, URL, query parameters, headers, cookies, body (JSON, form, multipart, XML or text), basic and bearer auth, and curl options such as `-k`, `-L`, `--proxy` and `--max-time` are all imported. HTTP/2 pseudo headers (`authority`, `method`, `path`, `scheme`) that PowerShell snippets include are dropped. Pasted secrets, such as an `Authorization` header or session cookie, are only in the unsaved tab: move them into a [secret variable](/api-testing/environments#secrets) before you save the request.
+
 ## Sidebar
 
 The left sidebar of the REST view has three panes, like Postman's:

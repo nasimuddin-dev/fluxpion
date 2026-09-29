@@ -1,5 +1,5 @@
 import { Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
@@ -27,10 +27,38 @@ export function EnvironmentsView() {
   useEffect(() => {
     void load();
   }, []);
+  const [dragId, setDragId] = useState<string>();
+  const [dropAt, setDropAt] = useState<number>();
+  /** Move an environment to position `to`; the order is saved and used by every environment picker. */
+  const move = async (id: string, to: number) => {
+    setDragId(undefined);
+    setDropAt(undefined);
+    const from = envs.findIndex((e) => e.id === id);
+    if (from < 0 || to < 0 || to >= envs.length || to === from) return;
+    const next = [...envs];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m!);
+    try {
+      const saved = await call<Environment[]>('env.reorder', { ids: next.map((e) => e.id) });
+      reordering.current = true;
+      setEnvs(saved);
+      await useApp.getState().refreshWorkspace();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+      await load();
+    }
+  };
   useEffect(() => setWsVars(ws?.variables ?? []), [ws]);
   useEffect(() => setGlobals(settings?.globalVariables ?? []), [settings]);
+  // a reorder only changes positions: keep the open environment's unsaved edits
+  const reordering = useRef(false);
   useEffect(() => {
     const e = envs.find((x) => x.id === sel);
+    if (reordering.current) {
+      reordering.current = false;
+      if (e) setDraft((d) => (d?.id === e.id ? { ...d, order: e.order } : e));
+      return;
+    }
     setDraft(e);
     setSecretValues({});
     if (e) void call('env.secretStatus', { envId: e.id, keys: e.variables.filter((v) => v.secret).map((v) => v.key) }).then(setSecretStatus);
@@ -98,8 +126,39 @@ export function EnvironmentsView() {
               >
                 Environments
               </SectionTitle>
-              {envs.map((e) => (
-                <button key={e.id} onClick={() => setSel(e.id)} className={cx('text-left px-3 py-2 border-b border-line/60 flex items-center gap-2', sel === e.id ? 'bg-accent/10' : 'hover:bg-hover')}>
+              {envs.map((e, i) => (
+                <button
+                  key={e.id}
+                  draggable
+                  title="Drag (or Alt+↑/↓) to reorder"
+                  onClick={() => setSel(e.id)}
+                  onDragStart={(ev) => {
+                    setDragId(e.id);
+                    ev.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(ev) => {
+                    if (!dragId || dragId === e.id) return;
+                    ev.preventDefault();
+                    setDropAt(i);
+                  }}
+                  onDragLeave={() => setDropAt((d) => (d === i ? undefined : d))}
+                  onDrop={(ev) => {
+                    ev.preventDefault();
+                    if (dragId) void move(dragId, i);
+                  }}
+                  onDragEnd={() => (setDragId(undefined), setDropAt(undefined))}
+                  onKeyDown={(ev) => {
+                    if (!ev.altKey || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+                    ev.preventDefault();
+                    void move(e.id, ev.key === 'ArrowUp' ? i - 1 : i + 1);
+                  }}
+                  className={cx(
+                    'text-left px-3 py-2 border-b border-line/60 flex items-center gap-2 cursor-grab active:cursor-grabbing',
+                    sel === e.id ? 'bg-accent/10' : 'hover:bg-hover',
+                    dragId === e.id && 'opacity-50',
+                    dropAt === i && 'shadow-[inset_0_2px_0_var(--accent)]',
+                  )}
+                >
                   <span className="w-2 h-2 rounded-full" style={{ background: e.color ?? (e.isProduction ? 'var(--bad)' : 'var(--ok)') }} />
                   <span className="text-sm">{e.name}</span>
                   {e.isProduction && <Badge tone="bad">prod</Badge>}

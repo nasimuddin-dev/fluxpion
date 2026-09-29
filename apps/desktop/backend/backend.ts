@@ -75,6 +75,8 @@ import {
   summarizeSchema,
   prepareHttpRequest,
   parseCurl,
+  parseRequestSnippet,
+  detectRequestSnippet,
   generateCode,
   CODE_LANGUAGES,
   type SnippetRequest,
@@ -468,6 +470,7 @@ export class Backend {
         return this.ws.saveEnvironment(env);
       },
       'env.delete': ({ id }: { id: string }) => this.ws.deleteEnvironment(id),
+      'env.reorder': ({ ids }: { ids: string[] }) => this.ws.reorderEnvironments(ids),
       'currentValues.summary': () => this.currentValues?.summary(),
       'currentValues.get': ({ scope, owner }: { scope: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => {
         const values = this.currentValues?.get(scope, owner ?? '') ?? {};
@@ -612,6 +615,8 @@ export class Backend {
       'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => this.codeSnippet(p),
       'http.codeLanguages': () => CODE_LANGUAGES,
       'http.parseCurl': ({ text }: { text: string }) => parseCurl(text),
+      /** Paste-to-request: cURL (bash/cmd), fetch, fetch (Node.js) or PowerShell from browser devtools. */
+      'http.parseSnippet': ({ text }: { text: string }) => ({ format: detectRequestSnippet(text), request: parseRequestSnippet(text) }),
       'http.saveBody': async ({ payloadPath, name }: { payloadPath: string; name?: string }) => {
         if (!payloadPath || !payloadPath.startsWith(this.ws.path('payloads'))) throw new ApsError('ValidationError', 'Unknown payload');
         const dest = await this.host.saveDialog?.({ defaultPath: name ?? 'response.bin' });

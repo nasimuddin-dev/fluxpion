@@ -159,6 +159,7 @@ export interface Environment {
   variables: Array<{ key: string; value: string; secret?: boolean; enabled?: boolean }>;
   isProduction?: boolean;
   color?: string;
+  order?: number;
 }
 
 export interface Span {

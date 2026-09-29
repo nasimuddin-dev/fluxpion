@@ -13,7 +13,23 @@ import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { uid } from '../lib/format';
 
-const isCurl = (t: string) => /^\s*curl(\.exe)?\s/i.test(t);
+/** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
+const isRequestSnippet = (t: string) =>
+  /^\s*(?:curl(?:\.exe)?\s|(?:(?:const|let|var)\s+\w+\s*=\s*)?(?:await\s+)?fetch\s*\(|(?:Invoke-WebRequest|Invoke-RestMethod|iwr|irm)\s)/i.test(t) ||
+  (/^\s*\$\w+\s*=/.test(t) && /\b(?:Invoke-WebRequest|Invoke-RestMethod)\b/i.test(t));
+const SNIPPET_LABEL: Record<string, string> = { curl: 'cURL command', fetch: 'fetch call', powershell: 'PowerShell command' };
+/** A tab name like "POST /v1/pets" for a pasted request. */
+const snippetName = (r: HttpRequestSpec) => {
+  let path = r.url;
+  try {
+    path = new URL(r.url).pathname;
+  } catch {
+    /* keep the raw URL */
+  }
+  return `${r.method} ${path}`.slice(0, 60);
+};
+const isEditable = (el: EventTarget | null) =>
+  el instanceof HTMLElement && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || !!el.closest('.cm-editor'));
 import { AssertionEditor } from '../components/AssertionEditor';
 import { AuthEditor } from '../components/AuthEditor';
 import { CodeEditor } from '../components/CodeEditor';
@@ -129,16 +145,42 @@ export function RestView() {
   const setUrl = (url: string) => setReq({ url, params: paramsFromUrl(url, tab.request.params), pathVariables: syncPathVariables(url, tab.request.pathVariables) });
   /** Params table edits rebuild the URL's query string. */
   const setParams = (params: KeyValue[]) => setReq({ params, url: urlFromParams(tab.request.url, params) });
-  /** Pasting a cURL command into the URL bar imports it. */
-  const importCurl = async (text: string) => {
+  /**
+   * Pasting a cURL / fetch / PowerShell snippet imports it. From the URL bar it fills the current
+   * tab; pasted anywhere else in the view it fills a pristine tab or opens a new one.
+   */
+  const importSnippet = async (text: string, into: 'current' | 'auto' = 'current') => {
     try {
-      const r = await call<HttpRequestSpec>('http.parseCurl', { text });
-      update({ request: fromEngineRequest(r) });
-      useApp.getState().toast('Imported cURL command', 'success');
+      const { format, request } = await call<{ format?: string; request: HttpRequestSpec }>('http.parseSnippet', { text });
+      const req = fromEngineRequest(request);
+      const name = snippetName(request);
+      const target = tabs.find((t) => t.id === active);
+      const reuse = into === 'current' ? !!target : !!target && !target.dirty && !target.requestId;
+      if (reuse && target) setTabs((ts) => ts.map((t) => (t.id === target.id ? { ...t, request: req, name: t.requestId ? t.name : name, dirty: true } : t)));
+      else {
+        const t: RestTab = { ...blankRequest(), name, request: req, dirty: true };
+        setTabs((ts) => [...ts, t]);
+        setActive(t.id);
+      }
+      useApp.getState().toast(`Imported ${SNIPPET_LABEL[format ?? 'curl'] ?? 'request'}`, 'success');
     } catch (e) {
-      useApp.getState().toast(`Couldn't import cURL: ${asError(e).message}`, 'error');
+      useApp.getState().toast(`Couldn't import the pasted request: ${asError(e).message}`, 'error');
     }
   };
+  const importSnippetRef = useRef(importSnippet);
+  importSnippetRef.current = importSnippet;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      // views stay mounted in the background; only the visible REST view handles the paste
+      if (useApp.getState().view !== 'rest' || isEditable(e.target) || isEditable(document.activeElement)) return;
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (!isRequestSnippet(text)) return;
+      e.preventDefault();
+      void importSnippetRef.current(text, 'auto');
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
 
   const openRequest = (c: Collection, n: CollectionNode) => {
     if (n.kind === 'graphql') return useApp.getState().openIntent('graphql', { collectionId: c.id, requestId: n.id });
@@ -512,8 +554,8 @@ export function RestView() {
             className="flex-1 h-8"
             value={tab.request.url}
             onChange={setUrl}
-            onPasteText={(text) => (isCurl(text) ? (void importCurl(text), true) : false)}
-            placeholder="Enter a URL, paste a cURL command, or use {{baseUrl}}/path"
+            onPasteText={(text) => (isRequestSnippet(text) ? (void importSnippet(text), true) : false)}
+            placeholder="Enter a URL, paste cURL / fetch / PowerShell, or use {{baseUrl}}/path"
             onEnter={send}
             collectionId={tab.collectionId}
           />

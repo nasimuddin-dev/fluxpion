@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-Nothing yet.
+- **Paste a request from the browser.** Copy a request in the browser devtools Network tab with **Copy as cURL (bash)**, **Copy as cURL (cmd)**, **Copy as fetch**, **Copy as fetch (Node.js)** or **Copy as PowerShell**, and paste it into the URL bar or anywhere in the REST view: FluxPion builds the request (method, URL, params, headers, cookies, body and auth). Pasting outside the URL bar fills an unchanged new tab or opens a new one named after the method and path. cURL commands copied for Windows `cmd` (with `^` escapes) now import correctly too.
+- **Reorder environments.** Drag environments (or press Alt+Up/Down) in the Environments view to set their order; the environment picker, Home view and sidebars follow it. The order is stored in each environment file.
+- **Fixed:** workspace search (Ctrl/Cmd+Shift+F) now opens right under the top-bar search box instead of floating in the middle of the window.
+- **Fixed:** in the dark theme, the environment picker's dropdown list (and other native dropdowns) showed light text on a white background.
 
 ## 0.5.1 — 2026-09-27
 

@@ -175,7 +175,7 @@ export class WorkspaceStore {
   /* environments */
   listEnvironments(): Environment[] {
     const dir = this.path('environments');
-    return readdirSync(dir)
+    const envs = readdirSync(dir)
       .filter((f) => f.endsWith('.json'))
       .sort()
       .flatMap((f) => {
@@ -185,6 +185,22 @@ export class WorkspaceStore {
           return [];
         }
       });
+    // stable sort: explicit order first, the rest keep file-name order
+    return envs.sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+  }
+
+  /** Set the display order of environments. Ids not listed keep their relative order after the listed ones. */
+  reorderEnvironments(ids: string[]): Environment[] {
+    const envs = this.listEnvironments();
+    const rank = (e: Environment) => {
+      const i = ids.indexOf(e.id);
+      return i >= 0 ? i : ids.length + envs.indexOf(e);
+    };
+    const sorted = [...envs].sort((a, b) => rank(a) - rank(b));
+    sorted.forEach((e, order) => {
+      if (e.order !== order) writeJson(this.path('environments', `${slugify(e.id)}.json`), { ...e, order });
+    });
+    return this.listEnvironments();
   }
 
   getEnvironment(idOrName: string): Environment | undefined {
@@ -194,6 +210,18 @@ export class WorkspaceStore {
   /** Secret variable values must already have been moved to the secret store — they are stripped here. */
   saveEnvironment(env: Environment): Environment {
     const clean: Environment = { ...env, variables: env.variables.map((v) => (v.secret ? { ...v, value: '' } : v)) };
+    // the position is owned by reorderEnvironments; a save from a stale editor copy must not move it
+    const file = this.path('environments', `${slugify(env.id)}.json`);
+    if (existsSync(file)) {
+      let order: number | undefined;
+      try {
+        order = readJson<Environment>(file).order;
+      } catch {
+        order = env.order; // unreadable file: it is being replaced anyway
+      }
+      if (order === undefined) delete clean.order;
+      else clean.order = order;
+    }
     writeJson(this.path('environments', `${slugify(env.id)}.json`), clean);
     return clean;
   }

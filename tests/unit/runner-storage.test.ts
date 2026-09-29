@@ -267,6 +267,21 @@ describe('workspace storage', () => {
     store.close();
   });
 
+  it('keeps a user-chosen environment order', () => {
+    const ws = new WorkspaceManager(join(dir, 'app')).create('Order');
+    for (const [id, name] of [['development', 'Development'], ['production', 'Production'], ['staging', 'Staging'], ['uat', 'User Acceptance']])
+      ws.saveEnvironment({ id: id!, name: name!, variables: [] });
+    const names = () => ws.listEnvironments().map((e) => e.name);
+    expect(names()).toEqual(['Development', 'Production', 'Staging', 'User Acceptance']);
+    ws.reorderEnvironments(['development', 'uat', 'staging']);
+    expect(names()).toEqual(['Development', 'User Acceptance', 'Staging', 'Production']);
+    // saving from a stale copy (old order) does not move it; new environments go last
+    ws.saveEnvironment({ id: 'uat', name: 'UAT', variables: [], order: 3 });
+    ws.saveEnvironment({ id: 'alpha', name: 'Alpha', variables: [] });
+    expect(names()).toEqual(['Development', 'UAT', 'Staging', 'Production', 'Alpha']);
+    ws.close();
+  });
+
   it('never persists secrets in plain text', async () => {
     const mgr = new WorkspaceManager(join(dir, 'app'));
     const ws = mgr.create('Secrets');

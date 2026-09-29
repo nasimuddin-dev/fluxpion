@@ -11,6 +11,10 @@ description: "Variable scopes and precedence, secret variables, dynamic variable
 
 `Global → Workspace → Environment → Collection → Request → Runtime`. Later scopes win. Runtime variables are set by scripts, `extract:` rules and CLI `--var key=value`.
 
+## Order
+
+In the **Environments** view, drag an environment up or down the list (or focus it and press **Alt+↑** / **Alt+↓**) to change its position. The order is saved in the workspace (an `order` field in each environment file) and used everywhere environments are listed: the environment picker in the top bar, the Home view, the REST sidebar and the collection runner. Environments without a position, such as newly created ones, come last.
+
 ## Built-in variables
 
 `{{$uuid}}`, `{{$timestamp}}`, `{{$timestampMs}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, `{{$randomInt(1,10)}}`, `{{$randomEmail}}`, `{{$env.NAME}}` (process environment), `{{$secret.NAME}}` (secret store), and `{{workspaceDir}}`.

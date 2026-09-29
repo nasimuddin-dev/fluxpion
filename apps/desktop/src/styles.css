@@ -5,6 +5,7 @@
 
 /* Design tokens (shadcn/ui-style zinc + indigo). Components use the Tailwind colours mapped below. */
 :root {
+  color-scheme: light;
   --font-size: 14px;
   --radius: 8px;
   --bg: #ffffff;
@@ -33,6 +34,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --bg: #111114;
   --panel: #17171b;
   --panel-2: #1f1f24;
@@ -278,7 +280,9 @@ select.field {
   padding-right: 28px;
   cursor: pointer;
 }
-select.field option {
+/* native dropdown lists follow the theme (not the OS white popup) */
+select option,
+select optgroup {
   background: var(--bg);
   color: var(--fg);
 }

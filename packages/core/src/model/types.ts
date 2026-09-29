@@ -480,6 +480,8 @@ export interface Environment {
   /** Marks the environment as production; load testing is blocked unless explicitly allowed. */
   isProduction?: boolean;
   color?: string;
+  /** Position in environment lists and pickers (lowest first); environments without one follow, by file name. */
+  order?: number;
 }
 
 /** A saved response of a request (Postman "example"): documents the API and feeds the mock server. */
