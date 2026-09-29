@@ -62,7 +62,7 @@ function modelOf(v: unknown): ModelRef {
 /** Convert a loosely-written YAML/JSON test into a canonical TestCase. */
 export function normalizeTest(raw: Record<string, unknown>, file?: string, index = 0): TestCase {
   if (!raw || typeof raw !== 'object') throw new ApsError('ConfigurationError', `Invalid test definition in ${file}`);
-  const type = String(raw.type ?? (raw.request || raw.url ? 'http' : raw.query ? 'graphql' : raw.tool ? 'mcp' : raw.prompt ? 'llm' : ''));
+  const type = String(raw.type ?? (raw.request || raw.url ? 'http' : raw.query ? 'graphql' : raw.protos || raw.proto ? 'grpc' : raw.tool ? 'mcp' : raw.prompt ? 'llm' : ''));
   const name = String(raw.name ?? `${file ? basename(file) : 'test'} #${index + 1}`);
   const base = {
     id: String(raw.id ?? `${file ? slugify(basename(file).replace(/\.[^.]+$/, '')) + ':' : ''}${slugify(name)}`),
@@ -112,6 +112,20 @@ export function normalizeTest(raw: Record<string, unknown>, file?: string, index
         auth: authOf(raw.auth),
         variables: raw.vars as Record<string, unknown> | undefined,
       };
+    case 'grpc': {
+      const protos = raw.protos ?? raw.proto;
+      return {
+        ...base,
+        type: 'grpc',
+        target: String(raw.target ?? raw.address ?? raw.url ?? ''),
+        method: String(raw.method ?? ''),
+        message: raw.message ?? raw.request,
+        metadata: kvList(raw.metadata),
+        protos: (Array.isArray(protos) ? protos : protos ? [protos] : []).map(String),
+        ...(raw.tls !== undefined ? { tls: !!raw.tls } : {}),
+        variables: vars,
+      };
+    }
     case 'mcp': {
       const server = raw.server as string | { name?: string; id?: string } | undefined;
       const tool = raw.tool as string | { name: string } | undefined;
@@ -169,7 +183,7 @@ export function normalizeTest(raw: Record<string, unknown>, file?: string, index
       } as TestCase;
     default:
       throw new ApsError('ConfigurationError', `Unknown or missing test type "${type}" in ${file ?? 'test'} (${name})`, {
-        suggestions: ['Set `type:` to one of http, graphql, mcp, llm, rag, agent.'],
+        suggestions: ['Set `type:` to one of http, graphql, grpc, mcp, llm, rag, agent.'],
       });
   }
 }

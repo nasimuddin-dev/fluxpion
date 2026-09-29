@@ -34,6 +34,8 @@ export interface CheckContext {
   /** Reads a workspace file (relative to the workspace root), e.g. an OpenAPI document. */
   readFile?: (path: string) => string;
   graphqlErrors?: unknown[];
+  /** gRPC: the call's status. */
+  grpc?: { code: number; codeName: string; details: string; trailers?: Array<[string, string]> };
   toolCalls?: Array<{ name: string; arguments: Record<string, unknown> }>;
   toolSchemas?: Record<string, Record<string, unknown>>;
   contexts?: RetrievedDoc[];
@@ -215,6 +217,15 @@ function regexCheck(negate: boolean): CheckFn {
 registerCheck('regex', regexCheck(false));
 registerCheck('matches', regexCheck(false));
 registerCheck('not-regex', regexCheck(true));
+
+/** gRPC status: `expected` is a name (OK, NOT_FOUND …), a code number, or a list of them. Default OK. */
+registerCheck('grpc-status', (cfg, ctx) => {
+  if (!ctx.grpc) return res(cfg, false, 'grpc-status applies to gRPC calls');
+  const want = (Array.isArray(cfg.expected) ? cfg.expected : [cfg.expected ?? 'OK']).map((v) => (typeof v === 'number' ? v : String(v).toUpperCase().replace(/\s+/g, '_')));
+  const ok = want.some((v) => v === ctx.grpc!.code || v === ctx.grpc!.codeName);
+  const actual = `${ctx.grpc.code} ${ctx.grpc.codeName}${ctx.grpc.details ? `: ${ctx.grpc.details}` : ''}`;
+  return res(cfg, ok, ok ? `status ${ctx.grpc.codeName}` : `expected ${want.join(' or ')}, got ${actual}`, { expected: want, actual });
+});
 
 registerCheck('is-json', (cfg, ctx) => {
   const ok = typeof ctx.body === 'object' && ctx.body !== null ? true : tryParseJson(ctx.text).ok;

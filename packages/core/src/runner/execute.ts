@@ -5,6 +5,7 @@ import type {
   CheckConfig,
   CheckResult,
   GraphQLTest,
+  GrpcTest,
   HttpTest,
   LlmTest,
   McpServerConfig,
@@ -23,6 +24,7 @@ import type { Redactor } from '../util/redact.js';
 import type { Logger } from '../log/logger.js';
 import { executeHttp } from '../protocols/http/client.js';
 import { executeGraphQL } from '../protocols/graphql/graphql.js';
+import { executeGrpc } from '../protocols/grpc/grpc.js';
 import { mcpResultBody, type McpManager } from '../protocols/mcp/client.js';
 import { estimateCost, renderPrompt, type ProviderRegistry } from '../ai/index.js';
 import { runAgent, type AgentTool } from '../ai/agent.js';
@@ -125,6 +127,8 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
           return runHttp(test, scope, svc, root, signal);
         case 'graphql':
           return runGraphQL(test, scope, svc, root, signal);
+        case 'grpc':
+          return runGrpc(test, scope, svc, root, signal);
         case 'mcp':
           return runMcp(test, scope, svc, root, signal);
         case 'llm':
@@ -243,6 +247,7 @@ function implicitChecks(test: TestCase, ctx: CheckContext): CheckConfig[] {
   }
   if (test.type === 'mcp' && !explicit.length) out.push({ type: 'status', expected: 'success' });
   if (test.type === 'graphql' && !explicit.length) out.push({ type: 'graphql-no-errors' });
+  if (test.type === 'grpc' && !explicit.some((c) => c.type === 'grpc-status')) out.push({ type: 'grpc-status', expected: 'OK' });
   return out;
 }
 
@@ -305,6 +310,38 @@ async function runGraphQL(test: GraphQLTest, scope: VariableScope, svc: ExecServ
         graphqlErrors: out.errors,
       },
       partial: { input: summarize(r.query, 1000), output: summarize(out.response.json ?? out.response.bodyPreview) },
+    };
+  } catch (e) {
+    s.fail(e);
+    throw e;
+  }
+}
+
+async function runGrpc(test: GrpcTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {
+  if (!svc.readFile) throw new ApsError('ConfigurationError', 'gRPC tests need a workspace to read their .proto files from');
+  const protoFiles = test.protos.map((name) => ({ name, text: svc.readFile!(name) }));
+  const r = scope.resolveDeep({ target: test.target, method: test.method, message: test.message, metadata: test.metadata });
+  const s = span.child(`grpc ${r.method}`, 'grpc', { input: { message: r.message } });
+  try {
+    const out = await executeGrpc(
+      { target: r.target, method: r.method, message: r.message === undefined ? undefined : JSON.stringify(r.message), metadata: r.metadata, protoFiles, tls: test.tls, timeoutMs: test.timeoutMs ?? svc.defaultTimeoutMs },
+      { signal, redactor: svc.redactor },
+    );
+    const body = out.messages ? out.messages.map((m) => m.data) : (out.response ?? null);
+    s.setAttributes({ target: out.target, method: out.method, code: out.code });
+    s.end({ status: out.code === 0 ? 'ok' : 'error', output: summarize(body, 16_000) });
+    return {
+      ctx: {
+        testType: 'grpc',
+        status: out.code,
+        headers: out.metadata,
+        body,
+        text: JSON.stringify(body),
+        latencyMs: out.durationMs,
+        grpc: { code: out.code, codeName: out.codeName, details: out.details, trailers: out.trailers },
+      },
+      partial: { input: `${out.method} @ ${out.target}`, output: summarize(svc.redactor.redact(body)) },
+      metadata: { target: out.target, method: out.method, code: out.codeName },
     };
   } catch (e) {
     s.fail(e);

@@ -38,18 +38,20 @@ export function parseProtos(files: ProtoFile[]): protobuf.Root {
   if (!files.length) throw new ApsError('ValidationError', 'Add a .proto file describing the service');
   const root = new protobuf.Root();
   const byName = new Map(files.map((f) => [normalize(f.name), f]));
-  const done = new Set<string>();
+  // each file (and well-known type) is parsed once, however it is referred to (`shop/v1/a.proto` or `protos/shop/v1/a.proto`)
+  const done = new Set<ProtoFile | string>();
   const load = (name: string, from?: string) => {
     const key = normalize(name);
-    if (done.has(key)) return;
-    done.add(key);
     const common = (protobuf.common as unknown as Record<string, { nested?: protobuf.INamespace['nested'] }>)[key];
     if (common) {
-      root.addJSON(common.nested ?? {});
+      if (!done.has(key)) root.addJSON(common.nested ?? {});
+      done.add(key);
       return;
     }
     const file = byName.get(key) ?? [...byName.values()].find((f) => normalize(f.name).endsWith(`/${key}`) || key.endsWith(`/${normalize(f.name)}`));
     if (!file) throw new ApsError('ValidationError', `"${from ?? 'A proto file'}" imports "${name}", which was not provided`, { suggestions: ['Add the imported .proto file too (with the same path as in the import statement).'] });
+    if (done.has(file)) return;
+    done.add(file);
     let parsed: protobuf.IParserResult;
     try {
       parsed = protobuf.parse(file.text, root, { keepCase: true, alternateCommentMode: true });
@@ -243,7 +245,9 @@ export async function executeGrpc(spec: GrpcRequestSpec, opts: { signal?: AbortS
         );
         return;
       }
-      resolve(result(code, err?.details ?? status?.details ?? '', response, false, err?.metadata ?? status?.metadata));
+      const details = err?.details ?? status?.details ?? '';
+      // a successful call's details just repeat "OK"
+      resolve(result(code, code === grpc.status.OK && details === 'OK' ? '' : details, response, false, err?.metadata ?? status?.metadata));
     };
     const result = (code: number, details: string, response: unknown, streamStopped: boolean, trailerMd?: grpc.Metadata): GrpcResponseData => ({
       code,

@@ -225,7 +225,7 @@ export interface CheckResult {
 
 /* ------------------------------------------------------------------ tests */
 
-export type TestType = 'http' | 'graphql' | 'mcp' | 'llm' | 'rag' | 'agent';
+export type TestType = 'http' | 'graphql' | 'grpc' | 'mcp' | 'llm' | 'rag' | 'agent';
 
 export interface TestBase {
   id?: string;
@@ -261,6 +261,20 @@ export interface GraphQLTest extends TestBase {
   operationName?: string;
   headers?: KeyValue[];
   auth?: AuthConfig;
+}
+
+export interface GrpcTest extends TestBase {
+  type: 'grpc';
+  /** `host:port`, `grpcs://host:port` for TLS. */
+  target: string;
+  /** `package.Service/Method` */
+  method: string;
+  /** Request message; a list of messages for client-streaming methods. */
+  message?: unknown;
+  metadata?: KeyValue[];
+  /** .proto files (workspace paths); imports resolve by path, e.g. `import "vet/v1/common.proto"` finds `protos/vet/v1/common.proto`. */
+  protos: string[];
+  tls?: boolean;
 }
 
 export interface McpTest extends TestBase {
@@ -326,7 +340,7 @@ export interface AgentTest extends TestBase {
   maxSteps?: number;
 }
 
-export type TestCase = HttpTest | GraphQLTest | McpTest | LlmTest | RagTest | AgentTest;
+export type TestCase = HttpTest | GraphQLTest | GrpcTest | McpTest | LlmTest | RagTest | AgentTest;
 
 export interface SuiteConfig {
   name: string;
@@ -437,7 +451,7 @@ export interface NormalizedError {
 
 /* ------------------------------------------------------------------ trace */
 
-export type SpanKind = 'http' | 'graphql' | 'llm' | 'tool' | 'mcp' | 'evaluation' | 'script' | 'test' | 'internal';
+export type SpanKind = 'http' | 'graphql' | 'grpc' | 'llm' | 'tool' | 'mcp' | 'evaluation' | 'script' | 'test' | 'internal';
 
 export interface Span {
   traceId: string;

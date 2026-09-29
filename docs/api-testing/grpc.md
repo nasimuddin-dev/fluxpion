@@ -46,6 +46,30 @@ node examples/servers/demo-servers.mjs
 
 Connect to `127.0.0.1:4014` with `examples/veterinary-workspace/protos/vet/v1/pets.proto` (name it `vet/v1/pets.proto`). Try `GetPet` with `{"id": "1"}` (or `"9"` for `NOT_FOUND`), `StreamVitals` for a live stream, and `CheckIn` with a list of pets.
 
+## Tests, CLI and AI agents
+
+gRPC calls can be tests in a workspace's `tests/` folder, run by the [test runner](../test-runner/overview.md) and in CI:
+
+```yaml
+name: Get a pet
+type: grpc
+target: "{{grpcHost}}"             # host:port, or grpcs://host:port
+method: vet.v1.PetService/GetPet
+message: { id: "1" }
+protos: [protos/vet/v1/pets.proto] # workspace paths, with the files they import
+assertions:
+  - type: grpc-status              # OK by default; a name, a code or a list
+    expected: OK
+  - type: equals
+    path: $.name
+    expected: Byron
+```
+
+JSONPath assertions run on the response message, or on the list of messages for streaming methods (`$[0].name`). Without a `grpc-status` assertion, a test passes only with status `OK`.
+
+- From a terminal: [`testpion grpc`](../cli/reference.md#grpc) lists the methods of `.proto` files or calls one.
+- AI agents using [`testpion mcp-server`](../ai-testing/mcp-server.md) get the `grpc_call` tool.
+
 ## Limits
 
 - Server reflection isn't supported yet: the `.proto` files are needed.

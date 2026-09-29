@@ -11,6 +11,8 @@ import type { WorkspaceStore } from '../storage/workspace.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext, inheritedAuthFor } from '../engine.js';
 import { executeHttp } from '../protocols/http/client.js';
+import { describeProtos, executeGrpc } from '../protocols/grpc/grpc.js';
+import { readFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -204,6 +206,49 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
                   ...(response.streamStopped ? { streamStopped: true } : {}),
                 }
               : {}),
+            unresolvedVariables: ctx.vars.unresolved.size ? [...ctx.vars.unresolved] : undefined,
+          };
+        } finally {
+          await ctx.dispose();
+        }
+      },
+    },
+    {
+      name: 'grpc_call',
+      write: true,
+      description:
+        'Call a gRPC method described by .proto files in the workspace, or list the methods (with example requests) when no method is given. Returns the gRPC status, the response message (or the streamed messages), metadata and trailers. {{variables}} resolve from the environment.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          target: str('Server address: host:port, or grpcs://host:port for TLS'),
+          protos: { type: 'array', items: { type: 'string' }, description: '.proto files in the workspace (and the files they import), e.g. ["protos/vet/v1/pets.proto"]' },
+          method: str('package.Service/Method; omit to list the methods'),
+          message: { description: 'Request message as a JSON object (a list of messages for client-streaming methods)' },
+          metadata: { type: 'object', additionalProperties: { type: 'string' }, description: 'Metadata (headers)' },
+          environment: str('Environment name'),
+        },
+        required: ['protos'],
+      },
+      run: async (a) => {
+        const protoFiles = ((a.protos as string[]) ?? []).map((name) => ({ name, text: readFileSync(store.safePath(String(name)), 'utf8') }));
+        if (!a.method) return describeProtos(protoFiles).map((m) => ({ method: m.name, clientStreaming: m.clientStreaming, serverStreaming: m.serverStreaming, example: m.example }));
+        if (!a.target) throw new ApsError('ValidationError', 'Give the server address (target)');
+        const environment = checkEnvironment(a.environment);
+        const ctx = createEngineContext({ store, secrets, settings, environment });
+        try {
+          const r = ctx.vars.resolveDeep({ target: String(a.target), message: a.message ?? {}, metadata: Object.entries((a.metadata as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value })) });
+          const out = await executeGrpc({ target: r.target, method: String(a.method), message: JSON.stringify(r.message), metadata: r.metadata, protoFiles, timeoutMs: settings.defaultTimeoutMs }, { redactor: ctx.redactor });
+          const body = (v: unknown) => clip(ctx.redactor.redactString(JSON.stringify(v)));
+          return {
+            code: out.code,
+            status: out.codeName,
+            details: out.details || undefined,
+            durationMs: out.durationMs,
+            ...(out.response !== undefined ? { response: body(out.response) } : {}),
+            ...(out.messages ? { messageCount: out.messages.length, messages: out.messages.slice(0, 100).map((m) => body(m.data)) } : {}),
+            metadata: Object.fromEntries(out.metadata),
+            trailers: Object.fromEntries(out.trailers),
             unresolvedVariables: ctx.vars.unresolved.size ? [...ctx.vars.unresolved] : undefined,
           };
         } finally {

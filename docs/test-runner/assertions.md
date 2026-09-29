@@ -22,6 +22,7 @@ All checks share `type`, an optional `name`, and usually `path` (JSONPath such a
 | `latency`, `tokens`, `cost` | `max` (`tokens` also takes `field: input\|output\|total`) |
 | `header` | `header`, `expected` |
 | `graphql-no-errors`, `graphql-errors` | `expected` (count or message) |
+| `grpc-status` | `expected`: a gRPC status name (`OK`, `NOT_FOUND` …), a code, or a list. Default `OK`. |
 | AI, RAG, agent and safety checks | see [evaluations](../ai-testing/evaluations.md) |
 
 Check options can use variables, e.g. `expected: "{{expected}}"`. Script tests (`pm.test`) also appear as checks.

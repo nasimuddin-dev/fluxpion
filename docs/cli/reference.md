@@ -24,6 +24,7 @@ testpion env list|order -w    List environments; set their order
 testpion history list|diff -w   Response history of saved requests; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
+testpion grpc <target> [method] -p <protos>   Call a gRPC method, or list the methods of .proto files
 testpion report <results.jsonl>              Re-generate reports
 ```
 
@@ -102,6 +103,25 @@ testpion mock-mcp mocks/customer.mcp-mock.yaml --http -p 3333   # Streamable HTT
 |---|---|
 | `--http` | Serve over Streamable HTTP on `127.0.0.1` instead of stdio (the URL is printed). |
 | `-p, --port <port>` | Port for `--http` (default: any free port). |
+
+## `grpc`
+
+Calls a [gRPC](/api-testing/grpc) method described by `.proto` files, or lists the methods (with example requests) when no method is given. The exit code is 0 for status `OK` and 1 otherwise.
+
+```bash
+testpion grpc localhost:4014 -p protos/vet/v1/pets.proto                  # list methods
+testpion grpc localhost:4014 vet.v1.PetService/GetPet -p protos/vet/v1/pets.proto -d '{"id": "1"}'
+testpion grpc grpcs://api.example.com vet.v1.PetService/ListPets -p pets.proto -H "authorization:Bearer $TOKEN" --json
+```
+
+| Option | Description |
+|---|---|
+| `-p, --proto <files...>` | The `.proto` files, including the ones they import. |
+| `-d, --data <json>` | The request message as JSON (a JSON list for client streaming), or `@file.json`. Default `{}`. |
+| `-H, --metadata <key:value...>` | Metadata entries. |
+| `--tls` | Use TLS (also on with a `grpcs://` address). |
+| `--timeout <ms>` | Deadline (default 30000). |
+| `--json` | Print the result as JSON, for scripts and AI agents. |
 
 ## `docs`
 
@@ -185,7 +205,7 @@ testpion env order Development Staging Production -w my-workspace
 
 ## `mcp-server`
 
-Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request` and `run_collection`. See [Use TestPion from AI agents](/ai-testing/mcp-server).
+Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request`, `grpc_call` and `run_collection`. See [Use TestPion from AI agents](/ai-testing/mcp-server).
 
 ```bash
 testpion mcp-server -w my-workspace
