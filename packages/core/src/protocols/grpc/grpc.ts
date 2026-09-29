@@ -1,4 +1,6 @@
 import * as grpc from '@grpc/grpc-js';
+import { isIP } from 'node:net';
+import { checkServerIdentity } from 'node:tls';
 import * as protoLoader from '@grpc/proto-loader';
 import protobuf from 'protobufjs';
 import { ApsError } from '../../errors.js';
@@ -160,8 +162,41 @@ export interface GrpcRequestSpec {
   descriptorSet?: string;
   /** Use TLS (default: from the target's scheme; plain `host:port` is plaintext). */
   tls?: boolean;
+  /** Certificates for TLS (PEM text): a custom CA, and a client certificate + key for mutual TLS. Turns TLS on. */
+  tlsOptions?: GrpcTlsOptions;
   /** Deadline in ms (default 30 s). */
   timeoutMs?: number;
+}
+
+export interface GrpcTlsOptions {
+  /** CA certificate(s) the server's certificate must chain to (default: the system's trusted CAs). */
+  ca?: string;
+  /** Client certificate chain, for servers that require mutual TLS. */
+  cert?: string;
+  /** Private key of the client certificate. */
+  key?: string;
+}
+
+/** Channel credentials: plaintext, TLS with the system CAs, or TLS with a custom CA and/or a client certificate. */
+export function grpcCredentials(tls: boolean, o?: GrpcTlsOptions, host?: string): grpc.ChannelCredentials {
+  if (!tls && !o?.ca && !o?.cert) return grpc.credentials.createInsecure();
+  if (!!o?.cert !== !!o?.key) throw new ApsError('ValidationError', 'Mutual TLS needs both the client certificate and its private key');
+  const pem = (s?: string) => (s?.trim() ? Buffer.from(s) : null);
+  // an IP address can't be the TLS server name (SNI): the certificate is still checked against the IP itself
+  const ip = host && isIP(host.replace(/^\[|\]$/g, '')) ? host.replace(/^\[|\]$/g, '') : undefined;
+  try {
+    return grpc.credentials.createSsl(pem(o?.ca), pem(o?.key), pem(o?.cert), ip ? { checkServerIdentity: (_name, cert) => checkServerIdentity(ip, cert) } : undefined);
+  } catch (e) {
+    throw new ApsError('ValidationError', `The TLS certificates can't be used: ${(e as Error).message}`, { suggestions: ['Use PEM text (-----BEGIN CERTIFICATE----- …).'] });
+  }
+}
+
+/** Credentials and channel options for an address (`host:port`). */
+export function grpcChannel(address: string, tls: boolean, o?: GrpcTlsOptions): { credentials: grpc.ChannelCredentials; options: grpc.ChannelOptions } {
+  const host = address.replace(/:\d+$/, '');
+  const credentials = grpcCredentials(tls, o, host);
+  const secure = tls || !!o?.ca || !!o?.cert;
+  return { credentials, options: secure && isIP(host.replace(/^\[|\]$/g, '')) ? { 'grpc.ssl_target_name_override': 'ip-address.invalid' } : {} };
 }
 
 export interface GrpcResponseData {
@@ -216,7 +251,8 @@ function parseMessage(text: string | undefined, what: string): unknown {
 export async function executeGrpc(spec: GrpcRequestSpec, opts: { signal?: AbortSignal; redactor?: Redactor; onMessage?: (data: unknown, atMs: number) => void } = {}): Promise<GrpcResponseData> {
   const t0 = performance.now();
   const ms = () => Math.round((performance.now() - t0) * 100) / 100;
-  const { address, tls } = parseGrpcTarget(spec.target, spec.tls);
+  const { address, tls: tlsFromTarget } = parseGrpcTarget(spec.target, spec.tls);
+  const tls = tlsFromTarget || !!spec.tlsOptions?.ca || !!spec.tlsOptions?.cert;
   await assertUrlAllowed(new URL(`${tls ? 'https' : 'http'}://${address}`));
 
   const root = grpcRoot(spec);
@@ -228,7 +264,8 @@ export async function executeGrpc(spec: GrpcRequestSpec, opts: { signal?: AbortS
   const pkg = grpc.loadPackageDefinition(protoLoader.fromJSON(root.toJSON(), LOADER_OPTIONS));
   const Ctor = info.service.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], pkg) as grpc.ServiceClientConstructor | undefined;
   if (!Ctor) throw new ApsError('ValidationError', `Service ${info.service} could not be loaded`);
-  const client = new Ctor(address, tls ? grpc.credentials.createSsl() : grpc.credentials.createInsecure());
+  const channel = grpcChannel(address, tls, spec.tlsOptions);
+  const client = new Ctor(address, channel.credentials, channel.options);
 
   const md = new grpc.Metadata();
   for (const h of spec.metadata ?? []) if (h.enabled !== false && h.key) md.add(h.key.toLowerCase(), h.value);
