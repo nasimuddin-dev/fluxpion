@@ -57,6 +57,7 @@ export * from './runner/runner.js';
 export * from './runner/loader.js';
 export * from './runner/datasets.js';
 export * from './runner/collection-run.js';
+export * from './runner/saved-evaluations.js';
 export * from './runner/monitors.js';
 export * from './runner/ci-config.js';
 export * from './runner/env-request-compare.js';

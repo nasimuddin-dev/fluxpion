@@ -22,6 +22,7 @@ testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents
 testpion env set|unset|get <env> -w   Set or remove plain variables of an environment (secrets stay in the app)
 testpion vars usages|rename -w   Where a variable is used; rename it everywhere
 testpion openapi-diff <old> <new>   List breaking changes between two OpenAPI versions (--fail-on-breaking for CI)
+testpion eval list|run <name>   Evaluations saved in the app: list them, or run one by name (exit 1 on failures)
 testpion coverage <spec> -w   API coverage: which OpenAPI operations and responses the runs exercised (--min for CI)
 testpion docs <collection>    Write Markdown (or --html) documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)

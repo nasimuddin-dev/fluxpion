@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Run saved evaluations anywhere**: `testpion eval list` and `testpion eval run <name>` (reports, baselines, exit 1 on failures) and the `list_evaluations` / `run_evaluation` MCP tools for AI agents. The app, the CLI and the MCP server build the tests the same way.
 - **Request settings like Postman's**: a clearer Settings tab (one row per setting with an explanation) and new options: follow the original HTTP method on redirects, keep the Authorization header on cross-host redirects, remove the Referer header on redirect, encode the URL automatically (on by default), disable the cookie jar, allowed TLS versions and cipher suites. They're saved with the request and apply in runs, monitors and the CLI.
 
 ## 0.9.1 — 2026-09-30

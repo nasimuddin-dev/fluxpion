@@ -130,19 +130,8 @@ export function EvaluationsView() {
   const run = () => runDraft(d);
   const runDraft = async (d: Draft) => {
     try {
-      const template: Record<string, unknown> =
-        d.type === 'llm'
-          ? {
-              name: d.name,
-              type: 'llm',
-              model: { provider: d.provider, name: d.model || undefined, temperature: d.temperature },
-              ...(d.system ? { system: d.system } : {}),
-              prompt: d.prompt,
-              ...(d.format === 'json' ? { responseFormat: { type: 'json' } } : {}),
-              evaluators: d.evaluators,
-            }
-          : { name: d.name, type: 'rag', model: { provider: d.provider, name: d.model || undefined, temperature: d.temperature }, ...(d.prompt.includes('{{context}}') ? { prompt: d.prompt } : {}), evaluators: d.evaluators };
-      const r = await call<{ runId: string }>('eval.run', { name: d.name, template, datasetText: d.dataset, datasetFormat: d.datasetFormat, expectedField: d.expectedField, concurrency: d.concurrency, limit: d.limit, retries: d.retries, environment: env });
+      // the engine builds the test template, exactly as `testpion eval run` and the run_evaluation MCP tool do
+      const r = await call<{ runId: string }>('eval.runDraft', { draft: d, environment: env });
       setRunId(r.runId);
       setRuns((rs) => [{ id: r.runId, name: d.name, startedAt: new Date().toISOString(), passed: 0, total: 0 }, ...rs]);
     } catch (e) {

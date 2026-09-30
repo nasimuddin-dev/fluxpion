@@ -1068,7 +1068,7 @@ export class Backend {
     return { items, total };
   }
 
-  private startRun(
+  startRun(
     name: string,
     tests: AsyncIterable<TestCase>,
     opts: { environment?: string; collectionId?: string; concurrency?: number; retries?: number; bail?: boolean; keepVariableValues?: boolean; traceMode?: 'all' | 'failures' | 'none' },

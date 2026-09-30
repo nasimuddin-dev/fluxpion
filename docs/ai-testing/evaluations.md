@@ -13,6 +13,15 @@ Save an evaluation (its dataset, prompt, model, parameters and evaluators) with 
 
 Saved evaluations are kept in the workspace file `library/evaluations.json`, so they're versioned and shared with the workspace (use `{{variables}}` rather than typed-in keys).
 
+Run them without the app, e.g. in CI or from an AI agent:
+
+```bash
+testpion eval list                       # name, folder, model, cases, evaluators (--json)
+testpion eval run "Intent classification" -e Staging --limit 50 -r console junit
+```
+
+`eval run` exits `1` when a case fails, writes the usual reports, and works with `--baseline` / `--save-baseline` for regression checks. AI agents use the `list_evaluations` and `run_evaluation` tools of `testpion mcp-server`.
+
 ## Evaluator types
 
 | Source | Evaluators |

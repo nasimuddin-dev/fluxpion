@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'list_tests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
+      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_evaluations', 'list_monitors', 'list_requests', 'list_tests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -556,6 +556,54 @@ describe('example workspace (end-to-end)', () => {
       expect(out.summary.covered).toBe(report.summary.covered);
       // paths outside the workspace are refused
       expect((await s.callTool('api_coverage', { spec: '../../outside.yaml' })).isError).toBe(true);
+    } finally {
+      await s.close();
+    }
+  }, 90_000);
+  it('saved evaluations: `testpion eval list|run` and the list_evaluations / run_evaluation MCP tools', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    ws.saveLibrary('evaluations', {
+      folders: ['Intents'],
+      items: [
+        {
+          id: 'ev-1',
+          name: 'Intent check',
+          folder: 'Intents',
+          data: {
+            name: 'Intent check',
+            type: 'llm',
+            provider: 'mock-llm',
+            model: 'mock-gpt',
+            temperature: 0,
+            prompt: 'Classify the customer intent. Respond with JSON {"intent": "cancellation" | "refill" | "booking" | "other"}.\n\nCustomer: {{input}}',
+            format: 'json',
+            datasetFormat: 'jsonl',
+            dataset: '{"input":"Cancel my appointment","expected":"cancellation"}\n{"input":"I need a refill","expected":"refill"}',
+            expectedField: 'expected',
+            evaluators: [{ type: 'exact-match', path: '$.intent', expected: '{{expected}}' }],
+            concurrency: 2,
+            retries: 0,
+          },
+        },
+      ],
+    });
+    const list = await run([cli, 'eval', 'list', '-w', ws.root, '--json'], env);
+    expect(JSON.parse(list.stdout)).toEqual([expect.objectContaining({ name: 'Intent check', folder: 'Intents', cases: 2, evaluators: ['exact-match'] })]);
+
+    const out = join(dir, 'eval-out');
+    const r = await run([cli, 'eval', 'run', 'intent check', '-w', ws.root, '-o', out, '-q'], env);
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(out, 'summary.json'), 'utf8'))).toMatchObject({ total: 2, passed: 2 });
+    expect((await run([cli, 'eval', 'run', 'nope', '-w', ws.root], env)).status).toBe(2);
+
+    const s = new McpSession({ id: 'ev', name: 'testpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env });
+    await s.connect(20_000);
+    try {
+      expect(JSON.parse(mcpResultBody(await s.callTool('list_evaluations', {})).text)[0].name).toBe('Intent check');
+      const res = JSON.parse(mcpResultBody(await s.callTool('run_evaluation', { name: 'Intent check', limit: 1 })).text);
+      expect(res).toMatchObject({ total: 1, passed: 1 });
     } finally {
       await s.close();
     }

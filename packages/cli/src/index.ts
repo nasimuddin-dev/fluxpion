@@ -9,6 +9,7 @@ import {
 } from '@testpion/core';
 import { EXIT, red, dim, CliError } from './shared.js';
 import { registerRunCommands } from './commands/run.js';
+import { registerEvaluationCommands } from './commands/evaluations.js';
 import { registerServeCommands } from './commands/serve.js';
 import { registerDataCommands } from './commands/data.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
@@ -23,6 +24,7 @@ export function buildProgram(): Command {
     .version(ENGINE_VERSION);
 
   registerRunCommands(program);
+  registerEvaluationCommands(program);
   registerServeCommands(program);
   registerDataCommands(program);
   registerWorkspaceCommands(program);

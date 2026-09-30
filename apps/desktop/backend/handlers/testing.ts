@@ -2,6 +2,8 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  evaluationTests,
+  type SavedEvaluation,
   ApsError,
   compareToBaseline,
   createBaseline,
@@ -59,6 +61,9 @@ export function testingHandlers(be: Backend): Handlers {
       return be.startTestRun({ paths: [], environment, concurrency, retries, name: `Failed tests of ${r.runId}`, ids: r.ids });
     },
     'eval.run': (p: EvalRunParams) => be.startEvalRun(p),
+    /** Run an evaluation as edited in the app (saved or not): the same conversion as `testpion eval run`. */
+    'eval.runDraft': ({ draft, environment }: { draft: SavedEvaluation; environment?: string }) =>
+      be.startRun(draft.name || 'Evaluation', evaluationTests(draft), { environment, concurrency: draft.concurrency, retries: draft.retries, traceMode: 'all' }),
     'runs.cancel': ({ runId }: { runId: string }) => be.runs.get(runId)?.ctrl.abort(),
     'runs.list': (q: { query?: string; limit?: number; offset?: number }) => be.ws.meta.listRuns(q),
     'runs.summary': ({ runId }: { runId: string }) => {

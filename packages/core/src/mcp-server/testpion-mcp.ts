@@ -28,6 +28,7 @@ import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
 import { workspaceApiCoverage } from '../openapi/coverage.js';
+import { evaluationTests, findSavedEvaluation, listSavedEvaluations } from '../runner/saved-evaluations.js';
 import { securityLint, variableFlow } from '../eval/security.js';
 import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { introspect } from '../protocols/graphql/graphql.js';
@@ -844,6 +845,48 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
           store.meta.addRun(summary, outDir);
           return { runId, total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, skipped: summary.skipped, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
+        } finally {
+          await ctx.dispose();
+        }
+      },
+    },
+    {
+      name: 'list_evaluations',
+      description: 'Evaluations saved in the app (Evaluations ▸ Save): a dataset × prompt × model × evaluators. Returns id, name, folder, model, number of cases and evaluator types. Run one with run_evaluation.',
+      inputSchema: { type: 'object', properties: {} },
+      run: () => listSavedEvaluations(store),
+    },
+    {
+      name: 'run_evaluation',
+      write: true,
+      description:
+        'Run a saved evaluation by name or id, like `testpion eval run`: every dataset record through the model, scored by its evaluators (AI-judge scores are labelled as such). Returns totals, mean scores and per-case results with failed checks; the run is recorded in the workspace history. `limit` runs only the first n records (at most 500 here).',
+      inputSchema: { type: 'object', properties: { name: str('Saved evaluation name or id'), environment: str('Environment name'), limit: { type: 'number', description: 'Only the first n dataset records' } }, required: ['name'] },
+      run: async (a) => {
+        const environment = checkEnvironment(a.environment);
+        const saved = findSavedEvaluation(store, String(a.name ?? ''));
+        const limit = Math.min(500, typeof a.limit === 'number' && a.limit > 0 ? a.limit : (saved.limit ?? 500));
+        const ctx = createEngineContext({ store, secrets, settings, environment });
+        const runId = shortId('run-');
+        const outDir = store.runDir(runId);
+        mkdirSync(outDir, { recursive: true });
+        const results: TestResult[] = [];
+        try {
+          const summary = await runTests({
+            name: saved.name,
+            runId,
+            tests: evaluationTests({ ...saved, limit }),
+            services: ctx.services,
+            concurrency: Math.min(8, saved.concurrency || 4),
+            retries: saved.retries ?? 0,
+            resultsFile: join(outDir, 'results.jsonl'),
+            traceMode: 'none',
+            environment,
+            onEvent: (e: RunEvent) => void (e.type === 'test-end' && results.push(e.result)),
+          });
+          writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
+          store.meta.addRun(summary, outDir);
+          return { runId, total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, scores: summary.scores, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
         } finally {
           await ctx.dispose();
         }
