@@ -15,6 +15,7 @@ import {
   ElicitRequestSchema,
   ListRootsRequestSchema,
   LoggingMessageNotificationSchema,
+  ResourceUpdatedNotificationSchema,
   type CreateMessageRequest,
   type CreateMessageResult,
   type ElicitRequest,
@@ -207,6 +208,33 @@ export class McpSession {
     this.handlers = h;
   }
 
+  private updateListeners: Array<(uri: string) => void> = [];
+  /** Called when a subscribed resource changes (notifications/resources/updated). */
+  onResourceUpdated(l: (uri: string) => void): () => void {
+    this.updateListeners.push(l);
+    return () => (this.updateListeners = this.updateListeners.filter((x) => x !== l));
+  }
+
+  /** Subscribe to changes of a resource (the server must support resources.subscribe). */
+  async subscribeResource(uri: string): Promise<void> {
+    if (!(this.client.getServerCapabilities()?.resources as { subscribe?: boolean } | undefined)?.subscribe)
+      throw new ApsError('ProtocolError', 'This server does not support resource subscriptions', { suggestions: ['Read the resource again to see changes.'] });
+    await this.client.subscribeResource({ uri });
+  }
+  async unsubscribeResource(uri: string): Promise<void> {
+    await this.client.unsubscribeResource({ uri });
+  }
+
+  /**
+   * Suggestions for an argument of a prompt or a resource template (completion/complete). Empty when the
+   * server has no completions.
+   */
+  async complete(ref: { type: 'ref/prompt'; name: string } | { type: 'ref/resource'; uri: string }, argument: { name: string; value: string }, context?: Record<string, string>): Promise<{ values: string[]; hasMore?: boolean; total?: number }> {
+    if (!this.client.getServerCapabilities()?.completions) return { values: [] };
+    const r = await this.client.complete({ ref, argument, ...(context ? { context: { arguments: context } } : {}) });
+    return { values: r.completion.values.slice(0, 100), hasMore: r.completion.hasMore, total: r.completion.total };
+  }
+
   onEvent(l: McpEventListener): () => void {
     this.listeners.push(l);
     return () => (this.listeners = this.listeners.filter((x) => x !== l));
@@ -283,6 +311,9 @@ export class McpSession {
     this.transport = new TracingTransport(this.createTransport(), this.emit, this.redactor);
     this.client.setNotificationHandler(LoggingMessageNotificationSchema, () => {
       /* recorded by the tracing transport */
+    });
+    this.client.setNotificationHandler(ResourceUpdatedNotificationSchema, (n) => {
+      for (const l of this.updateListeners) l(n.params.uri);
     });
     try {
       await this.client.connect(this.transport, { timeout: timeoutMs });

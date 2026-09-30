@@ -84,6 +84,7 @@ export function mcpHandlers(be: Backend): Handlers {
       });
       const b = be.batched<unknown>('mcp.events');
       session.onEvent((e) => b.push({ serverId, event: e }));
+      session.onResourceUpdated((uri) => be.host.emit('mcp.resourceUpdated', { serverId, uri }));
       be.mcpSessions.set(serverId, session);
       be.mcpRedactors.set(serverId, ctx.redactor);
       const started = Date.now();
@@ -185,6 +186,11 @@ export function mcpHandlers(be: Backend): Handlers {
     'mcp.prompt': ({ serverId, name, args }: { serverId: string; name: string; args: Record<string, string> }) =>
       be.mcpLogged(serverId, 'PROMPT', `prompts/get ${name}`, args, () => be.session(serverId).getPrompt(name, args)),
     'mcp.ping': async ({ serverId }: { serverId: string }) => be.session(serverId).ping(),
+    /** Suggestions for a prompt argument or resource-template parameter (completion/complete). */
+    'mcp.complete': ({ serverId, ref, argument, context }: { serverId: string; ref: { type: 'ref/prompt'; name: string } | { type: 'ref/resource'; uri: string }; argument: { name: string; value: string }; context?: Record<string, string> }) =>
+      be.session(serverId).complete(ref, argument, context),
+    'mcp.subscribe': ({ serverId, uri }: { serverId: string; uri: string }) => be.session(serverId).subscribeResource(uri),
+    'mcp.unsubscribe': ({ serverId, uri }: { serverId: string; uri: string }) => be.session(serverId).unsubscribeResource(uri),
     'mcp.saveTest': ({ serverId, tool, args, assertions, name }: { serverId: string; tool: string; args: Record<string, unknown>; assertions: CheckConfig[]; name: string }) => {
       const cfg = be.ws.getMcpServers().find((s) => s.id === serverId);
       const rel = `mcp/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.yaml`;
