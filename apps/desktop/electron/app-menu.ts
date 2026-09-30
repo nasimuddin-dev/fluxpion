@@ -128,6 +128,7 @@ function build(a: AppMenuActions): Menu {
         item({ label: 'Check for Updates…', i: 'updates', click: () => a.checkForUpdates() }),
         sep,
         item({ label: 'Open Examples Workspace', i: 'examples', click: () => a.menu('open-examples') }),
+        item({ label: 'Keyboard Shortcuts', i: 'shortcuts', click: () => a.menu('shortcuts') }),
         sep,
         item({ label: 'Documentation', i: 'docs', click: () => a.openExternal(DOCS) }),
         item({ label: 'Release Notes', i: 'releaseNotes', click: () => a.openExternal(`${DOCS}changelog`) }),

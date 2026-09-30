@@ -51,6 +51,7 @@ const ICONS = {
   maximize: 'Square',
   closeWindow: 'AppWindow',
   updates: 'RefreshCw',
+  shortcuts: 'Keyboard',
   examples: 'Sparkles',
   docs: 'BookOpen',
   releaseNotes: 'ScrollText',

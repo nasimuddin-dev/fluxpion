@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Keyboard shortcuts list.** Press `?` (outside a text field), use **Help ▸ Keyboard Shortcuts** or the command palette to see every shortcut, with the right modifier key for your platform.
 - **Icons on every menu.** The application menu (File, Edit, View, Window, Help) has an icon on every item, in the same style as the rest of the app, and follows the light or dark system theme. The command palette shows an icon for each command. Right-clicking a text field (the URL bar, any input) now opens an Undo / Redo / Cut / Copy / Paste / Select All menu.
 - **Trusted certificates.** **Settings ▸ Certificates** lets HTTPS trust the operating system's certificate store (for corporate TLS inspection) and extra CA certificates (PEM, with name, issuer and expiry shown). The CLI takes `TESTPION_USE_SYSTEM_CA=1` and `TESTPION_CA_FILE`. Settings now refuse a malformed certificate or proxy URL instead of saving it.
 - **Fixes from a first-run pass over the examples.**

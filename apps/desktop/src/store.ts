@@ -89,6 +89,7 @@ interface AppState {
   /** Which tab of the bottom panel is shown. */
   bottomTab: 'console' | 'logs';
   assistant?: AssistantRequest;
+  shortcutsOpen?: boolean;
   /** The "Run in CI" dialog, with what to run preselected. */
   ci?: CiRequest;
   toasts: Toast[];

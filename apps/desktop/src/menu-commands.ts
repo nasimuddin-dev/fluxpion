@@ -20,6 +20,7 @@ export type MenuCommand =
   | 'new-workspace'
   | 'open-workspace'
   | 'open-examples'
+  | 'shortcuts'
   | 'import'
   | 'export-collection'
   | 'export-environment'
@@ -105,6 +106,8 @@ export async function runMenuCommand(cmd: MenuCommand): Promise<void> {
       case 'save':
         // the active view saves on Ctrl/Cmd+S; the menu accelerator takes the key, so pass it on
         return void window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, metaKey: navigator.platform.startsWith('Mac'), bubbles: true }));
+      case 'shortcuts':
+        return s.set({ shortcutsOpen: true });
       case 'settings':
         return s.setView('settings');
     }

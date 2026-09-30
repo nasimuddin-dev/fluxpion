@@ -1,4 +1,4 @@
-import { AlarmClock, Bot, Columns2, CopyX, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
+import { AlarmClock, Bot, Keyboard, Columns2, CopyX, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
 import { createElement, lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
@@ -14,6 +14,7 @@ import { Spinner, TooltipProvider } from './components/ui';
  * startup fast and, importantly, defers Monaco and protocol-specific code until
  * it is useful. Named exports keep view modules simple.
  */
+const ShortcutsDialog = lazy(async () => ({ default: (await import('./components/ShortcutsDialog')).ShortcutsDialog }));
 const CiDialog = lazy(async () => ({ default: (await import('./components/CiDialog')).CiDialog }));
 const view = (load: () => Promise<any>, name: string) => lazy(async () => ({ default: (await load())[name] as ComponentType }));
 const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
@@ -57,6 +58,9 @@ function useThemeEffect() {
   }, [settings]);
 }
 
+/** Keys typed into a field are text, not shortcuts. */
+const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !!t.closest('.monaco-editor'));
+
 /** Icons of the command palette's commands (the same icons as the menus and navigation). */
 const PALETTE_ICONS: Record<string, LucideIcon> = {
   'new-request': Network,
@@ -80,6 +84,7 @@ const PALETTE_ICONS: Record<string, LucideIcon> = {
   compare: Columns2,
   eval: FlaskConical,
   update: RefreshCw,
+  shortcuts: Keyboard,
   'm-new-http': Network,
   'm-new-grpc': Waypoints,
   'm-new-ws': Radio,
@@ -103,6 +108,7 @@ export default function App() {
   const searchOpen = useApp((s) => s.searchOpen);
   const assistant = useApp((s) => s.assistant);
   const ci = useApp((s) => s.ci);
+  const shortcutsOpen = useApp((s) => s.shortcutsOpen);
   const logsOpen = useApp((s) => s.logsOpen);
   const workspace = useApp((s) => s.workspace);
   const [ready, setReady] = useState(false);
@@ -169,6 +175,9 @@ export default function App() {
         e.preventDefault();
         const st = useApp.getState();
         set(st.logsOpen && st.bottomTab === 'console' ? { logsOpen: false } : { logsOpen: true, bottomTab: 'console' });
+      } else if (e.key === '?' && !mod && !isTyping(e.target)) {
+        e.preventDefault();
+        set({ shortcutsOpen: true });
       } else if (mod && e.altKey && /^[1-9]$/.test(e.key)) {
         const n = NAV[Number(e.key) - 1];
         if (n) useApp.getState().setView(n.id);
@@ -201,6 +210,7 @@ export default function App() {
       { id: 'load', label: 'New Load Test', run: () => s.setView('load') },
       { id: 'compare', label: 'Compare Models', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'compare' }) },
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
+      { id: 'shortcuts', label: 'Keyboard Shortcuts', hint: '?', run: () => s.set({ shortcutsOpen: true }) },
       { id: 'update', label: 'Check for Updates', hint: 'Help', run: () => void checkForUpdates({ manual: true }) },
       { id: 'm-new-http', label: 'New HTTP Request', hint: 'File', run: () => void runMenuCommand('new-http') },
       { id: 'm-new-grpc', label: 'New gRPC Request', hint: 'File', run: () => void runMenuCommand('new-grpc') },
@@ -259,6 +269,11 @@ export default function App() {
       <StatusBar />
       {paletteOpen && <CommandPalette commands={commands} />}
       {searchOpen && <SearchDialog />}
+      {shortcutsOpen && (
+        <Suspense fallback={null}>
+          <ShortcutsDialog />
+        </Suspense>
+      )}
       {ci && (
         <Suspense fallback={null}>
           <CiDialog />
