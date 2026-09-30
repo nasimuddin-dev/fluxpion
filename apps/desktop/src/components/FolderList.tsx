@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, Copy, Folder, FolderInput, FolderOpen, FolderPlus, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { confirmAction, promptText } from '../store';
-import { Button, cx, IconButton, Menu, type MenuItem } from './ui';
+import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
 
 export interface FolderListItem {
   id: string;
@@ -68,6 +68,10 @@ export function FolderList({
     }
   });
   const [menuFor, setMenuFor] = useState<string>();
+  // filter by name, subtitle or folder (like the REST collection tree)
+  const [q, setQ] = useState('');
+  const ql = q.trim().toLowerCase();
+  const shown = ql ? items.filter((i) => [i.name, i.folder ?? '', typeof i.subtitle === 'string' ? i.subtitle : ''].some((t) => t.toLowerCase().includes(ql))) : items;
   const [dropTarget, setDropTarget] = useState<string | null>();
   const toggle = (f: string) =>
     setCollapsed((c) => {
@@ -170,7 +174,7 @@ export function FolderList({
     </div>
   );
 
-  const top = items.filter((i) => !i.folder);
+  const top = shown.filter((i) => !i.folder);
   return (
     <div className="h-full flex flex-col min-h-0">
       <div className="flex items-center gap-1 pl-3 pr-1 h-9 shrink-0">
@@ -182,10 +186,15 @@ export function FolderList({
           <Plus size={14} />
         </IconButton>
       </div>
+      {items.length > 0 && (
+        <div className="px-2 pb-2 shrink-0">
+          <Input className="w-full h-7 min-h-7 text-sm" placeholder={`Filter ${itemNoun}s`} aria-label={`Filter ${itemNoun}s`} value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+      )}
       <div className="flex-1 overflow-auto pb-2">
-        {allFolders.map((f) => {
-          const inFolder = items.filter((i) => i.folder === f);
-          const open = !collapsed[f];
+        {allFolders.filter((f) => !ql || shown.some((i) => i.folder === f)).map((f) => {
+          const inFolder = shown.filter((i) => i.folder === f);
+          const open = !!ql || !collapsed[f];
           return (
             <div key={`folder:${f}`}>
               <div
@@ -230,6 +239,7 @@ export function FolderList({
               </div>
             </>
           )}
+          {ql && !shown.length && <p className="px-3 py-4 text-sm text-muted text-center">No {itemNoun}s match this filter.</p>}
           {allFolders.length > 0 && <div className="h-6" aria-hidden />}
         </div>
       </div>
