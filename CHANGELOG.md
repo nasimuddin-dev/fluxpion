@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-09-30
+
+Highlights: **MQTT** alongside WebSocket and Socket.IO; **HTTP/2**; **WSDL/SOAP**, **Bruno** folder import and export, HTTPie and grpcurl paste; **async scripts** (`await pm.sendRequest`, async `pm.test`), **script packages** (`pm.require`) and more Postman modules (ajv, chai, cheerio, xml2js, csv-parse); **MCP client features** (elicitation, sampling, roots, completions, resource subscriptions); **load-test thresholds** and **gRPC load tests**; **watch mode**, **re-run failed tests** and **OpenTelemetry export** in the CLI; tests run from AI agents over MCP (`list_tests`, `run_tests`, `save_test`), **Explain with AI** for failed tests; and a tidier UI: grouped navigation, collections in the GraphQL view, filterable saved lists and a clearer Tests sidebar.
 
 - **Tests view sidebar**: a labelled **New** menu for test templates (REST, GraphQL, gRPC, WebSocket, MQTT, MCP, AI, suite) in place of the small + picker, and a filter box for test files.
 - **Collections in the GraphQL view**: a Collections / Schema switch in the sidebar shows the same collection tree as REST (new collections and folders, **New GraphQL request** in any folder, drag and drop, run, move), **Save** (now also Ctrl+S) asks for the collection and folder, and HTTP requests in the tree open in REST.
