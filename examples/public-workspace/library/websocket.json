@@ -1,6 +1,9 @@
 {
   "schemaVersion": "1.0",
-  "folders": ["Echo servers"],
+  "folders": [
+    "Echo servers",
+    "MQTT brokers"
+  ],
   "items": [
     {
       "id": "ws-postman-echo",
@@ -24,6 +27,26 @@
         "headers": [],
         "message": "Hello from TestPion",
         "mode": "websocket"
+      }
+    },
+    {
+      "id": "mqtt-mosquitto",
+      "name": "Mosquitto test broker",
+      "folder": "MQTT brokers",
+      "data": {
+        "url": "mqtt://test.mosquitto.org:1883",
+        "protocols": "",
+        "headers": [],
+        "mode": "mqtt",
+        "topic": "testpion/examples/hello",
+        "qos": 0,
+        "message": "{\n  \"from\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\"\n}",
+        "subscriptions": [
+          {
+            "topic": "testpion/examples/#",
+            "qos": 0
+          }
+        ]
       }
     }
   ]

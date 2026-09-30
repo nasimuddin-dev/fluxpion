@@ -1,0 +1,13 @@
+# MQTT: subscribe to a topic on the public Mosquitto test broker, publish to it, and check what came back.
+name: Mosquitto test broker delivers a published message
+type: mqtt
+tags: [mqtt, public]
+url: mqtt://test.mosquitto.org:1883
+subscribe: [testpion/examples/#]
+send:
+  - { topic: testpion/examples/hello, payload: { from: TestPion, kind: greeting }, qos: 1 }
+waitMs: 2000
+assertions:
+  - { type: status, expected: 200 }
+  - { type: equals, path: "$.received[0].topic", expected: testpion/examples/hello }
+  - { type: equals, path: "$.received[0].data.from", expected: TestPion }

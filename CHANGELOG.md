@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Examples**: the Examples workspace has a SOAP collection imported from a public WSDL and an MQTT test and saved connection for the public Mosquitto broker.
 - **Paste a grpcurl command** into the gRPC view's server field to fill in the call (server, TLS, method, message, metadata, time limit).
 - **Save as test**: turn the request in the REST (tab menu), GraphQL, gRPC or WebSocket / Socket.IO / MQTT view into a YAML test file under `tests/`, with its checks and scripts ({{variables}} kept), ready for the Tests view, `testpion test` and CI. AI agents use the `save_test` MCP tool.
 - **Load test thresholds**: pass/fail rules like k6's (`p95<500`, `errors<1%`, `rps>=50`, `p99[Get patient]<800`) with `testpion load --threshold` (exit 1 when one fails, for CI), **Pass if** in the Load view, and `thresholds` in the `load_test` MCP tool.

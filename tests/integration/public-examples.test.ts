@@ -33,7 +33,7 @@ describe('examples workspace (public APIs)', () => {
   it('has valid collections, environment, providers, MCP servers, saved items and monitors', () => {
     const cols = store.listCollections();
     expect(cols.filter((c) => c.problem)).toEqual([]);
-    expect(cols.map((c) => c.id).sort()).toEqual(['graphql-public', 'httpbin', 'jsonplaceholder', 'live-streams', 'petstore']);
+    expect(cols.map((c) => c.id).sort()).toEqual(['graphql-public', 'httpbin', 'jsonplaceholder', 'live-streams', 'petstore', 'soap']);
     expect(store.getEnvironment('Public APIs')?.variables.some((v) => v.key === 'petstoreMcp')).toBe(true);
     expect(store.getProviders().map((p) => p.id)).toContain('demo');
     expect(store.getMcpServers().map((s) => s.name)).toEqual(['Petstore MCP', 'DeepWiki', 'Weather (offline mock)']);

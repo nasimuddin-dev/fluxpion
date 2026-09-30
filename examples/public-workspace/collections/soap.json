@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "1.0",
+  "id": "soap",
+  "name": "SOAP: Number Conversion",
+  "version": 1,
+  "variables": [
+    {
+      "key": "baseUrl",
+      "value": "https://www.dataaccess.com/webservicesserver/NumberConversion.wso",
+      "enabled": true
+    }
+  ],
+  "items": [
+    {
+      "kind": "folder",
+      "id": "fld-muo41e67914ad1354a",
+      "name": "NumberConversion · NumberConversionSoap",
+      "items": [
+        {
+          "kind": "http",
+          "id": "soap-1",
+          "name": "NumberToWords",
+          "description": "Returns the word corresponding to the positive number passed as parameter. Limited to quadrillions.",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.dataaccess.com/webservicesserver/\">\n  <soap:Header/>\n  <soap:Body>\n    <tns:NumberToWords>\n      <tns:ubiNum>42</tns:ubiNum>\n    </tns:NumberToWords>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ],
+          "testScript": "// the reply is XML: xml2Json turns it into an object\nconst reply = xml2Json(pm.response.text());\nconst body = reply['soap:Envelope']['soap:Body'];\nconst words = body['m:NumberToWordsResponse']['m:NumberToWordsResult'];\npm.test('42 in words', () => pm.expect(words.trim()).to.equal('forty two'));"
+        },
+        {
+          "kind": "http",
+          "id": "soap-2",
+          "name": "NumberToDollars",
+          "description": "Returns the non-zero dollar amount of the passed number.",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.dataaccess.com/webservicesserver/\">\n  <soap:Header/>\n  <soap:Body>\n    <tns:NumberToDollars>\n      <tns:dNum>12.5</tns:dNum>\n    </tns:NumberToDollars>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ],
+          "testScript": "pm.test('dollars and cents', () => pm.expect(pm.response.text()).to.include('twelve dollars and fifty cents'));"
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-muo41e681eaa7418cd",
+      "name": "NumberConversion · NumberConversionSoap12 (SOAP 1.2)",
+      "items": [
+        {
+          "kind": "http",
+          "id": "soap-3",
+          "name": "NumberToWords",
+          "description": "Returns the word corresponding to the positive number passed as parameter. Limited to quadrillions.",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "application/soap+xml; charset=utf-8",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tns=\"http://www.dataaccess.com/webservicesserver/\">\n  <soap:Header/>\n  <soap:Body>\n    <tns:NumberToWords>\n      <tns:ubiNum>42</tns:ubiNum>\n    </tns:NumberToWords>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ],
+          "testScript": "// the reply is XML: xml2Json turns it into an object\nconst reply = xml2Json(pm.response.text());\nconst body = reply['soap:Envelope']['soap:Body'];\nconst words = body['m:NumberToWordsResponse']['m:NumberToWordsResult'];\npm.test('42 in words', () => pm.expect(words.trim()).to.equal('forty two'));"
+        },
+        {
+          "kind": "http",
+          "id": "soap-4",
+          "name": "NumberToDollars",
+          "description": "Returns the non-zero dollar amount of the passed number.",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "application/soap+xml; charset=utf-8",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:tns=\"http://www.dataaccess.com/webservicesserver/\">\n  <soap:Header/>\n  <soap:Body>\n    <tns:NumberToDollars>\n      <tns:dNum>12.5</tns:dNum>\n    </tns:NumberToDollars>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ],
+          "testScript": "pm.test('dollars and cents', () => pm.expect(pm.response.text()).to.include('twelve dollars and fifty cents'));"
+        }
+      ]
+    }
+  ],
+  "description": "A public SOAP service, imported from its WSDL (Import ▸ link: https://www.dataaccess.com/webservicesserver/NumberConversion.wso?WSDL). Each operation has its SOAPAction and an envelope built from the XML Schema; the tests read the XML reply with xml2Json.",
+  "updatedAt": "2026-09-30T00:00:00.000Z"
+}
