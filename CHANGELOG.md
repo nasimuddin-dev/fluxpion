@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **lodash in scripts.** As in Postman, scripts can use `_` (for example `_.get(json, 'items[0].id')`) or `require('lodash')`. It's loaded only for scripts that use it.
 - Fixed: `pm.response.to.have.jsonSchema(schema)` in scripts always passed. It now validates the response (with Ajv, as the Schema check does) and the failure says what didn't match. `pm.expect(value).to.have.jsonSchema(schema)` and `tv4.validate(data, schema)` (older Postman scripts) work too.
 - **Postman's dynamic variables.** `{{$randomFirstName}}`, `{{$randomCity}}`, `{{$randomUUID}}`, `{{$randomLoremSentence}}`, `{{$randomDateFuture}}` and about 70 more now give fresh fake values, so imported Postman collections send what they sent there instead of the literal text. Type `{{$` in any field or editor to pick one. `pm.variables.replaceIn()` in scripts fills them too.
 - **Use your own Claude API key.** **Settings ▸ AI assistant** now works like Markpion: turn the assistant on, paste your Anthropic API key and **Save key** (TestPion checks it with Anthropic, then keeps it in the OS secret store, never in settings or workspace files), and pick Claude Opus 5.5, Sonnet 5.5 or Haiku 4.5. The key powers the assistant and appears in AI Lab and evaluations as **Claude (your API key)** (`claude-app`); CI can pass it as `TESTPION_SECRET_APP_ANTHROPIC_APIKEY`. A workspace provider (e.g. local Ollama) can still be chosen instead.

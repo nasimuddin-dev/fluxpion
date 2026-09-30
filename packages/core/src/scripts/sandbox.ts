@@ -4,6 +4,9 @@ import variant from '@jitl/quickjs-singlefile-mjs-release-sync';
 import { EPILOGUE, PRELUDE } from './prelude.js';
 import { dynamicValue } from '../vars/dynamic.js';
 import { validateSchema } from '../eval/checks.js';
+import { LODASH_SOURCE } from './lodash.generated.js';
+
+const USES_LODASH = /(^|[^\w$.])_\s*[.(]|require\s*\(\s*['"]lodash['"]/;
 import type { CookieJarOp, StoredCookie } from '../cookies/cookie-jar.js';
 
 /**
@@ -173,6 +176,13 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     const inputHandle = vm.newString(JSON.stringify(input));
     vm.setProp(vm.global, '__input_json', inputHandle);
     inputHandle.dispose();
+
+    // lodash, like Postman's sandbox: `_` and require('lodash'). Parsed only for scripts that use it.
+    if (USES_LODASH.test(code)) {
+      const lib = vm.evalCode(LODASH_SOURCE, 'lodash.js');
+      if (lib.error) lib.error.dispose();
+      else lib.value.dispose();
+    }
 
     const wrapped = `${PRELUDE}\ntry { (function(){\n${code}\n})(); } catch (e) { __out.error = String((e && e.stack) || e); }\n${EPILOGUE}\nJSON.stringify(__out);`;
     const result = vm.evalCode(wrapped, 'user-script.js');

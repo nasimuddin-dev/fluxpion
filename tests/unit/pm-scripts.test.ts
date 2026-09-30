@@ -192,4 +192,23 @@ describe('Postman-compatible scripts (pm.*)', () => {
     ]);
     expect(out.tests[1]!.message).toMatch(/must have required property 'missing'/);
   });
+
+  it('has lodash like Postman (_ and require("lodash")), loaded only when used', async () => {
+    const out = await runScript(
+      `const lodash = require("lodash");
+       const items = pm.response.json().items;
+       pm.test("lodash", () => {
+         pm.expect(_.get(pm.response.json(), "items[0].tags[0]")).to.equal("dog");
+         pm.expect(lodash.map(items, "name")).to.eql(["Rex"]);
+         pm.expect(_.sortBy([3, 1, 2])).to.eql([1, 2, 3]);
+         pm.expect(_.isEqual({ a: [1] }, { a: [1] })).to.be.true;
+       });`,
+      { variables: {}, response },
+    );
+    expect(out.error).toBeUndefined();
+    expect(out.tests).toEqual([expect.objectContaining({ name: 'lodash', passed: true })]);
+    const plain = await runScript(`pm.test("no lodash", () => pm.expect(typeof _).to.equal("undefined"));`, { variables: {}, response });
+    expect(plain.tests[0]!.passed).toBe(true);
+    expect(out.durationMs).toBeLessThan(1500);
+  });
 });
