@@ -151,7 +151,7 @@ describe('importing into a workspace', () => {
       auth: { type: 'bearer', bearer: { token: '{{tok}}' } },
       item: [
         { name: 'Basic', request: { url: 'https://a.test/x', method: 'GET', auth: { type: 'basic', basic: { username: 'u', password: 'p' } } } },
-        { name: 'Key', request: { url: 'https://a.test/y', method: 'GET', auth: { type: 'apikey', apikey: { key: 'X-Key', value: 'k', in: 'header' } } } },
+        { name: 'Key', request: { url: 'https://a.test/y', method: 'GET', header: 'Accept: application/json\nX-Trace: t:1', auth: { type: 'apikey', apikey: { key: 'X-Key', value: 'k', in: 'header' } } } },
       ],
     };
     const r = importAny(JSON.stringify(v20));
@@ -159,6 +159,11 @@ describe('importing into a workspace', () => {
     expect(r.collection!.items.map((i) => (i as SavedHttpRequest).request.auth)).toEqual([
       { type: 'basic', username: 'u', password: 'p' },
       { type: 'apiKey', key: 'X-Key', value: 'k', in: 'header' },
+    ]);
+    // headers written as one string
+    expect((r.collection!.items[1] as SavedHttpRequest).request.headers?.map((h) => [h.key, h.value])).toEqual([
+      ['Accept', 'application/json'],
+      ['X-Trace', 't:1'],
     ]);
   });
 });

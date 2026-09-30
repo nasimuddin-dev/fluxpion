@@ -316,7 +316,9 @@ export function importPostman(text: string): { collection: Collection } {
       const [base, qs] = url.split('?');
       const params: KeyValue[] = (r.url?.query ?? []).map((q: any) => ({ key: q.key, value: q.value ?? '', enabled: !q.disabled, ...(q.description ? { description: pmDescription(q.description) } : {}) }));
       const pathVariables: KeyValue[] = (r.url?.variable ?? []).filter((v: any) => v.key).map((v: any) => ({ key: v.key, value: String(v.value ?? ''), ...(v.description ? { description: pmDescription(v.description) } : {}) }));
-      const headers: KeyValue[] = (r.header ?? []).map((h: any) => ({ key: h.key, value: h.value ?? '', enabled: !h.disabled, ...(h.description ? { description: pmDescription(h.description) } : {}) }));
+      // v2.0 also allows headers as one "Name: value" string per line
+      const rawHeaders = typeof r.header === 'string' ? r.header.split(/\r?\n/).filter((l: string) => l.includes(':')).map((l: string) => ({ key: l.slice(0, l.indexOf(':')).trim(), value: l.slice(l.indexOf(':') + 1).trim() })) : r.header;
+      const headers: KeyValue[] = (rawHeaders ?? []).map((h: any) => ({ key: h.key, value: h.value ?? '', enabled: !h.disabled, ...(h.description ? { description: pmDescription(h.description) } : {}) }));
       const auth = pmAuth(r.auth) ?? { type: 'inherit' as const };
       if (r.body?.mode === 'graphql') {
         const g = r.body.graphql ?? {};
