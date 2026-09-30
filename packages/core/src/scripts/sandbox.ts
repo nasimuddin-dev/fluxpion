@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { newQuickJSWASMModuleFromVariant, shouldInterruptAfterDeadline, type QuickJSWASMModule } from 'quickjs-emscripten-core';
 import variant from '@jitl/quickjs-singlefile-mjs-release-sync';
 import { EPILOGUE, PRELUDE } from './prelude.js';
+import { dynamicValue } from '../vars/dynamic.js';
 import type { CookieJarOp, StoredCookie } from '../cookies/cookie-jar.js';
 
 /**
@@ -152,6 +153,7 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     };
     const alg = (a: string) => (HASHES.has(a) ? a : 'sha256');
     fn('__host_uuid', () => randomUUID());
+    fn('__host_dynamic', (name) => JSON.stringify(dynamicValue(name ?? '') ?? null));
     fn('__host_hash', (a, s) => createHash(alg(a)).update(s ?? '').digest('hex'));
     fn('__host_hmac', (a, key, s) => createHmac(alg(a), key ?? '').update(s ?? '').digest('hex'));
     fn('__host_b64', (s) => Buffer.from(s ?? '', 'utf8').toString('base64'));

@@ -42,7 +42,7 @@ function __resolve(key) {
   return undefined;
 }
 function __replaceIn(str) {
-  return String(str).replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (m, k) => { const v = __resolve(k.trim()); return v === undefined ? m : typeof v === 'object' ? JSON.stringify(v) : String(v); });
+  return String(str).replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (m, k) => { let v = __resolve(k.trim()); if (v === undefined && k.trim()[0] === '$') v = JSON.parse(__host_dynamic(k.trim())) ?? undefined; return v === undefined ? m : typeof v === 'object' ? JSON.stringify(v) : String(v); });
 }
 function __scope(name) {
   const store = __scopes[name];

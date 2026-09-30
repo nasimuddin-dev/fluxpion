@@ -155,4 +155,17 @@ describe('Postman-compatible scripts (pm.*)', () => {
     const out = await runScript(`function go(n) { pm.sendRequest('https://x.test/' + n, () => go(n + 1)); } go(0);`, { variables: {} }, { sendRequest, maxRequests: 5 });
     expect(out.error).toMatch(/more than 5 requests/);
   });
+
+  it('pm.variables.replaceIn fills dynamic variables ($randomFirstName, $guid …)', async () => {
+    const out = await runScript(
+      `const s = pm.variables.replaceIn("{{$randomFirstName}}|{{$guid}}|{{$randomInt(3,3)}}|{{$nope}}|{{name}}");
+       pm.environment.set("s", s);`,
+      { variables: { name: 'Rex' } },
+    );
+    expect(out.error).toBeUndefined();
+    const [first, guid, n, nope, name] = String(out.scopeSets.environment.s).split('|');
+    expect(first).toMatch(/^[A-Z]/);
+    expect(guid).toMatch(/^[0-9a-f-]{36}$/);
+    expect([n, nope, name]).toEqual(['3', '{{$nope}}', 'Rex']);
+  });
 });

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Postman's dynamic variables.** `{{$randomFirstName}}`, `{{$randomCity}}`, `{{$randomUUID}}`, `{{$randomLoremSentence}}`, `{{$randomDateFuture}}` and about 70 more now give fresh fake values, so imported Postman collections send what they sent there instead of the literal text. Type `{{$` in any field or editor to pick one.
+- **Postman's dynamic variables.** `{{$randomFirstName}}`, `{{$randomCity}}`, `{{$randomUUID}}`, `{{$randomLoremSentence}}`, `{{$randomDateFuture}}` and about 70 more now give fresh fake values, so imported Postman collections send what they sent there instead of the literal text. Type `{{$` in any field or editor to pick one. `pm.variables.replaceIn()` in scripts fills them too.
 - **Use your own Claude API key.** **Settings ▸ AI assistant** now works like Markpion: turn the assistant on, paste your Anthropic API key and **Save key** (TestPion checks it with Anthropic, then keeps it in the OS secret store, never in settings or workspace files), and pick Claude Opus 5.5, Sonnet 5.5 or Haiku 4.5. The key powers the assistant and appears in AI Lab and evaluations as **Claude (your API key)** (`claude-app`); CI can pass it as `TESTPION_SECRET_APP_ANTHROPIC_APIKEY`. A workspace provider (e.g. local Ollama) can still be chosen instead.
 - **.env files.** Import a `.env` file as an environment (secret-looking keys become secret variables, with values in the OS secret store), and export an environment as `.env` from the Envs view.
 - Fixed: in the MCP view, assertions (and the raw JSON arguments) were shared by all tools of a server, so picking another tool kept showing the previous tool's checks. Each tool now has its own.
