@@ -263,14 +263,63 @@ function __headerList(list) {
     count: () => arr.length,
   };
 }
+// Postman's Url object over a URL string that may hold {{variables}} (kept as written)
+function __urlObject(r) {
+  const split = () => {
+    const s = String(r.url || '');
+    const hash = s.indexOf('#');
+    const noHash = hash >= 0 ? s.slice(0, hash) : s;
+    const q = noHash.indexOf('?');
+    const base = q >= 0 ? noHash.slice(0, q) : noHash;
+    const m = /^([a-z][a-z0-9+.-]*:\/\/)?([^/]*)(.*)$/i.exec(base) || [];
+    return { scheme: m[1] || '', authority: m[2] || '', path: m[3] || '', query: q >= 0 ? noHash.slice(q + 1) : '', hash: hash >= 0 ? s.slice(hash) : '' };
+  };
+  const parseQuery = (qs) => (qs ? qs.split('&').filter((p) => p !== '').map((p) => { const i = p.indexOf('='); return i >= 0 ? { key: p.slice(0, i), value: p.slice(i + 1) } : { key: p, value: null }; }) : []);
+  const build = (u, params) => {
+    const qs = params.map((p) => (p.value === null || p.value === undefined ? p.key : p.key + '=' + p.value)).join('&');
+    r.url = u.scheme + u.authority + u.path + (qs ? '?' + qs : '') + u.hash;
+  };
+  const withQuery = (fn) => { const u = split(); const params = parseQuery(u.query); fn(params); build(u, params); };
+  const query = {
+    get: (k) => { const p = parseQuery(split().query).find((x) => x.key === k); return p ? p.value : undefined; },
+    has: (k) => parseQuery(split().query).some((x) => x.key === k),
+    add: (p) => withQuery((ps) => ps.push(typeof p === 'string' ? parseQuery(p)[0] : { key: String(p.key), value: p.value === undefined ? null : String(p.value) })),
+    upsert: (p) => withQuery((ps) => { const i = ps.findIndex((x) => x.key === p.key); const v = { key: String(p.key), value: p.value === undefined ? null : String(p.value) }; if (i >= 0) ps[i] = v; else ps.push(v); }),
+    remove: (k) => withQuery((ps) => { for (let i = ps.length - 1; i >= 0; i--) if (ps[i].key === (typeof k === 'object' ? k.key : k)) ps.splice(i, 1); }),
+    clear: () => withQuery((ps) => ps.splice(0, ps.length)),
+    all: () => parseQuery(split().query),
+    each: (fn) => parseQuery(split().query).forEach(fn),
+    count: () => parseQuery(split().query).length,
+    toObject: () => { const o = {}; parseQuery(split().query).forEach((p) => { o[p.key] = p.value; }); return o; },
+  };
+  const hostPort = () => { const a = split().authority.replace(/^[^@]*@/, ''); const m = /^(\[[^\]]*\]|[^:]*)(?::(.*))?$/.exec(a) || []; return { host: m[1] || '', port: m[2] }; };
+  return {
+    toString: () => r.url,
+    update: (u) => { r.url = String(u); },
+    getHost: () => hostPort().host,
+    getRemote: () => { const h = hostPort(); return h.port ? h.host + ':' + h.port : h.host; },
+    getPath: () => split().path || '/',
+    getQueryString: () => split().query,
+    getPathWithQuery: () => { const u = split(); return (u.path || '/') + (u.query ? '?' + u.query : ''); },
+    get protocol() { return split().scheme.replace('://', ''); },
+    get host() { return hostPort().host.split('.'); },
+    get port() { return hostPort().port; },
+    get path() { return split().path.split('/').filter((x) => x !== ''); },
+    query: query,
+    addQueryParams: (ps) => (Array.isArray(ps) ? ps : [ps]).forEach((p) => query.add(p)),
+    removeQueryParams: (ks) => (Array.isArray(ks) ? ks : [ks]).forEach((k) => query.remove(k)),
+  };
+}
 let __request;
 if (__out.request) {
   const r = __out.request;
   r.headers = r.headers || [];
+  const __url = __urlObject(r);
   __request = {
     get method() { return r.method; },
     set method(m) { r.method = String(m).toUpperCase(); },
-    url: { toString: () => r.url, update: (u) => { r.url = String(u); }, getHost: () => (/^[a-z]+:\/\/([^/:?#]+)/i.exec(r.url) || [])[1] },
+    get url() { return __url; },
+    set url(u) { r.url = String(u); },
     headers: __headerList(r.headers),
     addHeader: (h) => __headerList(r.headers).add(h),
     removeHeader: (k) => __headerList(r.headers).remove(k),

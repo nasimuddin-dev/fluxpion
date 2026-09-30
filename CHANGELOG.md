@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scripts: `pm.request.url` is now a Postman-style URL object (`getPath()`, `getQueryString()`, `getRemote()`, `query.get/add/upsert/remove` …, keeping `{{variables}}` as written), and assigning a string to it replaces the URL.
 - **Scripts for GraphQL requests.** The GraphQL view has a **Scripts** tab (pre-request and post-response), and in collection runs the collection's and folders' scripts now run for GraphQL requests too; before, a collection script that set a token or header was skipped for them. Postman GraphQL requests keep their scripts on import and export. Also fixed: saving a GraphQL request dropped its favorite mark.
 - Scripts: typing a quote in `pm.environment.get('`, `pm.variables.set('`, `pm.globals.has('` … suggests the variable names of that scope, with their values (secrets hidden).
 - **Mock an OpenAPI API at once.** Importing an OpenAPI / Swagger document now saves an example for each documented response (from its example, a named example or the schema), so the collection can be mocked straight away. `testpion mock`, `docs` and `export` also take a file or an http(s) link, e.g. `testpion mock https://petstore3.swagger.io/api/v3/openapi.json`.

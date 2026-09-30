@@ -73,6 +73,13 @@ interface PmCookieJar {
   unset(url: string, name: string, cb?: (err: null) => void): void;
   clear(url: string, cb?: (err: null) => void): void;
 }
+/** Postman's Url object; {{variables}} stay as written. Assigning a string to pm.request.url replaces it. */
+interface PmUrl {
+  toString(): string; update(url: string): void; getHost(): string; getRemote(): string; getPath(): string; getQueryString(): string; getPathWithQuery(): string;
+  readonly protocol: string; readonly host: string[]; readonly port: string | undefined; readonly path: string[];
+  query: { get(key: string): string | null | undefined; has(key: string): boolean; add(p: { key: string; value?: any }): void; upsert(p: { key: string; value?: any }): void; remove(key: string): void; clear(): void; all(): Array<{ key: string; value: string | null }>; count(): number; toObject(): Record<string, string | null> };
+  addQueryParams(params: Array<{ key: string; value?: any }> | { key: string; value?: any }): void; removeQueryParams(keys: string[] | string): void;
+}
 declare const pm: {
   /** Define a named test; it passes unless the function throws. */
   test(name: string, fn: () => void): void;
@@ -80,7 +87,7 @@ declare const pm: {
   expect: { (value: any): PmExpect; fail(message?: string): never };
   variables: PmVariableScope; environment: PmVariableScope; globals: PmVariableScope; collectionVariables: PmVariableScope;
   iterationData: { get(key: string): any; has(key: string): boolean; toObject(): Record<string, any> };
-  request: { method: string; url: { toString(): string; update(url: string): void }; headers: PmHeaderList; body: { toString(): string; update(body: string | object): void } };
+  request: { method: string; url: PmUrl; headers: PmHeaderList; body: { toString(): string; update(body: string | object): void } };
   response: { code: number; status: string; responseTime: number; responseSize: number; headers: PmHeaderList; json(): any; text(): string; to: PmResponseAssert; size(): { body: number; header: number; total: number } };
   info: { requestName: string; requestId: string; iteration: number; iterationCount: number; eventName: 'prerequest' | 'test' };
   cookies: { get(name: string): string | undefined; has(name: string): boolean; toObject(): Record<string, string>; jar(): PmCookieJar };

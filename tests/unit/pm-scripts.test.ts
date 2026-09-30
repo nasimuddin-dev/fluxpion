@@ -321,4 +321,36 @@ describe('Postman-compatible scripts (pm.*)', () => {
       ['late order', true, ''],
     ]);
   });
+
+  it('pm.request.url works like Postman\'s Url object, keeping {{variables}}', async () => {
+    const out = await runScript(
+      `const u = pm.request.url;
+       const seen = {
+         host: u.getHost(), remote: u.getRemote(), path: u.getPath(), qs: u.getQueryString(), pq: u.getPathWithQuery(),
+         protocol: u.protocol, segments: u.path, page: u.query.get('page'), hasQ: u.query.has('q'), count: u.query.count(),
+       };
+       u.query.upsert({ key: 'page', value: 2 });
+       u.query.add({ key: 'sig', value: '{{signature}}' });
+       u.query.remove('drop');
+       pm.environment.set('seen', JSON.stringify(seen));`,
+      { variables: {}, request: { method: 'GET', url: 'https://api.test:8443/v1/pets/{{petId}}?page=1&q=dog&drop=x', headers: [] } },
+    );
+    expect(out.error).toBeUndefined();
+    expect(JSON.parse(String(out.scopeSets.environment.seen))).toEqual({
+      host: 'api.test',
+      remote: 'api.test:8443',
+      path: '/v1/pets/{{petId}}',
+      qs: 'page=1&q=dog&drop=x',
+      pq: '/v1/pets/{{petId}}?page=1&q=dog&drop=x',
+      protocol: 'https',
+      segments: ['v1', 'pets', '{{petId}}'],
+      page: '1',
+      hasQ: true,
+      count: 3,
+    });
+    expect(out.request!.url).toBe('https://api.test:8443/v1/pets/{{petId}}?page=2&q=dog&sig={{signature}}');
+    // assigning a string replaces the URL, as in Postman
+    const set = await runScript(`pm.request.url = '{{baseUrl}}/other?x=1';`, { variables: {}, request: { method: 'GET', url: 'https://a.test/', headers: [] } });
+    expect(set.request!.url).toBe('{{baseUrl}}/other?x=1');
+  });
 });
