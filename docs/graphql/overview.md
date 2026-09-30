@@ -11,7 +11,9 @@ Enter the endpoint (variables allowed), then write the operation in the Monaco e
 
 - **Ctrl/Cmd+Enter** runs the operation, **Prettify** formats it, and **Generate** asks the AI assistant to draft a query from the schema.
 - Responses appear as a JSON tree. GraphQL `errors` are counted and can be asserted on.
-- Subscriptions need a WebSocket transport (graphql-ws), which this release does not include. You can test them manually in the WebSocket view.
+- **Code** shows the call as code (cURL, fetch, Python, Go and more): the JSON `POST` with the query, variables and operation name, with `{{variables}}` resolved.
+- Subscriptions run over WebSocket (`graphql-transport-ws` and `graphql-ws`): see [subscriptions](./subscriptions.md).
+- The schema explorer's **Build** writes a whole operation for a root field (see [schema explorer](./schema-explorer.md#build-an-operation)).
 
 See [schema explorer](./schema-explorer.md), [testing](./testing.md) and the [GraphQL mock server](./mocking.md).
 

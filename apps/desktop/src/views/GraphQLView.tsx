@@ -1,11 +1,12 @@
-import { BookOpen, ChevronLeft, FlaskConical, Play, Radio, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, Code2, FlaskConical, Play, Radio, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import { setGraphQLSchema } from '../monaco';
-import type { AuthConfig, CheckConfig, CheckResult, Collection, HttpResponseData, KeyValue, SavedGraphQLRequest } from '../types';
+import type { AuthConfig, CheckConfig, CheckResult, Collection, HttpRequestSpec, HttpResponseData, KeyValue, SavedGraphQLRequest } from '../types';
+import { CodeModal } from '../components/CodeModal';
 import { formatMs, uid } from '../lib/format';
 import { AssertionEditor } from '../components/AssertionEditor';
 import { AuthEditor } from '../components/AuthEditor';
@@ -147,6 +148,27 @@ export function GraphQLView() {
   };
 
   const selectedOp = operations.find((o) => o.name === d.operationName) ?? operations[0];
+
+  // Code snippets: a GraphQL call is a JSON POST ({{variables}} are resolved by the snippet generator)
+  const [showCode, setShowCode] = useState(false);
+  const asHttpRequest = (): HttpRequestSpec => {
+    const vars = d.variables.trim();
+    let variables: string;
+    try {
+      variables = vars ? JSON.stringify(JSON.parse(vars), null, 2).replace(/\n/g, '\n  ') : '{}';
+    } catch {
+      variables = vars; // e.g. with {{variables}} that aren't valid JSON yet: kept as typed
+    }
+    const content = `{\n  "query": ${JSON.stringify(d.query)},\n  "variables": ${variables}${selectedOp?.name && operations.length > 1 ? `,\n  "operationName": ${JSON.stringify(selectedOp.name)}` : ''}\n}`;
+    const hasType = d.headers.some((h) => h.enabled !== false && h.key.toLowerCase() === 'content-type');
+    return {
+      method: 'POST',
+      url: d.endpoint,
+      headers: [...d.headers, ...(hasType ? [] : [{ key: 'Content-Type', value: 'application/json', enabled: true }])],
+      auth: d.auth,
+      body: { type: 'json', content },
+    };
+  };
   const isSubscription = selectedOp?.type === 'subscription';
   useEffect(
     () =>
@@ -296,10 +318,14 @@ export function GraphQLView() {
             {isSubscription ? 'Subscribe' : 'Run'}
           </Button>
         )}
+        <Button icon={<Code2 size={13} />} title="The request as code: cURL, fetch, Python and more" onClick={() => setShowCode(true)}>
+          Code
+        </Button>
         <Button icon={<Save size={13} />} onClick={save}>
           Save
         </Button>
       </div>
+      {showCode && <CodeModal request={asHttpRequest()} collectionId={d.collectionId} requestId={d.requestId} onClose={() => setShowCode(false)} />}
       <div className="flex-1 min-h-0">
         <Split id="gql-explorer" sidebar initial={22} min={12}>
           <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onBuild={(f) => void buildOperation(f)} onIntrospect={introspectNow} loading={introspecting} />

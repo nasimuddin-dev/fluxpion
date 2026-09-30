@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **GraphQL code snippets**: the GraphQL view's **Code** button shows the call as cURL, fetch, Python, Go and the other snippet languages.
 - **Watch mode**: `testpion test --watch`, `testpion run --watch` and `testpion run-collection --watch` run again whenever a test, collection, environment or data file changes (the run's own results don't count).
 - **HTTP/2**: requests over https use HTTP/2 when the server supports it, the response shows an **HTTP/2** badge (`httpVersion` in results), and the request setting **HTTP/1.1 only** turns it off. HTTP/2 responses get their standard status text (`200 OK`).
 - **WSDL import (SOAP)**: a WSDL 1.1 document (file or `?wsdl` link) becomes a collection of SOAP 1.1 / 1.2 requests with `SOAPAction` headers and sample envelopes built from the XML Schema (document/literal and RPC, base types, enumerations). The demo servers have a SOAP patient service (`http://127.0.0.1:4010/soap/patients?wsdl`).
