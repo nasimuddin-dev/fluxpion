@@ -15,15 +15,24 @@ export interface VarInfo {
   secret?: boolean;
 }
 
-const DYNAMIC: VarInfo[] = [
-  { name: '$uuid', scope: 'dynamic', value: 'random UUID' },
-  { name: '$guid', scope: 'dynamic', value: 'random UUID' },
-  { name: '$timestampMs', scope: 'dynamic', value: 'Unix time (ms)' },
-  { name: '$timestamp', scope: 'dynamic', value: 'Unix time (s)' },
-  { name: '$isoTimestamp', scope: 'dynamic', value: 'ISO-8601 time' },
-  { name: '$randomInt', scope: 'dynamic', value: '0–1000' },
-  { name: '$randomEmail', scope: 'dynamic', value: 'user…@example.test' },
+const DYNAMIC_FALLBACK: VarInfo[] = [
+  { name: '$guid', scope: 'dynamic', value: 'A random UUID' },
+  { name: '$timestamp', scope: 'dynamic', value: 'Unix time in seconds' },
+  { name: '$isoTimestamp', scope: 'dynamic', value: 'The current time, ISO-8601' },
+  { name: '$randomInt', scope: 'dynamic', value: 'A whole number from 0 to 1000' },
 ];
+let DYNAMIC: VarInfo[] = DYNAMIC_FALLBACK;
+let dynamicLoaded: Promise<void> | undefined;
+/** The engine's list of dynamic variables ($guid, $randomFirstName …), fetched once. */
+export function dynamicVariables(): Promise<VarInfo[]> {
+  return loadDynamic().then(() => DYNAMIC);
+}
+function loadDynamic(): Promise<void> {
+  dynamicLoaded ??= call<Array<{ name: string; description: string }>>('vars.dynamic')
+    .then((list) => void (DYNAMIC = list.map((d) => ({ name: d.name, scope: 'dynamic', value: d.description }))))
+    .catch(() => undefined);
+  return dynamicLoaded;
+}
 
 /* ------------------------------------------------------------------ variables (cached per environment) */
 
@@ -34,8 +43,8 @@ let pending: Promise<VarInfo[]> | undefined;
 export function editorVariables(): Promise<VarInfo[]> {
   const env = useApp.getState().environment ?? '';
   if (cache && cache.key === env && Date.now() - cache.at < 5000) return Promise.resolve(cache.vars);
-  pending ??= call<VarInfo[]>('vars.inspect', { environment: env || undefined })
-    .then((list) => {
+  pending ??= Promise.all([call<VarInfo[]>('vars.inspect', { environment: env || undefined }), loadDynamic()])
+    .then(([list]) => {
       const vars = [...list.filter((v) => v.name !== 'workspaceDir'), ...DYNAMIC];
       cache = { key: env, at: Date.now(), vars };
       return vars;
@@ -47,7 +56,7 @@ export function editorVariables(): Promise<VarInfo[]> {
 
 /** Defined somewhere, or resolved at run time (dynamic values, {{$env.NAME}}, secret references). */
 export function isKnownVariable(name: string, known: Set<string>): boolean {
-  return known.has(name) || /^\$(env\.|secret)/.test(name);
+  return known.has(name) || /^\$(env\.|secret|randomInt\()/.test(name);
 }
 
 /** The variable reference around a position: `{{name}}` or an unfinished `{{nam`. */

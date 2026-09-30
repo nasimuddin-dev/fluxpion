@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { call } from '../api';
 import { useApp } from '../store';
+import { dynamicVariables } from '../editor-intel';
 import { cx, useDebounced } from './ui';
 
 interface VarInfo {
@@ -9,14 +10,6 @@ interface VarInfo {
   value?: string;
   secret?: boolean;
 }
-
-const DYNAMIC: VarInfo[] = [
-  { name: '$uuid', scope: 'dynamic', value: 'random UUID' },
-  { name: '$timestamp', scope: 'dynamic', value: 'Unix time (s)' },
-  { name: '$isoTimestamp', scope: 'dynamic', value: 'ISO-8601 time' },
-  { name: '$randomInt', scope: 'dynamic', value: '0–1000' },
-  { name: '$randomEmail', scope: 'dynamic', value: 'user…@example.test' },
-];
 
 /**
  * Single-line input that highlights {{variables}} (resolved = blue, unresolved = red), shows where
@@ -62,7 +55,10 @@ export function VarInput({
     void call<VarInfo[]>('vars.inspect', { environment: env, collectionId, template: debounced }).then((list) => setVars(Object.fromEntries(list.map((v) => [v.name, v]))));
   }, [debounced, env, collectionId]);
 
-  const loadAll = () => void call<VarInfo[]>('vars.inspect', { environment: env, collectionId }).then((list) => setAll([...list.filter((v) => v.name !== 'workspaceDir'), ...DYNAMIC]));
+  const loadAll = () =>
+    void Promise.all([call<VarInfo[]>('vars.inspect', { environment: env, collectionId }), dynamicVariables()]).then(([list, dynamic]) =>
+      setAll([...list.filter((v) => v.name !== 'workspaceDir'), ...dynamic]),
+    );
 
   /** Show suggestions when the caret is inside an unfinished `{{name`. */
   const updateSuggest = (text: string, caret: number) => {

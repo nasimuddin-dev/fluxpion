@@ -10,6 +10,7 @@ import {
   WorkspaceStore,
   WORKSPACE_FORMATS,
   exportPostmanEnvironment,
+  DYNAMIC_VARIABLES,
   environmentToDotenv,
   type CookieInput,
   secretKeys,
@@ -216,6 +217,9 @@ export function workspaceHandlers(be: Backend): Handlers {
         return { name: n, scope: d?.scope, value: d ? (d.secret ? '••••••' : String(typeof d.value === 'object' ? JSON.stringify(d.value) : d.value)) : undefined, secret: d?.secret };
       });
     },
+
+    /** The dynamic variables ({{$guid}}, {{$randomFirstName}} …) with what each one gives. */
+    'vars.dynamic': () => DYNAMIC_VARIABLES,
 
     /** Export an environment in Postman's format (secret values are never included). */
     'env.export': async ({ id, format }: { id: string; format?: 'postman' | 'dotenv' }) => {

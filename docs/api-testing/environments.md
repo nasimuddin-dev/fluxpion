@@ -28,7 +28,20 @@ Dynamic values (`{{$uuid}}`, `{{$timestamp}}` …) and `{{$env.NAME}}` count as 
 
 ## Built-in variables
 
-`{{$uuid}}`, `{{$timestamp}}`, `{{$timestampMs}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, `{{$randomInt(1,10)}}`, `{{$randomEmail}}`, `{{$env.NAME}}` (process environment), `{{$secret.NAME}}` (secret store), and `{{workspaceDir}}`.
+`{{$env.NAME}}` (process environment), `{{$secret.NAME}}` (secret store) and `{{workspaceDir}}`, plus **dynamic variables** that give a new value every time they're used. Their names are Postman's, so imported Postman collections send the same kind of values. Type `{{$` to pick one; the list says what each gives.
+
+| Kind | Variables |
+| --- | --- |
+| IDs and time | `$guid` / `$uuid` / `$randomUUID`, `$timestamp` (seconds), `$timestampMs`, `$isoTimestamp`, `$randomDateFuture`, `$randomDatePast`, `$randomDateRecent`, `$randomWeekday`, `$randomMonth` |
+| Numbers | `$randomInt` (0–1000), `$randomInt(min,max)`, `$randomBoolean`, `$randomPrice`, `$randomBankAccount`, `$randomSemver`, `$randomLatitude`, `$randomLongitude` |
+| People | `$randomFirstName`, `$randomLastName`, `$randomFullName`, `$randomNamePrefix`, `$randomNameSuffix`, `$randomJobTitle`, `$randomJobArea`, `$randomUserName`, `$randomPassword`, `$randomPhoneNumber`, `$randomPhoneNumberExt` |
+| Places | `$randomCity`, `$randomCountry`, `$randomCountryCode`, `$randomStreetName`, `$randomStreetAddress`, `$randomLocale` |
+| Internet | `$randomEmail`, `$randomExampleEmail`, `$randomUrl`, `$randomDomainName`, `$randomDomainWord`, `$randomDomainSuffix`, `$randomIP`, `$randomIPV6`, `$randomMACAddress`, `$randomProtocol`, `$randomUserAgent`, `$randomImageUrl`, `$randomAvatarImage` |
+| Business | `$randomCompanyName`, `$randomCompanySuffix`, `$randomDepartment`, `$randomProduct`, `$randomProductName`, `$randomProductAdjective`, `$randomProductMaterial`, `$randomCatchPhrase`, `$randomCurrencyCode`, `$randomCurrencyName`, `$randomCurrencySymbol` |
+| Text | `$randomWord`, `$randomWords`, `$randomLoremWord`, `$randomLoremWords`, `$randomLoremSentence`, `$randomLoremSentences`, `$randomLoremParagraph`, `$randomLoremSlug`, `$randomAbbreviation`, `$randomAlphaNumeric`, `$randomColor`, `$randomHexColor` |
+| Files | `$randomFileName`, `$randomFileExt`, `$randomFileType`, `$randomMimeType` |
+
+The values are made up: emails use `example.test` / `example.com`, phone numbers the fictional 555 range, domains `*.example.*`.
 
 ## Secrets
 

@@ -1,5 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
 import type { Redactor } from '../util/redact.js';
+import { dynamicValue } from './dynamic.js';
 
 /**
  * Variable scopes in increasing precedence (later scopes override earlier ones):
@@ -123,14 +123,9 @@ export class VariableScope {
   }
 
   private dynamic(name: string): unknown {
-    if (name === '$uuid' || name === '$guid') return randomUUID();
-    if (name === '$timestamp') return Math.floor(Date.now() / 1000);
-    if (name === '$timestampMs') return Date.now();
-    if (name === '$isoTimestamp') return new Date().toISOString();
-    if (name === '$randomInt') return randomInt(0, 1001);
-    const ri = /^\$randomInt\((\d+)\s*,\s*(\d+)\)$/.exec(name);
-    if (ri) return randomInt(Number(ri[1]), Number(ri[2]) + 1);
-    if (name === '$randomEmail') return `user${randomInt(0, 1e6)}@example.test`;
+    // Postman-compatible dynamic variables ($guid, $timestamp, $randomFirstName …), see dynamic.ts
+    const d = dynamicValue(name);
+    if (d !== undefined) return d;
     if (name.startsWith('$env.')) {
       if (!this.opts.allowEnv) return undefined;
       const v = process.env[name.slice(5)];
