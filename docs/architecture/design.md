@@ -222,6 +222,8 @@ Shared primitives live in `apps/desktop/src/components/ui.tsx` (Radix UI + Tailw
 | `Badge` | Status and counts: `ok`, `warn`, `bad`, `accent`, `judge` (AI evaluations). |
 | `Tabs` | Sections of a view; the active tab has the gradient underline and counts in a pill. |
 | `Menu` | Dropdown and right-click menus. Every item has an icon; destructive items are red and last, after a separator. The same menu opens from **⋯** and from a right-click. |
+| Application menu | The native File / Edit / View / Window / Help menus and the text-field right-click menu use the same lucide icons, prerendered to PNG (`npm run menu-icons -w @testpion/desktop` after changing `scripts/make-menu-icons.cjs`): template images on macOS, a light or dark ink on Windows and Linux that follows the system theme. |
+| Command palette | Every command shows its icon; *Go to* commands use the navigation icons, environments their colour. |
 | `Modal` | Forms and custom dialogs. Say what will happen, and use a danger button for irreversible actions. |
 | `confirmAction()`, `ask()`, `promptText()` | Every confirmation, question and text prompt (never the browser's `confirm` / `prompt`). A tone icon (info, question, warning, danger, success), a bold message, a muted detail, and buttons named for the action (**Delete collection**, not **OK**). |
 | `Empty` | Every empty state: an accent icon, one sentence, and the next action. |

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
+import { AlarmClock, Bot, Columns2, CopyX, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
+import { createElement, lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
@@ -55,6 +56,46 @@ function useThemeEffect() {
     return () => mq.removeEventListener('change', apply);
   }, [settings]);
 }
+
+/** Icons of the command palette's commands (the same icons as the menus and navigation). */
+const PALETTE_ICONS: Record<string, LucideIcon> = {
+  'new-request': Network,
+  'new-graphql': GitBranch,
+  'new-mcp': Plug,
+  'new-ai': Sparkles,
+  'run-test': Play,
+  'run-suite': ListChecks,
+  'open-collection': FolderTree,
+  'search-history': History,
+  'open-settings': Settings,
+  'export-results': FileDown,
+  search: Search,
+  'tab-close': X,
+  'tab-close-others': ListX,
+  'tab-close-all': CopyX,
+  'toggle-console': SquareTerminal,
+  'toggle-logs': ScrollText,
+  assistant: Bot,
+  load: Gauge,
+  compare: Columns2,
+  eval: FlaskConical,
+  update: RefreshCw,
+  'm-new-http': Network,
+  'm-new-grpc': Waypoints,
+  'm-new-ws': Radio,
+  'm-new-mcp': Plug,
+  'm-new-col': FolderPlus,
+  'm-new-env': KeyRound,
+  'm-open-examples': Sparkles,
+  'm-ci': Workflow,
+  'm-new-monitor': AlarmClock,
+  'm-new-workspace': Layers,
+  'm-open-ws': FolderOpen,
+  'm-import': Upload,
+  'm-exp-col': FolderTree,
+  'm-exp-env': KeyRound,
+  'm-exp-ws': Download,
+};
 
 export default function App() {
   const view = useApp((s) => s.view);
@@ -157,7 +198,6 @@ export default function App() {
       { id: 'toggle-console', label: 'Show Console', hint: 'Ctrl+Alt+C', run: () => s.set({ logsOpen: true, bottomTab: 'console' }) },
       { id: 'toggle-logs', label: 'Show Application Logs', run: () => s.set({ logsOpen: true, bottomTab: 'logs' }) },
       { id: 'assistant', label: 'Ask AI Assistant', run: () => s.set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } }) },
-      { id: 'new-ws', label: 'New WebSocket Connection', run: () => s.setView('websocket') },
       { id: 'load', label: 'New Load Test', run: () => s.setView('load') },
       { id: 'compare', label: 'Compare Models', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'compare' }) },
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
@@ -178,8 +218,11 @@ export default function App() {
       { id: 'm-exp-env', label: 'Export Current Environment', hint: 'File', run: () => void runMenuCommand('export-environment') },
       { id: 'm-exp-ws', label: 'Export Workspace', hint: 'File', run: () => void runMenuCommand('export-workspace') },
     ];
-    for (const n of NAV) cmds.push({ id: `go-${n.id}`, label: `Go to ${n.label}`, run: () => s.setView(n.id) });
-    for (const e of workspace?.environments ?? []) cmds.push({ id: `env-${e.id}`, label: `Switch Environment: ${e.name}`, run: () => s.setEnvironment(e.name) });
+    for (const c of cmds) c.icon = PALETTE_ICONS[c.id] ? createElement(PALETTE_ICONS[c.id]!, { size: 16 }) : undefined;
+    // "Go to" commands use the navigation's own icons
+    for (const n of NAV) cmds.push({ id: `go-${n.id}`, label: `Go to ${n.label}`, icon: n.icon, run: () => s.setView(n.id) });
+    for (const e of workspace?.environments ?? [])
+      cmds.push({ id: `env-${e.id}`, label: `Switch Environment: ${e.name}`, icon: <span className="block w-2.5 h-2.5 rounded-full" style={{ background: e.color ?? 'var(--ok)' }} />, run: () => s.setEnvironment(e.name) });
     return cmds;
   }, [workspace]);
 

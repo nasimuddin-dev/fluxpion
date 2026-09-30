@@ -277,6 +277,7 @@ function AppLogs() {
 export interface PaletteCommand {
   id: string;
   label: string;
+  icon?: ReactNode;
   hint?: string;
   run(): void;
 }
@@ -320,8 +321,11 @@ export function CommandPalette({ commands }: { commands: PaletteCommand[] }) {
               aria-selected={i === idx}
               onMouseEnter={() => setIdx(i)}
               onClick={() => run(c)}
-              className={cx('w-full text-left px-4 py-2 text-sm flex items-center', i === idx && 'bg-accent/10')}
+              className={cx('w-full text-left px-4 py-2 text-sm flex items-center gap-3', i === idx && 'bg-accent/10')}
             >
+              <span aria-hidden className={cx('w-[18px] h-[18px] shrink-0 grid place-items-center [&_svg]:w-4 [&_svg]:h-4', i === idx ? 'text-accent' : 'text-muted')}>
+                {c.icon}
+              </span>
               {c.label}
               {c.hint && <span className="ml-auto text-xs text-muted">{c.hint}</span>}
             </button>

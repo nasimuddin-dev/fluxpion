@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, safeStorage, shell, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, shell, nativeTheme } from 'electron';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { Backend } from '../backend/backend.js';
 import { canInstallInPlace, createUpdater } from './updater.js';
+import { installAppMenu, installTextContextMenu } from './app-menu.js';
 import { defaultAppDir, normalizeError } from '@testpion/core';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
@@ -59,6 +60,7 @@ function createWindow(): void {
     },
   });
   win.once('ready-to-show', () => !capture && win?.show());
+  installTextContextMenu(win);
   win.webContents.on('did-finish-load', () => console.log('[aps] renderer loaded'));
   win.webContents.on('render-process-gone', (_e, d) => console.error(`[aps] renderer gone: ${d.reason} (exit ${d.exitCode})`));
   win.webContents.on('console-message', (e) => {
@@ -168,71 +170,12 @@ function start(): void {
   });
   ipcMain.handle('aps:startup', () => ({ backendMs: Date.now() - t0 }));
 
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate([
-      ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
-      {
-        label: 'File',
-        submenu: [
-          { label: 'New Request Tab', accelerator: 'CmdOrCtrl+T', click: () => emit('tabs.command', { command: 'new' }) },
-          {
-            label: 'New',
-            submenu: [
-              { label: 'HTTP Request', click: () => menu('new-http') },
-              { label: 'GraphQL Query', click: () => menu('new-graphql') },
-              { label: 'gRPC Request', click: () => menu('new-grpc') },
-              { label: 'WebSocket / Socket.IO Connection', click: () => menu('new-websocket') },
-              { label: 'MCP Server…', click: () => menu('new-mcp-server') },
-              { type: 'separator' },
-              { label: 'Collection…', click: () => menu('new-collection') },
-              { label: 'Environment…', click: () => menu('new-environment') },
-              { label: 'Monitor…', click: () => menu('new-monitor') },
-              { label: 'Workspace…', click: () => menu('new-workspace') },
-            ],
-          },
-          { label: 'Open Workspace Folder…', click: () => menu('open-workspace') },
-          { type: 'separator' },
-          { label: 'Import…', accelerator: 'CmdOrCtrl+O', click: () => menu('import') },
-          {
-            label: 'Export',
-            submenu: [
-              { label: 'Collection (Postman v2.1)…', click: () => menu('export-collection') },
-              { label: 'Current Environment…', click: () => menu('export-environment') },
-              { label: 'Workspace…', click: () => menu('export-workspace') },
-            ],
-          },
-          { type: 'separator' },
-          { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => menu('save') },
-          { type: 'separator' },
-          { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => emit('tabs.command', { command: 'close' }) },
-          { label: 'Close Other Tabs', click: () => emit('tabs.command', { command: 'closeOthers' }) },
-          { label: 'Close All Tabs', accelerator: 'CmdOrCtrl+Shift+W', click: () => emit('tabs.command', { command: 'closeAll' }) },
-          { type: 'separator' },
-          { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => menu('settings') },
-          { type: 'separator' },
-          process.platform === 'darwin' ? { role: 'close', label: 'Close Window', accelerator: 'CmdOrCtrl+Alt+W' } : { role: 'quit', label: 'Exit' },
-        ],
-      },
-      { role: 'editMenu' },
-      {
-        label: 'View',
-        submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }],
-      },
-      { role: 'windowMenu' },
-      {
-        role: 'help',
-        submenu: [
-          { label: 'Check for Updates…', click: () => emit('update.checkManual', {}) },
-          { type: 'separator' },
-          { label: 'Open Examples Workspace', click: () => menu('open-examples') },
-          { type: 'separator' },
-          { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/testpion/') },
-          { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/testpion/changelog') },
-          { label: 'Report an Issue', click: () => void shell.openExternal('https://github.com/nasimuddin-dev/testpion/issues') },
-        ],
-      },
-    ]),
-  );
+  installAppMenu({
+    menu,
+    tabs: (command) => emit('tabs.command', { command }),
+    checkForUpdates: () => emit('update.checkManual', {}),
+    openExternal: (url) => void shell.openExternal(url),
+  });
   protocol.handle('tpviz', (req) => {
     const page = be.visualizationPage(new URL(req.url).hostname);
     return new Response(page ?? 'This visualization is no longer available. Send the request again.', {
