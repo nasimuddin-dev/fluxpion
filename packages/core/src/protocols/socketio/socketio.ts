@@ -3,6 +3,7 @@ import { ApsError } from '../../errors.js';
 import type { KeyValue } from '../../model/types.js';
 import { assertUrlAllowed } from '../../net/policy.js';
 import { shortId } from '../../util/ids.js';
+import { proxyAgentFor } from '../../net/proxy.js';
 
 /**
  * Socket.IO client session: connect to a namespace, listen to every event, emit events with JSON
@@ -81,6 +82,8 @@ export class SocketIoSession {
       reconnection: false,
       timeout: this.opts.timeoutMs ?? 15_000,
       forceNew: true,
+      // through the proxy (Settings ▸ Proxy / HTTP(S)_PROXY) when one applies
+      ...(proxyAgentFor(target.toString()) ? { agent: proxyAgentFor(target.toString()) as never } : {}),
     });
     this.socket = socket;
     socket.onAny((event: string, ...args: unknown[]) => this.emitMessage('received', stringify(args), { event }));

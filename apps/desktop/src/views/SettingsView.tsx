@@ -247,7 +247,7 @@ function ProxySettings({ value, onChange }: { value: NonNullable<AppSettings['pr
     <>
       <div className="flex flex-col gap-3">
         {option('env', 'Use the environment variables', envSet ? `HTTP_PROXY / HTTPS_PROXY are set on this computer: ${env.HTTPS_PROXY ?? env.HTTP_PROXY}${env.NO_PROXY ? `, except ${env.NO_PROXY}` : ''}.` : 'HTTP_PROXY, HTTPS_PROXY and NO_PROXY, like curl. None are set on this computer, so requests go direct.')}
-        {option('custom', 'Use this proxy', 'For requests, OAuth token calls, AI providers, MCP over HTTP and datasets.')}
+        {option('custom', 'Use this proxy', 'For requests, OAuth token calls, AI providers, MCP over HTTP, WebSocket and datasets.')}
         {option('off', "Don't use a proxy", 'Connect directly, even when the environment variables are set.')}
       </div>
       {value.mode === 'custom' && (
@@ -278,7 +278,7 @@ function ProxySettings({ value, onChange }: { value: NonNullable<AppSettings['pr
           </div>
         </div>
       )}
-      <p className="text-xs text-muted">A request's own proxy (request Settings) wins over this. WebSocket connections don't use the proxy yet; gRPC reads the environment variables itself. The CLI always uses the environment variables (set TESTPION_NO_PROXY=1 to turn that off).</p>
+      <p className="text-xs text-muted">A request's own proxy (request Settings) wins over this. WebSocket and Socket.IO connections use it too; gRPC reads the environment variables itself. The CLI always uses the environment variables (set TESTPION_NO_PROXY=1 to turn that off).</p>
     </>
   );
 }

@@ -23,7 +23,7 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Use this proxy**: a proxy URL, an optional user name and password, and a list of hosts that bypass it. The bypass list uses `NO_PROXY` rules: host names (subdomains included), `.domain` suffixes, `host:port`, IP addresses, or `*`. The password is kept in the OS secret store, never in the settings file.
 - **Don't use a proxy.**
 
-The proxy applies to requests, `pm.sendRequest`, OAuth token calls, AI providers, MCP over HTTP and remote datasets. A request's own proxy (its **Settings** tab) wins. WebSocket connections don't use the proxy yet; gRPC reads the environment variables itself.
+The proxy applies to requests, `pm.sendRequest`, OAuth token calls, AI providers, MCP over HTTP, remote datasets, and WebSocket and Socket.IO connections (tunnelled with CONNECT). A request's own proxy (its **Settings** tab) wins. gRPC reads the environment variables itself.
 
 The CLI always uses the environment variables. Set `TESTPION_NO_PROXY=1` to connect directly instead.
 

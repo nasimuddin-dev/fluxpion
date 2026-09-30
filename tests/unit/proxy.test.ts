@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import { connect as netConnect, type AddressInfo } from 'node:net';
-import { bypassed, executeHttp, proxyFor, setProxySettings } from '../../packages/core/src/index.js';
+import { WebSocketServer } from 'ws';
+import { Server as SocketIoServer } from 'socket.io';
+import { SocketIoSession, WebSocketSession, bypassed, executeHttp, proxyFor, setProxySettings } from '../../packages/core/src/index.js';
 
 describe('proxy rules', () => {
   afterAll(() => setProxySettings({ mode: 'env' }));
@@ -105,4 +107,34 @@ describe('requests through a proxy', () => {
     expect(r.response.status).toBe(200);
     expect(seen.length).toBe(before + 1);
   });
+
+  it('WebSocket and Socket.IO connect through the proxy', async () => {
+    const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await new Promise((r) => wss.once('listening', r));
+    wss.on('connection', (ws) => ws.on('message', (d) => ws.send(`echo:${d}`)));
+    const http = createServer();
+    const io = new SocketIoServer(http);
+    io.on('connection', (sock) => sock.emit('hello', 'through the proxy'));
+    await new Promise<void>((r) => http.listen(0, '127.0.0.1', r));
+    try {
+      setProxySettings({ mode: 'custom', url: proxyUrl, username: 'ada', password: 'pw' });
+      const before = seen.length;
+      const ws = new WebSocketSession(`ws://127.0.0.1:${(wss.address() as AddressInfo).port}`);
+      await ws.connect(5000);
+      ws.close();
+      expect(seen.length).toBeGreaterThan(before);
+      expect(seen.at(-1)!.auth).toBe(`Basic ${Buffer.from('ada:pw').toString('base64')}`);
+
+      const mid = seen.length;
+      const sio = new SocketIoSession(`http://127.0.0.1:${(http.address() as AddressInfo).port}`, { transports: ['websocket'] });
+      await sio.connect();
+      sio.close();
+      expect(seen.length).toBeGreaterThan(mid);
+    } finally {
+      setProxySettings({ mode: 'env' });
+      wss.close();
+      io.close();
+    }
+  });
 });
+

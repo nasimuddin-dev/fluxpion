@@ -3,6 +3,7 @@ import { request as httpsRequest } from 'node:https';
 import { lookup } from 'node:dns/promises';
 import { connect } from 'node:net';
 import { assertUrlAllowed } from '../../net/policy.js';
+import { websocketDispatcher } from '../../net/proxy.js';
 import { WebSocket as UndiciWebSocket } from 'undici';
 import { ApsError } from '../../errors.js';
 import { shortId } from '../../util/ids.js';
@@ -79,7 +80,8 @@ export class WebSocketSession {
     return new Promise((resolve, reject) => {
       let ws: InstanceType<typeof UndiciWebSocket>;
       try {
-        ws = new UndiciWebSocket(this.url, { protocols: this.opts.protocols, headers } as never);
+        // the proxy settings (Settings ▸ Proxy / HTTP(S)_PROXY) apply to the handshake too
+        ws = new UndiciWebSocket(this.url, { protocols: this.opts.protocols, headers, dispatcher: websocketDispatcher() } as never);
       } catch (e) {
         this.setStatus('closed');
         return reject(new ApsError('ConfigurationError', `Invalid WebSocket URL: ${(e as Error).message}`));

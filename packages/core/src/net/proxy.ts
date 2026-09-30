@@ -1,14 +1,18 @@
 import { Agent, EnvHttpProxyAgent, ProxyAgent, setGlobalDispatcher, type Dispatcher } from 'undici';
+import { Agent as HttpAgent, request as httpRequest, type AgentOptions, type IncomingMessage } from 'node:http';
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
+import { connect as tlsConnect, type ConnectionOptions } from 'node:tls';
+import type { Duplex } from 'node:stream';
 import { policyLookup } from './policy.js';
 
 /**
  * Outbound proxy for everything the engine sends over HTTP (requests, pm.sendRequest, OAuth token
- * calls, AI providers, MCP over HTTP, remote datasets):
+ * calls, AI providers, MCP over HTTP, remote datasets, WebSocket and Socket.IO handshakes):
  * - `env` (default): the standard HTTP_PROXY / HTTPS_PROXY / NO_PROXY variables, as curl and most CLIs do;
  * - `custom`: one proxy URL (optionally with a user name and password) and a bypass list;
  * - `off`: connect directly, even when the variables are set.
- * A request's own proxy setting wins over this. WebSocket connections and gRPC (which reads the same
- * variables itself) are not covered.
+ * A request's own proxy setting wins over this. gRPC is not covered (grpc-js reads the same
+ * environment variables itself).
  */
 export interface ProxySettings {
   mode: 'env' | 'custom' | 'off';
@@ -24,6 +28,7 @@ export interface ProxySettings {
 let settings: ProxySettings = { mode: 'env' };
 let generation = 0;
 let base: Dispatcher | undefined;
+let wsBase: Dispatcher | undefined;
 
 const withAuth = (url: string, username?: string, password?: string) => {
   if (!username) return url;
@@ -57,6 +62,11 @@ export function baseDispatcher(): Dispatcher {
   return (base ??= makeDispatcher({}, undefined, { connections: 256, pipelining: 1, keepAliveTimeout: 10_000 }));
 }
 
+/** For WebSocket handshakes: always a CONNECT tunnel through the proxy (proxies can't forward a ws:// upgrade otherwise). */
+export function websocketDispatcher(): Dispatcher {
+  return (wsBase ??= makeDispatcher({}, undefined, { proxyTunnel: true }));
+}
+
 /** Changes whenever the proxy settings change, so callers can drop cached dispatchers. */
 export function proxyGeneration(): number {
   return generation;
@@ -71,10 +81,10 @@ export function setProxySettings(p: ProxySettings): void {
   if (p.mode === 'custom' && p.url) new URL(p.url); // throws on a malformed URL before anything changes
   settings = { ...p };
   generation++;
-  const old = base;
-  base = undefined;
+  const old = [base, wsBase];
+  base = wsBase = undefined;
   setGlobalDispatcher(baseDispatcher());
-  void old?.close().catch(() => undefined);
+  for (const d of old) void d?.close().catch(() => undefined);
 }
 
 /** Which proxy a URL would use under the current settings (for the UI, `testpion` diagnostics and tests). */
@@ -104,3 +114,49 @@ export function bypassed(u: URL, noProxy: string): boolean {
       return host === name || host.endsWith(`.${name}`);
     });
 }
+
+/** The proxy URL for a target, with the custom proxy's credentials (for clients that aren't undici). */
+function proxyUriFor(url: string): string | undefined {
+  const proxy = proxyFor(url);
+  if (!proxy) return undefined;
+  return settings.mode === 'custom' ? withAuth(proxy, settings.username, settings.password) : proxy;
+}
+
+/**
+ * A Node `http.Agent` that tunnels through the proxy with CONNECT, for clients built on Node's http
+ * module (Socket.IO's engine.io); undefined when the target goes direct. ws:// and http:// targets get
+ * a plain tunnel, wss:// and https:// a TLS connection inside it.
+ */
+export function proxyAgentFor(url: string): HttpAgent | undefined {
+  const target = new URL(url.replace(/^ws(s?):/i, 'http$1:'));
+  const uri = proxyUriFor(target.toString());
+  if (!uri) return undefined;
+  const p = new URL(uri);
+  const auth = p.username ? `Basic ${Buffer.from(`${decodeURIComponent(p.username)}:${decodeURIComponent(p.password)}`).toString('base64')}` : undefined;
+  const secure = target.protocol === 'https:';
+  const createConnection = (opts: ConnectionOptions & { host?: string; port?: number | string }, cb: (err: Error | null, socket?: Duplex) => void) => {
+    const hostPort = `${opts.host}:${opts.port}`;
+    const req = (p.protocol === 'https:' ? httpsRequest : httpRequest)({
+      host: p.hostname,
+      port: p.port || (p.protocol === 'https:' ? 443 : 80),
+      method: 'CONNECT',
+      path: hostPort,
+      headers: { host: hostPort, ...(auth ? { 'proxy-authorization': auth } : {}) },
+    });
+    req.once('connect', (res: IncomingMessage, socket: Duplex) => {
+      if (res.statusCode !== 200) {
+        socket.destroy();
+        return cb(new Error(`The proxy refused the connection to ${hostPort} (HTTP ${res.statusCode})`));
+      }
+      cb(null, secure ? tlsConnect({ ...opts, socket: socket as never, servername: opts.servername ?? opts.host }) : socket);
+    });
+    req.once('error', (e) => cb(e));
+    req.end();
+    return undefined;
+  };
+  const Base = secure ? HttpsAgent : HttpAgent;
+  const agent = new Base({ keepAlive: false } as AgentOptions);
+  (agent as unknown as { createConnection: typeof createConnection }).createConnection = createConnection;
+  return agent;
+}
+
