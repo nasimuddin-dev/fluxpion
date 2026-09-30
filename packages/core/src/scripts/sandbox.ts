@@ -36,7 +36,7 @@ export interface ScriptInput {
   jar?: StoredCookie[];
   /** Responses to `pm.sendRequest` calls from earlier passes (set by the host). */
   sent?: Array<{ key: string; response?: ScriptHttpResponse; error?: string }>;
-  info?: { requestName?: string; requestId?: string; iteration?: number; iterationCount?: number };
+  info?: { requestName?: string; requestId?: string; iteration?: number; iterationCount?: number; environmentName?: string };
   /** Arbitrary extra data exposed as `pm.data` (e.g. LLM output, MCP result). */
   data?: unknown;
 }

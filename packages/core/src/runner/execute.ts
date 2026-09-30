@@ -57,6 +57,8 @@ export interface ExecServices {
   persistVariable?: PersistVariable;
   /** Cookie jar shared by the HTTP/GraphQL requests of a run (Postman's cookie jar). */
   cookieJar?: CookieJar;
+  /** The active environment's name (pm.environment.name). */
+  environmentName?: string;
   /** Reads a workspace file by relative path (OpenAPI documents for contract checks); never outside the workspace. */
   readFile?: (path: string) => string;
 }
@@ -108,7 +110,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
           : test.type === 'graphql'
             ? { method: 'POST', url: test.endpoint, headers: [...(test.headers ?? [])], body: JSON.stringify({ query: test.query, variables: test.graphqlVariables, operationName: test.operationName }) }
             : undefined;
-      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id } }, { sendRequest });
+      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName } }, { sendRequest });
       root.event('pre-request script', { logs: s.logs, error: s.error });
       if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
       applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
@@ -178,7 +180,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
       response: { status: ctx.status, headers: ctx.headers, body: ctx.text, time: ctx.latencyMs },
       cookies: ctx.cookies,
       jar: svc.cookieJar?.list(),
-      info: { requestName: test.name, requestId: test.id },
+      info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName },
       data: { body: ctx.body, toolCalls: ctx.toolCalls, tokens: ctx.tokens, error: ctx.error },
     }, { sendRequest });
     if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);

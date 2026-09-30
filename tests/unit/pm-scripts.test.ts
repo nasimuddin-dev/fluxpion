@@ -349,6 +349,9 @@ describe('Postman-compatible scripts (pm.*)', () => {
       count: 3,
     });
     expect(out.request!.url).toBe('https://api.test:8443/v1/pets/{{petId}}?page=2&q=dog&sig={{signature}}');
+    // pm.environment.name is the active environment
+    const env = await runScript(`pm.variables.set('envName', String(pm.environment.name));`, { variables: {}, info: { environmentName: 'Staging' } });
+    expect(env.vars.envName).toBe('Staging');
     // assigning a string replaces the URL, as in Postman
     const set = await runScript(`pm.request.url = '{{baseUrl}}/other?x=1';`, { variables: {}, request: { method: 'GET', url: 'https://a.test/', headers: [] } });
     expect(set.request!.url).toBe('{{baseUrl}}/other?x=1');

@@ -587,7 +587,7 @@ export class Backend {
           ...scriptScopes(ctx.vars),
           request: { method: request.method, url: request.url, headers: request.headers ?? [], body: bodyText },
           jar: ctx.services.cookieJar?.list(),
-          info: { requestName: p.name, requestId: p.requestId },
+          info: { requestName: p.name, requestId: p.requestId, environmentName: ctx.environment?.name },
         }, { sendRequest: scriptSender });
         scriptLogs.push(...out.logs, ...sentLogs(out));
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
@@ -649,7 +649,7 @@ export class Backend {
           response: { status: response.status, headers: response.headers, body: response.bodyPreview, time: response.durationMs },
           cookies: responseCookies(response.cookies, ctx.services.cookieJar, response.url),
           jar: ctx.services.cookieJar?.list(),
-          info: { requestName: p.name, requestId: p.requestId },
+          info: { requestName: p.name, requestId: p.requestId, environmentName: ctx.environment?.name },
         }, { sendRequest: scriptSender });
         scriptLogs.push(...out.logs, ...sentLogs(out));
         if (out.visualizer !== undefined) visual = out.visualizer;
@@ -792,7 +792,7 @@ export class Backend {
     const scriptSender = scriptRequestSender({ redactor: ctx.redactor, cookieJar: ctx.services.cookieJar, signal: ctrl.signal, timeoutMs: this.settings.defaultTimeoutMs });
     const scriptLogs: Array<{ phase: 'pre-request' | 'test'; message: string }> = [];
     const folders = ctx.collection && p.requestId ? folderChain(ctx.collection, p.requestId) : [];
-    const info = { requestName: p.name ?? p.operationName, requestId: p.requestId };
+    const info = { requestName: p.name ?? p.operationName, requestId: p.requestId, environmentName: ctx.environment?.name };
     try {
       // collection, folder (outer to inner) and request pre-request scripts, as for REST requests
       let request = p.request;

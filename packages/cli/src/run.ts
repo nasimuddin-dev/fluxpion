@@ -335,6 +335,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
   const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var, cookieJar, fileRoot: ephemeral ? process.cwd() : undefined });
   if (fromFile) ctx.vars.setScope('collection', collection.variables);
   if (envFile) ctx.vars.setScope('environment', envFile.variables);
+  if (envFile) ctx.services.environmentName = envFile.name;
   // Newman: -g globals file, then --global-var / --env-var overrides
   for (const v of globalsFile?.variables ?? []) if (v.key && v.enabled !== false) ctx.vars.set(v.key, v.value, 'global');
   for (const [k, v] of Object.entries(o.globalVar ?? {})) ctx.vars.set(k, v, 'global');

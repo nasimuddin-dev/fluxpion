@@ -499,7 +499,8 @@ const pm = {
   },
   expect,
   variables: __variables,
-  environment: __scope('environment'),
+  // pm.environment.name is the active environment's name, as in Postman
+  environment: Object.assign(__scope('environment'), { name: (__in.info && __in.info.environmentName) || undefined }),
   globals: __scope('globals'),
   collectionVariables: __scope('collectionVariables'),
   iterationData: { get: (k) => __scopes.iterationData[k], has: (k) => Object.prototype.hasOwnProperty.call(__scopes.iterationData, k), toObject: () => Object.assign({}, __scopes.iterationData), toJSON: () => Object.assign({}, __scopes.iterationData) },
