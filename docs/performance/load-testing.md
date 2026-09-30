@@ -19,7 +19,11 @@ testpion load http://127.0.0.1:4010/health --vus 50 --duration 30 --ramp-up 5
 
 ## Saved load tests
 
-**Save** (next to the title) keeps the whole configuration: the target, headers and body, users, duration, ramp-up and ramp-down, rate limit, think time and pass/fail rules. It appears under **Saved** in the sidebar, where you can group load tests in folders and right-click one to **Run** it again. Saved load tests are kept in the workspace file `library/load-tests.json`.
+**Save** (next to the title) keeps the whole configuration: the target, headers and body, users, duration, ramp-up and ramp-down, rate limit, think time and pass/fail rules. It appears under **Saved** in the sidebar, where you can group load tests in folders and right-click one to **Run** it again. Saved load tests are kept in the workspace file `library/load-tests.json`. Run one from a terminal or CI by name; options you type there win over the saved ones, and `{{variables}}` resolve from the `-e` environment:
+
+```bash
+testpion load --saved "Health smoke" -e Staging --duration 30
+```
 
 ## A whole collection
 

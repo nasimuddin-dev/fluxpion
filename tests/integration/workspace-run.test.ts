@@ -608,4 +608,22 @@ describe('example workspace (end-to-end)', () => {
       await s.close();
     }
   }, 90_000);
+  it('CLI: `testpion load --saved` runs a load test saved in the app, with variables resolved', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    ws.saveLibrary('load-tests', {
+      folders: [],
+      items: [{ id: 'lt-1', name: 'Health smoke', data: { kind: 'http', method: 'GET', url: '{{baseUrl}}/health', headers: [], body: '', vus: 2, duration: 2, rampUp: 0, rampDown: 0, rps: '', thresholds: 'errors<1%' } }],
+    });
+    const json = join(dir, 'load.json');
+    const r = await run([cli, 'load', '--saved', 'health smoke', '-w', ws.root, '-e', 'Development', '--duration', '1', '--json', json], env);
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    const out = JSON.parse(readFileSync(json, 'utf8'));
+    expect(out.requests).toBeGreaterThan(0);
+    // --duration from the command line wins over the saved 2 seconds
+    expect(out.elapsedSec).toBeLessThan(2);
+    expect(out.thresholds).toEqual([expect.objectContaining({ expr: 'errors<1%', passed: true })]);
+    expect((await run([cli, 'load', '--saved', 'nope', '-w', ws.root], env)).status).toBe(2);
+  }, 60_000);
 });

@@ -78,8 +78,8 @@ export function registerRunCommands(program: Command): void {
     .description('run a load test against a URL or a collection (safeguarded: local hosts only unless --allow-remote)')
     .argument('[url]', 'target URL (or use --collection); with --grpc, the gRPC server address (host:port, grpcs://host:port for TLS)')
     .option('--collection <nameOrId>', 'load-test a collection: every virtual user sends its requests in order, again and again')
-    .option('-w, --workspace <nameOrPath>', 'with --collection: workspace name or directory')
-    .option('-e, --environment <name>', 'with --collection: environment')
+    .option('-w, --workspace <nameOrPath>', 'workspace (for --collection, --saved and {{variables}})')
+    .option('-e, --environment <name>', 'environment (for --collection, --saved and {{variables}})')
     .option('--folder <nameOrId...>', 'with --collection: only these folders or requests')
     .option('--warm-up', 'with --collection: run it once first with scripts (e.g. to log in), then use the variables they set')
     .option('--grpc <method>', 'load-test a gRPC method (package.Service/Method) on the server given as [url]; -d is the request message as JSON, -H metadata')
@@ -95,8 +95,11 @@ export function registerRunCommands(program: Command): void {
     .option('--allow-remote', 'allow non-local hosts (only systems you are authorised to test)')
     .option('--json <file>', 'write final metrics as JSON')
     .option('-t, --threshold <rule...>', 'pass/fail rules for CI, e.g. "p95<500" "errors<1%" "rps>=50" "p99[Get pet]<800"; exit 1 when one fails')
-    .action(async (url: string | undefined, o) => {
-      if (!url && !o.collection) throw new CliError('Give a URL or --collection', EXIT.CONFIG_ERROR);
+    .option('--saved <name>', 'a load test saved in the app (Load ▸ Save): its target, users, duration, ramps, rate and pass/fail rules; options given here win')
+    .action(async (urlArg: string | undefined, o, cmd: Command) => {
+      let url = urlArg;
+      if (o.saved) url = applySavedLoadTest(o, cmd, url);
+      if (!url && !o.collection) throw new CliError('Give a URL, --collection or --saved <name>', EXIT.CONFIG_ERROR);
       // thresholds are checked before the test runs, so a typo doesn't waste a run
       const rules = ((o.threshold as string[] | undefined) ?? []).map((r) => {
         try {
@@ -135,6 +138,19 @@ export function registerRunCommands(program: Command): void {
           target = t.target;
           isProduction = !!ctx.environment?.isProduction;
           console.log(dim(`${t.target.requests.length} requests per pass: ${t.target.requests.map((r) => r.name).join(' → ')}`));
+        } finally {
+          await ctx.dispose();
+          store.close();
+        }
+      }
+      // {{variables}} in a URL / saved load test resolve from the workspace and -e environment
+      if (target.kind !== 'sequence' && JSON.stringify(target).includes('{{')) {
+        const { store, ephemeral } = openWorkspace(o.workspace, undefined, mgr);
+        const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings, environment: o.environment });
+        try {
+          target = ctx.vars.resolveDeep(target);
+          isProduction = !!ctx.environment?.isProduction;
+          if (ctx.vars.unresolved.size) console.log(yellow(`Unresolved variables: ${[...ctx.vars.unresolved].join(', ')}${ephemeral ? ' (no workspace found: pass -w)' : ' (pick an environment with -e)'}`));
         } finally {
           await ctx.dispose();
           store.close();
@@ -199,4 +215,70 @@ export function registerRunCommands(program: Command): void {
       const out = await writeReports(o.out ?? dirname(file), summary, () => readResults(file), o.format);
       for (const [f, p] of Object.entries(out)) console.log(`${f}: ${p}`);
     });
+}
+
+interface SavedLoadTest {
+  kind: 'http' | 'llm' | 'collection' | 'grpc';
+  grpcTarget?: string;
+  grpcMethod?: string;
+  collectionId?: string;
+  folderId?: string;
+  warmUp?: boolean;
+  thresholds?: string;
+  method?: string;
+  url?: string;
+  headers?: Array<{ key: string; value: string; enabled?: boolean }>;
+  body?: string;
+  vus?: number;
+  duration?: number;
+  rampUp?: number;
+  rampDown?: number;
+  rps?: string | number;
+}
+
+/**
+ * `testpion load --saved <name>`: fill the options from a load test saved in the app (library/load-tests.json).
+ * Options typed on the command line win; remote hosts still need --allow-remote here.
+ */
+function applySavedLoadTest(o: Record<string, unknown>, cmd: Command, url: string | undefined): string | undefined {
+  const { store } = openWorkspace(o.workspace as string | undefined, undefined, new WorkspaceManager());
+  let item: { name: string; data: SavedLoadTest } | undefined;
+  let names: string[] = [];
+  try {
+    const items = store.getLibrary<SavedLoadTest>('load-tests').items;
+    names = items.map((i) => i.name);
+    const ref = String(o.saved).toLowerCase();
+    item = items.find((i) => i.id === o.saved) ?? items.find((i) => i.name.toLowerCase() === ref);
+  } finally {
+    store.close();
+  }
+  if (!item) throw new CliError(`No saved load test "${String(o.saved)}". Saved: ${names.join(', ') || 'none (save one in the app: Load ▸ Save)'}`, EXIT.CONFIG_ERROR);
+  const d = item.data;
+  const fromCli = (k: string) => cmd.getOptionValueSource(k) === 'cli';
+  const setIfUnset = (k: string, v: unknown) => {
+    if (v !== undefined && v !== '' && !fromCli(k)) o[k] = String(v);
+  };
+  if (d.kind === 'llm') throw new CliError(`"${item.name}" load-tests an LLM provider, which runs in the app only`, EXIT.CONFIG_ERROR);
+  if (d.kind === 'collection') {
+    if (!fromCli('collection')) o.collection = d.collectionId;
+    if (!fromCli('folder') && d.folderId) o.folder = [d.folderId];
+    if (!fromCli('warmUp') && d.warmUp) o.warmUp = true;
+  } else if (d.kind === 'grpc') {
+    url = url ?? d.grpcTarget;
+    if (!fromCli('grpc')) o.grpc = d.grpcMethod;
+    setIfUnset('data', d.body);
+  } else {
+    url = url ?? d.url;
+    setIfUnset('method', d.method);
+    setIfUnset('data', d.body);
+  }
+  if (!fromCli('header') && d.headers?.length && d.kind !== 'collection') o.header = d.headers.filter((h) => h.enabled !== false && h.key).map((h) => `${h.key}: ${h.value}`);
+  setIfUnset('vus', d.vus);
+  setIfUnset('duration', d.duration);
+  setIfUnset('rampUp', d.rampUp);
+  setIfUnset('rampDown', d.rampDown);
+  setIfUnset('rps', d.rps);
+  if (!fromCli('threshold') && d.thresholds?.trim()) o.threshold = d.thresholds.split(/[,\n]/).map((r) => r.trim()).filter(Boolean);
+  console.log(dim(`Saved load test "${item.name}"`));
+  return url;
 }

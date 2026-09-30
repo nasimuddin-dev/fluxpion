@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`testpion load --saved <name>`** runs a load test saved in the app (options typed on the command line win), and `{{variables}}` in a load-test URL now resolve from the workspace and `-e` environment.
 - **Export beside Import**: the Collections sidebar has an Export menu (the selected collection as TestPion JSON, Postman v2.1, OpenAPI 3.1 or a Bruno folder, or the whole workspace), and the REST sidebar has an export button next to import.
 - **Fix: switching the body type no longer loses what you typed**: each type (JSON/XML/Text/HTML text, form fields, the binary file) is kept while the request is open, so going to None or a form and back brings it back, as in Postman.
 - **Run saved evaluations anywhere**: `testpion eval list` and `testpion eval run <name>` (reports, baselines, exit 1 on failures) and the `list_evaluations` / `run_evaluation` MCP tools for AI agents. The app, the CLI and the MCP server build the tests the same way.
