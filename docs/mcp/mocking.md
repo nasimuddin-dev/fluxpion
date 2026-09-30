@@ -18,7 +18,7 @@ An MCP mock is a fake MCP server: tools with canned responses, resources and pro
 1. In **MCP**, connect to the server and call the tools you want to capture.
 2. Click **Save as mock**.
 
-TestPion writes `mocks/<server>.mcp-mock.yaml` in the workspace, with the server's tools (names, descriptions, input schemas, annotations), resources (and their text), prompts, and each tool call you made as a response matched on its arguments. Secrets in recorded content are redacted. A server entry *<server> (mock)* is added, so you can connect to the mock right away.
+TestPion writes `mocks/<server>.mcp-mock.yaml` in the workspace, with the server's tools (names, descriptions, input schemas, annotations), resources (and their text), prompts, and each tool call you made as a response matched on its arguments. Secrets in recorded content are redacted. A server entry `<server> (mock)` is added, so you can connect to the mock right away.
 
 ## Write one by hand
 

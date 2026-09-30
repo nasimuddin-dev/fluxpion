@@ -157,7 +157,7 @@ The app is built from layered surfaces, so it is clear at a glance where you are
   <!-- work area -->
   <rect x="272" y="74" width="688" height="330" fill="#101629"/>
   <rect x="288" y="88" width="70" height="26" rx="7" fill="#0e0f14" stroke="#333c58"/><text x="300" y="105" fill="#66da85" font-size="11" font-weight="700">GET</text>
-  <rect x="366" y="88" width="470" height="26" rx="7" fill="#0e0f14" stroke="#333c58"/><text x="378" y="105" fill="#4697ff" font-size="11">{{baseUrl}}</text><text x="446" y="105" fill="#eef2fa" font-size="11">/patients</text>
+  <rect x="366" y="88" width="470" height="26" rx="7" fill="#0e0f14" stroke="#333c58"/><text x="378" y="105" fill="#4697ff" font-size="11">&#123;&#123;baseUrl&#125;&#125;</text><text x="446" y="105" fill="#eef2fa" font-size="11">/patients</text>
   <rect x="846" y="88" width="98" height="26" rx="7" fill="url(#g)"/><text x="895" y="105" fill="#fff" font-size="11" font-weight="600" text-anchor="middle">Send</text>
   <text x="290" y="140" fill="#eef2fa" font-size="11">Params  Auth  Headers  Body  Scripts  Tests</text>
   <line x1="272" y1="230" x2="960" y2="230" stroke="#26272e"/>
@@ -289,7 +289,7 @@ More detail: [Architecture overview](./overview.md) and [Execution engine](./exe
   <linearGradient id="b" x1="0" x2="1"><stop offset="0" stop-color="#2f7bff"/><stop offset="1" stop-color="#8b5cff"/></linearGradient></defs>
   <rect width="960" height="250" rx="14" fill="#0c1440"/>
   <g font-size="12" fill="#eef2fa" text-anchor="middle">
-    <rect x="20" y="40" width="120" height="84" rx="12" fill="#101629" stroke="#333c58"/><text x="80" y="72" font-weight="700">1 Resolve</text><text x="80" y="92" fill="#9ba4be" font-size="10.5">{{variables}}</text><text x="80" y="108" fill="#9ba4be" font-size="10.5">env · collection</text>
+    <rect x="20" y="40" width="120" height="84" rx="12" fill="#101629" stroke="#333c58"/><text x="80" y="72" font-weight="700">1 Resolve</text><text x="80" y="92" fill="#9ba4be" font-size="10.5">&#123;&#123;variables&#125;&#125;</text><text x="80" y="108" fill="#9ba4be" font-size="10.5">env · collection</text>
     <rect x="156" y="40" width="120" height="84" rx="12" fill="#101629" stroke="#333c58"/><text x="216" y="72" font-weight="700">2 Pre-request</text><text x="216" y="92" fill="#9ba4be" font-size="10.5">collection → folder</text><text x="216" y="108" fill="#9ba4be" font-size="10.5">→ request scripts</text>
     <rect x="292" y="40" width="120" height="84" rx="12" fill="#101629" stroke="#333c58"/><text x="352" y="72" font-weight="700">3 Auth</text><text x="352" y="92" fill="#9ba4be" font-size="10.5">inherited auth</text><text x="352" y="108" fill="#9ba4be" font-size="10.5">cookie jar</text>
     <rect x="428" y="40" width="120" height="84" rx="12" fill="url(#b)"/><text x="488" y="72" font-weight="700">4 Send</text><text x="488" y="92" font-size="10.5">stream body to disk</text><text x="488" y="108" font-size="10.5">timings</text>
