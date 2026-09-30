@@ -21,6 +21,7 @@ import {
   grpcRoot,
   parseGrpcTarget,
   reflectServer,
+  runRealtimeExchange,
   Redactor,
 } from '@testpion/core';
 import { EXIT, dim, bold, cyan, green, red, CliError, openWorkspace } from '../shared.js';
@@ -141,6 +142,56 @@ export function registerServeCommands(program: Command): void {
       console.log(cyan(`\nPrompts (${d.prompts.length})`));
       for (const p of d.prompts) console.log(`  ${p.name} ${dim(p.description ?? '')}`);
       await s.close();
+    });
+
+  program
+    .command('ws')
+    .description('talk to a WebSocket or Socket.IO server: send messages / emit events, print what comes back, close')
+    .argument('<url>', 'ws:// or wss:// (WebSocket); http(s)://host/namespace (Socket.IO)')
+    .option('-m, --message <text...>', 'WebSocket: messages to send, in order')
+    .option('-e, --emit <event=json...>', 'Socket.IO: events to emit, e.g. say=\'{"text":"hi"}\' (a JSON list gives several arguments)')
+    .option('--ack', 'Socket.IO: wait for acknowledgements')
+    .option('--socketio', 'use Socket.IO (default for http(s) URLs)')
+    .option('-H, --header <key:value...>', 'handshake headers')
+    .option('--auth <json>', 'Socket.IO handshake auth payload')
+    .option('-w, --wait <ms>', 'how long to listen after sending', '1500')
+    .option('--json', 'print the result as JSON (for scripts and AI agents)')
+    .action(async (url: string, o) => {
+      const headers = ((o.header as string[] | undefined) ?? []).map((kv) => {
+        const i = kv.indexOf(':');
+        if (i <= 0) throw new CliError(`--header expects key:value, got "${kv}"`, EXIT.CONFIG_ERROR);
+        return { key: kv.slice(0, i).trim(), value: kv.slice(i + 1).trim() };
+      });
+      const parse = (s: string, what: string) => {
+        try {
+          return JSON.parse(s) as unknown;
+        } catch {
+          throw new CliError(`${what} is not valid JSON: ${s}`, EXIT.CONFIG_ERROR);
+        }
+      };
+      const emits = ((o.emit as string[] | undefined) ?? []).map((e) => {
+        const i = e.indexOf('=');
+        const event = i < 0 ? e : e.slice(0, i);
+        const v = i < 0 ? undefined : parse(e.slice(i + 1), `--emit ${event}`);
+        return { event, args: v === undefined ? [] : Array.isArray(v) ? v : [v], ack: !!o.ack };
+      });
+      const r = await runRealtimeExchange(
+        {
+          url,
+          mode: o.socketio || emits.length ? 'socketio' : undefined,
+          send: emits.length ? emits : (o.message as string[] | undefined),
+          waitMs: Number(o.wait),
+          headers,
+          auth: o.auth ? (parse(o.auth, '--auth') as Record<string, unknown>) : undefined,
+        },
+        { redactor: new Redactor() },
+      );
+      if (o.json) console.log(JSON.stringify(r, null, 2));
+      else {
+        console.log(`${r.connected ? green('connected') : red('not connected')} ${dim(`${r.mode} · ${url} · ${r.durationMs} ms`)}`);
+        for (const m of r.messages) console.log(`${dim(`${(m.atMs / 1000).toFixed(2)}s`)} ${m.direction === 'sent' ? cyan('→') : m.direction === 'received' ? green('←') : dim('·')} ${m.event ? bold(`${m.ack ? 'ack ' : ''}${m.event} `) : ''}${m.data}`);
+      }
+      process.exitCode = r.connected ? EXIT.SUCCESS : EXIT.EXECUTION_ERROR;
     });
 
   program

@@ -24,6 +24,7 @@ testpion env list|order -w    List environments; set their order
 testpion history list|diff -w   Response history of saved requests; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
+testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
 testpion grpc <target> [method] [-p protos]   Call a gRPC method, or list the methods (.proto files or server reflection)
 testpion report <results.jsonl>              Re-generate reports
 ```
@@ -103,6 +104,26 @@ testpion mock-mcp mocks/customer.mcp-mock.yaml --http -p 3333   # Streamable HTT
 |---|---|
 | `--http` | Serve over Streamable HTTP on `127.0.0.1` instead of stdio (the URL is printed). |
 | `-p, --port <port>` | Port for `--http` (default: any free port). |
+
+## `ws`
+
+Connects to a [WebSocket or Socket.IO](/api-testing/websocket) server, sends messages (WebSocket) or emits events (Socket.IO) in order, prints everything the server sends while it listens, then closes. The exit code is 3 when it can't connect (the reason is printed).
+
+```bash
+testpion ws ws://127.0.0.1:4013 -m '{"type":"ping"}' -m second
+testpion ws http://127.0.0.1:4015/chat -e 'say={"text":"hi"}' --ack --json
+```
+
+| Option | Description |
+|---|---|
+| `-m, --message <text...>` | WebSocket messages, in order. |
+| `-e, --emit <event=json...>` | Socket.IO events with their argument (a JSON list gives several arguments). Implies Socket.IO. |
+| `--ack` | Socket.IO: wait for acknowledgements. |
+| `--socketio` | Use Socket.IO (the default for `http(s)://` URLs). |
+| `-H, --header <key:value...>` | Handshake headers. |
+| `--auth <json>` | Socket.IO handshake auth payload. |
+| `-w, --wait <ms>` | How long to listen after sending (default 1500). |
+| `--json` | Print the result as JSON, for scripts and AI agents. |
 
 ## `grpc`
 
@@ -205,7 +226,7 @@ testpion env order Development Staging Production -w my-workspace
 
 ## `mcp-server`
 
-Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request`, `grpc_call` and `run_collection`. See [Use TestPion from AI agents](/ai-testing/mcp-server).
+Serves a workspace to AI agents over MCP on stdio: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request`, `grpc_call`, `realtime_exchange` and `run_collection`. See [Use TestPion from AI agents](/ai-testing/mcp-server).
 
 ```bash
 testpion mcp-server -w my-workspace

@@ -13,6 +13,7 @@ import { createEngineContext } from '../engine.js';
 import { executeHttp } from '../protocols/http/client.js';
 import { describeRoot, executeGrpc, grpcRoot, parseGrpcTarget } from '../protocols/grpc/grpc.js';
 import { reflectServer } from '../protocols/grpc/reflection.js';
+import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
 import { readFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
@@ -254,6 +255,42 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             trailers: Object.fromEntries(out.trailers),
             unresolvedVariables: ctx.vars.unresolved.size ? [...ctx.vars.unresolved] : undefined,
           };
+        } finally {
+          await ctx.dispose();
+        }
+      },
+    },
+    {
+      name: 'realtime_exchange',
+      write: true,
+      description:
+        'Talk to a WebSocket or Socket.IO server: connect, send messages (WebSocket text frames) or emit events (Socket.IO, optionally waiting for acknowledgements) in order, collect everything the server sends for waitMs, then close. Returns the messages with their direction, time and event name. {{variables}} resolve from the environment.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: str('ws:// / wss:// for WebSocket; http(s)://host/namespace for Socket.IO'),
+          mode: { type: 'string', enum: ['websocket', 'socketio'], description: 'Default: socketio for http(s) URLs, websocket otherwise' },
+          send: {
+            type: 'array',
+            description: 'WebSocket: strings (JSON as text). Socket.IO: { event, args?, ack? } objects',
+            items: { anyOf: [{ type: 'string' }, { type: 'object', properties: { event: { type: 'string' }, args: { type: 'array' }, ack: { type: 'boolean' } }, required: ['event'] }] },
+          },
+          waitMs: { type: 'number', description: 'How long to listen after sending (default 1500, max 60000)' },
+          headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Handshake headers' },
+          auth: { type: 'object', description: 'Socket.IO handshake auth payload' },
+          environment: str('Environment name'),
+        },
+        required: ['url'],
+      },
+      run: async (a) => {
+        const environment = checkEnvironment(a.environment);
+        const ctx = createEngineContext({ store, secrets, settings, environment });
+        try {
+          const r = ctx.vars.resolveDeep({ url: String(a.url), send: a.send, headers: Object.entries((a.headers as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value })), auth: a.auth });
+          return await runRealtimeExchange(
+            { url: r.url, mode: a.mode as 'websocket' | 'socketio' | undefined, send: r.send as RealtimeExchange['send'], waitMs: Number(a.waitMs) || undefined, headers: r.headers, auth: r.auth as Record<string, unknown> | undefined },
+            { redactor: ctx.redactor, cookieJar: ctx.services.cookieJar },
+          );
         } finally {
           await ctx.dispose();
         }
