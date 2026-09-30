@@ -4,7 +4,7 @@
 
 - **More modules for scripts**: `require('ajv')` (JSON Schema validation, as in many Postman tests), `chai`, `xml2js`, `csv-parse/lib/sync`, `atob` and `btoa`, like Postman's sandbox.
 - **gRPC load tests**: load-test a unary or server-streaming gRPC method (the Load view's **gRPC method** target, `testpion load <server> --grpc <method>`, and `grpc` in the `load_test` MCP tool): one connection per test, methods from server reflection or proto files, results by gRPC status.
-- **Re-run failed tests**: **Re-run failed** on a finished test or collection run (for collections, the failed requests once), and `testpion test --rerun-failed [runId]` (default: the last run), run only the tests that failed or errored.
+- **Re-run failed tests**: **Re-run failed** on a finished test or collection run (for collections, the failed requests once), and `testpion test --rerun-failed [runId]` / `testpion run-collection --rerun-failed` (default: the last run), run only the tests or requests that failed or errored.
 - **Paste an HTTPie command**: `http` / `https` / `xh` commands paste into the REST view (and import with `testpion import -`) like cURL: JSON fields, raw JSON, query parameters, headers, files, forms and auth.
 - **`pm.test` async and skip**: tests can be async functions or use Postman's `done` callback (never calling it fails the test), and `pm.test.skip` lists a test without running it.
 - **Export to Bruno**: **Export ▸ Bruno collection folder…** and `testpion export --format bruno --out <folder>` write a collection (with the workspace's environments, secret values never) as the folder Bruno keeps in git; it imports back unchanged.

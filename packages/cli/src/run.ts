@@ -255,7 +255,7 @@ export async function finishRun(a: {
   return summary.failed + summary.errors > 0 || (o.failOnRegression && regressionFailed) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
 }
 
-export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel' | 'otlp' | 'otlpHeader'> {
+export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel' | 'otlp' | 'otlpHeader' | 'rerunFailed'> {
   iterationData?: string;
   iterationCount?: string;
   delayRequest?: string;
@@ -334,7 +334,14 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
 
   if (o.insecure) collection = insecureCollection(collection);
   const globalsFile = o.globals ? readImport(resolve(o.globals), 'environment') : undefined;
-  const selection = resolveSelection(collection, o.folder);
+  // --rerun-failed: only the requests that failed in an earlier run of this collection
+  const rerun = o.rerunFailed && !ephemeral ? store.failedTestIds(typeof o.rerunFailed === 'string' ? o.rerunFailed : 'last') : undefined;
+  if (rerun && !rerun.ids.length) {
+    console.log(green('Nothing failed in that run.'));
+    return EXIT.SUCCESS;
+  }
+  const selection = rerun ? rerun.ids : resolveSelection(collection, o.folder);
+  if (rerun && !o.quiet) console.log(dim(`Re-running ${rerun.ids.length} failed request${rerun.ids.length === 1 ? '' : 's'} of ${rerun.runId}`));
   let data: DatasetRecord[] | undefined;
   if (o.iterationData) {
     const file = resolve(o.iterationData);

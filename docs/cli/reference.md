@@ -102,6 +102,7 @@ testpion run-collection api.postman_collection.json -e staging.postman_environme
 | `-n, --iteration-count` | Number of iterations (default: the number of data rows, or 1). |
 | `--delay-request <ms>` | Pause between requests. |
 | `--watch` | Run again whenever the collection, an environment or the data file changes, until Ctrl+C. |
+| `--rerun-failed [runId]` | Run only the requests that failed in a run of this collection (default: the last run). |
 | `--folder <name...>` | Only run these folders or requests, by name or id (repeatable). |
 | `--bail`, `--timeout` | Stop after the first failure; per-request timeout in ms. |
 | `--cookie-jar <file>` | Start with the cookies in this JSON file (TestPion format or a Newman cookie jar). |
