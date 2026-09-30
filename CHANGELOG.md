@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **A clearer Collections sidebar**:
+  - The panel is titled with your workspace name. Its sections follow what you work with: **Collections** (HTTP and GraphQL), **gRPC**, **WebSocket & MQTT**, **MCP servers** (with a connected dot) and **API definitions** (API coverage, compare versions).
+  - Each section has an icon, a count and a **+** that creates that kind of item. Saved items are grouped by folder, and empty sections say what goes there and offer a button to start.
+  - Environments, monitors, AI prompts, evaluations and load tests are no longer repeated here: they live on their own rail items (the environment picker stays in the top bar).
+
 ## 0.11.1 — 2026-09-30
 
 - **New request is the same everywhere**: the button on the empty editor, the tab strip's **+** and the explorer's **New** menu all offer HTTP, GraphQL, gRPC, WebSocket / Socket.IO / MQTT and MCP (the empty editor used to create an HTTP request straight away).

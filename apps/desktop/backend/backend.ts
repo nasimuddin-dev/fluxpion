@@ -113,7 +113,7 @@ import { monitorHandlers, runMonitorNow } from './handlers/monitors.js';
 import { grpcHandlers } from './handlers/grpc.js';
 
 /** RPC methods that change what the workspace lists (collections, saved items, environments, monitors, MCP servers). */
-const DATA_CHANGING = /^(col\.(save|delete|import\w*|move\w*|duplicate\w*)|lib\.save|env\.(save|delete|reorder|import\w*)|monitor\.(save|delete)|mcp\.saveServers|trash\.restore|ws\.(open|import\w*|openExamples))$/;
+const DATA_CHANGING = /^(col\.(save|delete|import\w*|move\w*|duplicate\w*)|lib\.save|env\.(save|delete|reorder|import\w*)|monitor\.(save|delete)|mcp\.(saveServers|connect|disconnect)|trash\.restore|ws\.(open|import\w*|openExamples))$/;
 
 export interface BackendHost {
   appDir: string;
