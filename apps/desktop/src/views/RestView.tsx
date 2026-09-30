@@ -13,8 +13,10 @@ import { uid } from '../lib/format';
 /** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
 const isRequestSnippet = (t: string) =>
   /^\s*(?:curl(?:\.exe)?\s|(?:(?:const|let|var)\s+\w+\s*=\s*)?(?:await\s+)?fetch\s*\(|(?:Invoke-WebRequest|Invoke-RestMethod|iwr|irm)\s)/i.test(t) ||
-  (/^\s*\$\w+\s*=/.test(t) && /\b(?:Invoke-WebRequest|Invoke-RestMethod)\b/i.test(t));
-const SNIPPET_LABEL: Record<string, string> = { curl: 'cURL command', fetch: 'fetch call', powershell: 'PowerShell command' };
+  (/^\s*\$\w+\s*=/.test(t) && /\b(?:Invoke-WebRequest|Invoke-RestMethod)\b/i.test(t)) ||
+  // HTTPie / xh: http [flags] [METHOD] URL …
+  /^\s*(?:https?|xhs?)\s+(?:-\S+\s+)*(?:[A-Z]+\s+)?(?:https?:\/\/|:\d|localhost|[\w.-]+\.[a-z]{2,}|[\w.-]+:\d)/i.test(t);
+const SNIPPET_LABEL: Record<string, string> = { curl: 'cURL command', fetch: 'fetch call', powershell: 'PowerShell command', httpie: 'HTTPie command' };
 /** A tab name like "POST /v1/pets" for a pasted request. */
 const snippetName = (r: HttpRequestSpec) => {
   let path = r.url;
