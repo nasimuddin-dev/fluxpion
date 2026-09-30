@@ -17,6 +17,7 @@ import {
   formatDuration,
   CookieJar,
   cookiesFromJson,
+  exportPostmanEnvironment,
   startMockServer,
   type MockServer,
   loadSuite,
@@ -240,6 +241,32 @@ export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 
   folder?: string[];
   cookieJar?: string;
   exportCookieJar?: string;
+  /** Newman-compatible options */
+  globals?: string;
+  envVar?: Record<string, string>;
+  globalVar?: Record<string, string>;
+  timeoutRequest?: string;
+  insecure?: boolean;
+  exportEnvironment?: string;
+  exportGlobals?: string;
+  suppressExitCode?: boolean;
+  reporters?: string[];
+  reporterJunitExport?: string;
+}
+
+/** A copy of the collection with TLS verification off for every request (Newman's --insecure). */
+function insecureCollection(c: Collection): Collection {
+  const walk = (nodes: CollectionNode[]): CollectionNode[] =>
+    nodes.map((n) => (n.kind === 'folder' ? { ...n, items: walk(n.items) } : { ...n, request: { ...n.request, settings: { ...n.request.settings, insecure: true } } } as CollectionNode));
+  return { ...c, items: walk(c.items) };
+}
+
+/** Write a scope's values after a run as a Postman environment / globals file. Secret values are left empty. */
+function writeScopeFile(file: string, name: string, values: Record<string, unknown>, isSecret: (k: string) => boolean, scope: 'environment' | 'globals'): number {
+  const variables = Object.entries(values).map(([key, v]) => ({ key, value: typeof v === 'string' ? v : JSON.stringify(v), secret: isSecret(key), enabled: true }));
+  const doc = { ...exportPostmanEnvironment({ id: name, name, variables } as unknown as Environment), _postman_variable_scope: scope };
+  writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
+  return variables.length;
 }
 
 /** Map --folder names/ids to node ids (folders or requests), like Newman's --folder. */
@@ -282,6 +309,8 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
     envName = o.environment;
   } else if (!fromFile && store.listEnvironments().length === 1) envName = store.listEnvironments()[0]!.name;
 
+  if (o.insecure) collection = insecureCollection(collection);
+  const globalsFile = o.globals ? readImport(resolve(o.globals), 'environment') : undefined;
   const selection = resolveSelection(collection, o.folder);
   let data: DatasetRecord[] | undefined;
   if (o.iterationData) {
@@ -304,6 +333,10 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
   const ctx = createEngineContext({ store, secrets, settings, environment: envName, collectionId: fromFile ? undefined : collection.id, logger, runtimeVars: o.var, cookieJar, fileRoot: ephemeral ? process.cwd() : undefined });
   if (fromFile) ctx.vars.setScope('collection', collection.variables);
   if (envFile) ctx.vars.setScope('environment', envFile.variables);
+  // Newman: -g globals file, then --global-var / --env-var overrides
+  for (const v of globalsFile?.variables ?? []) if (v.key && v.enabled !== false) ctx.vars.set(v.key, v.value, 'global');
+  for (const [k, v] of Object.entries(o.globalVar ?? {})) ctx.vars.set(k, v, 'global');
+  for (const [k, v] of Object.entries(o.envVar ?? {})) ctx.vars.set(k, v, 'environment');
   const environment = envName ?? envFile?.name;
   const runId = shortId('run-');
   // outside a workspace the ephemeral one is deleted afterwards, so keep results next to the caller (like Newman's ./newman)
@@ -335,7 +368,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
       data,
       iterations,
       delayMs: o.delayRequest ? Number(o.delayRequest) : undefined,
-      timeoutMs: o.timeout ? Number(o.timeout) : undefined,
+      timeoutMs: o.timeout ?? o.timeoutRequest ? Number(o.timeout ?? o.timeoutRequest) : undefined,
       bail: o.bail,
       services: ctx.services,
       signal: ctrl.signal,
@@ -356,14 +389,33 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
     throw e instanceof ApsError && e.kind === 'ValidationError' ? new CliError(e.message, EXIT.CONFIG_ERROR) : e;
   } finally {
     process.off('SIGINT', onSigint);
-    await ctx.dispose();
   }
+  // values after the run, including what scripts set (Newman's --export-environment / --export-globals)
+  const isSecret = (k: string) => ctx.vars.isSecret(k);
+  if (o.exportEnvironment) {
+    const n = writeScopeFile(resolve(o.exportEnvironment), environment ?? 'environment', ctx.vars.scopeValues('environment'), isSecret, 'environment');
+    if (!o.quiet) console.log(dim(`Environment written to ${resolve(o.exportEnvironment)} (${n} variables; secret values left empty)`));
+  }
+  if (o.exportGlobals) {
+    const n = writeScopeFile(resolve(o.exportGlobals), 'globals', ctx.vars.scopeValues('global'), isSecret, 'globals');
+    if (!o.quiet) console.log(dim(`Globals written to ${resolve(o.exportGlobals)} (${n} variables; secret values left empty)`));
+  }
+  await ctx.dispose();
   if (o.exportCookieJar) {
     const file = resolve(o.exportCookieJar);
     writeFileSync(file, JSON.stringify({ cookies: cookieJar.toJSON() }, null, 2) + '\n', { mode: 0o600 });
     if (!o.quiet) console.log(dim(`Cookie jar written to ${file} (${cookieJar.toJSON().length} cookies; values are in plain text, keep it out of git)`));
   }
-  return finishRun({ store, ephemeral, summary, outDir, resultsFile, o, emptyMessage: 'No requests ran.' });
+  const reporter = [...(o.reporters?.length ? o.reporters : o.reporter)];
+  if (o.reporterJunitExport && !reporter.includes('junit')) reporter.push('junit');
+  const code = await finishRun({ store, ephemeral, summary, outDir, resultsFile, o: { ...o, reporter }, emptyMessage: 'No requests ran.' });
+  if (o.reporterJunitExport) {
+    const target = resolve(o.reporterJunitExport);
+    writeFileSync(target, readFileSync(join(outDir, 'junit.xml')));
+    if (!o.quiet) console.log(dim(`junit report: ${target}`));
+  }
+  // --suppress-exit-code: test failures don't fail the command (configuration errors still do)
+  return o.suppressExitCode && code === EXIT.TEST_FAILURE ? EXIT.SUCCESS : code;
 }
 
 /** `testpion mock`: serve saved examples until interrupted. */

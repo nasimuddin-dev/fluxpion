@@ -72,7 +72,20 @@ testpion run-collection api.postman_collection.json -e staging.postman_environme
 | `--bail`, `--timeout` | Stop after the first failure; per-request timeout in ms. |
 | `--cookie-jar <file>` | Start with the cookies in this JSON file (TestPion format or a Newman cookie jar). |
 | `--export-cookie-jar <file>` | Write the run's cookie jar to this JSON file afterwards (plain text: keep it out of git). |
+| `-g, --globals <file>` | A Postman globals file. |
+| `--env-var <key=value>`, `--global-var <key=value>` | Set an environment or global variable (repeatable); overrides the files. |
+| `--export-environment <file>`, `--export-globals <file>` | Write the environment / globals after the run, including values scripts set, as Postman files. Secret values are left empty. |
+| `-k, --insecure` | Don't verify TLS certificates (development servers only). |
+| `--suppress-exit-code` | Exit `0` even when tests fail (configuration errors still exit `2`). |
+| `--reporter-junit-export <file>` | Also write the JUnit report to this file. |
 | `-w`, `-r`, `-o`, `--var`, `--trace`, `--baseline` … | Same as `test`. |
+
+**Coming from Newman?** Most command lines work after replacing `newman run` with `testpion run-collection`: `-e`, `-g`, `-d`, `-n`, `--folder`, `--env-var`, `--global-var`, `--delay-request`, `--timeout-request`, `--bail`, `-k`, `--export-environment`, `--export-globals`, `--suppress-exit-code`, `--reporters` and `--reporter-junit-export` mean the same.
+
+```bash
+# newman run api.json -e staging.json -g globals.json --env-var token=$TOKEN --reporters cli,junit --reporter-junit-export out.xml
+testpion run-collection api.json -e staging.json -g globals.json --env-var token=$TOKEN --reporters console junit --reporter-junit-export out.xml
+```
 
 Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./testpion-results/<runId>` unless you pass `-o`.
 

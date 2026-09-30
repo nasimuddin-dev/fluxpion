@@ -155,6 +155,55 @@ describe('example workspace (end-to-end)', () => {
     expect(missing.status).toBe(2);
   });
 
+  it('CLI: run-collection takes Newman options (globals, --env-var, exports, --suppress-exit-code, junit export)', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    writeFileSync(
+      join(dir, 'nm.postman_collection.json'),
+      JSON.stringify({
+        info: { name: 'Newman flags', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+        item: [
+          {
+            name: 'Health',
+            request: { method: 'GET', url: '{{baseUrl}}/health?who={{who}}' },
+            event: [
+              {
+                listen: 'test',
+                script: {
+                  exec: [
+                    "pm.test('global from file', () => pm.expect(pm.globals.get('who')).to.equal('file'));",
+                    "pm.test('env var override', () => pm.expect(pm.environment.get('baseUrl')).to.equal('http://localhost:4010'));",
+                    "pm.test('global var', () => pm.expect(pm.globals.get('extra')).to.equal('x'));",
+                    "pm.environment.set('token', 'from-script');",
+                    "pm.globals.set('count', 2);",
+                    "pm.test('fails on purpose', () => pm.expect(pm.variables.get('failMe')).to.not.equal('yes'));",
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    writeFileSync(join(dir, 'g.postman_globals.json'), JSON.stringify({ name: 'Globals', _postman_variable_scope: 'globals', values: [{ key: 'who', value: 'file', enabled: true }] }));
+    const args = [cli, 'run-collection', join(dir, 'nm.postman_collection.json'), '-g', join(dir, 'g.postman_globals.json'), '--env-var', 'baseUrl=http://localhost:4010', '--global-var', 'extra=x', '--timeout-request', '5000'];
+    const envOut = join(dir, 'nm-env.json');
+    const junit = join(dir, 'nm-junit.xml');
+    const ok = await run([...args, '--export-environment', envOut, '--export-globals', join(dir, 'nm-globals.json'), '--reporters', 'json', '--reporter-junit-export', junit, '-o', join(dir, 'nm1'), '-q'], env);
+    expect(ok.stderr).toBe('');
+    expect(ok.status).toBe(0);
+    const exported = JSON.parse(readFileSync(envOut, 'utf8'));
+    expect(exported._postman_variable_scope).toBe('environment');
+    expect(exported.values).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'baseUrl', value: 'http://localhost:4010' }), expect.objectContaining({ key: 'token', value: 'from-script' })]));
+    expect(JSON.parse(readFileSync(join(dir, 'nm-globals.json'), 'utf8')).values).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'count', value: '2' })]));
+    expect(readFileSync(junit, 'utf8')).toContain('<testcase name="Health"');
+
+    // a failing test exits 1, or 0 with --suppress-exit-code
+    const failing = [...args, '--var', 'failMe=yes', '-r', 'json', '-q'];
+    expect((await run([...failing, '-o', join(dir, 'nm2')], env)).status).toBe(1);
+    expect((await run([...failing, '--suppress-exit-code', '-o', join(dir, 'nm3')], env)).status).toBe(0);
+  });
+
   it('CLI: run-collection keeps cookies across requests and exports / imports the cookie jar', async () => {
     const cli = resolve('packages/cli/bin/testpion.js');
     const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };

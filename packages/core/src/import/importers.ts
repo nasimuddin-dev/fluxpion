@@ -27,7 +27,7 @@ export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 
   if (d.openapi) return 'openapi';
   if (d.swagger) return 'swagger';
   if (d.info?._postman_id || String(d.info?.schema ?? '').includes('postman')) return 'postman';
-  if (d._postman_variable_scope === 'environment' || (Array.isArray(d.values) && d.name)) return 'postman-env';
+  if (d._postman_variable_scope === 'environment' || d._postman_variable_scope === 'globals' || (Array.isArray(d.values) && d.name)) return 'postman-env';
   if (d.log?.entries) return 'har';
   if (WORKSPACE_FORMATS.has(d.format)) return 'aps-workspace';
   if (d.schemaVersion && Array.isArray(d.items)) return 'aps-collection';
