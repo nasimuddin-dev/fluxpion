@@ -7,7 +7,7 @@ description: "Run test suites in parallel with bounded concurrency, retries, tim
 
 # Test runner
 
-Tests are YAML or JSON files under `tests/`, of type `http`, `graphql`, `grpc`, `websocket` (or `socketio`), `mcp`, `llm`, `rag` or `agent`. A file can hold one test, a `tests:` list (with `defaults:`), or a dataset template. Suites are `*.suite.yaml` files:
+Tests are YAML or JSON files under `tests/`, of type `http`, `graphql`, `grpc`, `websocket` (or `socketio`, `mqtt`), `mcp`, `llm`, `rag` or `agent`. A file can hold one test, a `tests:` list (with `defaults:`), or a dataset template. You don't have to write them by hand: **Save as test** in the REST tab menu and **Test** in the GraphQL, gRPC and WebSocket views save the current request as a test file (the MCP view has **Save as test** too). Suites are `*.suite.yaml` files:
 
 ```yaml
 name: Regression

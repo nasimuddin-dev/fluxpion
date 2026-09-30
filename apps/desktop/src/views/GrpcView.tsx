@@ -1,4 +1,4 @@
-import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints } from 'lucide-react';
+import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
@@ -14,6 +14,7 @@ import { Badge, Button, cx, Empty, Field, IconButton, Input, Split, Tabs, Virtua
 import { pickTextFile } from '../lib/files';
 import { useSticky } from '../lib/sticky';
 import { plural } from '../lib/format';
+import { saveAsTestFile } from '../lib/save-test';
 
 interface ProtoFile {
   name: string;
@@ -261,6 +262,22 @@ export function GrpcView() {
           }
         >
           grpcurl
+        </Button>
+        <Button
+          icon={<FileCheck2 size={13} />}
+          disabled={!d.method}
+          title="Save as a YAML test file (tests/grpc, using server reflection) for the Tests view, testpion test and CI"
+          onClick={() => {
+            let message: unknown = d.message;
+            try {
+              message = JSON.parse(d.message);
+            } catch {
+              /* kept as text */
+            }
+            void saveAsTestFile(`${d.method.split('/').pop() ?? 'gRPC call'} works`, { kind: 'grpc', target: d.target, method: d.method, message, metadata: d.metadata, tls: d.tls });
+          }}
+        >
+          Test
         </Button>
         <Button icon={<Save size={13} />} title={currentSaved ? `Save changes to "${currentSaved.name}"` : 'Save this request'} onClick={() => void saveRequest()}>
           {savedDirty ? 'Save*' : 'Save'}

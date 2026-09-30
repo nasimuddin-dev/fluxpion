@@ -1,4 +1,4 @@
-import { BookOpen, ChevronLeft, Code2, FlaskConical, Play, Radio, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, Code2, FlaskConical, Play, Radio, RefreshCw, Save, Sparkles, Square, Wand2, FileCheck2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, on, type NormalizedError } from '../api';
@@ -19,6 +19,7 @@ import { JsonTree, RawView } from '../components/JsonView';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Input, Select, Split, statusTone, Tabs, Tooltip } from '../components/ui';
+import { saveAsTestFile } from '../lib/save-test';
 
 interface SchemaType {
   name: string;
@@ -320,6 +321,21 @@ export function GraphQLView() {
         )}
         <Button icon={<Code2 size={13} />} title="The request as code: cURL, fetch, Python and more" onClick={() => setShowCode(true)}>
           Code
+        </Button>
+        <Button
+          icon={<FileCheck2 size={13} />}
+          title="Save as a YAML test file (tests/graphql) for the Tests view, testpion test and CI"
+          onClick={() => {
+            let variables: Record<string, unknown> | undefined;
+            try {
+              variables = d.variables.trim() ? (JSON.parse(d.variables) as Record<string, unknown>) : undefined;
+            } catch {
+              variables = undefined;
+            }
+            void saveAsTestFile(d.name || selectedOp?.name || 'GraphQL query', { kind: 'graphql', endpoint: d.endpoint, query: d.query, variables, operationName: operations.length > 1 ? selectedOp?.name : undefined, headers: d.headers, auth: d.auth }, d.assertions);
+          }}
+        >
+          Test
         </Button>
         <Button icon={<Save size={13} />} onClick={save}>
           Save

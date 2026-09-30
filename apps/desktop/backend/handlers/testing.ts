@@ -11,7 +11,10 @@ import {
   ciConfig,
   type CiConfigOptions,
   type LoadTestConfig,
+  type CheckConfig,
   exportOtlp,
+  testFromRequest,
+  type TestSource,
   evaluateThresholds,
   parseThreshold,
 } from '@testpion/core';
@@ -22,6 +25,14 @@ export function testingHandlers(be: Backend): Handlers {
     'tests.tree': () => be.ws.testTree(),
     'tests.read': ({ path }: { path: string }) => be.ws.readTestFile(path),
     'tests.write': ({ path, content }: { path: string; content: string }) => be.ws.writeTestFile(path, content),
+    /** Save as test: a request from the REST, GraphQL, gRPC or WebSocket view as tests/<kind>/<name>.yaml (a free name). */
+    'tests.saveFrom': ({ name, source, assertions }: { name: string; source: TestSource; assertions?: CheckConfig[] }) => {
+      const t = testFromRequest(name, source, assertions);
+      let path = t.path;
+      for (let i = 2; existsSync(be.ws.safePath(path, be.ws.path('tests'))); i++) path = t.path.replace(/\.yaml$/, `-${i}.yaml`);
+      be.ws.writeTestFile(path, t.yaml);
+      return { path };
+    },
     'tests.delete': ({ path }: { path: string }) => be.ws.deleteTestFile(path),
     'tests.preview': async ({ path }: { path: string }) => {
       const out: Array<{ id?: string; name: string; type: string; tags?: string[] }> = [];

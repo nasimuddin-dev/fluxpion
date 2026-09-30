@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X, FileCheck2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
@@ -12,6 +12,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { JsonTree } from '../components/JsonView';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Input, Select, Split, Tabs, VirtualList } from '../components/ui';
+import { saveAsTestFile } from '../lib/save-test';
 
 interface WsMessage {
   id: string;
@@ -249,6 +250,23 @@ export function WebSocketView() {
             Connect
           </Button>
         )}
+        <Button
+          icon={<FileCheck2 size={13} />}
+          title="Save as a YAML test file (tests/websocket): connect, send this message, check that something comes back"
+          onClick={() => {
+            const parsed = (() => {
+              try {
+                return JSON.parse(d.message) as unknown;
+              } catch {
+                return d.message;
+              }
+            })();
+            const send = mqtt ? (d.topic ? [{ topic: d.topic, payload: d.message, qos: d.qos ?? 0 }] : []) : sio ? (d.event ? [{ event: d.event, args: Array.isArray(parsed) ? parsed : [parsed], ack: !!d.ack }] : []) : d.message.trim() ? [d.message] : [];
+            void saveAsTestFile(`${hostOf(d.url)} replies`, { kind: 'websocket', mode: d.mode ?? 'websocket', url: d.url, send, subscribe: mqtt ? (d.subscriptions ?? []).map((s) => s.topic) : undefined, headers: mqtt ? undefined : d.headers, username: mqtt ? d.username : undefined, password: mqtt ? d.password : undefined });
+          }}
+        >
+          Test
+        </Button>
         <Button icon={<Save size={13} />} title={current ? `Save changes to "${current.name}"` : 'Save this connection'} onClick={() => void save()}>
           {current ? (dirty ? 'Save*' : 'Save') : 'Save'}
         </Button>

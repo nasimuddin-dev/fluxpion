@@ -1,3 +1,4 @@
+import { testFromRequest } from '../runner/test-from.js';
 import { evaluateThresholds, parseThreshold } from '../load/thresholds.js';
 import { ENGINE_VERSION } from '../version.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -15,7 +16,7 @@ import { executeHttp } from '../protocols/http/client.js';
 import { describeRoot, executeGrpc, grpcRoot, parseGrpcTarget } from '../protocols/grpc/grpc.js';
 import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -416,6 +417,25 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         // same rewrite as save_request: cookies, tokens and keys become {{variables}}, never values
         const { request: safe, placeholders } = externalizeSecrets(request, redactor);
         return { format, request: redactor.redact(safe), placeholders };
+      },
+    },
+    {
+      name: 'save_test',
+      write: true,
+      description:
+        'Save a saved request (REST or GraphQL) of a collection as a YAML test file under tests/ (tests/rest or tests/graphql), with its checks or a first status / no-errors check, for `testpion test` and CI. {{variables}} are kept. Returns the file path.',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request name or id'), name: str('Test name (default: the request name)') }, required: ['collection', 'request'] },
+      run: (a) => {
+        const { node } = findRequest(findCollection(a.collection), a.request);
+        const name = String(a.name ?? node.name);
+        const t =
+          node.kind === 'graphql'
+            ? testFromRequest(name, { kind: 'graphql', endpoint: node.request.endpoint, query: node.request.query, variables: node.request.variables as Record<string, unknown> | undefined, operationName: node.request.operationName, headers: node.request.headers, auth: node.request.auth }, node.assertions)
+            : testFromRequest(name, { kind: 'http', request: node.request, preRequestScript: node.preRequestScript, testScript: node.testScript }, node.assertions);
+        let path = t.path;
+        for (let i = 2; existsSync(store.safePath(path, store.path('tests'))); i++) path = t.path.replace(/\.yaml$/, `-${i}.yaml`);
+        store.writeTestFile(path, t.yaml);
+        return { path: `tests/${path}` };
       },
     },
     {

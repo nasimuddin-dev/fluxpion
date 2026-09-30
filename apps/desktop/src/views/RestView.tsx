@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
+import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X, FileCheck2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
@@ -41,6 +41,7 @@ import { METHODS, TAB_WIDTH, PINNED_TAB_WIDTH, TAB_STRIP_RESERVED, RestTab, Send
 import { RequestEditor } from './rest/RequestEditor';
 import { SaveModal, ImportModal } from './rest/dialogs';
 import { RequestTabItem } from './rest/RequestTabItem';
+import { saveAsTestFile } from '../lib/save-test';
 
 
 /** Production environments where the user chose "don't ask again" (this session only). */
@@ -402,6 +403,12 @@ export function RestView() {
       { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, onSelect: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))) },
       { label: 'Rename…', icon: <Pencil size={13} />, shortcut: 'Double-click', onSelect: () => void renameTab(t) },
       { label: 'Duplicate tab', icon: <Copy size={13} />, onSelect: () => duplicateTab(t) },
+      {
+        label: 'Save as test file…',
+        icon: <FileCheck2 size={13} />,
+        onSelect: () =>
+          void saveAsTestFile(t.name, { kind: 'http', request: toEngineRequest(t.request), preRequestScript: t.preRequestScript, testScript: t.testScript, status: results[t.id]?.response?.status }, t.assertions),
+      },
       { label: 'Close tab', icon: <X size={13} />, separator: true, onSelect: () => closeTab(t.id), shortcut: 'Middle-click' },
       { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: !others.length, onSelect: () => closeTabs(others) },
       { label: 'Close tabs to the right', icon: <ArrowRightToLine size={13} />, disabled: !right.length, onSelect: () => closeTabs(right) },
