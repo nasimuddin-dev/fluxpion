@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.10.1 — 2026-09-30
+
+Highlights: **Back and Forward** navigation (top bar, Alt+← / Alt+→, mouse buttons) that reopens what you had open, and clicking a monitor opens its settings.
 
 - **Back and Forward** next to the workspace switcher, like a browser. They go to the views you visited and reopen the request, saved item, environment or monitor you had open. The tooltips name where they lead, a drop-down lists recent places, and they work with Alt+← / Alt+→ and the mouse's back and forward buttons.
 - **Monitors**: clicking a monitor in the list (or in the Collections explorer) opens its settings, like the edit button.
