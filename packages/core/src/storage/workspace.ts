@@ -400,8 +400,8 @@ export class WorkspaceStore {
       if (!line.trim()) continue;
       try {
         const r = JSON.parse(line) as { id?: string; status?: string };
-        // results carry the attempt number after @ for retried tests
-        if (r.id && (r.status === 'failed' || r.status === 'error')) ids.add(r.id.replace(/@\d+$/, ''));
+        // collection runs number results per iteration: request@2 (and request@2#3 when it ran again)
+        if (r.id && (r.status === 'failed' || r.status === 'error')) ids.add(r.id.replace(/@\d+(#\d+)?$/, ''));
       } catch {
         /* a partial line from an interrupted run */
       }

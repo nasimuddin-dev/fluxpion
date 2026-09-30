@@ -260,7 +260,20 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
         </div>
         <div className="flex-1 min-h-0">
           {runId ? (
-            <RunPanel key={runId} runId={runId} expectedTotal={selected.length * iterCount} />
+            <RunPanel
+              key={runId}
+              runId={runId}
+              expectedTotal={selected.length * iterCount}
+              onRerunFailed={(id) =>
+                void call<{ runId: string }>('col.rerunFailed', { runId: id, collectionId: collection.id, environment: environment || undefined }).then(
+                  (r) => {
+                    setRunId(r.runId);
+                    setTimeout(() => void loadRuns(), 500);
+                  },
+                  (e) => useApp.getState().toast(asError(e).message, 'error'),
+                )
+              }
+            />
           ) : (
             <Empty icon={<Play size={26} />} title="Run this collection">
               Requests run one at a time, in order. Variables set by scripts carry over to later requests, and <span className="mono">pm.execution.setNextRequest()</span> changes the order. Results, traces and reports are saved with the run.

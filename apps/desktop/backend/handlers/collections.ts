@@ -175,6 +175,13 @@ export function collectionsHandlers(be: Backend): Handlers {
       return be.handlers['col.import']!({ text: readFileSync(f, 'utf8'), fileName: basename(f) });
     },
     'col.run': (p: CollectionRunParams) => be.startCollectionRun(p),
+    /** Run again only the requests that failed in a collection run (one iteration). */
+    'col.rerunFailed': ({ runId, collectionId, environment }: { runId: string; collectionId: string; environment?: string }) => {
+      const r = be.ws.failedTestIds(runId);
+      if (!r.ids.length) throw new ApsError('ValidationError', 'Nothing failed in that run');
+      const c = be.ws.getCollection(collectionId);
+      return be.startCollectionRun({ collectionId, selection: r.ids, environment, name: `Failed requests of ${c.name}` });
+    },
     /**
      * A data file uploaded from the browser (no native file picker): it is stored in the workspace's
      * datasets/uploads folder and previewed like a picked file.
