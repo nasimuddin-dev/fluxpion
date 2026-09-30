@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Tests view sidebar**: a labelled **New** menu for test templates (REST, GraphQL, gRPC, WebSocket, MQTT, MCP, AI, suite) in place of the small + picker, and a filter box for test files.
 - **Collections in the GraphQL view**: a Collections / Schema switch in the sidebar shows the same collection tree as REST (new collections and folders, **New GraphQL request** in any folder, drag and drop, run, move), **Save** (now also Ctrl+S) asks for the collection and folder, and HTTP requests in the tree open in REST.
 - **Clearer saved lists**: the WebSocket, gRPC, AI Lab and MCP sidebars have a filter box like the REST collection tree (matching folders open), and when empty they show **Save current …** and **New folder** buttons.
 - **Navigation regrouped**: the left rail is now grouped as Requests (REST, GraphQL, gRPC, WebSocket, MCP), Testing (Tests, Monitors, Load), AI (AI Lab, Evaluations) and Workspace (Collections, Environments, History, Traces); tooltips say what each covers (WebSocket includes Socket.IO and MQTT), and on short windows the rail becomes a compact icon bar with no scrolling.

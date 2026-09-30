@@ -7,7 +7,7 @@ import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunPanel } from '../components/RunPanel';
 import { finishSave, type SaveResult } from '../lib/files';
-import { Badge, Button, cx, Empty, IconButton, Input, SectionTitle, Split, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, IconButton, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
 
 interface Node {
   name: string;
@@ -119,6 +119,11 @@ retries: 1
 
 export function TestsView() {
   const [tree, setTree] = useState<Node[]>([]);
+  // filter the tree by file or folder path (matching folders stay open)
+  const [treeFilter, setTreeFilter] = useState('');
+  const tf = treeFilter.trim().toLowerCase();
+  const filterTree = (nodes: Node[]): Node[] =>
+    !tf ? nodes : nodes.flatMap((n) => (n.kind === 'dir' ? ((c) => (c.length ? [{ ...n, children: c }] : []))(filterTree(n.children ?? [])) : n.path.toLowerCase().includes(tf) ? [n] : []));
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [file, setFile] = useState<string>();
   const [content, setContent] = useState('');
@@ -212,7 +217,7 @@ export function TestsView() {
         <div key={n.path}>
           <div className="group flex items-center h-7 hover:bg-hover pr-1 text-sm" style={{ paddingLeft: 6 + depth * 12 }}>
             <button className="flex items-center gap-1 flex-1 min-w-0" onClick={() => setOpen({ ...open, [n.path]: !(open[n.path] ?? true) })}>
-              {open[n.path] ?? true ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
+              {tf || (open[n.path] ?? true) ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
               <Folder size={13} className="text-muted" />
               <span className="truncate">{n.name}</span>
             </button>
@@ -220,7 +225,7 @@ export function TestsView() {
               <Play size={11} />
             </IconButton>
           </div>
-          {(open[n.path] ?? true) && renderTree(n.children ?? [], depth + 1)}
+          {(tf || (open[n.path] ?? true)) && renderTree(n.children ?? [], depth + 1)}
         </div>
       ) : (
         <div key={n.path} className={cx('group flex items-center h-7 pr-1 text-sm', file === n.path ? 'bg-accent/10' : 'hover:bg-hover')} style={{ paddingLeft: 20 + depth * 12 }}>
@@ -243,18 +248,28 @@ export function TestsView() {
         <SectionTitle
           right={
             <div className="flex items-center">
-              <select aria-label="New test file" className="bg-transparent text-xs text-muted hover:text-fg cursor-pointer w-5" value="" onChange={(e) => e.target.value && void newFile(e.target.value)}>
-                <option value="">+</option>
-                <option value="http">New REST test</option>
-                <option value="graphql">New GraphQL test</option>
-                <option value="grpc">New gRPC test</option>
-                <option value="websocket">New WebSocket test</option>
-                <option value="mqtt">New MQTT test</option>
-                <option value="mcp">New MCP test</option>
-                <option value="llm">New AI test</option>
-                <option value="suite">New suite</option>
-              </select>
-              <FilePlus2 size={13} className="text-muted -ml-4 pointer-events-none" />
+              <Menu
+                width={220}
+                items={(
+                  [
+                    ['http', 'New REST test'],
+                    ['graphql', 'New GraphQL test'],
+                    ['grpc', 'New gRPC test'],
+                    ['websocket', 'New WebSocket test'],
+                    ['mqtt', 'New MQTT test'],
+                    ['mcp', 'New MCP test'],
+                    ['llm', 'New AI test'],
+                    ['suite', 'New suite'],
+                  ] as const
+                ).map(([kind, label], i) => ({ label, icon: kind === 'suite' ? <Layers size={13} /> : <FilePlus2 size={13} />, separator: i === 7, onSelect: () => void newFile(kind) }))}
+                trigger={
+                  <button aria-label="New test file" title="New test file (REST, GraphQL, gRPC, WebSocket, MQTT, MCP, AI or a suite)" className="flex items-center gap-1 h-6 px-1.5 rounded-md text-xs text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover">
+                    <FilePlus2 size={13} />
+                    New
+                    <ChevronDown size={11} />
+                  </button>
+                }
+              />
               <IconButton label="Run in CI (GitHub Actions, GitLab, Azure, Jenkins)" className="ml-1" onClick={() => useApp.getState().set({ ci: {} })}>
                 <Workflow size={13} />
               </IconButton>
@@ -263,7 +278,12 @@ export function TestsView() {
         >
           Tests
         </SectionTitle>
-        <div className="flex-1 overflow-auto">{tree.length ? renderTree(tree) : <Empty title="No test files">Use + to create a REST, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
+        {tree.length > 0 && (
+          <div className="px-2 pb-2">
+            <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter test files" aria-label="Filter test files" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
+          </div>
+        )}
+        <div className="flex-1 overflow-auto">{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use New to create a REST, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
         <div className="border-t border-line p-2 flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <label className="flex flex-col gap-0.5">
