@@ -85,4 +85,11 @@ describe('desktop backend', () => {
       wss.close();
     }
   });
+
+  it('settings.save refuses malformed certificates and proxy URLs', async () => {
+    const current = (await call('settings.get')) as Record<string, unknown>;
+    await expect(Promise.resolve().then(() => call('settings.save', { ...current, tls: { extraCa: '-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----' } }))).rejects.toThrow(/Extra CA certificates/);
+    await expect(Promise.resolve().then(() => call('settings.save', { ...current, proxy: { mode: 'custom', url: 'proxy:8080 x' } }))).rejects.toThrow(/not a URL/);
+  });
 });
+

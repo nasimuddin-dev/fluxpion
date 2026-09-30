@@ -641,6 +641,8 @@ export interface AppSettings {
   checkForUpdates: boolean;
   /** Outbound proxy: environment variables (default), a custom proxy, or none. The password is in the secret store. */
   proxy?: { mode: 'env' | 'custom' | 'off'; url?: string; bypass?: string; username?: string };
+  /** Certificate authorities HTTPS trusts besides the built-in list: the OS store and/or extra PEM certificates. */
+  tls?: { systemCa?: boolean; extraCa?: string };
   /** Settings layout revision, used for one-time migrations of defaults. */
   settingsRevision?: number;
 }

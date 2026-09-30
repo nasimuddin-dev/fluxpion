@@ -90,6 +90,7 @@ import {
   lastMonitorResult,
   type WorkspaceInfo,
   setProxySettings,
+  setTlsTrust,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -213,7 +214,7 @@ export class Backend {
     if (!host.noMonitors) this.monitorScheduler.start();
   }
 
-  /** Apply the proxy settings (the password comes from the secret store and is redacted from logs). */
+  /** Apply the proxy and certificate settings (the proxy password comes from the secret store and is redacted from logs). */
   applyProxy(): void {
     const p = this.settings.proxy ?? { mode: 'env' as const };
     const password = p.mode === 'custom' && p.username ? this.secrets.get('proxy.password') : undefined;
@@ -223,6 +224,12 @@ export class Backend {
     } catch (e) {
       this.logger.warn(`Proxy settings ignored: ${(e as Error).message}`);
       setProxySettings({ mode: 'env' });
+    }
+    try {
+      setTlsTrust(this.settings.tls ?? {});
+    } catch (e) {
+      this.logger.warn(`Certificate settings ignored: ${(e as Error).message}`);
+      setTlsTrust({});
     }
   }
 

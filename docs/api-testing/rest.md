@@ -27,6 +27,15 @@ The proxy applies to requests, `pm.sendRequest`, OAuth token calls, AI providers
 
 The CLI always uses the environment variables. Set `TESTPION_NO_PROXY=1` to connect directly instead.
 
+## Certificates
+
+If your company inspects TLS traffic, or an API uses a private certificate authority, HTTPS requests fail with a certificate error until TestPion trusts that CA. **Settings ▸ Certificates** has two options:
+
+- **Trust the certificates installed in the operating system**: the Windows certificate store, the macOS keychain or the Linux CA bundle. A corporate root certificate is usually already there.
+- **Extra CA certificates**: paste PEM blocks or add `.pem` / `.crt` files. TestPion shows each certificate's name, issuer and expiry before you save.
+
+These apply wherever the proxy does. A request that turns off TLS verification ignores them. From the terminal, use `TESTPION_USE_SYSTEM_CA=1`, `TESTPION_CA_FILE=ca.pem`, or Node's `NODE_EXTRA_CA_CERTS`.
+
 ## Paste a request from the browser
 
 In the browser's devtools, right-click a request on the **Network** tab, choose **Copy**, and pick any of:

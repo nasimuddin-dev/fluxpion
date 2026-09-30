@@ -308,6 +308,7 @@ export interface AppSettings {
   globalVariables: KeyValue[];
   checkForUpdates: boolean;
   proxy?: { mode: 'env' | 'custom' | 'off'; url?: string; bypass?: string; username?: string };
+  tls?: { systemCa?: boolean; extraCa?: string };
 }
 
 export interface WorkspaceCurrent {

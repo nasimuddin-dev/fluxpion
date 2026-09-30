@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { Command, CommanderError } from 'commander';
 import {
   ApsError,
   normalizeError,
   ENGINE_VERSION,
   setProxySettings,
+  setTlsTrust,
 } from '@testpion/core';
 import { EXIT, red, dim, CliError } from './shared.js';
 import { registerRunCommands } from './commands/run.js';
@@ -32,6 +34,16 @@ export function buildProgram(): Command {
 export async function main(argv = process.argv): Promise<number> {
   // HTTP_PROXY / HTTPS_PROXY / NO_PROXY apply to everything the CLI sends (curl-style)
   setProxySettings({ mode: process.env.TESTPION_NO_PROXY ? 'off' : 'env' });
+  // TESTPION_USE_SYSTEM_CA=1 trusts the OS certificate store; TESTPION_CA_FILE adds CA certificates (PEM).
+  // (Node's own NODE_EXTRA_CA_CERTS works too.)
+  if (process.env.TESTPION_USE_SYSTEM_CA || process.env.TESTPION_CA_FILE) {
+    try {
+      setTlsTrust({ systemCa: !!process.env.TESTPION_USE_SYSTEM_CA, extraCa: process.env.TESTPION_CA_FILE ? readFileSync(process.env.TESTPION_CA_FILE, 'utf8') : undefined });
+    } catch (e) {
+      console.error(red(`TESTPION_CA_FILE: ${(e as Error).message}`));
+      return EXIT.CONFIG_ERROR;
+    }
+  }
   const program = buildProgram();
   program.exitOverride();
   try {

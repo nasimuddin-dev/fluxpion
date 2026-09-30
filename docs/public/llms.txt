@@ -8,6 +8,7 @@ Key facts for agents:
 - Test types: http, graphql, grpc, websocket (or socketio: connect, `send` messages / `{event,args,ack}`, assert on `$.received[n]`), mcp, llm, rag, agent.
 - Environment drift: `testpion env diff <a> <b> --json` (exit 1 when they differ) or MCP `compare_environments` (statuses only, no values).
 - Proxy: the CLI honours HTTP_PROXY / HTTPS_PROXY / NO_PROXY (TESTPION_NO_PROXY=1 disables); the app has Settings ▸ Proxy (env, custom URL + bypass list, or off).
+- Private / corporate CAs: app Settings ▸ Certificates (OS store, extra PEM); CLI TESTPION_USE_SYSTEM_CA=1, TESTPION_CA_FILE=path or NODE_EXTRA_CA_CERTS.
 - CI: `testpion ci <github|gitlab|azure|jenkins> -w <ws> [--suite s | --collection c [--folder f]] [-e env] --json` (or MCP `ci_config`) returns { path, content, secrets, command }; the pipeline installs the CLI from github.com/nasimuddin-dev/testpion at the version's tag (the CLI is not on npm).
 - A complete example workspace against free public APIs is at `examples/public-workspace` (REST, GraphQL, gRPC, WebSocket, SSE, MCP, AI; suites `all` and `offline`); the desktop app opens it on first launch. Docs: /getting-started/examples
 - Imports (app, `testpion import <file> -w <ws> --json`): OpenAPI 3 / Swagger 2, Postman v2.1, Insomnia v4/v5, Bruno JSON export, Hoppscotch, HAR, cURL/fetch/PowerShell snippets.

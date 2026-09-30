@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Trusted certificates.** **Settings ▸ Certificates** lets HTTPS trust the operating system's certificate store (for corporate TLS inspection) and extra CA certificates (PEM, with name, issuer and expiry shown). The CLI takes `TESTPION_USE_SYSTEM_CA=1` and `TESTPION_CA_FILE`. Settings now refuse a malformed certificate or proxy URL instead of saving it.
 - **Fixes from a first-run pass over the examples.**
   - WebSocket messages and Socket.IO events now resolve `{{variables}}` (including `{{$guid}}` and the like) before they are sent. They used to go out literally.
   - A saved gRPC request without `.proto` files describes its service through server reflection as soon as it is opened, so **Invoke** works straight away. Descriptors from the previously open request no longer carry over, and reflecting no longer marks the request as edited.

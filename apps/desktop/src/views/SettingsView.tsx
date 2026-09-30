@@ -1,12 +1,13 @@
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { call } from '../api';
+import { asError, call } from '../api';
+import { pickTextFile } from '../lib/files';
 import { useApp } from '../store';
 import type { AppSettings, PriceEntry, ProviderConfig } from '../types';
 import { checkForUpdates } from '../updates';
 import { Badge, Button, Field, IconButton, Input, Select, Tabs, Toggle } from '../components/ui';
 
-type Tab = 'appearance' | 'requests' | 'proxy' | 'privacy' | 'pricing' | 'load' | 'assistant' | 'about';
+type Tab = 'appearance' | 'requests' | 'proxy' | 'certificates' | 'privacy' | 'pricing' | 'load' | 'assistant' | 'about';
 
 export function SettingsView() {
   const settings = useApp((s) => s.settings);
@@ -21,7 +22,14 @@ export function SettingsView() {
   }, []);
   if (!s) return null;
   const set = (p: Partial<AppSettings>) => setS({ ...s, ...p });
-  const save = () => useApp.getState().saveSettings(s).then(() => useApp.getState().toast('Settings saved', 'success'));
+  const save = () =>
+    useApp
+      .getState()
+      .saveSettings(s)
+      .then(
+        () => useApp.getState().toast('Settings saved', 'success'),
+        (e) => useApp.getState().toast(asError(e).message, 'error'),
+      );
   const setPrice = (i: number, p: Partial<PriceEntry>) => set({ pricing: s.pricing.map((x, j) => (j === i ? { ...x, ...p } : x)) });
   return (
     <div className="h-full flex flex-col">
@@ -32,6 +40,7 @@ export function SettingsView() {
           { id: 'appearance', label: 'Appearance' },
           { id: 'requests', label: 'Requests' },
           { id: 'proxy', label: 'Proxy' },
+          { id: 'certificates', label: 'Certificates' },
           { id: 'privacy', label: 'Privacy & security' },
           { id: 'pricing', label: 'Model pricing' },
           { id: 'load', label: 'Load testing' },
@@ -82,6 +91,7 @@ export function SettingsView() {
             </>
           )}
           {tab === 'proxy' && <ProxySettings value={s.proxy ?? { mode: 'env' }} onChange={(proxy) => set({ proxy })} />}
+          {tab === 'certificates' && <CertificateSettings value={s.tls ?? {}} onChange={(tls) => set({ tls })} />}
           {tab === 'privacy' && (
             <>
               <Field label="Always-redacted field names" hint="Matched case-insensitively (and as suffixes, e.g. accessToken) in logs, traces, history, reports and exports.">
@@ -279,6 +289,68 @@ function ProxySettings({ value, onChange }: { value: NonNullable<AppSettings['pr
         </div>
       )}
       <p className="text-xs text-muted">A request's own proxy (request Settings) wins over this. WebSocket and Socket.IO connections use it too; gRPC reads the environment variables itself. The CLI always uses the environment variables (set TESTPION_NO_PROXY=1 to turn that off).</p>
+    </>
+  );
+}
+
+interface CertInfo {
+  subject: string;
+  issuer: string;
+  validTo: string;
+  expired: boolean;
+  ca: boolean;
+}
+
+/** Certificate authorities HTTPS trusts besides the built-in list (corporate roots, private CAs). */
+function CertificateSettings({ value, onChange }: { value: NonNullable<AppSettings['tls']>; onChange(v: NonNullable<AppSettings['tls']>): void }) {
+  const [certs, setCerts] = useState<CertInfo[]>([]);
+  const [error, setError] = useState<string>();
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!value.extraCa?.trim()) return (setCerts([]), setError(undefined));
+      call<CertInfo[]>('settings.describeCertificates', { pem: value.extraCa }).then(
+        (c) => (setCerts(c), setError(c.length ? undefined : 'No "-----BEGIN CERTIFICATE-----" block found.')),
+        (e) => (setCerts([]), setError(asError(e).message)),
+      );
+    }, 300);
+    return () => clearTimeout(t);
+  }, [value.extraCa]);
+  const load = async () => {
+    const f = await pickTextFile('.pem,.crt,.cer');
+    if (f) onChange({ ...value, extraCa: [value.extraCa?.trim(), f.text.trim()].filter(Boolean).join('\n') });
+  };
+  return (
+    <>
+      <p className="text-sm text-muted">
+        HTTPS connections trust the usual public certificate authorities. If your company inspects TLS traffic, or an API uses a private CA, requests fail with a certificate error until TestPion trusts that CA too.
+      </p>
+      <Toggle checked={!!value.systemCa} onChange={(systemCa) => onChange({ ...value, systemCa })} label="Trust the certificates installed in the operating system (Windows certificate store, macOS keychain, Linux CA bundle)" />
+      <Field label="Extra CA certificates (PEM)" hint="One or more -----BEGIN CERTIFICATE----- blocks. Public certificates only: never paste a private key here.">
+        <textarea className="field mono text-xs min-h-36" spellCheck={false} placeholder={'-----BEGIN CERTIFICATE-----\nMIID…\n-----END CERTIFICATE-----'} value={value.extraCa ?? ''} onChange={(e) => onChange({ ...value, extraCa: e.target.value || undefined })} />
+      </Field>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => void load()}>
+          Add from file…
+        </Button>
+        {value.extraCa && (
+          <Button size="sm" variant="ghost" onClick={() => onChange({ ...value, extraCa: undefined })}>
+            Remove all
+          </Button>
+        )}
+      </div>
+      {error && <div className="text-sm text-bad">{error}</div>}
+      {certs.length > 0 && (
+        <ul className="text-sm flex flex-col gap-1">
+          {certs.map((c, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <Badge tone={c.expired ? 'bad' : c.ca ? 'ok' : 'warn'}>{c.expired ? 'expired' : c.ca ? 'CA' : 'not a CA'}</Badge>
+              <span className="font-medium">{c.subject}</span>
+              <span className="text-muted text-xs">issued by {c.issuer} · valid until {new Date(c.validTo).toLocaleDateString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-muted">Applies to requests, OAuth, AI providers, MCP over HTTP, WebSocket and datasets. A request that turns off TLS verification (its Settings tab) ignores this. From the terminal: TESTPION_USE_SYSTEM_CA=1 and TESTPION_CA_FILE=path, or Node's NODE_EXTRA_CA_CERTS.</p>
     </>
   );
 }

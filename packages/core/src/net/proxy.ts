@@ -1,7 +1,9 @@
 import { Agent, EnvHttpProxyAgent, ProxyAgent, setGlobalDispatcher, type Dispatcher } from 'undici';
 import { Agent as HttpAgent, request as httpRequest, type AgentOptions, type IncomingMessage } from 'node:http';
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
+import * as tls from 'node:tls';
 import { connect as tlsConnect, type ConnectionOptions } from 'node:tls';
+import { X509Certificate } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import { policyLookup } from './policy.js';
 
@@ -51,7 +53,9 @@ function proxyOptions(): { httpProxy?: string; httpsProxy?: string; noProxy?: st
  * overrides them). The SSRF guard (`policyLookup`) always applies to direct connections.
  */
 export function makeDispatcher(connect: Record<string, unknown> = {}, requestProxy?: string, pool: Record<string, unknown> = {}): Dispatcher {
-  const c = { lookup: policyLookup, ...connect };
+  const ca = trustedCa();
+  // a request's own CA (client certificate settings) wins over the trusted set
+  const c = { lookup: policyLookup, ...(ca ? { ca } : {}), ...connect };
   if (requestProxy) return new ProxyAgent({ uri: requestProxy, connect: c, requestTls: c as never, ...pool });
   if (settings.mode === 'off') return new Agent({ connect: c as never, ...pool });
   return new EnvHttpProxyAgent({ ...proxyOptions(), connect: c as never, requestTls: c as never, ...pool } as never);
@@ -78,13 +82,81 @@ export function getProxySettings(): ProxySettings {
 
 /** Apply new proxy settings (the app's Settings, or the CLI's defaults). Global `fetch` follows them too. */
 export function setProxySettings(p: ProxySettings): void {
-  if (p.mode === 'custom' && p.url) new URL(p.url); // throws on a malformed URL before anything changes
+  if (p.mode === 'custom' && p.url) {
+    // throws on a malformed URL before anything changes
+    const u = new URL(p.url);
+    if (!/^https?:$/.test(u.protocol) || !u.hostname) throw new Error(`The proxy URL must be http:// or https:// with a host: ${p.url}`);
+  }
   settings = { ...p };
+  rebuild();
+}
+
+function rebuild(): void {
   generation++;
   const old = [base, wsBase];
   base = wsBase = undefined;
   setGlobalDispatcher(baseDispatcher());
   for (const d of old) void d?.close().catch(() => undefined);
+}
+
+/* ------------------------------------------------------------------ trusted certificates */
+
+/**
+ * Which certificate authorities HTTPS connections trust, besides Node's built-in list: the operating
+ * system's store (where corporate root certificates usually are, e.g. for a TLS-inspecting proxy) and
+ * extra CA certificates (PEM). Applies wherever the proxy settings apply.
+ */
+export interface TlsTrust {
+  /** Also trust the operating system's certificate store. */
+  systemCa?: boolean;
+  /** Extra CA certificates, PEM (one or more). */
+  extraCa?: string;
+}
+
+let trust: TlsTrust = {};
+let caList: string[] | undefined;
+
+const splitPem = (pem = '') => pem.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? [];
+
+function systemCertificates(): string[] {
+  const get = (tls as unknown as { getCACertificates?: (type: string) => string[] }).getCACertificates;
+  try {
+    return get?.('system') ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** The CA list to use, or undefined for Node's default (nothing extra configured). */
+export function trustedCa(): string[] | undefined {
+  if (!trust.systemCa && !splitPem(trust.extraCa).length) return undefined;
+  return (caList ??= [...tls.rootCertificates, ...(trust.systemCa ? systemCertificates() : []), ...splitPem(trust.extraCa)]);
+}
+
+/** Validate PEM certificates (throws on a malformed one) and apply the trust settings. */
+export function setTlsTrust(t: TlsTrust): void {
+  describeCertificates(t.extraCa ?? '');
+  trust = { ...t };
+  caList = undefined;
+  rebuild();
+}
+
+export function getTlsTrust(): TlsTrust & { systemCertificates: number } {
+  return { ...trust, systemCertificates: trust.systemCa ? systemCertificates().length : 0 };
+}
+
+/** What a PEM bundle holds: subject, issuer, expiry (for the UI and for validation). */
+export function describeCertificates(pem: string): Array<{ subject: string; issuer: string; validTo: string; expired: boolean; ca: boolean; fingerprint: string }> {
+  return splitPem(pem).map((block, i) => {
+    let c: X509Certificate;
+    try {
+      c = new X509Certificate(block);
+    } catch (e) {
+      throw new Error(`Certificate ${i + 1} is not a valid PEM certificate: ${(e as Error).message}`);
+    }
+    const cn = (dn: string) => /CN=([^\n,]+)/.exec(dn)?.[1] ?? dn.split('\n')[0] ?? dn;
+    return { subject: cn(c.subject), issuer: cn(c.issuer), validTo: new Date(c.validTo).toISOString(), expired: Date.parse(c.validTo) < Date.now(), ca: c.ca, fingerprint: c.fingerprint256 };
+  });
 }
 
 /** Which proxy a URL would use under the current settings (for the UI, `testpion` diagnostics and tests). */
@@ -148,7 +220,8 @@ export function proxyAgentFor(url: string): HttpAgent | undefined {
         socket.destroy();
         return cb(new Error(`The proxy refused the connection to ${hostPort} (HTTP ${res.statusCode})`));
       }
-      cb(null, secure ? tlsConnect({ ...opts, socket: socket as never, servername: opts.servername ?? opts.host }) : socket);
+      const ca = trustedCa();
+      cb(null, secure ? tlsConnect({ ...opts, ...(ca && !opts.ca ? { ca } : {}), socket: socket as never, servername: opts.servername ?? opts.host }) : socket);
     });
     req.once('error', (e) => cb(e));
     req.end();
