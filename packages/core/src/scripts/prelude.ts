@@ -494,16 +494,57 @@ function __requirePackage(name) {
   const module = { exports: {} };
   __packages[name] = module;
   const run = new Function('module', 'exports', 'pm', 'require', src + '\n//# sourceURL=package:' + name);
-  run(module, module.exports, pm, (n) => (['crypto-js', 'uuid', 'tv4', 'lodash', 'moment'].includes(n) ? require(n) : __requirePackage(n)));
+  run(module, module.exports, pm, (n) => (['cheerio', 'crypto-js', 'uuid', 'tv4', 'lodash', 'moment'].includes(n) ? require(n) : __requirePackage(n)));
   return module.exports;
 }
+// cheerio (as in Postman): $ = cheerio.load(html); $('title').text(), $('a').attr('href'), $('li').each(…)
+const cheerio = {
+  load(html) {
+    const src = String(html == null ? '' : html);
+    const q = (path, op, sel) => {
+      const r = JSON.parse(__host_html(src, JSON.stringify(path || []), op, sel == null ? '' : String(sel)));
+      if (r && r.error) throw new Error('cheerio: ' + r.error);
+      return r;
+    };
+    const wrap = (nodes) => {
+      const w = { length: nodes.length, cheerio: '[cheerio object]' };
+      nodes.forEach((n, i) => { w[i] = n; });
+      const at = (i) => nodes[i < 0 ? nodes.length + i : i];
+      w.text = () => nodes.map((n) => n.text).join('');
+      w.html = () => (nodes[0] ? nodes[0].html : null);
+      w.attr = (k) => (nodes[0] ? nodes[0].attrs[String(k).toLowerCase()] : undefined);
+      w.val = () => w.attr('value');
+      w.data = (k) => w.attr('data-' + k);
+      w.hasClass = (c) => nodes.some((n) => String(n.attrs['class'] || '').split(/\s+/).indexOf(c) >= 0);
+      w.is = (sel) => nodes.some((n) => q([], 'find', sel).some((m) => JSON.stringify(m.path) === JSON.stringify(n.path)));
+      w.eq = (i) => wrap(at(i) ? [at(i)] : []);
+      w.first = () => w.eq(0);
+      w.last = () => w.eq(-1);
+      w.get = (i) => (i === undefined ? nodes.slice() : at(i));
+      w.toArray = () => nodes.map((n) => wrap([n]));
+      w.find = (sel) => wrap(nodes.flatMap((n) => q(n.path, 'find', sel)));
+      w.children = (sel) => wrap(nodes.flatMap((n) => q(n.path, 'children', sel)));
+      w.parent = () => wrap(nodes.flatMap((n) => q(n.path, 'parent', '')));
+      w.filter = (f) => wrap(nodes.filter((n, i) => (typeof f === 'function' ? f.call(wrap([n]), i, wrap([n])) : wrap([n]).is(f))));
+      w.each = (fn) => { for (let i = 0; i < nodes.length; i++) if (fn.call(wrap([nodes[i]]), i, wrap([nodes[i]])) === false) break; return w; };
+      w.map = (fn) => { const out = nodes.map((n, i) => fn.call(wrap([n]), i, wrap([n]))).filter((x) => x != null); return { length: out.length, get: (i) => (i === undefined ? out : out[i]), toArray: () => out }; };
+      return w;
+    };
+    const $ = (sel) => (sel && typeof sel === 'object' && sel.cheerio ? sel : wrap(q([], 'find', sel)));
+    $.html = () => src;
+    $.text = () => wrap(q([], 'find', 'body')).text() || wrap(q([], 'find', 'html')).text();
+    $.root = () => ({ text: $.text, html: $.html, find: (sel) => $(sel) });
+    return $;
+  },
+};
 const require = (name) => {
+  if (name === 'cheerio') return cheerio;
   if (name === 'crypto-js') return CryptoJS;
   if (name === 'uuid') return { v4: () => __host_uuid() };
   if (name === 'tv4') return tv4;
   if (name === 'lodash' && typeof _ === 'function') return _;
   if (name === 'moment' && typeof moment === 'function') return moment;
-  throw new Error('require("' + name + '") is not available in the sandbox (supported: crypto-js, uuid, tv4, lodash, moment)');
+  throw new Error('require("' + name + '") is not available in the sandbox (supported: cheerio, crypto-js, uuid, tv4, lodash, moment)');
 };
 
 /* ---------------- pm / aps ---------------- */

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **cheerio in scripts**: `cheerio.load(html)` (or `require('cheerio')`) with CSS selectors and the usual methods (`text`, `attr`, `find`, `children`, `parent`, `each`, `map`, `eq`, `filter` …), as in Postman's sandbox; the HTML is parsed outside the sandbox. Postman scripts that scrape HTML now run.
 - **`pm.execution.location`** in scripts (collection, folders and request), and `pm.info.requestName` is the request's own name in collection runs, as in Postman.
 - **MCP elicitation, sampling and roots**: the MCP inspector answers servers that ask the client for input (a form from the requested schema, Accept / Decline / Cancel), for an LLM completion (review the request, write or draft the reply with the AI assistant) or for its roots (the workspace folder). `type: mcp` tests answer with `elicitation:`, `sampling:` and `roots:`, and record what the server asked.
 - Errors with numeric codes (JSON-RPC / MCP) no longer break error reporting.

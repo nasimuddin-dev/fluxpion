@@ -7,6 +7,7 @@ import { validateSchema } from '../eval/checks.js';
 import { LODASH_SOURCE } from './lodash.generated.js';
 import { MOMENT_SOURCE } from './moment.js';
 import { BRUNO_SOURCE, USES_BRUNO } from './bruno.js';
+import { queryHtml } from './html.js';
 
 const USES_MOMENT = /\bmoment\b/;
 const USES_LODASH = /(^|[^\w$.])_\s*[.(]|require\s*\(\s*['"]lodash['"]/;
@@ -188,6 +189,14 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
       }
     });
     fn('__host_dynamic', (name) => JSON.stringify(dynamicValue(name ?? '') ?? null));
+    // cheerio: CSS selectors over HTML, parsed on the host
+    fn('__host_html', (html, path, op, selector) => {
+      try {
+        return JSON.stringify(queryHtml(html ?? '', JSON.parse(path || '[]') as number[], op ?? 'find', selector ?? ''));
+      } catch (e) {
+        return JSON.stringify({ error: (e as Error).message });
+      }
+    });
     fn('__host_package', (name) => {
       try {
         return JSON.stringify(opts.requirePackage?.(name ?? '') ?? null);

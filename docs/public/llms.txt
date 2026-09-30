@@ -31,6 +31,7 @@ Key facts for agents:
 - OpenTelemetry: `testpion test|run-collection --trace all --otlp http://collector:4318` (or OTEL_EXPORTER_OTLP_ENDPOINT/HEADERS) sends traces as OTLP/HTTP JSON; MCP `export_traces`; Traces view ▸ Send to OpenTelemetry.
 - Scripts may use top-level `await`: `const res = await pm.sendRequest(url)`; `await pm.vault.get('key')` and `{{vault:key}}` read (secret) variables.
 - MCP client features: `type: mcp` tests answer server requests with `elicitation: { action, content }`, `sampling: "reply"`, `roots: [paths]`; the inspector shows elicitation forms and sampling review dialogs.
+- Scripts have cheerio (`const $ = cheerio.load(pm.response.text()); $('title').text()`), lodash, moment, tv4, crypto-js, xml2Json.
 - Script packages: `pm.require('@team/utils')` loads workspace file packages/@team/utils.js (CommonJS, module.exports), like Postman's package library.
 - Watch mode for local development: `testpion test --watch`, `testpion run-collection <c> --watch` re-run on file changes.
 - Imports (app, `testpion import <file> -w <ws> --json`): OpenAPI 3 / Swagger 2, Postman v2.1, Insomnia v4/v5, Bruno (collection folder of .bru files, a .bru file, or JSON export; Bruno scripts run with the bru/req/res API and assertions become tests), Hoppscotch, WSDL 1.1 (SOAP 1.1/1.2 requests with SOAPAction and sample envelopes from the XSD; file or ?wsdl link), HAR, cURL/fetch/PowerShell snippets.

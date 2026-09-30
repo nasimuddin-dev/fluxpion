@@ -1,10 +1,9 @@
 import type { Collection, CollectionNode } from '../model/types.js';
 
 /** Modules scripts can require (see prelude.ts). */
-export const SCRIPT_MODULES = ['crypto-js', 'uuid', 'tv4', 'lodash', 'moment'];
+export const SCRIPT_MODULES = ['cheerio', 'crypto-js', 'uuid', 'tv4', 'lodash', 'moment'];
 
 const UNSUPPORTED: Array<{ re: RegExp; api: string; hint: string }> = [
-  { re: /\bcheerio\b/, api: 'cheerio', hint: 'parse HTML with regular expressions or xml2Json() for XHTML' },
 ];
 
 export interface ScriptWarning {
@@ -24,7 +23,7 @@ function check(code: string | undefined, where: string, script: ScriptWarning['s
     if (!hasPackage(m[1]!)) out.push({ where, script, api: `pm.require('${m[1]}')`, hint: `add the package to the workspace as packages/${m[1]}.js (Script packages)` });
   for (const m of code.matchAll(/(?<![\w.$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
     const name = m[1]!;
-    if (!SCRIPT_MODULES.includes(name) && name !== 'cheerio') out.push({ where, script, api: `require('${name}')`, hint: `available modules: ${SCRIPT_MODULES.join(', ')}` });
+    if (!SCRIPT_MODULES.includes(name)) out.push({ where, script, api: `require('${name}')`, hint: `available modules: ${SCRIPT_MODULES.join(', ')}` });
   }
 }
 
