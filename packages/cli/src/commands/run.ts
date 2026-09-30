@@ -13,15 +13,16 @@ import {
   type LoadTarget,
 } from '@testpion/core';
 import { EXIT, dim, yellow, CliError, collectVar, openWorkspace, readResults, printLoad } from '../shared.js';
+import { runWatching, watchTargets } from '../watch.js';
 import { type RunCliOptions, executeRun, type CollectionCliOptions, executeCollectionRun, executeSend, resolveSelection, runOptions } from '../run.js';
 
 export function registerRunCommands(program: Command): void {
 
-  runOptions(program.command('test').description('run tests from files, directories, globs or a *.suite.yaml').argument('[paths...]', 'test files/dirs/globs')).action(async (paths: string[], o: RunCliOptions) => {
-    process.exitCode = await executeRun(paths, o);
+  runOptions(program.command('test').description('run tests from files, directories, globs or a *.suite.yaml').argument('[paths...]', 'test files/dirs/globs')).action(async (paths: string[], o: RunCliOptions & { watch?: boolean }) => {
+    process.exitCode = o.watch ? await runWatching(watchTargets(o.workspace, paths), () => executeRun(paths, o)) : await executeRun(paths, o);
   });
-  runOptions(program.command('run').description('run a named suite from a workspace').requiredOption('-s, --suite <name>', 'suite name (tests/<name>.suite.yaml)')).action(async (o: RunCliOptions) => {
-    process.exitCode = await executeRun([], o);
+  runOptions(program.command('run').description('run a named suite from a workspace').requiredOption('-s, --suite <name>', 'suite name (tests/<name>.suite.yaml)')).action(async (o: RunCliOptions & { watch?: boolean }) => {
+    process.exitCode = o.watch ? await runWatching(watchTargets(o.workspace), () => executeRun([], o)) : await executeRun([], o);
   });
   program
     .command('run-collection')
@@ -60,8 +61,10 @@ export function registerRunCommands(program: Command): void {
     .option('-v, --verbose', 'show passing checks')
     .option('-q, --quiet', 'only print the summary exit code')
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
-    .action(async (ref: string, o: CollectionCliOptions) => {
-      process.exitCode = await executeCollectionRun(ref, o);
+    .option('--watch', 'run again whenever the collection, an environment or the data file changes (until Ctrl+C)')
+    .action(async (ref: string, o: CollectionCliOptions & { watch?: boolean }) => {
+      const dataFile = o.iterationData && !/^https?:/i.test(o.iterationData) ? [o.iterationData] : [];
+      process.exitCode = o.watch ? await runWatching(watchTargets(o.workspace, [ref, ...dataFile]), () => executeCollectionRun(ref, o)) : await executeCollectionRun(ref, o);
     });
   program
     .command('load')

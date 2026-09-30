@@ -579,5 +579,6 @@ export function runOptions(cmd: Command): Command {
     .addOption(new Option('--trace <mode>', 'persist traces').choices(['all', 'failures', 'none']).default('failures'))
     .option('-v, --verbose', 'show passing checks')
     .option('-q, --quiet', 'only print the summary exit code')
-    .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)');
+    .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
+    .option('--watch', 'run again whenever a test, collection, environment or data file changes (until Ctrl+C)');
 }

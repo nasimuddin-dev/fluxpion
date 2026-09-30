@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Watch mode**: `testpion test --watch`, `testpion run --watch` and `testpion run-collection --watch` run again whenever a test, collection, environment or data file changes (the run's own results don't count).
 - **HTTP/2**: requests over https use HTTP/2 when the server supports it, the response shows an **HTTP/2** badge (`httpVersion` in results), and the request setting **HTTP/1.1 only** turns it off. HTTP/2 responses get their standard status text (`200 OK`).
 - **WSDL import (SOAP)**: a WSDL 1.1 document (file or `?wsdl` link) becomes a collection of SOAP 1.1 / 1.2 requests with `SOAPAction` headers and sample envelopes built from the XML Schema (document/literal and RPC, base types, enumerations). The demo servers have a SOAP patient service (`http://127.0.0.1:4010/soap/patients?wsdl`).
 - **Build GraphQL operations from the schema**: **Build** on a root field of the schema explorer writes a complete operation (typed variables with placeholder values, a selection of fields two levels deep, fragments for unions). Also `testpion graphql-op` and the `graphql_operation` MCP tool.

@@ -58,6 +58,7 @@ testpion report <results.jsonl>              Re-generate reports
 | `--baseline`, `--save-baseline`, `--fail-on-regression` | Regression testing. |
 | `--trace all\|failures\|none` | Trace persistence. |
 | `--log-level` | Enable debug logging; secrets stay redacted. |
+| `--watch` | Run again whenever a test, collection, environment or data file in the workspace (or the given paths) changes, until Ctrl+C. Results and reports the run writes don't count as changes. |
 
 ## `send`
 
@@ -98,6 +99,7 @@ testpion run-collection api.postman_collection.json -e staging.postman_environme
 | `-d, --iteration-data` | CSV or JSON data file: one row per iteration (`pm.iterationData`, `{{column}}`). |
 | `-n, --iteration-count` | Number of iterations (default: the number of data rows, or 1). |
 | `--delay-request <ms>` | Pause between requests. |
+| `--watch` | Run again whenever the collection, an environment or the data file changes, until Ctrl+C. |
 | `--folder <name...>` | Only run these folders or requests, by name or id (repeatable). |
 | `--bail`, `--timeout` | Stop after the first failure; per-request timeout in ms. |
 | `--cookie-jar <file>` | Start with the cookies in this JSON file (TestPion format or a Newman cookie jar). |
