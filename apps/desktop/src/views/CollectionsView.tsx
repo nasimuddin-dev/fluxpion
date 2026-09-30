@@ -103,7 +103,7 @@ export function CollectionsView() {
               </div>
             </button>
           ))}
-          {!cols.length && <Empty icon={<FolderTree size={24} />} title="No collections">Create one or import OpenAPI, Postman or HAR.</Empty>}
+          {!cols.length && <Empty icon={<FolderTree size={24} />} title="No collections">Create one or import OpenAPI, Postman, Insomnia, Bruno, Hoppscotch or HAR.</Empty>}
         </div>
       </div>
       <div className="h-full flex flex-col min-w-0">

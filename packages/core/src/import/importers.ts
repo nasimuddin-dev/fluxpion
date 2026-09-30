@@ -4,12 +4,13 @@ import { SCHEMA_VERSION } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { shortId, slugify } from '../util/ids.js';
 import { WORKSPACE_FORMATS } from '../storage/workspace.js';
+import { detectOtherTool, importBruno, importHoppscotch, importInsomnia } from './other-tools.js';
 
 function newCollection(name: string, items: CollectionNode[], extra: Partial<Collection> = {}): Collection {
   return { schemaVersion: SCHEMA_VERSION, id: slugify(name) + '-' + shortId().slice(-4), name, version: 0, variables: [], items, updatedAt: new Date().toISOString(), ...extra };
 }
 
-export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 'postman-env' | 'har' | 'aps-collection' | 'aps-workspace' | 'graphql-sdl' | 'unknown' {
+export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 'postman-env' | 'har' | 'aps-collection' | 'aps-workspace' | 'graphql-sdl' | 'insomnia' | 'bruno' | 'hoppscotch' | 'unknown' {
   const t = text.trim();
   if (/^(type|schema|interface|enum|input|scalar|union|directive|extend)\s/m.test(t) && !t.startsWith('{')) return 'graphql-sdl';
   let d: Record<string, any>;
@@ -19,6 +20,8 @@ export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 
     return 'unknown';
   }
   if (!d || typeof d !== 'object') return 'unknown';
+  const other = detectOtherTool(d);
+  if (other) return other;
   if (d.openapi) return 'openapi';
   if (d.swagger) return 'swagger';
   if (d.info?._postman_id || String(d.info?.schema ?? '').includes('postman')) return 'postman';
@@ -352,7 +355,7 @@ export function importHar(text: string): { collection: Collection } {
 }
 
 /** Import any supported document into a collection (and optionally an environment). */
-export function importAny(text: string): { format: string; collection?: Collection; environment?: Environment } {
+export function importAny(text: string): { format: string; collection?: Collection; environment?: Environment; environments?: Environment[] } {
   const format = detectFormat(text);
   switch (format) {
     case 'openapi':
@@ -364,13 +367,20 @@ export function importAny(text: string): { format: string; collection?: Collecti
       return { format, environment: importPostmanEnvironment(text) };
     case 'har':
       return { format, ...importHar(text) };
+    case 'insomnia':
+    case 'bruno': {
+      const r = format === 'insomnia' ? importInsomnia(text) : importBruno(text);
+      return { format, collection: r.collection, environment: r.environments[0], environments: r.environments };
+    }
+    case 'hoppscotch':
+      return { format, ...importHoppscotch(text) };
     case 'aps-collection': {
       const c = JSON.parse(text) as Collection;
       return { format, collection: { ...c, id: c.id || shortId('col-') } };
     }
     default:
       throw new ApsError('ValidationError', `Unrecognised import format (${format})`, {
-        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, HAR, TestPion collections and workspace exports.'],
+        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, Insomnia (v4 export, v5 YAML), Bruno collection exports, Hoppscotch collections, HAR, TestPion collections and workspace exports.'],
       });
   }
 }

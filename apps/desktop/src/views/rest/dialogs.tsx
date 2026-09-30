@@ -109,7 +109,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
           );
         else
           useApp.getState().toast(
-            `Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (environment ${r.environment})` : ''}${r.contractChecks ? `. Each request checks the OpenAPI contract (${r.specPath})` : ''}`,
+            `Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (${r.environment.includes(', ') ? 'environments' : 'environment'} ${r.environment})` : ''}${r.contractChecks ? `. Each request checks the OpenAPI contract (${r.specPath})` : ''}`,
             'success',
           );
         onDone();
@@ -147,7 +147,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
         </>
       }
     >
-      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, HAR files, TestPion collections, or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
+      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, Insomnia exports (v4 JSON, v5 YAML), Bruno collection exports, Hoppscotch collections, HAR files, TestPion collections, or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
       <textarea className="field mono w-full h-64 text-xs" placeholder="Paste a document here…" value={text} onChange={(e) => setText(e.target.value)} />
     </Modal>
   );

@@ -122,7 +122,7 @@ export function HomeView() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           <Action icon={<Network size={16} />} hue="blue" title="New HTTP request" text="Send a request, paste cURL or fetch from the browser, write pm.* scripts." onClick={() => open('rest', { newTab: true })} />
           <Action icon={<GitBranch size={16} />} hue="pink" title="New GraphQL query" text="Explore a schema with autocomplete and run queries." onClick={() => open('graphql', { reset: true })} />
-          <Action icon={<Upload size={16} />} hue="teal" title="Import" text="Postman collections and environments, OpenAPI, HAR or cURL." onClick={() => open('collections', { import: true })} />
+          <Action icon={<Upload size={16} />} hue="teal" title="Import" text="Postman, Insomnia, Bruno or Hoppscotch collections, OpenAPI, HAR or cURL." onClick={() => open('collections', { import: true })} />
           <Action icon={<FolderPlus size={16} />} hue="orange" title="New collection" text="Group requests, share auth and scripts, run and mock them." onClick={() => void newCollection()} />
           <Action icon={<Plug size={16} />} hue="green" title="Test an MCP server" text="Connect over stdio or HTTP and call tools with generated forms." onClick={() => setView('mcp')} />
           <Action icon={<Sparkles size={16} />} hue="violet" title="Try an AI prompt" text="Compare models, check structured output, track tokens and cost." onClick={() => open('ai', { reset: true })} />

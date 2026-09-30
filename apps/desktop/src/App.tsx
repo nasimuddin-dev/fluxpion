@@ -173,7 +173,7 @@ export default function App() {
       { id: 'm-new-monitor', label: 'New Monitor', hint: 'File', run: () => void runMenuCommand('new-monitor') },
       { id: 'm-new-workspace', label: 'New Workspace', hint: 'File', run: () => void runMenuCommand('new-workspace') },
       { id: 'm-open-ws', label: 'Open Workspace Folder', hint: 'File', run: () => void runMenuCommand('open-workspace') },
-      { id: 'm-import', label: 'Import (Postman, OpenAPI, HAR, cURL …)', hint: 'File', run: () => void runMenuCommand('import') },
+      { id: 'm-import', label: 'Import (Postman, Insomnia, Bruno, OpenAPI, HAR, cURL …)', hint: 'File', run: () => void runMenuCommand('import') },
       { id: 'm-exp-col', label: 'Export Collection (Postman)', hint: 'File', run: () => void runMenuCommand('export-collection') },
       { id: 'm-exp-env', label: 'Export Current Environment', hint: 'File', run: () => void runMenuCommand('export-environment') },
       { id: 'm-exp-ws', label: 'Export Workspace', hint: 'File', run: () => void runMenuCommand('export-workspace') },

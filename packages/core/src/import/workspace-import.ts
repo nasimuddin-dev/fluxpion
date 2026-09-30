@@ -2,13 +2,15 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Collection, CollectionNode, Environment } from '../model/types.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
-import { slugify } from '../util/ids.js';
+import { shortId, slugify } from '../util/ids.js';
 import { importAny } from './importers.js';
 
 export interface WorkspaceImportResult {
   format: string;
   collection?: Collection;
   environment?: Environment;
+  /** Every environment the file had (Insomnia and Bruno exports can hold several). */
+  environments?: Environment[];
   /** OpenAPI / Swagger imports: where the document was kept (relative to the workspace). */
   specPath?: string;
   /** Requests that got an `openapi` contract check. */
@@ -45,9 +47,19 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
     }
   }
   if (collection) out.collection = store.saveCollection(collection);
-  if (r.environment) {
-    store.saveEnvironment(r.environment);
-    out.environment = r.environment;
+  // an import never replaces an environment the workspace already has: a clash gets a new id and name
+  const envs = (r.environments ?? (r.environment ? [r.environment] : [])).map((e) => {
+    const taken = store.listEnvironments();
+    const clash = taken.some((x) => x.id === e.id || x.name.toLowerCase() === e.name.toLowerCase());
+    if (!clash) return e;
+    let name = `${e.name} (imported)`;
+    for (let i = 2; taken.some((x) => x.name.toLowerCase() === name.toLowerCase()); i++) name = `${e.name} (imported ${i})`;
+    return { ...e, id: `${slugify(name)}-${shortId().slice(-4)}`, name };
+  });
+  for (const e of envs) store.saveEnvironment(e);
+  if (envs.length) {
+    out.environment = envs[0];
+    out.environments = envs;
   }
   return out;
 }

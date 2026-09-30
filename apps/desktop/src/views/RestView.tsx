@@ -484,7 +484,7 @@ export function RestView() {
               >
                 <Star size={14} fill={favoritesOnly ? 'currentColor' : 'none'} />
               </IconButton>
-              <IconButton label="Import OpenAPI / Postman / HAR" onClick={() => setImporting(true)}>
+              <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" onClick={() => setImporting(true)}>
                 <Upload size={14} />
               </IconButton>
               <IconButton
@@ -524,7 +524,7 @@ export function RestView() {
                     </Button>
                   }
                 >
-                  Save a request with Ctrl+S, create a collection, or import OpenAPI, Postman or HAR.
+                  Save a request with Ctrl+S, create a collection, or import OpenAPI, Postman, Insomnia, Bruno or HAR.
                 </Empty>
               )}
             </div>

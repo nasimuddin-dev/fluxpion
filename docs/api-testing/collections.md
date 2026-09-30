@@ -36,13 +36,18 @@ Copied commands include the request's real header and token values, so they run 
 
 - OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, and security schemes map to auth. The document is kept in the workspace's `specs/` folder and every request gets a [**Matches OpenAPI contract**](../test-runner/assertions.md#openapi-contract-testing) check, so running the collection tests the API against its own contract (`testpion import --no-contract-checks` leaves the checks out).
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
+- Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment.
+- Bruno collection exports (JSON, from *Export collection*), with their environments. Secret variables arrive empty: set them again as secrets. `res.status: eq 200` assertions become status checks.
+- Hoppscotch collections (JSON).
 - HAR files.
+
+From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Their scripts use each tool's own script API, so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
 - TestPion collections and workspace exports.
 - A single request copied as cURL (bash or cmd), fetch or PowerShell. It is saved to the **Imported** collection, named after its method and path. Secrets in it (tokens, API keys, cookies, passwords) are replaced by `{{variables}}`, and a message lists the ones to add as secret environment variables. To just try the request without saving it, paste it into the REST view instead (see [paste a request](/api-testing/rest#paste-a-request-from-the-browser)).
 
 A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
 
-**Import…** in the workspace menu (top bar) accepts the same files. A TestPion workspace export opens as a new workspace, and anything else (a Postman collection or environment, OpenAPI, HAR) is added to the open workspace.
+**Import…** in the workspace menu (top bar) accepts the same files. A TestPion workspace export opens as a new workspace, and anything else (a Postman, Insomnia, Bruno or Hoppscotch file, OpenAPI, HAR) is added to the open workspace.
 
 The CLI can import too: `testpion import openapi.yaml -w my-workspace`.
 

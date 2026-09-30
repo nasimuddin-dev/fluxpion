@@ -99,7 +99,7 @@ export function collectionsHandlers(be: Backend): Handlers {
       }
       // an OpenAPI document is kept in specs/ and its requests get an openapi contract check
       const r = importIntoWorkspace(be.ws, text);
-      return { format: r.format, collection: r.collection?.name, environment: r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks };
+      return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks };
     },
     'col.importFile': async () => {
       const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions', extensions: ['json', 'yaml', 'yml', 'har'] }] });

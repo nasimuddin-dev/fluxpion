@@ -66,7 +66,7 @@ export function WorkspaceMenu() {
     if (!isCurrent(w)) void act(() => call('ws.open', { ref: w.path }), `Switched to "${w.name}"`);
   };
   const importFile = () => {
-    // a workspace export opens as a new workspace; Postman / OpenAPI / HAR files are added to this one
+    // a workspace export opens as a new workspace; Postman / Insomnia / Bruno / OpenAPI / HAR files are added to this one
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,.yaml,.yml,.har';
