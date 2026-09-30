@@ -125,6 +125,17 @@ describe('collection runner', () => {
     await expect(runCollection({ name: 'runaway', collection: c, services: services(), maxRequestsPerIteration: 5 })).rejects.toThrow(/setNextRequest loop/);
   });
 
+  it('gives scripts the request name and its location (pm.info.requestName, pm.execution.location)', async () => {
+    const c = collection();
+    c.testScript = undefined;
+    (c.items[0] as any).items[0].testScript =
+      "pm.test('location', () => { pm.expect(pm.info.requestName).to.equal('Token'); pm.expect([...pm.execution.location]).to.eql(['Demo', 'Auth', 'Token']); pm.expect(pm.execution.location.current).to.equal('Token'); });";
+    const results: TestResult[] = [];
+    await runCollection({ name: 'loc', collection: c, selection: ['r-token'], services: services(), onEvent: (e: RunEvent) => void (e.type === 'test-end' && results.push(e.result)) });
+    expect(results[0]!.checks.filter((x) => !x.passed)).toEqual([]);
+    expect(results[0]!.checks.map((x) => x.name)).toContain('location');
+  });
+
   it('runs collection, folder and request scripts for GraphQL requests too', async () => {
     seen.length = 0;
     const c: Collection = {

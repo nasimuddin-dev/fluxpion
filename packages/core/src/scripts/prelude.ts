@@ -532,7 +532,12 @@ const pm = {
   },
   // Postman's package library: workspace packages (packages/<name>.js) as CommonJS modules
   require: (name) => __requirePackage(String(name)),
-  execution: { setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); }, skipRequest: () => { __out.skipRequest = true; } },
+  execution: {
+    setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); },
+    skipRequest: () => { __out.skipRequest = true; },
+    // [collection, folders…, request]; .current is the request
+    location: Object.assign(((__in.info && __in.info.location) || [(__in.info && __in.info.requestName) || '']).slice(), { current: (__in.info && __in.info.requestName) || '' }),
+  },
   // Postman Visualizer: a Handlebars template and its data, rendered by the host (Visualize tab)
   visualizer: {
     set: (template, data, options) => {

@@ -115,7 +115,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
           : test.type === 'graphql'
             ? { method: 'POST', url: test.endpoint, headers: [...(test.headers ?? [])], body: JSON.stringify({ query: test.query, variables: test.graphqlVariables, operationName: test.operationName }) }
             : undefined;
-      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName } }, { sendRequest, requirePackage: svc.scriptPackage });
+      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: scriptInfo(test, svc) }, { sendRequest, requirePackage: svc.scriptPackage });
       root.event('pre-request script', { logs: s.logs, error: s.error });
       if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
       applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
@@ -185,7 +185,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
       response: { status: ctx.status, headers: ctx.headers, body: ctx.text, time: ctx.latencyMs },
       cookies: ctx.cookies,
       jar: svc.cookieJar?.list(),
-      info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName },
+      info: scriptInfo(test, svc),
       data: { body: ctx.body, toolCalls: ctx.toolCalls, tokens: ctx.tokens, error: ctx.error },
     }, { sendRequest, requirePackage: svc.scriptPackage });
     if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
@@ -421,6 +421,11 @@ async function runWebSocket(test: WebSocketTest, scope: VariableScope, svc: Exec
     partial: { input: `${mode} ${svc.redactor.redactUrl(r.url)} · ${send.length} sent`, output: summarize(received) },
     metadata: { url: svc.redactor.redactUrl(r.url), mode, received: received.length },
   };
+}
+
+/** pm.info for scripts: the request's own name (not its folder path), its location and the environment. */
+function scriptInfo(test: TestCase, svc: ExecServices) {
+  return { requestName: test.location?.at(-1) ?? test.name, requestId: test.id, environmentName: svc.environmentName, location: test.location ?? [test.name] };
 }
 
 async function runMcp(test: McpTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {

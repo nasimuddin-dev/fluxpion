@@ -5,7 +5,6 @@ export const SCRIPT_MODULES = ['crypto-js', 'uuid', 'tv4', 'lodash', 'moment'];
 
 const UNSUPPORTED: Array<{ re: RegExp; api: string; hint: string }> = [
   { re: /\bcheerio\b/, api: 'cheerio', hint: 'parse HTML with regular expressions or xml2Json() for XHTML' },
-  { re: /\bpm\.execution\.location\b/, api: 'pm.execution.location', hint: 'use pm.info.requestName' },
 ];
 
 export interface ScriptWarning {

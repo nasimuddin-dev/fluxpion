@@ -259,6 +259,8 @@ export interface TestBase {
   variables?: Record<string, unknown>;
   preRequestScript?: string;
   testScript?: string;
+  /** For requests run from a collection: collection, folder and request names (pm.execution.location). */
+  location?: string[];
   /** Extract values from the result body into runtime variables: `{ token: "$.access_token" }`. */
   extract?: Record<string, string>;
   assertions?: CheckConfig[];

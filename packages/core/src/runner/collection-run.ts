@@ -70,6 +70,7 @@ export function collectionRequestToTest(collection: Collection, ref: CollectionR
   const base = {
     id: extra.id ?? ref.id,
     name: extra.name ?? [...ref.path, ref.name].join(' / '),
+    location: [collection.name, ...ref.path, ref.name],
     // folder variables sit under the iteration's data row
     variables: ref.folders.some((f) => f.variables?.length) ? { ...folderVariables(ref.folders), ...(extra.data ?? {}) } : extra.data,
     assertions: ref.node.assertions,
