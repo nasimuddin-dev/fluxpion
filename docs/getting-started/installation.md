@@ -19,7 +19,7 @@ For CI servers and scripts, install the [`testpion` CLI](/installation/cli).
 
 ## Try it with the demo servers
 
-The repository includes local demo servers (REST, GraphQL, an OpenAI-compatible mock LLM, WebSocket and an MCP server) and an example workspace with 22 tests:
+The repository includes local demo servers (REST, a SOAP service, GraphQL, an OpenAI-compatible mock LLM, WebSocket, Socket.IO, gRPC, an MQTT broker and an MCP server) and an example workspace with 22 tests:
 
 ```bash
 git clone https://github.com/nasimuddin-dev/testpion.git

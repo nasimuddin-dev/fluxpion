@@ -5,6 +5,7 @@ import { ApsError } from '../errors.js';
 import { shortId, slugify } from '../util/ids.js';
 import { WORKSPACE_FORMATS } from '../storage/workspace.js';
 import { looksLikeBru } from './bru.js';
+import { importWsdl, isWsdl } from './wsdl.js';
 import { detectOtherTool, importBruno, importHoppscotch, importInsomnia } from './other-tools.js';
 import { importDotenv, isDotenv } from './dotenv.js';
 
@@ -12,8 +13,9 @@ function newCollection(name: string, items: CollectionNode[], extra: Partial<Col
   return { schemaVersion: SCHEMA_VERSION, id: slugify(name) + '-' + shortId().slice(-4), name, version: 0, variables: [], items, updatedAt: new Date().toISOString(), ...extra };
 }
 
-export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 'postman-env' | 'har' | 'aps-collection' | 'aps-workspace' | 'graphql-sdl' | 'insomnia' | 'bruno' | 'hoppscotch' | 'dotenv' | 'unknown' {
+export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 'postman-env' | 'har' | 'aps-collection' | 'aps-workspace' | 'graphql-sdl' | 'insomnia' | 'bruno' | 'hoppscotch' | 'dotenv' | 'wsdl' | 'unknown' {
   const t = text.trim();
+  if (isWsdl(t)) return 'wsdl';
   // a single Bruno .bru request file
   if (looksLikeBru(t)) return 'bruno';
   if (/^(type|schema|interface|enum|input|scalar|union|directive|extend)\s/m.test(t) && !t.startsWith('{')) return 'graphql-sdl';
@@ -432,6 +434,8 @@ export function importAny(text: string, opts: { name?: string } = {}): { format:
     }
     case 'hoppscotch':
       return { format, ...importHoppscotch(text) };
+    case 'wsdl':
+      return { format, ...importWsdl(text) };
     case 'dotenv': {
       const r = importDotenv(text, opts.name);
       return { format, environment: r.environment, environments: [r.environment], secretValues: { [r.environment.id]: r.secretValues } };
@@ -456,7 +460,7 @@ export function importAny(text: string, opts: { name?: string } = {}): { format:
         }
       }
       throw new ApsError('ValidationError', `Unrecognised import format (${format})`, {
-        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, Insomnia (v4 export, v5 YAML), Bruno collection exports, Hoppscotch collections, .env files, HAR, TestPion collections and workspace exports.'],
+        suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, Insomnia (v4 export, v5 YAML), Bruno collections (folder, .bru file or export), Hoppscotch collections, WSDL 1.1 (SOAP), .env files, HAR, TestPion collections and workspace exports.'],
       });
     }
   }

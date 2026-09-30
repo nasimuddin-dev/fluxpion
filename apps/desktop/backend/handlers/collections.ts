@@ -169,7 +169,7 @@ export function collectionsHandlers(be: Backend): Handlers {
       return be.handlers['col.import']!({ text: JSON.stringify(exported), fileName: name });
     },
     'col.importFile': async () => {
-      const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions, collections and .env files', extensions: ['json', 'yaml', 'yml', 'har', 'env'] }, { name: 'All files', extensions: ['*'] }] });
+      const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions, collections and .env files', extensions: ['json', 'yaml', 'yml', 'har', 'env', 'wsdl', 'xml', 'bru'] }, { name: 'All files', extensions: ['*'] }] });
       if (!f) return null;
       return be.handlers['col.import']!({ text: readFileSync(f, 'utf8'), fileName: basename(f) });
     },

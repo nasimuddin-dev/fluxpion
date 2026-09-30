@@ -6,6 +6,7 @@
  *   node examples/servers/demo-servers.mjs
  *
  *   REST API        http://127.0.0.1:4010   (veterinary API, bearer auth, SSE, large payloads)
+ *   SOAP service    http://127.0.0.1:4010/soap/patients (WSDL: GET /soap/patients?wsdl; GetPatient, RegisterPatient)
  *   GraphQL         http://127.0.0.1:4011/graphql
  *   Mock LLM        http://127.0.0.1:4012/v1  (OpenAI-compatible: chat completions, streaming, tools, embeddings)
  *   WebSocket echo  ws://127.0.0.1:4013
@@ -14,6 +15,7 @@
  *   gRPC            127.0.0.1:4014        (vet.v1.PetService, examples/veterinary-workspace/protos/vet/v1/pets.proto)
  */
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { buildSchema, graphql } from 'graphql';
@@ -35,6 +37,33 @@ const readBody = (req) =>
     req.on('data', (c) => chunks.push(c));
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
   });
+/** SOAP: the patient service described by patients.wsdl (SOAP 1.1 and 1.2). */
+const WSDL = readFileSync(new URL('./patients.wsdl', import.meta.url), 'utf8');
+function soapReply(req, res, body, patients, nextId) {
+  const soap12 = /soap\+xml/.test(req.headers['content-type'] ?? '');
+  const envNs = soap12 ? 'http://www.w3.org/2003/05/soap-envelope' : 'http://schemas.xmlsoap.org/soap/envelope/';
+  const send = (status, inner) => {
+    res.writeHead(status, { 'content-type': soap12 ? 'application/soap+xml; charset=utf-8' : 'text/xml; charset=utf-8' });
+    res.end(`<?xml version="1.0" encoding="utf-8"?>\n<soap:Envelope xmlns:soap="${envNs}">\n  <soap:Body>\n${inner}\n  </soap:Body>\n</soap:Envelope>`);
+  };
+  const fault = (msg) => send(soap12 ? 400 : 500, soap12 ? `    <soap:Fault><soap:Code><soap:Value>soap:Sender</soap:Value></soap:Code><soap:Reason><soap:Text xml:lang="en">${msg}</soap:Text></soap:Reason></soap:Fault>` : `    <soap:Fault><faultcode>soap:Client</faultcode><faultstring>${msg}</faultstring></soap:Fault>`);
+  const tag = (name, xml = body) => (new RegExp(`<(?:[\\w-]+:)?${name}>([^<]*)</(?:[\\w-]+:)?${name}>`).exec(xml) ?? [])[1];
+  const xmlPatient = (pt) => `<patient><name>${pt.name}</name><species>${pt.species.toUpperCase()}</species><id>${pt.id}</id></patient>`;
+  if (/<(?:[\w-]+:)?GetPatient[\s>]/.test(body)) {
+    const pt = patients.get(String(tag('id') ?? ''));
+    if (!pt) return fault(`No patient with id ${tag('id') ?? '(none)'}`);
+    return send(200, `    <GetPatientResponse xmlns="http://vet.example/patients">${xmlPatient(pt)}</GetPatientResponse>`);
+  }
+  if (/<(?:[\w-]+:)?RegisterPatient[\s>]/.test(body)) {
+    const name = tag('name');
+    if (!name || name === '?') return fault('The patient needs a name');
+    const id = String(nextId());
+    patients.set(id, { id, name, species: String(tag('species') ?? 'dog').toLowerCase(), ownerId: '123' });
+    return send(200, `    <RegisterPatientResponse xmlns="http://vet.example/patients">${id}</RegisterPatientResponse>`);
+  }
+  return fault('Unknown operation: send GetPatient or RegisterPatient');
+}
+
 const listen = (server, port) =>
   new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -61,6 +90,14 @@ export function createRestServer() {
     const p = url.pathname;
 
     if (p === '/health') return json(res, 200, { status: 'ok', time: new Date().toISOString() });
+    // SOAP (no auth): the WSDL with this server's address, and the operations
+    if (p === '/soap/patients') {
+      if (req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'text/xml; charset=utf-8' });
+        return res.end(WSDL.replaceAll('http://localhost:8080/soap/patients', `http://127.0.0.1:${req.socket.localPort}/soap/patients`));
+      }
+      return soapReply(req, res, await readBody(req), patients, () => nextId++);
+    }
     if (p === '/auth/token' && req.method === 'POST') {
       const body = await readBody(req);
       const params = new URLSearchParams(body);

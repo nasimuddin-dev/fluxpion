@@ -40,6 +40,7 @@ Copied commands include the request's real header and token values, so they run 
 - Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment.
 - Bruno collections: the collection folder itself (**Bruno folder…**, the folder with `bruno.json` and the `.bru` files you keep in git), a single `.bru` request file, or a JSON export (*Export collection*). See [Bruno](#bruno) below.
 - Hoppscotch collections (JSON).
+- WSDL 1.1 documents of SOAP services (a file, or a `?wsdl` link). See [SOAP](#soap-wsdl) below.
 - HAR files.
 
 From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Insomnia and Hoppscotch scripts use each tool's own script API, so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
@@ -49,6 +50,18 @@ From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, h
 If a Postman collection's scripts use something TestPion's script sandbox doesn't have (`cheerio`, `pm.vault`, `pm.require` packages, or a `require()` of a module other than crypto-js, uuid, tv4, lodash and moment), the import says which requests and what to use instead (`scriptWarnings` in `testpion import --json` and the MCP tool).
 
 A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
+
+### SOAP (WSDL)
+
+A WSDL 1.1 document becomes a collection of SOAP requests, one folder per SOAP port (SOAP 1.1 and SOAP 1.2 ports are both kept; with a single port there is no folder level). Each operation is a `POST` to `{{baseUrl}}` (the service address, set as a collection variable) with:
+
+- the right headers: `Content-Type: text/xml` and `SOAPAction` for SOAP 1.1, `Content-Type: application/soap+xml; action=…` for SOAP 1.2;
+- a sample envelope built from the XML Schema in the WSDL's `<types>`: every element of the input message with a placeholder value (`?` for text, `0` for numbers, `false`, the first value of an enumeration, dates), including the fields of base types (`extension`), with document/literal and RPC styles;
+- a status 200 check (a SOAP Fault comes back as 500 in SOAP 1.1).
+
+Replace the placeholders and send. The response is XML: `xml2Json(pm.response.text())` turns it into an object for tests. Schemas the WSDL imports from other files (`xsd:import`) are not fetched, and WSDL 2.0 is not supported.
+
+To try it, run the [demo servers](/getting-started/installation#try-it-with-the-demo-servers) and import the link `http://127.0.0.1:4010/soap/patients?wsdl` (`GetPatient` with id `1` or `2`, `RegisterPatient`).
 
 ### Bruno
 

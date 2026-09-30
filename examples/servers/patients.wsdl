@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A small veterinary patient service: document/literal, SOAP 1.1 and 1.2 ports -->
+<wsdl:definitions name="PatientService"
+    targetNamespace="http://vet.example/patients"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://vet.example/patients">
+  <wsdl:documentation>Look up and register patients.</wsdl:documentation>
+  <wsdl:types>
+    <xs:schema targetNamespace="http://vet.example/patients" elementFormDefault="qualified">
+      <xs:simpleType name="Species">
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="DOG"/>
+          <xs:enumeration value="CAT"/>
+        </xs:restriction>
+      </xs:simpleType>
+      <xs:complexType name="Animal">
+        <xs:sequence>
+          <xs:element name="name" type="xs:string"/>
+          <xs:element name="species" type="tns:Species"/>
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="Patient">
+        <xs:complexContent>
+          <xs:extension base="tns:Animal">
+            <xs:sequence>
+              <xs:element name="id" type="xs:int"/>
+              <xs:element name="born" type="xs:date" minOccurs="0"/>
+              <xs:element name="owner" type="tns:Owner" minOccurs="0"/>
+            </xs:sequence>
+          </xs:extension>
+        </xs:complexContent>
+      </xs:complexType>
+      <xs:complexType name="Owner">
+        <xs:sequence>
+          <xs:element name="name" type="xs:string"/>
+          <xs:element name="pets" type="tns:Patient" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+      </xs:complexType>
+      <xs:element name="GetPatient">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="id" type="xs:int"/>
+            <xs:element name="includeOwner" type="xs:boolean" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="GetPatientResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="patient" type="tns:Patient"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="RegisterPatient">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="patient" type="tns:Patient"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="RegisterPatientResponse" type="xs:int"/>
+    </xs:schema>
+  </wsdl:types>
+  <wsdl:message name="GetPatientIn"><wsdl:part name="parameters" element="tns:GetPatient"/></wsdl:message>
+  <wsdl:message name="GetPatientOut"><wsdl:part name="parameters" element="tns:GetPatientResponse"/></wsdl:message>
+  <wsdl:message name="RegisterPatientIn"><wsdl:part name="parameters" element="tns:RegisterPatient"/></wsdl:message>
+  <wsdl:message name="RegisterPatientOut"><wsdl:part name="parameters" element="tns:RegisterPatientResponse"/></wsdl:message>
+  <wsdl:portType name="PatientPort">
+    <wsdl:operation name="GetPatient">
+      <wsdl:documentation>Fetch one patient by id.</wsdl:documentation>
+      <wsdl:input message="tns:GetPatientIn"/>
+      <wsdl:output message="tns:GetPatientOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="RegisterPatient">
+      <wsdl:input message="tns:RegisterPatientIn"/>
+      <wsdl:output message="tns:RegisterPatientOut"/>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="PatientSoap" type="tns:PatientPort">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <wsdl:operation name="GetPatient">
+      <soap:operation soapAction="http://vet.example/patients/GetPatient"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RegisterPatient">
+      <soap:operation soapAction="http://vet.example/patients/RegisterPatient"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="PatientSoap12" type="tns:PatientPort">
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <wsdl:operation name="GetPatient">
+      <soap12:operation soapAction="http://vet.example/patients/GetPatient"/>
+      <wsdl:input><soap12:body use="literal"/></wsdl:input>
+      <wsdl:output><soap12:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="RegisterPatient">
+      <soap12:operation soapAction="http://vet.example/patients/RegisterPatient"/>
+      <wsdl:input><soap12:body use="literal"/></wsdl:input>
+      <wsdl:output><soap12:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="PatientService">
+    <wsdl:port name="PatientSoap" binding="tns:PatientSoap">
+      <soap:address location="http://localhost:8080/soap/patients"/>
+    </wsdl:port>
+    <wsdl:port name="PatientSoap12" binding="tns:PatientSoap12">
+      <soap12:address location="http://localhost:8080/soap/patients"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
