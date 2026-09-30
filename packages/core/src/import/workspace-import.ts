@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import type { Collection, CollectionNode, Environment } from '../model/types.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { shortId, slugify } from '../util/ids.js';
+import { secretKeys, type SecretStore } from '../storage/secrets.js';
 import { importAny } from './importers.js';
 
 export interface WorkspaceImportResult {
@@ -11,6 +12,8 @@ export interface WorkspaceImportResult {
   environment?: Environment;
   /** Every environment the file had (Insomnia and Bruno exports can hold several). */
   environments?: Environment[];
+  /** Secret variables whose values could not be stored (no secret store): set them in the app or as TESTPION_SECRET_* variables. */
+  secretsToSet?: string[];
   /** OpenAPI / Swagger imports: where the document was kept (relative to the workspace). */
   specPath?: string;
   /** Requests that got an `openapi` contract check. */
@@ -22,8 +25,8 @@ export interface WorkspaceImportResult {
  * `testpion import`). An OpenAPI / Swagger document is also kept in `specs/`, and every request made
  * from it gets an `openapi` check, so the new collection tests its own contract.
  */
-export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: { contractChecks?: boolean } = {}): WorkspaceImportResult {
-  const r = importAny(text);
+export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: { contractChecks?: boolean; name?: string; secrets?: SecretStore } = {}): WorkspaceImportResult {
+  const r = importAny(text, { name: opts.name });
   const out: WorkspaceImportResult = { format: r.format };
   let collection = r.collection;
   if (collection && (r.format === 'openapi' || r.format === 'swagger')) {
@@ -54,9 +57,18 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
     if (!clash) return e;
     let name = `${e.name} (imported)`;
     for (let i = 2; taken.some((x) => x.name.toLowerCase() === name.toLowerCase()); i++) name = `${e.name} (imported ${i})`;
-    return { ...e, id: `${slugify(name)}-${shortId().slice(-4)}`, name };
+    return { ...e, id: `${slugify(name)}-${shortId().slice(-4)}`, name, originalId: e.id };
   });
-  for (const e of envs) store.saveEnvironment(e);
+  for (const raw of envs) {
+    const { originalId, ...e } = raw as Environment & { originalId?: string };
+    store.saveEnvironment(e);
+    // secret values (from a .env file) go to the secret store; without one they are reported, never written
+    const values = r.secretValues?.[originalId ?? e.id] ?? {};
+    for (const [k, v] of Object.entries(values)) {
+      if (opts.secrets) void opts.secrets.set(secretKeys.envVar(e.id, k), v);
+      else (out.secretsToSet ??= []).push(`${e.name} › ${k}`);
+    }
+  }
   if (envs.length) {
     out.environment = envs[0];
     out.environments = envs;

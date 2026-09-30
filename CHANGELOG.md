@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Use your own Claude API key.** **Settings ▸ AI assistant** now works like Markpion: turn the assistant on, paste your Anthropic API key and **Save key** (TestPion checks it with Anthropic, then keeps it in the OS secret store, never in settings or workspace files), and pick Claude Opus 5.5, Sonnet 5.5 or Haiku 4.5. The key powers the assistant and appears in AI Lab and evaluations as **Claude (your API key)** (`claude-app`); CI can pass it as `TESTPION_SECRET_APP_ANTHROPIC_APIKEY`. A workspace provider (e.g. local Ollama) can still be chosen instead.
+- **.env files.** Import a `.env` file as an environment (secret-looking keys become secret variables, with values in the OS secret store), and export an environment as `.env` from the Envs view.
 - Fixed: in the MCP view, assertions (and the raw JSON arguments) were shared by all tools of a server, so picking another tool kept showing the previous tool's checks. Each tool now has its own.
 - **Rename from the request tab.** Right-click a request tab and choose **Rename…**, or double-click it. A saved request is renamed in its collection too.
 - **Filter responses with JSONPath.** The Pretty view of a JSON response (REST and GraphQL) has a JSONPath box: `$.items[*].name` shows just those values, with the number of matches.

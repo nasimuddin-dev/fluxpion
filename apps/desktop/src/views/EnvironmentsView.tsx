@@ -1,4 +1,4 @@
-import { ArchiveRestore, ArrowLeftRight, Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Copy, FileJson, FileText, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -8,7 +8,7 @@ import { download, uid } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { EnvCompare } from '../components/EnvCompare';
 import { TrashDialog } from '../components/TrashDialog';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
@@ -16,6 +16,18 @@ export function EnvironmentsView() {
   const [envs, setEnvs] = useState<Environment[]>([]);
   const [comparing, setComparing] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
+  /** Export the selected environment (secret values are never exported). */
+  const exportEnv = async (format: 'postman' | 'dotenv') => {
+    if (!draft) return;
+    try {
+      const r = await call<{ path?: string; environment?: unknown; text?: string; name: string }>('env.export', { id: draft.id, format });
+      if (r.environment) download(r.name, JSON.stringify(r.environment, null, 2));
+      else if (r.text !== undefined) download(r.name, r.text, 'text/plain');
+      else if (r.path) useApp.getState().toast(`Exported to ${r.path} (secret values are left out)`, 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Environment>();
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
@@ -203,21 +215,19 @@ export function EnvironmentsView() {
                     >
                       Duplicate
                     </Button>
-                    <Button
-                      icon={<Download size={13} />}
-                      title="Export in Postman's environment format (secret values are left out)"
-                      onClick={async () => {
-                        try {
-                          const r = await call<{ path?: string; environment?: unknown; name: string }>('env.export', { id: draft.id });
-                          if (r.environment) download(r.name, JSON.stringify(r.environment, null, 2));
-                          else if (r.path) useApp.getState().toast(`Exported to ${r.path}`, 'success');
-                        } catch (e) {
-                          useApp.getState().toast(asError(e).message, 'error');
-                        }
-                      }}
-                    >
-                      Export
-                    </Button>
+                    <Menu
+                      align="end"
+                      width={250}
+                      trigger={
+                        <Button icon={<Download size={13} />} title="Export (secret values are left out)">
+                          Export
+                        </Button>
+                      }
+                      items={[
+                        { label: 'Postman environment (.json)', icon: <FileJson size={14} />, onSelect: () => void exportEnv('postman') },
+                        { label: '.env file', icon: <FileText size={14} />, onSelect: () => void exportEnv('dotenv') },
+                      ]}
+                    />
                     <Button
                       variant="ghost"
                       className="text-bad"

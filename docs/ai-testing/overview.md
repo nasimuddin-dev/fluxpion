@@ -7,6 +7,19 @@ description: "Test LLM APIs across providers with prompt templates, structured o
 
 # AI testing
 
+## Your Claude API key
+
+The quickest way to start is your own Anthropic API key. Anthropic bills your account for what you use.
+
+1. Create a key in the [Anthropic Console](https://console.anthropic.com/) (**API keys → Create key**).
+2. In TestPion, open **Settings ▸ AI assistant** and turn on **the AI assistant**.
+3. Choose **Claude (Anthropic), with your API key**, paste the key and choose **Save key**. TestPion checks it with Anthropic, then stores it in the OS secret store (Windows Credential Manager / DPAPI, the macOS Keychain, or the Linux secret service). It is never written to the settings file or to a workspace.
+4. Choose the **model**: Claude Opus 5.5 (most capable, the default), Claude Sonnet 5.5 (faster and cheaper) or Claude Haiku 4.5 (fastest and cheapest), then **Save settings**.
+
+The key then powers the AI assistant: explaining errors and responses, drafting requests, GraphQL queries, MCP arguments, assertions and tests. It also appears in every workspace's AI Lab and evaluations as the provider **Claude (your API key)**, so tests can use `model: { provider: claude-app, name: claude-sonnet-5-5 }`. To stop using it, turn the assistant off or choose **Remove key**. You can also point the assistant at a provider of the workspace instead, such as a local Ollama model.
+
+For the CLI and CI, set the key as the `TESTPION_SECRET_APP_ANTHROPIC_APIKEY` environment variable: `claude-app` is then available there too.
+
 ## Saved prompts
 
 The Playground's **Saved prompts** list keeps prompts with their model, parameters, system prompt, variables, structured output and evaluators, grouped in folders. **Save** stores the current prompt (or the changes to the opened one, shown as *edited*); open a prompt to run it again. Folders work as in the REST collections: create them with the folder button, and move prompts with the `⋯` / right-click menu or by dragging. Saved prompts live in the workspace (`library/ai-prompts.json`).

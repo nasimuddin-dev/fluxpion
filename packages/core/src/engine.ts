@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { AppSettings, AuthConfig, Collection, CollectionNode, Environment, McpServerConfig } from './model/types.js';
+import type { ProviderConfig, AppSettings, AuthConfig, Collection, CollectionNode, Environment, McpServerConfig } from './model/types.js';
 import { defaultSettings } from './model/types.js';
 import { VariableScope } from './vars/variables.js';
 import { Redactor } from './util/redact.js';
@@ -10,6 +10,7 @@ import type { ExecServices } from './runner/execute.js';
 import type { WorkspaceStore } from './storage/workspace.js';
 import { secretKeys, type SecretStore } from './storage/secrets.js';
 import { CookieJar } from './cookies/cookie-jar.js';
+import { APP_CLAUDE_ID, APP_CLAUDE_SECRET, appClaudeProvider } from './ai/app-provider.js';
 
 export interface ContextOptions {
   store: WorkspaceStore;
@@ -30,6 +31,8 @@ export interface ContextOptions {
   runtimeVars?: Record<string, unknown>;
   /** Cookie jar to use (desktop: the persistent workspace jar). Defaults to an empty jar for this context. */
   cookieJar?: CookieJar | false;
+  /** Providers available besides the workspace's (the app's own Claude provider); a workspace provider with the same id wins. */
+  extraProviders?: ProviderConfig[];
 }
 
 export interface EngineContext {
@@ -85,7 +88,13 @@ export function createEngineContext(opts: ContextOptions): EngineContext {
     return cfg ? vars.resolveDeep(cfg) : undefined;
   };
   const mcp = new McpManager(resolveMcp, redactor, opts.onMcpEvent);
-  const providers = new ProviderRegistry(store.getProviders(), vars, redactor);
+  const own = store.getProviders();
+  // the app's Claude provider whenever its key is in a secret store (the OS store in the app,
+  // TESTPION_SECRET_APP_ANTHROPIC_APIKEY for the CLI and CI)
+  const extra = [...(opts.extraProviders ?? [])];
+  if (!extra.some((p) => p.id === APP_CLAUDE_ID) && opts.secrets.get(APP_CLAUDE_SECRET))
+    extra.push(appClaudeProvider((settings.assistantProvider === APP_CLAUDE_ID && settings.assistantModel) || undefined));
+  const providers = new ProviderRegistry([...own, ...extra.filter((p) => !own.some((o) => o.id === p.id))], vars, redactor);
   const logger = opts.logger ?? new Logger(settings.logLevel, redactor);
 
   const services: ExecServices = {

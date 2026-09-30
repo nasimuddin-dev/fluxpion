@@ -51,9 +51,13 @@ Use it when a request works on Staging but fails on Production. Secret and sensi
 
 From the terminal, `testpion env diff Staging Production -w my-workspace` lists the differences and exits with 1 when there are any. Add `--values` to see non-secret values, `--all` to include the variables that are the same, and `--json` for scripts. AI agents get the `compare_environments` tool, which returns statuses, never values.
 
+## Import a .env file
+
+**Import** (File menu, or Collections) also takes `.env` files: every `KEY=value` line becomes a variable of a new environment named after the file (`.env.staging` and `staging.env` become *staging*). Quotes, `export`, `#` comments and `\n` in double quotes work. Keys that look like secrets (`API_KEY`, `DB_PASSWORD`, `TOKEN` …) become secret variables: the app keeps their values in the OS secret store, never in the environment file, and the CLI (`testpion import .env.staging -w <workspace>`) lists them for you to set.
+
 ## Export
 
-**Export** in an environment's toolbar writes it in Postman's environment format, which Postman and Newman read, and so does `testpion run-collection -e`. Secret variables are included by name only: the value is empty and the type is `secret`. The CLI equivalent is `testpion export-environment <name> -o file.json`.
+**Export** in an environment's toolbar writes it as a `.env` file or in Postman's environment format. In a `.env` file, secret variables are listed with an empty value. The Postman format, which Postman and Newman read, and so does `testpion run-collection -e`. Secret variables are included by name only: the value is empty and the type is `secret`. The CLI equivalent is `testpion export-environment <name> -o file.json`.
 
 ## Production
 

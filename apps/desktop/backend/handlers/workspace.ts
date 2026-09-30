@@ -10,6 +10,7 @@ import {
   WorkspaceStore,
   WORKSPACE_FORMATS,
   exportPostmanEnvironment,
+  environmentToDotenv,
   type CookieInput,
   secretKeys,
   templateVariables,
@@ -217,9 +218,16 @@ export function workspaceHandlers(be: Backend): Handlers {
     },
 
     /** Export an environment in Postman's format (secret values are never included). */
-    'env.export': async ({ id }: { id: string }) => {
+    'env.export': async ({ id, format }: { id: string; format?: 'postman' | 'dotenv' }) => {
       const env = be.ws.getEnvironment(id);
       if (!env) throw new ApsError('ConfigurationError', `Environment "${id}" not found`);
+      if (format === 'dotenv') {
+        const text = environmentToDotenv(env);
+        const name = `.env.${env.name.replace(/[^\w.-]+/g, '-').toLowerCase()}`;
+        const dest = await be.host.saveDialog?.({ defaultPath: name, filters: [{ name: '.env file', extensions: ['env', '*'] }] });
+        if (dest) writeFileSync(dest, text);
+        return { path: dest, text: dest ? undefined : text, name };
+      }
       const out = exportPostmanEnvironment(env);
       const name = `${env.name}.postman_environment.json`;
       const dest = await be.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Environment', extensions: ['json'] }] });

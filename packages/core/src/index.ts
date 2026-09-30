@@ -53,6 +53,7 @@ export * from './report/reports.js';
 export * from './report/response-diff.js';
 export * from './report/response-stats.js';
 export * from './report/collection-html.js';
+export * from './ai/app-provider.js';
 export * from './storage/history-compare.js';
 export * from './net/policy.js';
 export * from './net/proxy.js';
@@ -77,6 +78,7 @@ export * from './storage/examples.js';
 
 export * from './import/importers.js';
 export * from './import/other-tools.js';
+export * from './import/dotenv.js';
 export * from './import/curl.js';
 export * from './import/snippet.js';
 export * from './import/save-request.js';

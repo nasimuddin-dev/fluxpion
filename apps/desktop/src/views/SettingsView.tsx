@@ -176,24 +176,7 @@ export function SettingsView() {
               <p className="text-xs text-muted">Environments marked as production always require an explicit per-run opt-in.</p>
             </>
           )}
-          {tab === 'assistant' && (
-            <>
-              <p className="text-sm text-muted">The assistant helps generate requests, queries, MCP arguments, assertions and tests, and explains errors. Its output is always labelled as an AI suggestion and is never treated as a test result.</p>
-              <Field label="Provider">
-                <Select value={s.assistantProvider ?? ''} onChange={(e) => set({ assistantProvider: e.target.value || undefined, assistantModel: providers.find((p) => p.id === e.target.value)?.defaultModel })}>
-                  <option value="">Disabled</option>
-                  {providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Model">
-                <Input className="mono" value={s.assistantModel ?? ''} onChange={(e) => set({ assistantModel: e.target.value || undefined })} />
-              </Field>
-            </>
-          )}
+          {tab === 'assistant' && <AssistantSettings s={s} set={set} providers={providers} />}
           {tab === 'about' && (
             <div className="text-sm flex flex-col gap-2">
               <div className="text-lg font-semibold">TestPion {info?.appVersion}</div>
@@ -351,6 +334,119 @@ function CertificateSettings({ value, onChange }: { value: NonNullable<AppSettin
         </ul>
       )}
       <p className="text-xs text-muted">Applies to requests, OAuth, AI providers, MCP over HTTP, WebSocket and datasets. A request that turns off TLS verification (its Settings tab) ignores this. From the terminal: TESTPION_USE_SYSTEM_CA=1 and TESTPION_CA_FILE=path, or Node's NODE_EXTRA_CA_CERTS.</p>
+    </>
+  );
+}
+
+const CLAUDE_ID = 'claude-app';
+
+/**
+ * The AI assistant (explain errors and responses, generate requests, tests and assertions): Claude with
+ * the user's own Anthropic API key (checked, then kept in the OS secret store), or a provider of the
+ * workspace (e.g. a local model). The key also appears in AI Lab as "Claude (your API key)".
+ */
+function AssistantSettings({ s, set, providers }: { s: AppSettings; set(p: Partial<AppSettings>): void; providers: ProviderConfig[] }) {
+  const [status, setStatus] = useState<{ hasKey: boolean; keyStorage: string; models: Array<{ id: string; name: string }> }>();
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = () => void call<NonNullable<typeof status>>('ai.appKeyStatus').then(setStatus);
+  useEffect(load, []);
+  const on = !!s.assistantProvider;
+  const source: 'claude' | 'workspace' = !s.assistantProvider || s.assistantProvider === CLAUDE_ID ? 'claude' : 'workspace';
+  const workspaceProviders = providers.filter((p) => p.id !== CLAUDE_ID);
+  const saveKey = async (value: string | null) => {
+    setBusy(true);
+    try {
+      const r = await call<{ hasKey: boolean; settings: AppSettings }>('ai.setAppKey', { key: value });
+      setKey('');
+      // saving the first key turns the assistant on with Claude
+      if (value && !s.assistantProvider) set({ assistantProvider: r.settings.assistantProvider, assistantModel: r.settings.assistantModel });
+      useApp.getState().set({ settings: { ...useApp.getState().settings!, assistantProvider: r.settings.assistantProvider, assistantModel: r.settings.assistantModel } });
+      useApp.getState().toast(value ? 'API key checked and saved in the secret store' : 'API key removed', 'success');
+      load();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const radio = (value: typeof source, title: string, text: string) => (
+    <label className="flex items-start gap-2 cursor-pointer">
+      <input
+        type="radio"
+        className="mt-1"
+        checked={source === value}
+        onChange={() => set(value === 'claude' ? { assistantProvider: CLAUDE_ID, assistantModel: status?.models[0]?.id } : { assistantProvider: workspaceProviders[0]?.id, assistantModel: workspaceProviders[0]?.defaultModel })}
+      />
+      <span>
+        <span className="font-medium">{title}</span>
+        <span className="block text-sm text-muted">{text}</span>
+      </span>
+    </label>
+  );
+  return (
+    <>
+      <Toggle
+        checked={on}
+        onChange={(v) => set(v ? { assistantProvider: CLAUDE_ID, assistantModel: s.assistantModel ?? status?.models[0]?.id } : { assistantProvider: undefined, assistantModel: undefined })}
+        label="Turn on the AI assistant"
+      />
+      <p className="text-sm text-muted">
+        The assistant explains errors and responses, and drafts requests, GraphQL queries, MCP arguments, assertions and tests. Its answers are always labelled as AI suggestions. Text is sent only when you use an
+        AI action, straight to the provider you choose.
+      </p>
+      {on && (
+        <>
+          {radio('claude', 'Claude (Anthropic), with your API key', 'Anthropic bills your account for what you use. The key also appears in AI Lab and evaluations as "Claude (your API key)".')}
+          {radio('workspace', 'A provider of this workspace', 'A provider set up in AI Lab ▸ Providers, for example a local Ollama model that works offline.')}
+          {source === 'claude' ? (
+            <div className="flex flex-col gap-3 pl-6">
+              {status?.hasKey ? (
+                <p className="text-sm flex items-center gap-2 flex-wrap">
+                  <Badge tone="ok">key saved</Badge> in {status.keyStorage}, never in settings or workspace files.
+                  <Button size="sm" variant="ghost" disabled={busy} onClick={() => void saveKey(null)}>
+                    Remove key
+                  </Button>
+                </p>
+              ) : (
+                <Field label="Anthropic API key" hint="Create one at console.anthropic.com ▸ API keys. TestPion checks it with Anthropic, then keeps it in the OS secret store.">
+                  <div className="flex gap-2">
+                    <Input type="password" autoComplete="off" spellCheck={false} className="mono flex-1 min-w-[22rem]" placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && key.trim() && void saveKey(key)} />
+                    <Button variant="primary" loading={busy} disabled={!key.trim()} onClick={() => void saveKey(key)}>
+                      {busy ? 'Checking…' : 'Save key'}
+                    </Button>
+                  </div>
+                </Field>
+              )}
+              <Field label="Model">
+                <Select value={s.assistantModel ?? status?.models[0]?.id ?? ''} onChange={(e) => set({ assistantModel: e.target.value })}>
+                  {(status?.models ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pl-6">
+              <Field label="Provider">
+                <Select value={s.assistantProvider ?? ''} onChange={(e) => set({ assistantProvider: e.target.value, assistantModel: workspaceProviders.find((p) => p.id === e.target.value)?.defaultModel })}>
+                  {workspaceProviders.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Model">
+                <Input className="mono" value={s.assistantModel ?? ''} onChange={(e) => set({ assistantModel: e.target.value || undefined })} />
+              </Field>
+            </div>
+          )}
+          <p className="text-xs text-muted">Save settings to keep the choice of source and model (the API key is saved on its own).</p>
+        </>
+      )}
     </>
   );
 }

@@ -8,13 +8,41 @@ import {
   type ProviderConfig,
   type ModelRef,
   parseGeneratedRequest,
+  APP_CLAUDE_ID,
+  APP_CLAUDE_SECRET,
+  CLAUDE_MODELS,
+  DEFAULT_CLAUDE_MODEL,
+  appClaudeProvider,
+  checkAnthropicKey,
 } from '@testpion/core';
 import type { Backend, Handlers, AiChatParams } from '../backend.js';
 
 export function aiHandlers(be: Backend): Handlers {
   return {
-    'ai.providers': () => be.ws.getProviders().map((p) => ({ ...p, hasKey: !!be.secrets.get(secretKeys.provider(p.id)) || !!(p.apiKey && !p.apiKey.includes('$secret')) })),
+    'ai.providers': () => [
+      ...be.ws.getProviders().map((p) => ({ ...p, hasKey: !!be.secrets.get(secretKeys.provider(p.id)) || !!(p.apiKey && !p.apiKey.includes('$secret')) })),
+      // the app's own Claude provider (Settings ▸ AI assistant), in every workspace; not editable here
+      ...(be.appClaudeKey() && !be.ws.getProviders().some((p) => p.id === APP_CLAUDE_ID) ? [{ ...appClaudeProvider(be.claudeModel()), hasKey: true, builtIn: true }] : []),
+    ],
+    /** Settings ▸ AI assistant: is a Claude key saved, and where. */
+    'ai.appKeyStatus': () => ({ hasKey: !!be.appClaudeKey(), keyStorage: be.host.cipher ? `the ${be.host.cipher.backend ?? 'OS'} secret store` : 'memory (this session only)', models: CLAUDE_MODELS }),
+    /** Check the key with Anthropic, then keep it in the secret store (null removes it). */
+    'ai.setAppKey': async ({ key }: { key: string | null }) => {
+      if (key) {
+        await checkAnthropicKey(key);
+        await be.secrets.set(APP_CLAUDE_SECRET, key.trim());
+        be.logger.redactor.addSecret(key.trim());
+        // first key: the assistant uses it straight away
+        if (!be.settings.assistantProvider) be.settings = be.manager.saveSettings({ ...be.settings, assistantProvider: APP_CLAUDE_ID, assistantModel: be.settings.assistantModel ?? DEFAULT_CLAUDE_MODEL });
+        be.appLog('info', 'Claude API key checked and saved');
+      } else {
+        await be.secrets.delete(APP_CLAUDE_SECRET);
+        be.appLog('info', 'Claude API key removed');
+      }
+      return { hasKey: !!key, settings: be.settings };
+    },
     'ai.saveProviders': async ({ providers, keys }: { providers: ProviderConfig[]; keys?: Record<string, string> }) => {
+      providers = providers.filter((p) => !(p as { builtIn?: boolean }).builtIn);
       for (const [id, key] of Object.entries(keys ?? {})) if (key) await be.secrets.set(secretKeys.provider(id), key);
       const clean = providers.map((p) => ({ ...p, apiKey: p.apiKey && /\{\{/.test(p.apiKey) ? p.apiKey : keys?.[p.id] || be.secrets.get(secretKeys.provider(p.id)) ? `{{$secret.${secretKeys.provider(p.id)}}}` : undefined }));
       be.ws.saveProviders(clean);

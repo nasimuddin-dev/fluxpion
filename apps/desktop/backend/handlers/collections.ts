@@ -90,7 +90,9 @@ export function collectionsHandlers(be: Backend): Handlers {
       if (!dryRun && r.changed) be.ws.saveCollection(r.collection);
       return { changed: r.changed, replacements: r.replacements, skipped: r.skipped, collection: dryRun ? r.collection : undefined };
     },
-    'col.import': ({ text }: { text: string }) => {
+    'col.import': ({ text, fileName }: { text: string; fileName?: string }) => {
+      // ".env.staging" / "staging.env" → "staging"; a bare ".env" keeps the default name
+      const envName = fileName ? fileName.replace(/^\.env\.?/, '').replace(/\.env$/, '') || undefined : undefined;
       if (isRequestSnippet(text)) {
         // a copied cURL / fetch / PowerShell request goes into the "Imported" collection; secrets become {{variables}}
         const r = importRequestSnippet(be.ws.listCollections().filter((c) => !c.problem), text, be.logger.redactor);
@@ -98,13 +100,14 @@ export function collectionsHandlers(be: Backend): Handlers {
         return { format: r.format, collection: saved.name, collectionId: saved.id, request: r.node.name, placeholders: r.placeholders };
       }
       // an OpenAPI document is kept in specs/ and its requests get an openapi contract check
-      const r = importIntoWorkspace(be.ws, text);
+      // .env imports: secret-looking values go to the OS secret store, never into workspace files
+      const r = importIntoWorkspace(be.ws, text, { name: envName, secrets: be.secrets });
       return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks };
     },
     'col.importFile': async () => {
-      const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions', extensions: ['json', 'yaml', 'yml', 'har'] }] });
+      const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions, collections and .env files', extensions: ['json', 'yaml', 'yml', 'har', 'env'] }, { name: 'All files', extensions: ['*'] }] });
       if (!f) return null;
-      return be.handlers['col.import']!({ text: readFileSync(f, 'utf8') });
+      return be.handlers['col.import']!({ text: readFileSync(f, 'utf8'), fileName: basename(f) });
     },
     'col.run': (p: CollectionRunParams) => be.startCollectionRun(p),
     /**

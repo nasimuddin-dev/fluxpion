@@ -91,6 +91,10 @@ import {
   type WorkspaceInfo,
   setProxySettings,
   setTlsTrust,
+  APP_CLAUDE_ID,
+  APP_CLAUDE_SECRET,
+  DEFAULT_CLAUDE_MODEL,
+  appClaudeProvider,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -477,8 +481,18 @@ export class Backend {
     }
   }
 
+  /** The Claude API key saved in Settings ▸ AI assistant (from the secret store), if any. */
+  appClaudeKey(): string | undefined {
+    return this.secrets.get(APP_CLAUDE_SECRET) || undefined;
+  }
+
+  claudeModel(): string {
+    return this.settings.assistantProvider === APP_CLAUDE_ID && this.settings.assistantModel ? this.settings.assistantModel : DEFAULT_CLAUDE_MODEL;
+  }
+
   context(opts: { environment?: string; collectionId?: string }) {
     const ctx = createEngineContext({
+      extraProviders: this.appClaudeKey() ? [appClaudeProvider(this.claudeModel())] : [],
       store: this.ws,
       secrets: this.secrets,
       settings: this.settings,
@@ -898,7 +912,9 @@ export class Backend {
   async assistant(p: { task: string; context: unknown; question?: string; environment?: string }) {
     const providerRef = this.settings.assistantProvider;
     if (!providerRef)
-      throw new ApsError('ConfigurationError', 'No AI assistant model configured', { suggestions: ['Choose an assistant provider and model in Settings → AI Assistant (a local model works offline).'] });
+      throw new ApsError('ConfigurationError', 'The AI assistant is off', { suggestions: ['Open Settings ▸ AI assistant and save your Claude (Anthropic) API key, or choose a provider of this workspace (a local model works offline).'] });
+    if (providerRef === APP_CLAUDE_ID && !this.appClaudeKey())
+      throw new ApsError('ConfigurationError', 'No Claude API key is saved', { suggestions: ['Open Settings ▸ AI assistant and save your Anthropic API key.'] });
     const ctx = this.context({ environment: p.environment });
     const { provider, model } = ctx.services.providers.resolveModel({ provider: providerRef, name: this.settings.assistantModel });
     const instructions: Record<string, string> = {

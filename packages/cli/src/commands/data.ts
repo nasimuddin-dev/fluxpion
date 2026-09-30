@@ -87,7 +87,7 @@ export function registerDataCommands(program: Command): void {
     });
   program
     .command('import')
-    .description('import OpenAPI/Swagger, Postman, HAR or collection files, or a copied cURL / fetch / PowerShell request, into a workspace')
+    .description('import OpenAPI/Swagger, Postman, Insomnia, Bruno, Hoppscotch, HAR, .env or collection files, or a copied cURL / fetch / PowerShell request, into a workspace')
     .argument('<file>', 'file to import, or - to read stdin (e.g. a cURL command from the clipboard)')
     .requiredOption('-w, --workspace <nameOrPath>')
     .option('--collection <name>', 'for a cURL / fetch / PowerShell request: the collection to add it to (created if needed)', 'Imported')
@@ -112,11 +112,12 @@ export function registerDataCommands(program: Command): void {
           }
           return;
         }
-        const r = importIntoWorkspace(store, text, { contractChecks: o.contractChecks !== false });
-        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name, environments: r.environments?.map((e) => e.name), specPath: r.specPath, contractChecks: r.contractChecks }, null, 2));
+        const r = importIntoWorkspace(store, text, { contractChecks: o.contractChecks !== false, name: dotenvName(file) });
+        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name, environments: r.environments?.map((e) => e.name), secretsToSet: r.secretsToSet, specPath: r.specPath, contractChecks: r.contractChecks }, null, 2));
         else {
           console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environments?.length ? ` ${r.environments.length > 1 ? 'environments' : 'environment'} ${r.environments.map((e) => `"${e.name}"`).join(', ')}` : ''}`));
           if (r.specPath) console.log(dim(`Kept the document as ${r.specPath}${r.contractChecks ? `; ${r.contractChecks} requests check the OpenAPI contract` : ''}`));
+          if (r.secretsToSet?.length) console.log(yellow(`Secret values were not saved (set them in the app, or as TESTPION_SECRET_* variables): ${r.secretsToSet.join(', ')}`));
         }
       } finally {
         store.close();
@@ -352,4 +353,11 @@ function savedRequestId(store: WorkspaceStore, request: string, collection?: str
   const hit = cols.flatMap((c) => flat(c.items)).find((n) => n.id.toLowerCase() === want || n.name.toLowerCase() === want);
   if (!hit) throw new CliError(`No saved request "${request}"`, EXIT.CONFIG_ERROR);
   return hit.id;
+}
+
+/** The environment name for an imported .env file: ".env.staging" / "staging.env" → "staging" (else the default). */
+function dotenvName(file: string): string | undefined {
+  const base = file.split(/[\\/]/).pop() ?? '';
+  if (!/(^\.env|\.env$)/.test(base)) return undefined;
+  return base.replace(/^\.env\.?/, '').replace(/\.env$/, '') || undefined;
 }
