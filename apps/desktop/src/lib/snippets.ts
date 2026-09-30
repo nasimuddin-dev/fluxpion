@@ -51,6 +51,8 @@ interface PmExpect {
   include(v: any): PmExpect; contain(v: any): PmExpect; property(name: string, value?: any): PmExpect; lengthOf(n: number): PmExpect;
   above(n: number): PmExpect; below(n: number): PmExpect; least(n: number): PmExpect; most(n: number): PmExpect; within(a: number, b: number): PmExpect;
   match(re: RegExp | string): PmExpect; oneOf(values: any[]): PmExpect; keys(...keys: string[]): PmExpect; members(values: any[]): PmExpect;
+  /** Validates against a JSON Schema (Ajv: draft-07 keywords and formats). */
+  jsonSchema(schema: object): PmExpect;
   readonly true: PmExpect; readonly false: PmExpect; readonly null: PmExpect; readonly undefined: PmExpect; readonly ok: PmExpect; readonly empty: PmExpect; readonly exist: PmExpect;
 }
 interface PmVariableScope { get(key: string): any; set(key: string, value: any): void; unset(key: string): void; has(key: string): boolean; clear(): void; toObject(): Record<string, any>; replaceIn(template: string): string; }
@@ -58,6 +60,8 @@ interface PmHeaderList { get(key: string): string | undefined; has(key: string):
 interface PmResponseAssert {
   to: PmResponseAssert; have: PmResponseAssert; be: PmResponseAssert; not: PmResponseAssert;
   status(codeOrReason: number | string): PmResponseAssert; header(name: string, value?: string): PmResponseAssert; body(expected?: string | object): PmResponseAssert; jsonBody(path?: string, value?: any): PmResponseAssert;
+  /** The response body validates against a JSON Schema (Ajv). */
+  jsonSchema(schema: object): PmResponseAssert;
   readonly ok: PmResponseAssert; readonly success: PmResponseAssert; readonly error: PmResponseAssert; readonly clientError: PmResponseAssert; readonly serverError: PmResponseAssert; readonly json: PmResponseAssert;
   readonly notFound: PmResponseAssert; readonly unauthorized: PmResponseAssert; readonly forbidden: PmResponseAssert; readonly badRequest: PmResponseAssert;
 }
@@ -73,11 +77,11 @@ declare const pm: {
   /** Define a named test; it passes unless the function throws. */
   test(name: string, fn: () => void): void;
   /** Chai-style assertion: pm.expect(value).to.equal(expected) */
-  expect(value: any): PmExpect;
+  expect: { (value: any): PmExpect; fail(message?: string): never };
   variables: PmVariableScope; environment: PmVariableScope; globals: PmVariableScope; collectionVariables: PmVariableScope;
   iterationData: { get(key: string): any; has(key: string): boolean; toObject(): Record<string, any> };
   request: { method: string; url: { toString(): string; update(url: string): void }; headers: PmHeaderList; body: { toString(): string; update(body: string | object): void } };
-  response: { code: number; status: string; responseTime: number; responseSize: number; headers: PmHeaderList; json(): any; text(): string; to: PmResponseAssert };
+  response: { code: number; status: string; responseTime: number; responseSize: number; headers: PmHeaderList; json(): any; text(): string; to: PmResponseAssert; size(): { body: number; header: number; total: number } };
   info: { requestName: string; requestId: string; iteration: number; iterationCount: number; eventName: 'prerequest' | 'test' };
   cookies: { get(name: string): string | undefined; has(name: string): boolean; toObject(): Record<string, string>; jar(): PmCookieJar };
   execution: { setNextRequest(name: string | null): void; skipRequest(): void };
@@ -90,7 +94,26 @@ declare const pm: {
   ): void;
   uuid(): string;
 };
-declare const postman: { setNextRequest(name: string | null): void; setEnvironmentVariable(k: string, v: any): void; getEnvironmentVariable(k: string): any; setGlobalVariable(k: string, v: any): void; getGlobalVariable(k: string): any };
+declare const postman: {
+  setNextRequest(name: string | null): void; setEnvironmentVariable(k: string, v: any): void; getEnvironmentVariable(k: string): any; clearEnvironmentVariable(k: string): void;
+  setGlobalVariable(k: string, v: any): void; getGlobalVariable(k: string): any; clearGlobalVariable(k: string): void;
+  getResponseHeader(name: string): string | undefined; getResponseCookie(name: string): { name: string; value: string } | undefined;
+};
+/** XML (e.g. a SOAP response) as an object: attributes under "$", text under "_", repeated elements as arrays. */
+declare function xml2Json(xml: string): any;
+/** lodash (loaded when a script uses it): _.get(obj, 'a.b[0]'), _.map, _.sortBy … */
+declare const _: any;
+interface PmMoment {
+  format(fmt?: string): string; add(n: number | object, unit?: string): PmMoment; subtract(n: number | object, unit?: string): PmMoment;
+  startOf(unit: string): PmMoment; endOf(unit: string): PmMoment; clone(): PmMoment; diff(other: any, unit?: string, float?: boolean): number;
+  isBefore(other: any, unit?: string): boolean; isAfter(other: any, unit?: string): boolean; isSame(other: any, unit?: string): boolean;
+  toISOString(): string; valueOf(): number; unix(): number; toDate(): Date; isValid(): boolean; fromNow(): string;
+}
+/** moment (UTC): moment().add(1, 'day').format('YYYY-MM-DD') */
+declare const moment: { (input?: any, format?: string): PmMoment; utc(input?: any, format?: string): PmMoment; unix(seconds: number): PmMoment; duration(n: number | object, unit?: string): any };
+/** tv4-compatible JSON Schema validation (older Postman scripts). */
+declare const tv4: { validate(data: any, schema: object): boolean; error: { message: string } | null; validateResult(data: any, schema: object): { valid: boolean; error: { message: string } | null }; validateMultiple(data: any, schema: object): { valid: boolean; errors: Array<{ message: string }> } };
+declare function require(name: 'crypto-js' | 'uuid' | 'tv4' | 'lodash' | 'moment'): any;
 declare const CryptoJS: any;
 declare const tests: Record<string, boolean>;
 declare function btoa(s: string): string;
