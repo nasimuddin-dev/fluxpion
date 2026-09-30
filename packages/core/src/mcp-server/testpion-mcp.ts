@@ -26,6 +26,7 @@ import { securityLint, variableFlow } from '../eval/security.js';
 import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { collectionToOpenApiText } from '../openapi/from-collection.js';
 import { renameVariable, variableUsages } from '../storage/variable-refactor.js';
+import { setEnvironmentVariables } from '../storage/env-edit.js';
 import { runLoadTest, type LoadTarget } from '../load/load.js';
 import { collectionLoadTarget } from '../load/collection-load.js';
 import { compareHistory } from '../storage/history-compare.js';
@@ -509,6 +510,17 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           secretsToSet: r.secretsToSet?.length ? r.secretsToSet : undefined,
           scriptWarnings: r.scriptWarnings,
         };
+      },
+    },
+    {
+      name: 'set_environment_variable',
+      write: true,
+      description: 'Set plain (non-secret) variables of an environment, e.g. { "baseUrl": "https://staging.example.com" }; `create` makes the environment if needed. Secret variables are refused: the user sets those in the app.',
+      inputSchema: { type: 'object', properties: { environment: str('Environment name or id'), values: { type: 'object', additionalProperties: { type: 'string' }, description: 'key → value' }, create: { type: 'boolean' } }, required: ['environment', 'values'] },
+      run: (a) => {
+        const values = Object.fromEntries(Object.entries((a.values ?? {}) as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
+        const env = setEnvironmentVariables(store, String(a.environment), values, { create: a.create === true });
+        return { environment: env.name, set: Object.keys(values) };
       },
     },
     {

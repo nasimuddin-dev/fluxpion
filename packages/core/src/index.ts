@@ -62,6 +62,7 @@ export * from './ai/app-provider.js';
 export * from './storage/history-compare.js';
 export * from './storage/history-har.js';
 export * from './storage/variable-refactor.js';
+export * from './storage/env-edit.js';
 export * from './net/policy.js';
 export * from './net/proxy.js';
 export * from './report/regression.js';

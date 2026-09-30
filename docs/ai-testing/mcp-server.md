@@ -57,6 +57,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `monitor_results` | A monitor's recent results, newest first. |
 | `run_monitor` | Run a monitor now; returns the result and the failed requests. |
 | `compare_responses` | Compare two responses by history id: status, timing, header changes and a field-by-field JSON body diff (`$.path` added / removed / changed). Sensitive values are masked. |
+| `set_environment_variable` | Set plain variables of an environment (optionally creating it). Secret variables are refused. |
 | `reorder_environments` | Set the order of environments in the environment picker (names or ids, first to last). |
 | `load_test` | Load-test a local URL or a collection (localhost and private networks only, at most 50 virtual users for 60 seconds; optional warm-up). Returns throughput, latency percentiles, error rate and per-request numbers. |
 | `graphql_subscribe` | Run a GraphQL subscription over WebSocket and return the events received (up to a count or 60 seconds). |

@@ -30,6 +30,9 @@ import {
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
+  findEnvironment,
+  setEnvironmentVariables,
+  unsetEnvironmentVariables,
   variableFlow,
   collectionToOpenApiText,
   variableUsages,
@@ -396,7 +399,69 @@ export function registerDataCommands(program: Command): void {
         store.close();
       }
     });
-  const envCmd = program.command('env').description('list environments and set their order');
+  const envCmd = program.command('env').description('list environments, set plain variables, and set their order');
+  envCmd
+    .command('set')
+    .description('set plain variables of an environment (key=value …); secret variables are set in the app')
+    .argument('<environment>', 'environment name or id')
+    .argument('<assignments...>', 'key=value pairs')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--create', 'create the environment if it does not exist')
+    .option('--json', 'print the variable names as JSON')
+    .action((ref: string, pairs: string[], o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const values: Record<string, string> = {};
+        for (const p of pairs) {
+          const i = p.indexOf('=');
+          if (i <= 0) throw new CliError(`Expected key=value, got "${p}"`, EXIT.CONFIG_ERROR);
+          values[p.slice(0, i)] = p.slice(i + 1);
+        }
+        const env = setEnvironmentVariables(store, ref, values, { create: !!o.create });
+        if (o.json) console.log(JSON.stringify({ environment: env.name, set: Object.keys(values) }, null, 2));
+        else console.log(green(`${env.name}: set ${Object.keys(values).join(', ')}`));
+      } catch (e) {
+        throw e instanceof CliError ? e : new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+      } finally {
+        store.close();
+      }
+    });
+  envCmd
+    .command('unset')
+    .description('remove plain variables from an environment')
+    .argument('<environment>', 'environment name or id')
+    .argument('<keys...>', 'variable names')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .action((ref: string, keys: string[], o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const env = unsetEnvironmentVariables(store, ref, keys);
+        console.log(green(`${env.name}: removed ${keys.join(', ')}`));
+      } catch (e) {
+        throw e instanceof CliError ? e : new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+      } finally {
+        store.close();
+      }
+    });
+  envCmd
+    .command('get')
+    .description("print a plain variable's value (secret values are never printed)")
+    .argument('<environment>', 'environment name or id')
+    .argument('<key>', 'variable name')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .action((ref: string, key: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const env = findEnvironment(store, ref);
+        if (!env) throw new CliError(`No environment "${ref}"`, EXIT.CONFIG_ERROR);
+        const v = env.variables.find((x) => x.key === key);
+        if (!v) throw new CliError(`${env.name} has no variable "${key}"`, EXIT.CONFIG_ERROR);
+        if ((v as { secret?: boolean }).secret) throw new CliError(`"${key}" is a secret variable: its value is never printed`, EXIT.CONFIG_ERROR);
+        console.log(v.value);
+      } finally {
+        store.close();
+      }
+    });
   envCmd
     .command('list')
     .description('list environments in display order, with variable names (never values)')

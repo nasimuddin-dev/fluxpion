@@ -18,6 +18,7 @@ testpion graphql-subscribe <endpoint> -q <doc>   Run a GraphQL subscription and 
 testpion lint <collection>    Security review of a collection's requests (--fail-on high for CI)
 testpion record <target>      Record traffic through a local reverse proxy; -w saves it as a collection (see Record traffic)
 testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
+testpion env set|unset|get <env> -w   Set or remove plain variables of an environment (secrets stay in the app)
 testpion vars usages|rename -w   Where a variable is used; rename it everywhere
 testpion openapi-diff <old> <new>   List breaking changes between two OpenAPI versions (--fail-on-breaking for CI)
 testpion docs <collection>    Write Markdown (or --html) documentation for a collection
