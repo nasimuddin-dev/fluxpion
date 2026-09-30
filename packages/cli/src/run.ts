@@ -14,6 +14,7 @@ import {
   consoleSink,
   createBaseline,
   createEngineContext,
+  executeHttp,
   formatDuration,
   CookieJar,
   cookiesFromJson,
@@ -419,6 +420,106 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
   }
   // --suppress-exit-code: test failures don't fail the command (configuration errors still do)
   return o.suppressExitCode && code === EXIT.TEST_FAILURE ? EXIT.SUCCESS : code;
+}
+
+/** `testpion send`: one saved request (scripts, auth, checks) or an ad-hoc URL; prints the response like curl. */
+export async function executeSend(
+  target: string,
+  o: { workspace?: string; environment?: string; method: string; header?: string[]; data?: string; include?: boolean; fail?: boolean; json?: boolean },
+): Promise<number> {
+  const mgr = new WorkspaceManager();
+  const settings = mgr.loadSettings();
+  const isUrl = /^(https?:\/\/|\{\{)/i.test(target);
+  const { store, ephemeral } = openWorkspace(o.workspace, isUrl && !o.workspace ? tmpdir() : undefined, mgr);
+  const secrets = new ChainSecretStore([new EnvSecretStore()]);
+  let response: { status: number; statusText: string; headers: Array<[string, string]>; body: string; durationMs: number; url: string } | undefined;
+  let checks: Array<{ name: string; passed: boolean; message?: string }> = [];
+  let error: string | undefined;
+  try {
+    if (isUrl) {
+      const ctx = createEngineContext({ store, secrets, settings, environment: o.environment });
+      try {
+        const headers = (o.header ?? []).map((h) => ({ key: h.slice(0, h.indexOf(':')).trim(), value: h.slice(h.indexOf(':') + 1).trim(), enabled: true }));
+        const body = o.data === undefined ? undefined : /^\s*[{[]/.test(o.data) ? { type: 'json' as const, content: o.data } : { type: 'text' as const, content: o.data };
+        const spec = ctx.vars.resolveDeep({ method: o.method.toUpperCase(), url: target, headers, body });
+        const { response: r, prepared } = await executeHttp({ ...spec, settings: { timeoutMs: settings.defaultTimeoutMs } }, { redactor: ctx.redactor, maxPreviewBytes: 10 * 1024 * 1024, cookieJar: ctx.services.cookieJar });
+        response = { status: r.status, statusText: r.statusText, headers: r.headers, body: r.bodyPreview, durationMs: r.durationMs, url: prepared.url };
+      } finally {
+        await ctx.dispose();
+      }
+    } else {
+      // "Collection/Folder/Request" or just "Request" (must be unique)
+      const parts = target.split('/').map((s) => s.trim()).filter(Boolean);
+      const cols = store.listCollections().filter((c) => !c.problem);
+      const matches: Array<{ c: Collection; id: string; path: string }> = [];
+      for (const c of cols) {
+        const within = parts.length > 1 && (c.name.toLowerCase() === parts[0]!.toLowerCase() || c.id === parts[0]) ? parts.slice(1) : parts.length > 1 ? undefined : parts;
+        if (!within) continue;
+        const walk = (nodes: CollectionNode[], path: string[]) => {
+          for (const n of nodes) {
+            const p = [...path, n.name];
+            if (n.kind === 'folder') walk(n.items, p);
+            else if (n.id === within.join('/') || p.join('/').toLowerCase().endsWith(within.join('/').toLowerCase())) matches.push({ c, id: n.id, path: [c.name, ...p].join(' / ') });
+          }
+        };
+        walk(c.items, []);
+      }
+      if (!matches.length) throw new CliError(`No saved request "${target}". Use "Collection/Request", or a URL.`, EXIT.CONFIG_ERROR);
+      if (matches.length > 1) throw new CliError(`"${target}" matches ${matches.length} requests: ${matches.slice(0, 5).map((m) => m.path).join('; ')}. Add the collection or folder.`, EXIT.CONFIG_ERROR);
+      const { c, id } = matches[0]!;
+      const ctx = createEngineContext({ store, secrets, settings, environment: o.environment, collectionId: c.id });
+      ctx.services.onHttpResponse = (r) => (response = r);
+      try {
+        await runCollection({
+          name: `send ${target}`,
+          collection: c,
+          selection: [id],
+          services: ctx.services,
+          traceMode: 'none',
+          onEvent: (e: RunEvent) => {
+            if (e.type !== 'test-end') return;
+            checks = e.result.checks.map((x) => ({ name: x.name, passed: x.passed, message: x.message }));
+            if (e.result.error) error = e.result.error.message;
+          },
+        });
+      } finally {
+        await ctx.dispose();
+      }
+    }
+  } finally {
+    store.close();
+    if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
+  }
+  if (!response) {
+    if (o.json) console.log(JSON.stringify({ error: error ?? 'no response', checks }, null, 2));
+    else console.error(red(error ?? 'The request got no response'));
+    return EXIT.EXECUTION_ERROR;
+  }
+  const failed = response.status >= 400 || checks.some((c) => !c.passed);
+  if (o.json) {
+    let body: unknown = response.body;
+    try {
+      body = JSON.parse(response.body);
+    } catch {
+      /* not JSON */
+    }
+    console.log(JSON.stringify({ status: response.status, statusText: response.statusText, url: response.url, durationMs: response.durationMs, headers: Object.fromEntries(response.headers), body, checks }, null, 2));
+  } else {
+    if (o.include) {
+      console.log(bold(`${response.status} ${response.statusText}`) + dim(`  ${response.url} · ${formatDuration(response.durationMs)}`));
+      for (const [k, v] of response.headers) console.log(`${dim(k + ':')} ${v}`);
+      console.log('');
+    }
+    let text = response.body;
+    try {
+      text = JSON.stringify(JSON.parse(response.body), null, 2);
+    } catch {
+      /* not JSON: as is */
+    }
+    process.stdout.write(text.endsWith('\n') ? text : text + '\n');
+    for (const c of checks) console.error(`${c.passed ? green('✓') : red('✗')} ${c.name}${c.passed ? '' : dim(`: ${c.message ?? ''}`)}`);
+  }
+  return o.fail && failed ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
 }
 
 /** `testpion mock`: serve saved examples until interrupted. */

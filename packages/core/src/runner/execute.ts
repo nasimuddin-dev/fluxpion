@@ -57,6 +57,8 @@ export interface ExecServices {
   persistVariable?: PersistVariable;
   /** Cookie jar shared by the HTTP/GraphQL requests of a run (Postman's cookie jar). */
   cookieJar?: CookieJar;
+  /** Every HTTP response of a test, in full (e.g. `testpion send` prints the body of a saved request). */
+  onHttpResponse?: (r: { testId: string; status: number; statusText: string; headers: Array<[string, string]>; body: string; durationMs: number; url: string }) => void;
   /** The active environment's name (pm.environment.name). */
   environmentName?: string;
   /** Reads a workspace file by relative path (OpenAPI documents for contract checks); never outside the workspace. */
@@ -283,6 +285,7 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
   const s = span.child(`${spec.method} ${svc.redactor.redactUrl(spec.url)}`, 'http', { attributes: { method: spec.method } });
   try {
     const { response, prepared } = await executeHttp(spec, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, openExternal: svc.openExternal, cookieJar: svc.cookieJar });
+    svc.onHttpResponse?.({ testId: test.id ?? test.name, status: response.status, statusText: response.statusText ?? '', headers: response.headers, body: response.bodyPreview, durationMs: response.durationMs, url: prepared.url });
     s.setAttributes({ url: prepared.url, status: response.status, size: response.size, durationMs: response.durationMs });
     s.span.input = { headers: prepared.headers, body: prepared.bodyPreview };
     s.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers, body: summarize(response.bodyPreview, 16_000) } });

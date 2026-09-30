@@ -10,6 +10,7 @@ description: "Reference for the testpion command-line interface."
 ```text
 testpion test [paths...]      Run test files, directories, globs or a *.suite.yaml
 testpion run --suite <name>   Run tests/<name>.suite.yaml from a workspace
+testpion send <request|url>   Send one saved request (scripts, auth, checks) or a URL and print the response, like curl
 testpion run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
@@ -54,6 +55,27 @@ testpion report <results.jsonl>              Re-generate reports
 | `--baseline`, `--save-baseline`, `--fail-on-regression` | Regression testing. |
 | `--trace all\|failures\|none` | Trace persistence. |
 | `--log-level` | Enable debug logging; secrets stay redacted. |
+
+## `send`
+
+Sends one request and prints the response body (pretty-printed JSON), like `curl`. The request is a saved one, by name, with its scripts, auth (inherited too), variables and checks, or a URL:
+
+```bash
+testpion send "Veterinary API/Authentication/Get access token" -e Development -i
+testpion send "Get patient" -e Development --fail          # a unique name is enough
+testpion send "{{baseUrl}}/patients?limit=2" -e Development --json
+testpion send https://api.example.com/items -X POST -H "Content-Type: application/json" -d '{"name":"Rex"}'
+```
+
+| Option | Description |
+|---|---|
+| `-e, --environment` | Environment whose variables resolve (and the collection's). |
+| `-X`, `-H`, `-d` | Method, headers and body, for a URL. |
+| `-i, --include` | Also print the status line and response headers. |
+| `--fail` | Exit `1` on an HTTP error status (400+) or a failed check. |
+| `--json` | Print `{ status, statusText, url, durationMs, headers, body, checks }`. |
+
+Check results go to stderr, so `testpion send … | jq` gets only the body.
 
 ## `run-collection`
 

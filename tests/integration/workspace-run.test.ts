@@ -345,6 +345,21 @@ describe('example workspace (end-to-end)', () => {
     }
   });
 
+  it('CLI: `testpion send` sends a saved request (scripts, checks) or a URL', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    const saved = await run([cli, 'send', 'Veterinary API/Authentication/Get access token', '-w', ws.root, '-e', 'Development', '--json'], env);
+    expect(saved.status).toBe(0);
+    const out = JSON.parse(saved.stdout);
+    expect(out).toMatchObject({ status: 200, body: { token_type: 'Bearer' } });
+    expect(out.checks.every((c: { passed: boolean }) => c.passed)).toBe(true);
+    const url = await run([cli, 'send', '{{baseUrl}}/health', '-w', ws.root, '-e', 'Development', '--json'], env);
+    expect(JSON.parse(url.stdout)).toMatchObject({ status: 200, body: { status: 'ok' } });
+    // an unknown name is a configuration error; --fail turns an HTTP error into exit 1
+    expect((await run([cli, 'send', 'No such request', '-w', ws.root], env)).status).toBe(2);
+    expect((await run([cli, 'send', '{{baseUrl}}/nope', '-w', ws.root, '-e', 'Development', '--fail'], env)).status).toBe(1);
+  });
+
   it('CLI: `testpion import` takes a copied request and `testpion env` lists and orders environments (--json)', async () => {
     const cli = resolve('packages/cli/bin/testpion.js');
     const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };

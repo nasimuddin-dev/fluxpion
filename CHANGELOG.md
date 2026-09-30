@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`testpion send`**: send one saved request by name (with its scripts, auth and checks) or a URL, and print the response like `curl` (`-i` for headers, `--json`, `--fail`).
 - **Monitor alerts by webhook.** A monitor can post to a Slack, Teams or Discord incoming webhook (or any URL) when it starts failing and when it recovers, from the app, `testpion monitor start` or cron runs. The URL can be a secret `{{variable}}`.
 - **GraphQL subscriptions.** A `subscription` operation in the GraphQL view gets **Subscribe**: TestPion connects over WebSocket (`graphql-transport-ws` or the older `graphql-ws`, whichever the server speaks), sends your auth with the handshake or in `connection_init`, and lists the events live. Also `testpion graphql-subscribe` and the MCP tool `graphql_subscribe`.
 - **Ask the AI assistant about the new results:** **Explain with AI** in Compare OpenAPI versions (which clients break and how to stay compatible), **How to fix (AI)** in a collection's security review, and **Analyze with AI** after a load test. Secret values are never sent.

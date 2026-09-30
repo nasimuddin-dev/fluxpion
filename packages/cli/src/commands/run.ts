@@ -13,7 +13,7 @@ import {
   type LoadTarget,
 } from '@testpion/core';
 import { EXIT, dim, yellow, CliError, collectVar, openWorkspace, readResults, printLoad } from '../shared.js';
-import { type RunCliOptions, executeRun, type CollectionCliOptions, executeCollectionRun, resolveSelection, runOptions } from '../run.js';
+import { type RunCliOptions, executeRun, type CollectionCliOptions, executeCollectionRun, executeSend, resolveSelection, runOptions } from '../run.js';
 
 export function registerRunCommands(program: Command): void {
 
@@ -134,6 +134,21 @@ export function registerRunCommands(program: Command): void {
       printLoad(snap);
       if (o.json) writeFileSync(o.json, JSON.stringify(snap, null, 2));
       process.exitCode = snap.errorRate > 0.05 ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+    });
+  program
+    .command('send')
+    .description('send one request, like curl: a saved request by name ("Collection/Request" or just "Request", with its scripts, auth and checks) or a URL; {{variables}} resolve from the environment')
+    .argument('<request>', 'saved request ("Collection/Folder/Request", "Request") or a URL (may use {{variables}})')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-e, --environment <name>', 'environment')
+    .option('-X, --method <method>', 'HTTP method for a URL', 'GET')
+    .option('-H, --header <header...>', 'headers "Name: value" for a URL')
+    .option('-d, --data <body>', 'request body for a URL (JSON is detected)')
+    .option('-i, --include', 'print the status line and response headers')
+    .option('--fail', 'exit 1 on an HTTP error status (400+) or a failed check')
+    .option('--json', 'print { status, headers, body, durationMs, checks } as JSON')
+    .action(async (target: string, o: { workspace?: string; environment?: string; method: string; header?: string[]; data?: string; include?: boolean; fail?: boolean; json?: boolean }) => {
+      process.exitCode = await executeSend(target, o);
     });
   program
     .command('report')
