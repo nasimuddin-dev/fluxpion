@@ -90,4 +90,6 @@ From the terminal, `testpion env diff Staging Production -w my-workspace` lists 
 
 Mark an environment as **production** to show a warning in the status bar and block load tests unless you opt in for that run.
 
+With a production environment active, sending a request that can change data (anything but GET, HEAD and OPTIONS) from the REST view asks first. **Send and don't ask again** stops asking for that environment until you restart the app.
+
 :::

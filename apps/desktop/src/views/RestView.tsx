@@ -1,7 +1,7 @@
 import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
-import { confirmAction, promptText, useApp } from '../store';
+import { ask, confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { Collection, CollectionNode, HttpRequestSpec, KeyValue, SavedExample, SavedHttpRequest, SseEvent } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
@@ -42,6 +42,32 @@ import { RequestEditor } from './rest/RequestEditor';
 import { SaveModal, ImportModal } from './rest/dialogs';
 import { RequestTabItem } from './rest/RequestTabItem';
 
+
+/** Production environments where the user chose "don't ask again" (this session only). */
+const productionSendAllowed = new Set<string>();
+
+/**
+ * A request that can change data (anything but GET, HEAD and OPTIONS) sent with a production
+ * environment active asks first. "Send and don't ask again" lasts until the app restarts.
+ */
+async function confirmProductionSend(method: string, environment: string | undefined): Promise<boolean> {
+  if (!environment || /^(GET|HEAD|OPTIONS)$/i.test(method)) return true;
+  const envObj = useApp.getState().workspace?.environments.find((e) => e.name === environment);
+  if (!envObj?.isProduction || productionSendAllowed.has(envObj.name)) return true;
+  const choice = await ask({
+    title: `Send ${method.toUpperCase()} to production?`,
+    message: `"${envObj.name}" is a production environment. This ${method.toUpperCase()} request may change real data.`,
+    tone: 'warning',
+    buttons: [
+      { id: 'cancel', label: 'Cancel' },
+      { id: 'always', label: "Send and don't ask again" },
+      { id: 'send', label: 'Send', variant: 'danger' },
+    ],
+    cancelId: 'cancel',
+  });
+  if (choice === 'always') productionSendAllowed.add(envObj.name);
+  return choice === 'send' || choice === 'always';
+}
 
 export function RestView() {
   const [tabs, setTabs] = useState<RestTab[]>(() => {
@@ -191,6 +217,7 @@ export function RestView() {
   });
 
   const send = async () => {
+    if (!(await confirmProductionSend(tab.request.method, env))) return;
     const id = uid('send-');
     const tabId = tab.id;
     setSending((s) => ({ ...s, [tabId]: id }));
