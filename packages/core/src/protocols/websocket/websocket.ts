@@ -128,6 +128,11 @@ export class WebSocketSession {
     });
   }
 
+  /** The subprotocol the server picked ('' when none). */
+  get protocol(): string {
+    return this.ws?.protocol ?? '';
+  }
+
   send(data: string): void {
     if (!this.ws || this.status !== 'open') throw new ApsError('ProtocolError', 'WebSocket is not open');
     this.ws.send(data);

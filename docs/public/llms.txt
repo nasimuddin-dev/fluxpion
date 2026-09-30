@@ -17,6 +17,7 @@ Key facts for agents:
 - `testpion export <collection> --format openapi [--json]` writes an OpenAPI 3.1 document for a collection (MCP `collection_openapi`).
 - `testpion record <target> [--port] [-w <ws> --collection <name>]` records traffic through a localhost reverse proxy and saves it as a collection (responses as examples, secrets as {{variables}}).
 - `testpion lint <collection> -w <ws> [--fail-on high] [--json]` is a security review of a collection's requests (MCP `security_review`); the `security-headers` check tests responses.
+- GraphQL subscriptions: `testpion graphql-subscribe <endpoint> -q <doc> [--max n] [--json]` (MCP `graphql_subscribe`), graphql-transport-ws and graphql-ws.
 - Newman command lines work with `newman run` replaced by `testpion run-collection` (same -e, -g, -d, -n, --folder, --env-var, --global-var, --export-environment, --export-globals, -k, --suppress-exit-code, --reporters, --reporter-junit-export). Scripts have lodash (`_`), `moment`, `tv4` and real `jsonSchema` checks, as in Postman.
 - Dynamic variables use Postman's names: `{{$guid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt(1,10)}}`, `{{$randomFirstName}}`, `{{$randomEmail}}` (example.test) and ~70 more `{{$random…}}` values; each use gives a new value.
 - `testpion openapi-diff <old> <new> [--json] [--fail-on-breaking]` lists breaking changes between two OpenAPI versions (files or links); MCP `openapi_diff` does the same.

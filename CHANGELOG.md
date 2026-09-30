@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **GraphQL subscriptions.** A `subscription` operation in the GraphQL view gets **Subscribe**: TestPion connects over WebSocket (`graphql-transport-ws` or the older `graphql-ws`, whichever the server speaks), sends your auth with the handshake or in `connection_init`, and lists the events live. Also `testpion graphql-subscribe` and the MCP tool `graphql_subscribe`.
 - **Ask the AI assistant about the new results:** **Explain with AI** in Compare OpenAPI versions (which clients break and how to stay compatible), **How to fix (AI)** in a collection's security review, and **Analyze with AI** after a load test. Secret values are never sent.
 - **API security checks.** **Security** in a collection's toolbar (and `testpion lint "My API" --fail-on high`, MCP `security_review`) finds secrets typed into requests instead of secret variables, secrets in query strings, plain http to other hosts, credentials over http and turned-off TLS checks. The new **Security headers** check tests responses for HSTS, `nosniff`, clickjacking protection, CORS with credentials and exposed server versions.
 - **Partial mocking.** A mock server can forward requests that match no example to the real API (**Forward the rest to** in the Mock tab, `testpion mock --fallback <url>`), so only the endpoints you saved examples for are mocked.

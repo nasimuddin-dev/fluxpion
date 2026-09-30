@@ -23,6 +23,7 @@ export * from './openapi/diff.js';
 export * from './openapi/from-collection.js';
 export * from './import/workspace-import.js';
 export * from './protocols/graphql/graphql.js';
+export * from './protocols/graphql/subscription.js';
 export * from './protocols/grpc/grpc.js';
 export * from './protocols/grpc/reflection.js';
 export * from './protocols/socketio/socketio.js';

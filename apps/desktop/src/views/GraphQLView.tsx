@@ -1,7 +1,7 @@
-import { BookOpen, ChevronLeft, FlaskConical, Play, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { BookOpen, ChevronLeft, FlaskConical, Play, Radio, RefreshCw, Save, Sparkles, Square, Wand2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { parse, print } from 'graphql';
-import { asError, call, type NormalizedError } from '../api';
+import { asError, call, on, type NormalizedError } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import { setGraphQLSchema } from '../monaco';
@@ -49,6 +49,15 @@ interface Draft {
   name: string;
   preRequestScript?: string;
   testScript?: string;
+  /** Subscriptions: the connection_init payload (JSON), e.g. { "authorization": "Bearer {{token}}" }. */
+  connectionParams?: string;
+}
+
+interface SubEvent {
+  type: 'status' | 'next' | 'error' | 'complete';
+  time: number;
+  data?: unknown;
+  message?: string;
 }
 
 const DEFAULT_QUERY = `# Write your query. Ctrl+Space for schema-aware suggestions, Ctrl+Enter to run.
@@ -89,7 +98,11 @@ export function GraphQLView() {
   };
   const [running, setRunning] = useState<string>();
   const [result, setResult] = useState<{ response?: HttpResponseData; errors?: unknown[]; checks?: CheckResult[]; error?: NormalizedError; operationType?: string; scriptLogs?: Array<{ phase: string; message: string }> }>();
-  const [sub, setSub] = useState<'variables' | 'headers' | 'auth' | 'scripts' | 'tests'>('variables');
+  const [sub, setSub] = useState<'variables' | 'headers' | 'auth' | 'scripts' | 'tests' | 'connection'>('variables');
+  // a running subscription and its events
+  const [subscription, setSubscription] = useState<{ id: string; protocol: string }>();
+  const [events, setEvents] = useState<SubEvent[]>();
+  const [eventSel, setEventSel] = useState<number>();
   const [resTab, setResTab] = useState<'response' | 'raw' | 'tests'>('response');
   const env = useApp((s) => s.environment);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
@@ -119,7 +132,42 @@ export function GraphQLView() {
     }
   };
 
+  const selectedOp = operations.find((o) => o.name === d.operationName) ?? operations[0];
+  const isSubscription = selectedOp?.type === 'subscription';
+  useEffect(
+    () =>
+      on<{ id: string; event: SubEvent }>('gql.subscription', (p) => {
+        if (p.id !== subscriptionRef.current) return;
+        setEvents((xs) => [...(xs ?? []), p.event].slice(-2000));
+        if (p.event.type === 'complete' || (p.event.type === 'status' && p.event.message === 'Connection closed')) setSubscription(undefined);
+      }),
+    [],
+  );
+  const subscriptionRef = useRef<string | undefined>(undefined);
+  subscriptionRef.current = subscription?.id;
+  const subscribe = async () => {
+    setEvents([]);
+    setEventSel(undefined);
+    setResult(undefined);
+    try {
+      const r = await call<{ id: string; protocol: string }>('gql.subscribe', {
+        request: { endpoint: d.endpoint, query: d.query, variables: d.variables, headers: d.headers, auth: d.auth },
+        environment: env,
+        collectionId: d.collectionId,
+        operationName: d.operationName && operations.some((o) => o.name === d.operationName) ? d.operationName : undefined,
+        connectionParams: d.connectionParams,
+      });
+      setSubscription(r);
+    } catch (e) {
+      setEvents(undefined);
+      setResult({ error: asError(e) });
+    }
+  };
+  const unsubscribe = () => subscription && void call('gql.unsubscribe', { id: subscription.id }).then(() => setSubscription(undefined));
+
   const run = async () => {
+    if (isSubscription) return subscribe();
+    setEvents(undefined);
     const id = uid('gql-');
     setRunning(id);
     useApp.getState().setActivity(id, 'Running GraphQL operation');
@@ -202,7 +250,7 @@ export function GraphQLView() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
-        <Badge tone="accent">POST</Badge>
+        <Badge tone="accent">{isSubscription ? 'WS' : 'POST'}</Badge>
         <VarInput ariaLabel="GraphQL endpoint" className="flex-1 h-8" value={d.endpoint} onChange={(endpoint) => set({ endpoint })} placeholder="https://api.example.com/graphql" />
         <Button icon={<RefreshCw size={13} className={introspecting ? 'spin' : ''} />} onClick={introspectNow} disabled={introspecting}>
           Introspect
@@ -221,13 +269,17 @@ export function GraphQLView() {
             ))}
           </Select>
         )}
-        {running ? (
+        {subscription ? (
+          <Button variant="danger" icon={<Square size={12} />} onClick={unsubscribe}>
+            Stop
+          </Button>
+        ) : running ? (
           <Button variant="danger" icon={<Square size={12} />} onClick={() => call('http.cancel', { id: running })}>
             Cancel
           </Button>
         ) : (
-          <Button variant="primary" icon={<Play size={13} />} onClick={run} title="Run (Ctrl+Enter)">
-            Run
+          <Button variant="primary" icon={isSubscription ? <Radio size={13} /> : <Play size={13} />} onClick={run} title={isSubscription ? 'Subscribe over WebSocket (Ctrl+Enter)' : 'Run (Ctrl+Enter)'}>
+            {isSubscription ? 'Subscribe' : 'Run'}
           </Button>
         )}
         <Button icon={<Save size={13} />} onClick={save}>
@@ -266,6 +318,7 @@ export function GraphQLView() {
                         { id: 'headers', label: 'Headers', badge: d.headers.length },
                         { id: 'auth', label: 'Auth' },
                         { id: 'scripts', label: 'Scripts', badge: (d.preRequestScript?.trim() ? 1 : 0) + (d.testScript?.trim() ? 1 : 0) || undefined },
+                        ...(isSubscription ? [{ id: 'connection' as const, label: 'Connection' }] : []),
                         { id: 'tests', label: 'Tests', badge: d.assertions.length },
                       ]}
                     />
@@ -277,6 +330,14 @@ export function GraphQLView() {
                         </div>
                       )}
                       {sub === 'auth' && <AuthEditor auth={d.auth} onChange={(auth) => set({ auth })} />}
+                      {sub === 'connection' && (
+                        <div className="h-full flex flex-col">
+                          <p className="px-2 py-1.5 text-xs text-muted border-b border-line">Payload of <span className="mono">connection_init</span> (JSON), for servers that read auth there, e.g. {'{ "authorization": "Bearer {{token}}" }'}. The Auth tab is also sent as a handshake header.</p>
+                          <div className="flex-1 min-h-0">
+                            <CodeEditor language="json" value={d.connectionParams ?? ''} onChange={(connectionParams) => set({ connectionParams })} minimal />
+                          </div>
+                        </div>
+                      )}
                       {sub === 'scripts' && <ScriptsPanel pre={d.preRequestScript ?? ''} post={d.testScript ?? ''} onPre={(v) => set({ preRequestScript: v })} onPost={(v) => set({ testScript: v })} />}
                       {sub === 'tests' && <AssertionEditor checks={d.assertions} onChange={(assertions) => set({ assertions })} groups={['Response', 'Body', 'GraphQL']} />}
                     </div>
@@ -285,7 +346,27 @@ export function GraphQLView() {
               </div>
             </div>
             <div className="h-full flex flex-col min-h-0">
-              {result?.error ? (
+              {events && !result?.error ? (
+                <div className="h-full flex flex-col min-h-0">
+                  <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm shrink-0">
+                    <Badge tone={subscription ? 'ok' : 'default'}>{subscription ? 'subscribed' : 'ended'}</Badge>
+                    {subscription?.protocol && <span className="text-xs text-muted mono">{subscription.protocol}</span>}
+                    <span className="text-muted ml-auto">{events.filter((e) => e.type === 'next').length} events</span>
+                  </div>
+                  <Split id="gql-sub-events" direction="vertical" initial={45}>
+                    <div className="h-full overflow-auto">
+                      {events.map((e, i) => (
+                        <button key={i} onClick={() => setEventSel(i)} className={cx('w-full flex items-center gap-2 px-3 py-1 text-left text-sm border-b border-line/50 hover:bg-hover', eventSel === i && 'bg-accent/10')}>
+                          <span className="text-xs text-muted tabular-nums shrink-0">{new Date(e.time).toLocaleTimeString()}</span>
+                          <Badge tone={e.type === 'next' ? 'accent' : e.type === 'error' ? 'bad' : 'default'}>{e.type}</Badge>
+                          <span className="mono text-xs truncate">{e.message ?? JSON.stringify(e.data)}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="h-full overflow-auto">{eventSel !== undefined && events[eventSel]?.data !== undefined ? <JsonTree data={events[eventSel]!.data} /> : <Empty title="Select an event" />}</div>
+                  </Split>
+                </div>
+              ) : result?.error ? (
                 <ErrorPanel error={result.error} context={{ endpoint: d.endpoint, query: d.query }} />
               ) : result?.response ? (
                 <>

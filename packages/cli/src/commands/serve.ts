@@ -7,6 +7,7 @@ import {
   McpSession,
   recordingToCollection,
   startRecorder,
+  collectSubscriptionEvents,
   WorkspaceManager,
   loadMcpMock,
   serveMcpMockStdio,
@@ -54,6 +55,36 @@ export function registerServeCommands(program: Command): void {
       } finally {
         store.close();
       }
+    });
+  program
+    .command('graphql-subscribe')
+    .description('run a GraphQL subscription over WebSocket (graphql-transport-ws or graphql-ws) and print the events')
+    .argument('<endpoint>', 'GraphQL endpoint (http(s):// is turned into ws(s)://)')
+    .requiredOption('-q, --query <query>', 'the subscription document')
+    .option('--variables <json>', 'variables as JSON')
+    .option('-H, --header <header...>', 'handshake headers "Name: value"')
+    .option('--connection-params <json>', 'connection_init payload as JSON')
+    .option('-n, --max <n>', 'stop after this many events', '10')
+    .option('--duration <sec>', 'stop after this many seconds', '30')
+    .option('--json', 'print { protocol, events, errors, completed } as JSON')
+    .action(async (endpoint: string, o: { query: string; variables?: string; header?: string[]; connectionParams?: string; max: string; duration: string; json?: boolean }) => {
+      const parseJson = (s: string | undefined, what: string) => {
+        if (!s) return undefined;
+        try {
+          return JSON.parse(s);
+        } catch {
+          throw new CliError(`${what} is not valid JSON`, EXIT.CONFIG_ERROR);
+        }
+      };
+      const headers = (o.header ?? []).map((h) => ({ key: h.slice(0, h.indexOf(':')).trim(), value: h.slice(h.indexOf(':') + 1).trim(), enabled: true }));
+      const r = await collectSubscriptionEvents({ url: endpoint, query: o.query, variables: parseJson(o.variables, '--variables'), connectionParams: parseJson(o.connectionParams, '--connection-params'), headers, maxEvents: Number(o.max) || 10, durationMs: (Number(o.duration) || 30) * 1000 });
+      if (o.json) console.log(JSON.stringify(r, null, 2));
+      else {
+        for (const e of r.events) console.log(JSON.stringify(e));
+        for (const e of r.errors) console.log(red(`error: ${JSON.stringify(e)}`));
+        console.log(dim(`${r.events.length} events over ${r.protocol || 'WebSocket'}${r.completed ? ', completed by the server' : ''}`));
+      }
+      if (r.errors.length) process.exitCode = EXIT.TEST_FAILURE;
     });
   program
     .command('record')

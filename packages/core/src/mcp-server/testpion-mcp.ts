@@ -23,6 +23,7 @@ import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
 import { securityLint } from '../eval/security.js';
+import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { collectionToOpenApiText } from '../openapi/from-collection.js';
 import { renameVariable, variableUsages } from '../storage/variable-refactor.js';
 import { runLoadTest, type LoadTarget } from '../load/load.js';
@@ -393,6 +394,39 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             ? `Ask the user to add ${placeholders.map((p) => p.variable).join(', ')} as secret variables of an environment (Environments view, or they stay unresolved).`
             : undefined,
         };
+      },
+    },
+    {
+      name: 'graphql_subscribe',
+      write: true,
+      description: 'Run a GraphQL subscription over WebSocket (graphql-transport-ws or graphql-ws) and return the events received: up to maxEvents (default 10) or durationSec (default 15, at most 60), whichever comes first. {{variables}} of the environment are resolved.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          endpoint: str('GraphQL endpoint (http(s) or ws(s))'),
+          query: str('The subscription document'),
+          variables: { type: 'object', description: 'Variables' },
+          environment: str('Environment name'),
+          maxEvents: { type: 'number' },
+          durationSec: { type: 'number' },
+        },
+        required: ['endpoint', 'query'],
+      },
+      run: async (a) => {
+        const ctx = createEngineContext({ store, secrets, settings, environment: checkEnvironment(a.environment) });
+        try {
+          const r = await collectSubscriptionEvents({
+            url: ctx.vars.resolve(String(a.endpoint)),
+            query: String(a.query),
+            variables: a.variables && typeof a.variables === 'object' ? ctx.vars.resolveDeep(a.variables as Record<string, unknown>) : undefined,
+            maxEvents: Math.min(100, Number(a.maxEvents) || 10),
+            durationMs: Math.min(60, Number(a.durationSec) || 15) * 1000,
+            cookieJar: ctx.services.cookieJar,
+          });
+          return ctx.redactor.redact(r);
+        } finally {
+          await ctx.dispose();
+        }
       },
     },
     {

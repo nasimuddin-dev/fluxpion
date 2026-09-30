@@ -91,6 +91,7 @@ const docsSidebar = [
     items: [
       { text: 'Overview', link: '/graphql/overview' },
       { text: 'Schema Explorer', link: '/graphql/schema-explorer' },
+      { text: 'Subscriptions', link: '/graphql/subscriptions' },
       { text: 'Testing', link: '/graphql/testing' },
       { text: 'Mock Server', link: '/graphql/mocking' },
     ],

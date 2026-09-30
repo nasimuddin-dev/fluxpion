@@ -2,6 +2,8 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   ApsError,
+  applyAuth,
+  startGraphQLSubscription,
   WebSocketSession,
   introspect,
   normalizeError,
@@ -89,6 +91,51 @@ export function requestsHandlers(be: Backend): Handlers {
       return { sdl, summary: summarizeSchema(schema) };
     },
     'gql.send': (p: GqlSendParams) => be.gqlSend(p),
+    /**
+     * Start a GraphQL subscription over WebSocket (graphql-transport-ws or graphql-ws). Events arrive as
+     * `gql.subscription` { id, event }. The request's auth is sent as a handshake header.
+     */
+    'gql.subscribe': async (p: { request: GraphQLRequestSpec; environment?: string; operationName?: string; connectionParams?: string; collectionId?: string }) => {
+      const ctx = be.context({ environment: p.environment, collectionId: p.collectionId });
+      const spec = ctx.vars.resolveDeep(p.request);
+      const headers = new Headers();
+      for (const h of spec.headers ?? []) if (h.enabled !== false && h.key) headers.set(h.key, h.value);
+      const auth = !spec.auth || spec.auth.type === 'inherit' ? (ctx.collection?.auth ? ctx.vars.resolveDeep(ctx.collection.auth) : undefined) : spec.auth;
+      await applyAuth(auth, headers, new URL(spec.endpoint.replace(/^ws/i, 'http')), { redactor: ctx.redactor, openExternal: be.host.openExternal?.bind(be.host) });
+      let variables: Record<string, unknown> | undefined;
+      try {
+        variables = typeof spec.variables === 'string' ? (spec.variables.trim() ? JSON.parse(spec.variables) : undefined) : spec.variables;
+      } catch {
+        throw new ApsError('ValidationError', 'The variables are not valid JSON');
+      }
+      let connectionParams: Record<string, unknown> | undefined;
+      if (p.connectionParams?.trim()) {
+        try {
+          connectionParams = JSON.parse(ctx.vars.resolve(p.connectionParams));
+        } catch {
+          throw new ApsError('ValidationError', 'The connection parameters are not valid JSON');
+        }
+      }
+      let subId = '';
+      const sub = await startGraphQLSubscription({
+        url: spec.endpoint,
+        query: spec.query,
+        variables,
+        operationName: p.operationName,
+        headers: [...headers].map(([key, value]) => ({ key, value, enabled: true })),
+        connectionParams,
+        cookieJar: ctx.services.cookieJar,
+        onEvent: (event) => be.host.emit('gql.subscription', { id: subId, event: ctx.redactor.redact(event) }),
+      });
+      subId = sub.id;
+      be.gqlSubs.set(sub.id, sub);
+      void sub.done.finally(() => be.gqlSubs.delete(sub.id));
+      return { id: sub.id, protocol: sub.protocol };
+    },
+    'gql.unsubscribe': ({ id }: { id: string }) => {
+      be.gqlSubs.get(id)?.stop();
+      be.gqlSubs.delete(id);
+    },
     /** Serve fake data for a schema on localhost (restarts with the new schema when already running). */
     'gql.mock.start': async ({ sdl, port, overrides }: { sdl: string; port?: number; overrides?: Record<string, Record<string, unknown>> }) => {
       const schema = schemaFromText(sdl);
