@@ -29,6 +29,7 @@ const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || !!el.closest('.cm-editor'));
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
 import { ResponseViewer } from '../components/ResponseViewer';
+import type { TreeAssertion } from '../components/JsonView';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
@@ -437,6 +438,12 @@ export function RestView() {
         })
     : undefined;
 
+  // a field clicked in the response tree becomes a check in the request's Tests tab
+  const addAssertion = (a: TreeAssertion) => {
+    update({ assertions: [...tab.assertions, a as never] });
+    useApp.getState().toast(`Added a check on ${a.path} (Tests tab). Save the request to keep it.`, 'success');
+  };
+
   const suggest = result?.response
     ? () =>
         useApp.getState().set({
@@ -689,7 +696,7 @@ export function RestView() {
                 <ErrorPanel error={result.error} context={{ request: { method: tab.request.method, url: tab.request.url } }} />
               </div>
             ) : result?.response ? (
-              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} visualizer={result.visualizer} requestId={tab.requestId} historyId={result.historyId} onSuggestAssertions={suggest} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
+              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} visualizer={result.visualizer} requestId={tab.requestId} historyId={result.historyId} onSuggestAssertions={suggest} onAddAssertion={addAssertion} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
             ) : (
               <Empty icon={<Send size={28} />} title="Send a request to see the response">
                 Press <b>Ctrl+Enter</b> to send. Variables like <span className="var-token mono">{'{{baseUrl}}'}</span> resolve from the active environment.

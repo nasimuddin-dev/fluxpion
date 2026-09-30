@@ -1,6 +1,6 @@
-import { ChevronDown, ChevronRight, ChevronUp, Copy, Search, WrapText } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Copy, Equal, ListChecks, ListOrdered, Search, Shapes, WrapText } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { cx, IconButton, Input, VirtualList } from './ui';
+import { cx, IconButton, Input, Menu, VirtualList, type MenuItem } from './ui';
 
 const ROW = 20;
 
@@ -24,7 +24,34 @@ function summary(v: unknown): string {
  * Virtualised JSON tree: only rows for expanded nodes are materialised and only visible rows are
  * rendered, so multi-megabyte payloads stay responsive.
  */
-export function JsonTree({ data, query }: { data: unknown; query?: string }) {
+/** A check a response field can become (the request's Tests tab). */
+export interface TreeAssertion {
+  type: string;
+  path: string;
+  expected?: unknown;
+  min?: number;
+}
+
+const typeName = (v: unknown) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
+const short = (v: unknown) => {
+  const s = JSON.stringify(v);
+  return s.length > 28 ? `${s.slice(0, 27)}…` : s;
+};
+
+/** What a field can be checked for: equal to its current value, present, of its type, its length. */
+function assertionItems(r: { path: string; value: unknown; expandable: boolean }, onAssert: (a: TreeAssertion) => void): MenuItem[] {
+  const items: MenuItem[] = [];
+  if (!r.expandable) items.push({ label: `Equals ${short(r.value)}`, icon: <Equal size={14} />, onSelect: () => onAssert({ type: 'equals', path: r.path, expected: r.value }) });
+  items.push({ label: 'Exists', icon: <CircleCheck size={14} />, onSelect: () => onAssert({ type: 'exists', path: r.path }) });
+  items.push({ label: `Is ${typeName(r.value) === 'object' ? 'an object' : typeName(r.value) === 'array' ? 'an array' : `a ${typeName(r.value)}`}`, icon: <Shapes size={14} />, onSelect: () => onAssert({ type: 'type', path: r.path, expected: typeName(r.value) }) });
+  if (Array.isArray(r.value)) {
+    items.push({ label: `Has ${r.value.length} item${r.value.length === 1 ? '' : 's'}`, icon: <ListOrdered size={14} />, onSelect: () => onAssert({ type: 'length', path: r.path, expected: (r.value as unknown[]).length }) });
+    items.push({ label: 'Is not empty', icon: <ListChecks size={14} />, onSelect: () => onAssert({ type: 'length', path: r.path, min: 1 }) });
+  }
+  return items;
+}
+
+export function JsonTree({ data, query, onAssert }: { data: unknown; query?: string; onAssert?(a: TreeAssertion): void }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['$']));
   useEffect(() => {
     // auto-expand first level on new data
@@ -79,7 +106,7 @@ export function JsonTree({ data, query }: { data: unknown; query?: string }) {
         <button className="hover:text-fg" onClick={() => setExpanded(new Set(['$']))}>
           Collapse all
         </button>
-        <span className="ml-auto">Click a key to copy its JSONPath</span>
+        <span className="ml-auto">{onAssert ? 'Click a key to copy its JSONPath or turn it into an assertion' : 'Click a key to copy its JSONPath'}</span>
       </div>
       <VirtualList
         className="flex-1 mono text-[0.9em]"
@@ -97,11 +124,26 @@ export function JsonTree({ data, query }: { data: unknown; query?: string }) {
                   </button>
                 )}
               </span>
-              {r.key !== undefined && (
-                <button title={`Copy ${r.path}`} onClick={() => navigator.clipboard.writeText(r.path)} className="text-[#0550ae] dark:text-[#79c0ff] hover:underline">
-                  {/^\d+$/.test(r.key) ? r.key : `"${r.key}"`}
-                </button>
-              )}
+              {r.key !== undefined &&
+                (onAssert ? (
+                  <Menu
+                    align="start"
+                    width={230}
+                    trigger={
+                      <button title={`${r.path}: copy the path or add an assertion`} className="text-[#0550ae] dark:text-[#79c0ff] hover:underline">
+                        {/^\d+$/.test(r.key) ? r.key : `"${r.key}"`}
+                      </button>
+                    }
+                    items={[
+                      { label: 'Copy JSONPath', icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(r.path) },
+                      ...assertionItems(r, onAssert).map((it, i) => (i === 0 ? { ...it, separator: true } : it)),
+                    ]}
+                  />
+                ) : (
+                  <button title={`Copy ${r.path}`} onClick={() => navigator.clipboard.writeText(r.path)} className="text-[#0550ae] dark:text-[#79c0ff] hover:underline">
+                    {/^\d+$/.test(r.key) ? r.key : `"${r.key}"`}
+                  </button>
+                ))}
               {r.key !== undefined && <span className="text-muted mr-1">:</span>}
               {r.expandable ? (
                 <span className="text-muted cursor-pointer" onClick={() => toggle(r.path)}>

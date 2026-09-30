@@ -93,6 +93,18 @@ The status, duration, size, headers, cookies and a timeline (prepare → TTFB �
 
 The full body is streamed to `payloads/` on disk. The viewer only holds a preview, 2 MB by default and configurable in Settings. Larger bodies show a *truncated* badge; **Save response** exports the complete file.
 
+## Checks from the response
+
+In the **Pretty** view of a JSON response, click a key to open its menu:
+
+- **Copy JSONPath** copies the key's path (like `$.items[0].id`).
+- **Equals** checks the field has its current value.
+- **Exists** checks the field is there.
+- **Is a …** checks the field's type (string, number, array …).
+- For arrays, **Has N items** and **Is not empty**.
+
+Each choice adds a check to the request's **Tests** tab. Save the request to keep it; collection runs, monitors and CI then check it every time.
+
 ## Server-Sent Events
 
 A `text/event-stream` response (live feeds, notifications, streaming LLM APIs) is shown **event by event while it arrives**: time, event type, id and data, newest at the bottom. Click an event to see its data in full (JSON as a tree), and filter by type, id or data.
