@@ -88,7 +88,7 @@ export function HistoryView() {
             Clear
           </Button>
         </div>
-        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} entries · grouped by day · double-click to open</div>
+        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} {total === 1 ? 'entry' : 'entries'} · grouped by day · double-click to open</div>
         {items.length ? (
           <VirtualList
             className="flex-1"
