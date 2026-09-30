@@ -30,4 +30,23 @@ Choose **Collection** as the target in the **Load** view (or `testpion load --co
 testpion load --collection "Veterinary API" -w . -e Staging --folder Patients --warm-up --vus 20 --duration 60
 ```
 
+## Pass or fail (thresholds)
+
+Give rules that decide whether the test passed, like k6 thresholds. They're checked on the final numbers: in the **Load** view under **Pass if** (a green or red summary with each rule's actual value), and with `--threshold` in the CLI, which exits with 1 when a rule fails (so a CI job fails on a slow build):
+
+```bash
+testpion load http://127.0.0.1:4010/health --vus 20 --duration 30   --threshold "p95<300" "errors<1%" "rps>=100"
+testpion load --collection "Veterinary API" -w . --threshold "p99[Get patient]<800" --json load.json
+```
+
+| Rule | Meaning |
+|---|---|
+| `p50`, `p90`, `p95`, `p99`, `avg`, `min`, `max` `< 500` | Latency in ms (`1s` works too). |
+| `errors<1%` / `error_rate<1%` | Share of failed requests; `errors<5` is a count. |
+| `rps>=50`, `requests>=1000` | Throughput and total requests. |
+| `ttft_p95<800`, `tokens_per_sec>=20` | LLM targets. |
+| `p95[Get patient]<400` | One request of a collection. |
+
+Operators: `<`, `<=`, `>`, `>=`. A rule for a number the test didn't produce fails. Without thresholds, the CLI fails when more than 5% of requests failed. The `--json` file and the `load_test` MCP tool (`thresholds: [...]`) include each rule's result.
+
 :::

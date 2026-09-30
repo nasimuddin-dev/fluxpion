@@ -45,6 +45,7 @@ const drafts = persisted('load', {
   collectionId: '',
   folderId: '',
   warmUp: true,
+  thresholds: '',
   method: 'GET',
   url: '{{baseUrl}}/health',
   headers: [] as KeyValue[],
@@ -94,6 +95,11 @@ export function LoadView() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [preparing, setPreparing] = useState(false);
   const [prep, setPrep] = useState<{ requests: string[]; unresolved: string[]; warmUp?: { passed: number; failed: number } }>();
+  // pass/fail rules, checked when the test finishes
+  const [checked, setChecked] = useState<Array<{ expr: string; actual?: number; passed: boolean; percent?: boolean }>>();
+  const rules = (d.thresholds ?? '').split(/[,\n]/).map((r: string) => r.trim()).filter(Boolean);
+  const rulesRef = useRef<string[]>([]);
+  rulesRef.current = rules;
   const env = useApp((s) => s.environment);
   const ws = useApp((s) => s.workspace);
   const idRef = useRef<string | undefined>(undefined);
@@ -109,6 +115,8 @@ export function LoadView() {
       if (p.snapshot.done) {
         useApp.getState().setActivity(p.id);
         setId(undefined);
+        if (rulesRef.current.length)
+          void call<Array<{ expr: string; actual?: number; passed: boolean; percent?: boolean }>>('load.thresholds', { rules: rulesRef.current, snapshot: p.snapshot }).then(setChecked, (e) => useApp.getState().toast(asError(e).message, 'error'));
       }
     });
     const b = on<{ id: string; error: NormalizedError }>('load.error', (p) => {
@@ -126,6 +134,15 @@ export function LoadView() {
   const start = async () => {
     setError(undefined);
     setSnap(undefined);
+    setChecked(undefined);
+    for (const rule of rules) {
+      try {
+        await call('load.parseThreshold', { rule });
+      } catch (e) {
+        useApp.getState().toast(asError(e).message, 'error');
+        return;
+      }
+    }
     if (d.allowRemote && !(await confirmAction({ title: 'Load test a remote host', message: 'You are about to generate load against a host that is not on this computer.', detail: 'Only continue if you own this system or are explicitly authorised to load test it.', confirmLabel: 'Start load test', tone: 'warning' }))) return;
     setPrep(undefined);
     const collectionId = d.collectionId || collections[0]?.id;
@@ -272,6 +289,9 @@ export function LoadView() {
             <Input type="number" min={0} value={d.think} onChange={(e) => set({ think: Number(e.target.value) })} />
           </Field>
         </div>
+        <Field label="Pass if" hint="Rules checked at the end, comma separated: p95<500, errors<1%, rps>=50, p99[Get pet]<800 (the same as testpion load --threshold)">
+          <Input className="mono" value={d.thresholds ?? ''} placeholder="p95<500, errors<1%" onChange={(e) => set({ thresholds: e.target.value })} />
+        </Field>
         <div className="rounded-md border border-warn/40 bg-warn/5 p-3 text-sm flex flex-col gap-2">
           <div className="flex items-center gap-2 font-medium text-warn">
             <AlertTriangle size={14} /> Safeguards
@@ -315,6 +335,17 @@ export function LoadView() {
                 </Button>
               )}
             </div>
+            {s.done && checked && (
+              <div className={cx('rounded-md border p-2 text-sm flex flex-wrap items-center gap-2', checked.every((c) => c.passed) ? 'border-ok/40 bg-ok/5' : 'border-bad/40 bg-bad/5')}>
+                <span className="font-medium">{checked.every((c) => c.passed) ? 'Passed' : 'Failed'}</span>
+                {checked.map((c) => (
+                  <Badge key={c.expr} tone={c.passed ? 'ok' : 'bad'} title={`actual ${c.actual ?? 'n/a'}${c.percent ? '%' : ''}`}>
+                    {c.passed ? '✓' : '✗'} {c.expr} ({c.actual ?? 'n/a'}
+                    {c.percent ? '%' : ''})
+                  </Badge>
+                ))}
+              </div>
+            )}
             <MetricGrid>
               <Metric label="Requests" value={s.requests.toLocaleString()} />
               <Metric label="Throughput" value={`${s.throughput}/s`} />

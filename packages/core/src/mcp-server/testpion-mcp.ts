@@ -1,3 +1,4 @@
+import { evaluateThresholds, parseThreshold } from '../load/thresholds.js';
 import { ENGINE_VERSION } from '../version.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -754,6 +755,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           virtualUsers: { type: 'number', description: 'Virtual users, 1–50 (default 5)' },
           durationSec: { type: 'number', description: 'Seconds, 1–60 (default 10)' },
           warmUp: { type: 'boolean', description: 'With collection: run it once with scripts first' },
+          thresholds: { type: 'array', items: { type: 'string' }, description: 'Pass/fail rules, e.g. ["p95<500", "errors<1%", "rps>=20", "p99[Get pet]<800"]; the result says which passed' },
         },
       },
       run: async (a) => {
@@ -762,6 +764,8 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const duration = Math.min(60, Math.max(1, Number(a.durationSec) || 10));
         const c = a.collection ? findCollection(a.collection) : undefined;
         if (!c && !a.url) throw new ApsError('ValidationError', 'Give a url or a collection');
+        const thresholds = Array.isArray(a.thresholds) ? (a.thresholds as unknown[]).map(String) : [];
+        thresholds.forEach(parseThreshold); // a typo fails before the test runs
         const ctx = createEngineContext({ store, secrets, settings, environment, collectionId: c?.id });
         try {
           let target: LoadTarget;
@@ -786,7 +790,8 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             { redactor: ctx.redactor },
           );
           const { series: _series, ...summary } = s;
-          return { ...prep, ...summary };
+          const checked = thresholds.length ? evaluateThresholds(thresholds, s) : undefined;
+          return { ...prep, ...summary, ...(checked ? { thresholds: checked, passed: checked.every((t) => t.passed) } : {}) };
         } finally {
           await ctx.dispose();
         }

@@ -12,6 +12,8 @@ import {
   type CiConfigOptions,
   type LoadTestConfig,
   exportOtlp,
+  evaluateThresholds,
+  parseThreshold,
 } from '@testpion/core';
 import type { Backend, Handlers, EvalRunParams } from '../backend.js';
 
@@ -92,5 +94,8 @@ export function testingHandlers(be: Backend): Handlers {
 
     'load.start': (p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean } }) => be.startLoad(p),
     'load.stop': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
+    /** Pass/fail rules ("p95<500", "errors<1%") against a finished load test's numbers. */
+    'load.thresholds': ({ rules, snapshot }: { rules: string[]; snapshot: Parameters<typeof evaluateThresholds>[1] }) => evaluateThresholds(rules, snapshot),
+    'load.parseThreshold': ({ rule }: { rule: string }) => parseThreshold(rule),
   };
 }

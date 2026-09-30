@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Load test thresholds**: pass/fail rules like k6's (`p95<500`, `errors<1%`, `rps>=50`, `p99[Get patient]<800`) with `testpion load --threshold` (exit 1 when one fails, for CI), **Pass if** in the Load view, and `thresholds` in the `load_test` MCP tool.
 - **MCP completions and resource subscriptions**: the inspector suggests values for prompt arguments and resource-template parameters from the server (`completion/complete`), gives each template parameter its own field, and can subscribe to a resource to re-read it whenever the server says it changed.
 - **cheerio in scripts**: `cheerio.load(html)` (or `require('cheerio')`) with CSS selectors and the usual methods (`text`, `attr`, `find`, `children`, `parent`, `each`, `map`, `eq`, `filter` …), as in Postman's sandbox; the HTML is parsed outside the sandbox. Postman scripts that scrape HTML now run.
 - **`pm.execution.location`** in scripts (collection, folders and request), and `pm.info.requestName` is the request's own name in collection runs, as in Postman.

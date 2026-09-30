@@ -7,12 +7,14 @@ import {
   EnvSecretStore,
   WorkspaceManager,
   collectionLoadTarget,
+  evaluateThresholds,
+  parseThreshold,
   createEngineContext,
   runLoadTest,
   writeReports,
   type LoadTarget,
 } from '@testpion/core';
-import { EXIT, dim, yellow, CliError, collectVar, openWorkspace, readResults, printLoad } from '../shared.js';
+import { EXIT, bold, dim, green, red, yellow, CliError, collectVar, openWorkspace, readResults, printLoad } from '../shared.js';
 import { runWatching, watchTargets } from '../watch.js';
 import { type RunCliOptions, executeRun, type CollectionCliOptions, executeCollectionRun, executeSend, resolveSelection, runOptions } from '../run.js';
 
@@ -87,8 +89,17 @@ export function registerRunCommands(program: Command): void {
     .option('--ramp-down <sec>', 'ramp-down seconds', '0')
     .option('--allow-remote', 'allow non-local hosts (only systems you are authorised to test)')
     .option('--json <file>', 'write final metrics as JSON')
+    .option('-t, --threshold <rule...>', 'pass/fail rules for CI, e.g. "p95<500" "errors<1%" "rps>=50" "p99[Get pet]<800"; exit 1 when one fails')
     .action(async (url: string | undefined, o) => {
       if (!url && !o.collection) throw new CliError('Give a URL or --collection', EXIT.CONFIG_ERROR);
+      // thresholds are checked before the test runs, so a typo doesn't waste a run
+      const rules = ((o.threshold as string[] | undefined) ?? []).map((r) => {
+        try {
+          return parseThreshold(r);
+        } catch (e) {
+          throw new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+        }
+      });
       const headers = ((o.header as string[]) ?? []).map((h) => {
         const i = h.indexOf(':');
         return { key: h.slice(0, i).trim(), value: h.slice(i + 1).trim() };
@@ -137,8 +148,14 @@ export function registerRunCommands(program: Command): void {
         },
       );
       printLoad(snap);
-      if (o.json) writeFileSync(o.json, JSON.stringify(snap, null, 2));
-      process.exitCode = snap.errorRate > 0.05 ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+      const checked = rules.length ? evaluateThresholds(rules, snap) : undefined;
+      if (checked) {
+        console.log(bold('\nThresholds'));
+        for (const t of checked) console.log(`  ${t.passed ? green('✓') : red('✗')} ${t.expr} ${dim(`(actual ${t.actual ?? 'n/a'}${t.percent ? '%' : ''})`)}`);
+      }
+      if (o.json) writeFileSync(o.json, JSON.stringify({ ...snap, ...(checked ? { thresholds: checked } : {}) }, null, 2));
+      // with thresholds, they decide; without, more than 5% errors fails
+      process.exitCode = (checked ? checked.some((t) => !t.passed) : snap.errorRate > 0.05) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
     });
   program
     .command('send')
