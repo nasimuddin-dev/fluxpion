@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, Layers, Play, Save, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, Layers, Play, Save, Trash2, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -242,6 +242,9 @@ export function TestsView() {
                 <option value="suite">New suite</option>
               </select>
               <FilePlus2 size={13} className="text-muted -ml-4 pointer-events-none" />
+              <IconButton label="Run in CI (GitHub Actions, GitLab, Azure, Jenkins)" className="ml-1" onClick={() => useApp.getState().set({ ci: {} })}>
+                <Workflow size={13} />
+              </IconButton>
             </div>
           }
         >

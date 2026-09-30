@@ -27,6 +27,12 @@ export interface Toast {
   text: string;
 }
 
+export interface CiRequest {
+  suite?: string;
+  collection?: string;
+  folders?: string[];
+}
+
 export interface AssistantRequest {
   task: string;
   title: string;
@@ -83,6 +89,8 @@ interface AppState {
   /** Which tab of the bottom panel is shown. */
   bottomTab: 'console' | 'logs';
   assistant?: AssistantRequest;
+  /** The "Run in CI" dialog, with what to run preselected. */
+  ci?: CiRequest;
   toasts: Toast[];
   activity: Record<string, string>;
   intent?: Intent;

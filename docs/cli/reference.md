@@ -22,6 +22,7 @@ testpion load <url>           Safeguarded load test
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order -w    List environments; set their order
 testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)
+testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
 testpion history list|stats|diff -w  Response history of saved requests; response times; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
@@ -216,6 +217,26 @@ testpion history diff h-abc h-def -w my-workspace --json                  # olde
 ```
 
 `history list` shows recent responses of requests sent in the app (`--collection`, `--request`, `-n/--limit`). `history stats` summarises the response times of a request's recent responses (`-n/--limit`, default 50): count, failed (no status or 400+), fastest, mean, median, p95 and slowest. `history diff` compares two of them: the status, timing, header changes (volatile ones such as `date` are flagged) and a field-by-field JSON body diff, or a line diff for text. Values of sensitive fields and headers are masked.
+
+## `monitor`
+
+```bash
+testpion monitor add "API health" --collection "My API" --folder Smoke --every 15m -e Staging -w my-workspace
+testpion monitor run --due -w my-workspace      # for cron; exit 1 if a run failed
+testpion monitor start -w my-workspace          # keep running them until Ctrl+C
+```
+
+`list`, `results` and `add` take `--json`. See [Monitors](/test-runner/monitors).
+
+## `ci`
+
+```bash
+testpion ci github -w . --suite regression -e Staging -o .github/workflows/testpion.yml
+testpion ci gitlab -w api-tests --collection "My API" --folder Smoke --workspace-dir api-tests
+testpion ci jenkins -w . --tests rest graphql --json
+```
+
+Writes a pipeline for GitHub Actions, GitLab CI, Azure Pipelines or Jenkins that installs the CLI (pinned to this version), runs the suite, collection or tests, publishes `junit.xml` and keeps the reports. Without `-o` it prints the file; the CI secrets to create are listed on stderr (and under `secrets` with `--json`). See [CI/CD](/test-runner/ci-cd#generate-a-pipeline).
 
 ## `env`
 

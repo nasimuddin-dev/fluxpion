@@ -46,6 +46,7 @@ export * from './runner/loader.js';
 export * from './runner/datasets.js';
 export * from './runner/collection-run.js';
 export * from './runner/monitors.js';
+export * from './runner/ci-config.js';
 
 export * from './report/reports.js';
 export * from './report/response-diff.js';

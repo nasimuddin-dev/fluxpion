@@ -34,10 +34,40 @@ The other direction works too. If part of a team or pipeline stays on Newman, `t
 - `TESTPION_SECRET_PROVIDER_<ID>_APIKEY` for provider keys
 - or reference `{{$env.NAME}}` directly
 
-## GitHub Actions
+## Generate a pipeline
+
+TestPion writes the pipeline file for you, like Postman's *Run in CI*. It works for **GitHub Actions**, **GitLab CI**, **Azure Pipelines** and **Jenkins**, and can run a suite, a collection (or some of its folders), or all tests.
+
+- **In the app:** click the pipeline icon at the top of the **Tests** view, right-click a collection and choose **Run in CI…**, or use the command palette (**Run in CI**). Choose the CI system, what to run, the environment, and where the workspace folder is in your repository. Then **Copy** the file or **Save** it.
+- **From the terminal:** `testpion ci <github|gitlab|azure|jenkins>`
+
+  ```bash
+  testpion ci github -w . --suite regression -e Staging -o .github/workflows/testpion.yml
+  testpion ci gitlab -w api-tests --collection "My API" --folder Smoke -e Staging --workspace-dir api-tests
+  testpion ci azure -w . --json          # { path, content, secrets, command }
+  ```
+
+- **AI agents:** the `ci_config` tool of the [MCP server](/ai-testing/mcp-server).
+
+The pipeline does four things:
+
+1. Installs the TestPion CLI from its GitHub repository, pinned to your TestPion version (for example `v0.8.0`), so runs are reproducible.
+2. Runs the tests with the `console`, `junit` and `html` reports.
+3. Publishes `junit.xml` as test results, where the CI system supports it.
+4. Keeps the reports as build artifacts.
+
+A failing test fails the build. The file never contains secret values. Instead, TestPion lists the **CI secrets to create**, such as `TESTPION_SECRET_ENV_STAGING_APIKEY` for the *Staging* environment's secret `apiKey`, and the pipeline passes them to the CLI.
+
+## By hand
+
+The CLI isn't published to npm yet, so a pipeline installs it from the repository (this is what the generated files do):
 
 ```yaml
-- run: npx testpion test tests -e Staging -r console junit html -o test-results
+# GitHub Actions
+- uses: actions/setup-node@v4
+  with: { node-version: 24 }
+- run: git clone --depth 1 --branch v0.8.0 https://github.com/nasimuddin-dev/testpion.git "$RUNNER_TEMP/testpion" && cd "$RUNNER_TEMP/testpion" && npm ci && npm run build -w @testpion/core -w @testpion/cli
+- run: node "$RUNNER_TEMP/testpion/packages/cli/bin/testpion.js" run -w . --suite regression -e Staging -r console junit html -o test-results
   env:
     TESTPION_SECRET_PROVIDER_OPENAI_APIKEY: ${{ secrets.OPENAI_API_KEY }}
 - uses: actions/upload-artifact@v4
@@ -45,22 +75,6 @@ The other direction works too. If part of a team or pipeline stays on Newman, `t
   with: { name: test-results, path: test-results }
 ```
 
-To run a collection instead of test files:
-
-```yaml
-- run: npx testpion run-collection "Veterinary API" -e Staging -r console junit -o test-results
-```
-
-## GitLab CI
-
-```yaml
-api-tests:
-  script: npx testpion test tests -o results
-  artifacts:
-    when: always
-    reports: { junit: results/junit.xml }
-```
-
-For Azure DevOps and Jenkins, publish `junit.xml` with *PublishTestResults* or the `junit` step.
+To run a collection instead, use `run-collection "My API" -w . -e Staging -r console junit -o test-results`. For GitLab, Azure DevOps and Jenkins, publish `test-results/junit.xml` with `reports: junit`, *PublishTestResults* or the `junit` step.
 
 :::

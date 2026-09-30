@@ -1,5 +1,5 @@
 /** RPC handlers: Tests, suites, evaluations, runs, baselines, traces and load tests. */
-import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ApsError,
@@ -8,6 +8,8 @@ import {
   loadSuite,
   loadTestsFromFile,
   isSuiteFile,
+  ciConfig,
+  type CiConfigOptions,
   type LoadTestConfig,
 } from '@testpion/core';
 import type { Backend, Handlers, EvalRunParams } from '../backend.js';
@@ -27,6 +29,13 @@ export function testingHandlers(be: Backend): Handlers {
         if (out.length >= 500) break;
       }
       return { tests: out };
+    },
+    /** A CI pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) for a suite, collection or test files. */
+    'ci.config': (o: CiConfigOptions) => ciConfig(be.ws, o),
+    'ci.save': (o: CiConfigOptions) => {
+      const c = ciConfig(be.ws, o);
+      const name = c.path.split('/').pop()!;
+      return be.saveOrDownload(name, undefined, (dest) => writeFileSync(dest, c.content), () => Buffer.from(c.content));
     },
     'tests.run': (p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[] }) => be.startTestRun(p),
     'eval.run': (p: EvalRunParams) => be.startEvalRun(p),

@@ -22,6 +22,7 @@ import { addRequestToCollection, externalizeSecrets } from '../import/save-reque
 import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
+import { ciConfig, type CiConfigOptions } from '../runner/ci-config.js';
 import { executeMonitor, findMonitor, listMonitors, monitorResults, monitorStatus } from '../runner/monitors.js';
 
 /**
@@ -399,6 +400,25 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         });
         return store.reorderEnvironments(ids).map((e) => e.name);
       },
+    },
+    {
+      name: 'ci_config',
+      description:
+        "A CI pipeline file that runs this workspace's tests on every push: GitHub Actions, GitLab CI, Azure Pipelines or Jenkins. Give one of suite, collection (+ folders) or tests. Returns { path, content, secrets, command }: write content to path in the repository and create the listed CI secrets (values are never included).",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string', enum: ['github', 'gitlab', 'azure', 'jenkins'] },
+          suite: str('Suite name (tests/<name>.suite.yaml)'),
+          collection: str('Collection name or id'),
+          folders: { type: 'array', items: { type: 'string' }, description: 'With collection: folder or request names' },
+          tests: { type: 'array', items: { type: 'string' }, description: 'Test files or folders under tests/' },
+          environment: str('Environment name'),
+          workspaceDir: str('The workspace folder relative to the repository root (default ".")'),
+        },
+        required: ['provider'],
+      },
+      run: (a) => ciConfig(store, a as unknown as CiConfigOptions),
     },
     {
       name: 'list_monitors',

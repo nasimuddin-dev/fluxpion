@@ -214,7 +214,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['collection_docs', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };

@@ -13,6 +13,7 @@ import { Spinner, TooltipProvider } from './components/ui';
  * startup fast and, importantly, defers Monaco and protocol-specific code until
  * it is useful. Named exports keep view modules simple.
  */
+const CiDialog = lazy(async () => ({ default: (await import('./components/CiDialog')).CiDialog }));
 const view = (load: () => Promise<any>, name: string) => lazy(async () => ({ default: (await load())[name] as ComponentType }));
 const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
   home: view(() => import('./views/HomeView'), 'HomeView'),
@@ -60,6 +61,7 @@ export default function App() {
   const paletteOpen = useApp((s) => s.paletteOpen);
   const searchOpen = useApp((s) => s.searchOpen);
   const assistant = useApp((s) => s.assistant);
+  const ci = useApp((s) => s.ci);
   const logsOpen = useApp((s) => s.logsOpen);
   const workspace = useApp((s) => s.workspace);
   const [ready, setReady] = useState(false);
@@ -167,6 +169,7 @@ export default function App() {
       { id: 'm-new-col', label: 'New Collection', hint: 'File', run: () => void runMenuCommand('new-collection') },
       { id: 'm-new-env', label: 'New Environment', hint: 'File', run: () => void runMenuCommand('new-environment') },
       { id: 'm-open-examples', label: 'Open Examples Workspace', hint: 'Help', run: () => void runMenuCommand('open-examples') },
+      { id: 'm-ci', label: 'Run in CI (GitHub Actions, GitLab, Azure, Jenkins)…', hint: 'Tests', run: () => useApp.getState().set({ ci: {} }) },
       { id: 'm-new-monitor', label: 'New Monitor', hint: 'File', run: () => void runMenuCommand('new-monitor') },
       { id: 'm-new-workspace', label: 'New Workspace', hint: 'File', run: () => void runMenuCommand('new-workspace') },
       { id: 'm-open-ws', label: 'Open Workspace Folder', hint: 'File', run: () => void runMenuCommand('open-workspace') },
@@ -213,6 +216,11 @@ export default function App() {
       <StatusBar />
       {paletteOpen && <CommandPalette commands={commands} />}
       {searchOpen && <SearchDialog />}
+      {ci && (
+        <Suspense fallback={null}>
+          <CiDialog />
+        </Suspense>
+      )}
       <Toaster />
       <DialogHost />
       <ProgressHost />

@@ -8,6 +8,8 @@ import {
   importRequestSnippet,
   compareHistory,
   responseTimeStats,
+  ciConfig,
+  type CiProvider,
   type WorkspaceStore,
   convertCollectionScripts,
   redactDiff,
@@ -206,6 +208,33 @@ export function registerDataCommands(program: Command): void {
           for (const h of r.diff.headers.filter((x) => !x.volatile)) console.log(`  header ${h.name}: ${h.before ?? '(none)'} -> ${h.after ?? '(none)'}`);
         }
         process.exitCode = 0;
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('ci')
+    .description('write a CI pipeline that runs a suite, a collection or test files: GitHub Actions, GitLab CI, Azure Pipelines or Jenkins')
+    .argument('<provider>', 'github, gitlab, azure or jenkins')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--suite <name>', 'run tests/<name>.suite.yaml')
+    .option('--collection <nameOrId>', 'run a collection')
+    .option('--folder <nameOrId>', 'with --collection: only this folder or request (repeatable)', (v: string, prev: string[] = []) => [...prev, v])
+    .option('--tests <paths...>', 'test files or folders under tests/ (default: all)')
+    .option('-e, --environment <name>', 'environment to run with')
+    .option('--workspace-dir <path>', 'the workspace folder relative to the repository root', '.')
+    .option('-o, --out <file>', 'write the file here (default: print it)')
+    .option('--json', 'print { path, content, secrets, command } as JSON')
+    .action((provider: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const c = ciConfig(store, { provider: provider as CiProvider, suite: o.suite, collection: o.collection, folders: o.folder, tests: o.tests, environment: o.environment, workspaceDir: o.workspaceDir });
+        if (o.json) return console.log(JSON.stringify(c, null, 2));
+        if (o.out) {
+          writeFileSync(resolve(o.out), c.content);
+          console.error(green(`Wrote ${o.out}`) + dim(` (usually ${c.path})`));
+        } else process.stdout.write(c.content);
+        if (c.secrets.length) console.error(dim(`CI secrets to create: ${c.secrets.map((x) => `${x.name} (${x.description})`).join(', ')}`));
       } finally {
         store.close();
       }
