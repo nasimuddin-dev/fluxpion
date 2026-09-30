@@ -15,6 +15,7 @@ testpion run-collection <collection>   Run a collection like Postman's Collectio
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
 testpion graphql-subscribe <endpoint> -q <doc>   Run a GraphQL subscription and print the events
+testpion graphql-op <Type.field> --endpoint <url> Build a ready-to-run operation for a root field (or --schema <file>)
 testpion lint <collection>    Security review of a collection's requests (--fail-on high for CI)
 testpion record <target>      Record traffic through a local reverse proxy; -w saves it as a collection (see Record traffic)
 testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
@@ -159,6 +160,23 @@ testpion mock-mcp mocks/customer.mcp-mock.yaml --http -p 3333   # Streamable HTT
 |---|---|
 | `--http` | Serve over Streamable HTTP on `127.0.0.1` instead of stdio (the URL is printed). |
 | `-p, --port <port>` | Port for `--http` (default: any free port). |
+
+## `graphql-op`
+
+Builds a [ready-to-run operation](/graphql/schema-explorer#build-an-operation) for one root field: variables for its arguments (with placeholder values) and a selection of its fields. The schema comes from `--schema` (SDL or an introspection result) or by introspecting `--endpoint`.
+
+```bash
+testpion graphql-op Query.patient --endpoint http://127.0.0.1:4011/graphql -H 'Authorization: Bearer …'
+testpion graphql-op Mutation.createPatient --schema schema.graphql --json
+```
+
+| Option | Description |
+|---|---|
+| `--schema <file>` / `--endpoint <url>` | Where the schema comes from. |
+| `-H, --header <key:value...>` | Headers for introspection. |
+| `-d, --depth <n>` | Levels of nested objects to select (default 2, at most 6). |
+| `--required-args` | Only the required arguments. |
+| `--json` | Print `{ operation, operationName, query, variables }`. |
 
 ## `ws`
 

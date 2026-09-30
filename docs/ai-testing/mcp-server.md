@@ -60,6 +60,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `set_environment_variable` | Set plain variables of an environment (optionally creating it). Secret variables are refused. |
 | `reorder_environments` | Set the order of environments in the environment picker (names or ids, first to last). |
 | `load_test` | Load-test a local URL or a collection (localhost and private networks only, at most 50 virtual users for 60 seconds; optional warm-up). Returns throughput, latency percentiles, error rate and per-request numbers. |
+| `graphql_operation` | Build a valid, ready-to-run operation for a root field of a GraphQL endpoint (introspected): variables with placeholder values and a selection of fields, so agents don't guess field names. |
 | `graphql_subscribe` | Run a GraphQL subscription over WebSocket and return the events received (up to a count or 60 seconds). |
 | `security_review` | Security findings in a collection's requests (typed-in secrets, secrets in URLs, plain http, turned-off TLS checks). |
 | `collection_openapi` | An OpenAPI 3.1 document (YAML) describing a collection's HTTP requests, examples and auth. |

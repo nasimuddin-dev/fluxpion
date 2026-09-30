@@ -15,6 +15,7 @@ import {
   startGraphQLMockServer,
   schemaFromText,
   introspect,
+  buildGraphQLOperation,
   setNetworkPolicy,
   serveTestPionMcp,
   ENGINE_VERSION,
@@ -188,6 +189,31 @@ export function registerServeCommands(program: Command): void {
         };
         process.on('SIGINT', stop);
       });
+    });
+  program
+    .command('graphql-op')
+    .description('build a ready-to-run operation for a root field of a GraphQL schema: variables for its arguments and a selection of its fields')
+    .argument('<field>', 'root field: Query.patient, Mutation.addPet, or just patient')
+    .option('--schema <file>', 'schema file: SDL (.graphql) or an introspection result (.json)')
+    .option('--endpoint <url>', 'or: introspect this GraphQL endpoint')
+    .option('-H, --header <key:value...>', 'headers for introspection (e.g. Authorization)')
+    .option('-d, --depth <n>', 'levels of nested objects to select', '2')
+    .option('--required-args', 'only the required arguments (default: all)')
+    .option('--json', 'print { operation, operationName, query, variables } as JSON (for scripts and AI agents)')
+    .action(async (field: string, o: { schema?: string; endpoint?: string; header?: string[]; depth: string; requiredArgs?: boolean; json?: boolean }) => {
+      if (!o.schema === !o.endpoint) throw new CliError('Give --schema <file> or --endpoint <url>', EXIT.CONFIG_ERROR);
+      const headers = (o.header ?? []).map((kv) => {
+        const i = kv.indexOf(':');
+        if (i <= 0) throw new CliError(`--header expects key:value, got "${kv}"`, EXIT.CONFIG_ERROR);
+        return { key: kv.slice(0, i).trim(), value: kv.slice(i + 1).trim() };
+      });
+      const schema = o.schema ? schemaFromText(readFileSync(o.schema, 'utf8')) : (await introspect({ endpoint: o.endpoint!, headers })).schema;
+      const op = buildGraphQLOperation(schema, field, { depth: Number(o.depth), includeOptionalArgs: !o.requiredArgs });
+      if (o.json) console.log(JSON.stringify(op, null, 2));
+      else {
+        console.log(op.query);
+        if (Object.keys(op.variables).length) console.log(`\n${dim('# variables')}\n${JSON.stringify(op.variables, null, 2)}`);
+      }
     });
   program
     .command('mcp')

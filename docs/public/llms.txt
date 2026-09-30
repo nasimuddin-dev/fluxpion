@@ -18,6 +18,7 @@ Key facts for agents:
 - `testpion record <target> [--port] [-w <ws> --collection <name>]` records traffic through a localhost reverse proxy and saves it as a collection (responses as examples, secrets as {{variables}}).
 - `testpion lint <collection> -w <ws> [--fail-on high] [--json]` is a security review of a collection's requests (MCP `security_review`); the `security-headers` check tests responses.
 - GraphQL subscriptions: `testpion graphql-subscribe <endpoint> -q <doc> [--max n] [--json]` (MCP `graphql_subscribe`), graphql-transport-ws and graphql-ws.
+- GraphQL operation builder: `testpion graphql-op Query.field --endpoint <url> | --schema <file> [--depth n] [--json]` (MCP `graphql_operation`) returns a valid query with typed variables and placeholder values; in the app, **Build** on a root field of the schema explorer.
 - `testpion send "<Collection/Request>"|<url> -w <ws> -e <env> [--json] [--fail]` sends one request (saved requests run their scripts and checks).
 - `testpion env set <env> key=value … -w <ws> [--create]` / `env unset` / `env get` edit plain environment variables (MCP `set_environment_variable`); secrets are only set in the app.
 - Newman command lines work with `newman run` replaced by `testpion run-collection` (same -e, -g, -d, -n, --folder, --env-var, --global-var, --export-environment, --export-globals, -k, --suppress-exit-code, --reporters, --reporter-junit-export). Scripts have lodash (`_`), `moment`, `tv4` and real `jsonSchema` checks, as in Postman.

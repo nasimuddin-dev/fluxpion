@@ -24,6 +24,8 @@ import {
   MqttSession,
   diffResponses,
   type HttpResponseData,
+  buildGraphQLOperation,
+  schemaFromSdl,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
@@ -102,6 +104,9 @@ export function requestsHandlers(be: Backend): Handlers {
       return { sdl, summary: summarizeSchema(schema) };
     },
     'gql.send': (p: GqlSendParams) => be.gqlSend(p),
+    /** A ready-to-run operation for a root field of the introspected schema (SDL from gql.introspect). */
+    'gql.buildOperation': ({ sdl, field, depth, requiredArgsOnly }: { sdl: string; field: string; depth?: number; requiredArgsOnly?: boolean }) =>
+      buildGraphQLOperation(schemaFromSdl(sdl), field, { depth, includeOptionalArgs: !requiredArgsOnly }),
     /**
      * Start a GraphQL subscription over WebSocket (graphql-transport-ws or graphql-ws). Events arrive as
      * `gql.subscription` { id, event }. The request's auth is sent as a handshake header.

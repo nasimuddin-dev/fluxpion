@@ -2,7 +2,7 @@ import { BookOpen, ChevronLeft, FlaskConical, Play, Radio, RefreshCw, Save, Spar
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, on, type NormalizedError } from '../api';
-import { persisted, promptText, useApp } from '../store';
+import { confirmAction, persisted, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import { setGraphQLSchema } from '../monaco';
 import type { AuthConfig, CheckConfig, CheckResult, Collection, HttpResponseData, KeyValue, SavedGraphQLRequest } from '../types';
@@ -129,6 +129,20 @@ export function GraphQLView() {
       setSchemaError(asError(e));
     } finally {
       setIntrospecting(false);
+    }
+  };
+
+  // schema explorer ▸ Build: a whole operation for a root field (variables with placeholder values)
+  const buildOperation = async (field: string) => {
+    if (!sdl) return;
+    try {
+      const op = await call<{ operationName: string; query: string; variables: Record<string, unknown> }>('gql.buildOperation', { sdl, field });
+      const current = d.query.trim();
+      if (current && current !== op.query.trim() && !(await confirmAction({ title: `Replace the query with ${op.operationName}?`, message: 'The editor has a query already. The built operation and its variables replace it.', confirmLabel: 'Replace' }))) return;
+      set({ query: op.query, variables: JSON.stringify(op.variables, null, 2), operationName: op.operationName });
+      setSub('variables');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
     }
   };
 
@@ -288,7 +302,7 @@ export function GraphQLView() {
       </div>
       <div className="flex-1 min-h-0">
         <Split id="gql-explorer" sidebar initial={22} min={12}>
-          <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onIntrospect={introspectNow} loading={introspecting} />
+          <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onBuild={(f) => void buildOperation(f)} onIntrospect={introspectNow} loading={introspecting} />
           <Split id="gql-main" initial={50}>
             <div className="h-full flex flex-col">
               <div className="flex items-center h-8 px-2 border-b border-line gap-1 text-xs text-muted shrink-0">
@@ -413,7 +427,7 @@ export function GraphQLView() {
   );
 }
 
-function SchemaExplorer({ schema, error, sdl, onInsert, onIntrospect, loading }: { schema?: SchemaSummary; error?: NormalizedError; sdl?: string; onInsert(field: string): void; onIntrospect(): void; loading: boolean }) {
+function SchemaExplorer({ schema, error, sdl, onInsert, onBuild, onIntrospect, loading }: { schema?: SchemaSummary; error?: NormalizedError; sdl?: string; onInsert(field: string): void; onBuild(field: string): void; onIntrospect(): void; loading: boolean }) {
   const [filter, setFilter] = useState('');
   const [stack, setStack] = useState<string[]>([]);
   const [showSdl, setShowSdl] = useState(false);
@@ -466,12 +480,24 @@ function SchemaExplorer({ schema, error, sdl, onInsert, onIntrospect, loading }:
                 ?.filter((x) => !f || x.name.toLowerCase().includes(f))
                 .map((x) => (
                   <div key={x.name} className="group">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <button className={cx('mono text-[#0550ae] dark:text-[#79c0ff] hover:underline', x.deprecated && 'line-through')} title="Insert field" onClick={() => onInsert(x.name)}>
-                        {x.name}
-                      </button>
-                      {x.args?.length ? <span className="text-muted mono text-xs">({x.args.map((a) => `${a.name}: ${a.type}`).join(', ')})</span> : null}
-                      <span className="text-muted">:</span> {typeLink(x.type)}
+                    <div className="flex items-start gap-2">
+                      <div className="flex items-center gap-1 flex-wrap min-w-0 flex-1">
+                        <button className={cx('mono text-[#0550ae] dark:text-[#79c0ff] hover:underline', x.deprecated && 'line-through')} title="Insert field" onClick={() => onInsert(x.name)}>
+                          {x.name}
+                        </button>
+                        {x.args?.length ? <span className="text-muted mono text-xs">({x.args.map((a) => `${a.name}: ${a.type}`).join(', ')})</span> : null}
+                        <span className="text-muted">:</span> {typeLink(x.type)}
+                      </div>
+                      {roots.includes(current.name) && (
+                        <button
+                          className="shrink-0 mt-0.5 opacity-60 group-hover:opacity-100 text-muted hover:text-fg flex items-center gap-1 text-xs"
+                          title={`Build a ${current.name === schema.mutationType ? 'mutation' : current.name === schema.subscriptionType ? 'subscription' : 'query'} for ${x.name}: variables for its arguments and a selection of its fields`}
+                          aria-label={`Build operation for ${x.name}`}
+                          onClick={() => onBuild(`${current.name}.${x.name}`)}
+                        >
+                          <Wand2 size={12} /> Build
+                        </button>
+                      )}
                     </div>
                     {x.description && <div className="text-xs text-muted">{x.description}</div>}
                     {x.deprecated && <div className="text-xs text-warn">Deprecated: {x.deprecated}</div>}
