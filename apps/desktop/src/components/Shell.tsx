@@ -42,35 +42,40 @@ import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
 
-export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: string }> = [
+/**
+ * The main navigation, grouped by what you are doing: send requests (per protocol), test and run
+ * them, AI, then the workspace's data. Order is also the Ctrl/Cmd+Alt+1… shortcut order.
+ */
+export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: string; hint?: string }> = [
   { id: 'home', label: 'Home', icon: <House size={18} />, group: 'Start' },
-  { id: 'rest', label: 'REST', icon: <Network size={18} />, group: 'Protocols' },
-  { id: 'graphql', label: 'GraphQL', icon: <GitBranch size={18} />, group: 'Protocols' },
-  { id: 'websocket', label: 'WebSocket', icon: <Radio size={18} />, group: 'Protocols' },
-  { id: 'grpc', label: 'gRPC', icon: <Waypoints size={18} />, group: 'Protocols' },
-  { id: 'mcp', label: 'MCP', icon: <Plug size={18} />, group: 'Protocols' },
-  { id: 'ai', label: 'AI Lab', icon: <Sparkles size={18} />, group: 'AI' },
-  { id: 'evaluations', label: 'Evaluations', icon: <FlaskConical size={18} />, group: 'AI' },
-  { id: 'tests', label: 'Tests', icon: <ShieldCheck size={18} />, group: 'Automation' },
-  { id: 'load', label: 'Load', icon: <Gauge size={18} />, group: 'Automation' },
-  { id: 'monitors', label: 'Monitors', icon: <AlarmClock size={18} />, group: 'Automation' },
-  { id: 'traces', label: 'Traces', icon: <Activity size={18} />, group: 'Observe' },
+  { id: 'rest', label: 'REST', icon: <Network size={18} />, group: 'Requests', hint: 'REST / HTTP requests' },
+  { id: 'graphql', label: 'GraphQL', icon: <GitBranch size={18} />, group: 'Requests' },
+  { id: 'grpc', label: 'gRPC', icon: <Waypoints size={18} />, group: 'Requests' },
+  { id: 'websocket', label: 'WebSocket', icon: <Radio size={18} />, group: 'Requests', hint: 'WebSocket, Socket.IO and MQTT' },
+  { id: 'mcp', label: 'MCP', icon: <Plug size={18} />, group: 'Requests', hint: 'MCP servers (inspector)' },
+  { id: 'tests', label: 'Tests', icon: <ShieldCheck size={18} />, group: 'Testing', hint: 'Test files and runs' },
+  { id: 'monitors', label: 'Monitors', icon: <AlarmClock size={18} />, group: 'Testing', hint: 'Scheduled runs' },
+  { id: 'load', label: 'Load', icon: <Gauge size={18} />, group: 'Testing', hint: 'Load tests' },
+  { id: 'ai', label: 'AI Lab', icon: <Sparkles size={18} />, group: 'AI', hint: 'Prompts and model comparison' },
+  { id: 'evaluations', label: 'Evaluations', icon: <FlaskConical size={18} />, group: 'AI', hint: 'LLM, RAG and agent evaluations' },
   { id: 'collections', label: 'Collections', icon: <FolderTree size={18} />, group: 'Workspace' },
+  { id: 'environments', label: 'Environments', icon: <KeyRound size={18} />, group: 'Workspace', hint: 'Environments and variables' },
   { id: 'history', label: 'History', icon: <History size={18} />, group: 'Workspace' },
-  { id: 'environments', label: 'Envs', icon: <KeyRound size={18} />, group: 'Workspace' },
+  { id: 'traces', label: 'Traces', icon: <Activity size={18} />, group: 'Workspace', hint: 'Traces of every request and run' },
 ];
 
 export function Sidebar() {
   const view = useApp((s) => s.view);
   const setView = useApp((s) => s.setView);
-  const item = (id: ViewId, label: string, icon: ReactNode, shortcut?: string) => (
-    <Tooltip content={shortcut ? `${label}  ·  ${shortcut}` : label} side="right">
+  const item = (id: ViewId, label: string, icon: ReactNode, shortcut?: string, hint?: string) => (
+    <Tooltip content={shortcut ? `${hint ?? label}  ·  ${shortcut}` : (hint ?? label)} side="right">
       <button
         onClick={() => setView(id)}
         aria-current={view === id ? 'page' : undefined}
         aria-label={label}
         className={cx(
-          'group relative w-full flex flex-col items-center gap-0.5 py-1 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
+          // short windows: icons only (the tooltip names them), so the whole rail fits without scrolling
+          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:820px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
           view === id ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
@@ -83,16 +88,16 @@ export function Sidebar() {
         >
           {icon}
         </span>
-        <span className="w-full truncate px-0.5 text-center leading-tight">{label}</span>
+        <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:820px)]:hidden">{label}</span>
       </button>
     </Tooltip>
   );
   return (
-    <nav aria-label="Main navigation" className="w-[84px] shrink-0 border-r border-line bg-chrome flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden">
+    <nav aria-label="Main navigation" className="w-[84px] [@media(max-height:820px)]:w-[64px] shrink-0 border-r border-line bg-chrome flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none]">
       {NAV.map((n, i) => (
         <div key={n.id}>
-          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-3 my-1 border-t border-line/70" />}
-          {item(n.id, n.label, n.icon, i < 9 ? `${modKey}+Alt+${i + 1}` : undefined)}
+          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-3 my-1 [@media(max-height:820px)]:my-0.5 border-t border-line/70" />}
+          {item(n.id, n.label, n.icon, i < 9 ? `${modKey}+Alt+${i + 1}` : undefined, n.hint)}
         </div>
       ))}
       <div className="mt-auto pt-2">{item('settings', 'Settings', <Settings size={18} />, `${modKey}+,`)}</div>

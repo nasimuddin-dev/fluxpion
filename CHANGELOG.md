@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Navigation regrouped**: the left rail is now grouped as Requests (REST, GraphQL, gRPC, WebSocket, MCP), Testing (Tests, Monitors, Load), AI (AI Lab, Evaluations) and Workspace (Collections, Environments, History, Traces); tooltips say what each covers (WebSocket includes Socket.IO and MQTT), and on short windows the rail becomes a compact icon bar with no scrolling.
 - **Explain a failed test with AI**: a failed result in a test or collection run has **Explain with AI**, which says why the checks failed and whether to change the test or the API.
 - **Run tests from AI agents**: the MCP server's `list_tests` and `run_tests` tools (filters, `rerunFailed`), so agents can run the tests they save with `save_test`.
 - **More modules for scripts**: `require('ajv')` (JSON Schema validation, as in many Postman tests), `chai`, `xml2js`, `csv-parse/lib/sync`, `atob` and `btoa`, like Postman's sandbox.
