@@ -13,7 +13,7 @@ import { CollectionDocs } from '../components/CollectionDocs';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
-import { ImportModal } from './RestView';
+import { ImportModal } from './rest/dialogs';
 
 export function CollectionsView() {
   const [cols, setCols] = useState<Collection[]>([]);
