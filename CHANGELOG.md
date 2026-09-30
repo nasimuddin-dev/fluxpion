@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **MCP servers are edited like any request**: adding one opens a *New server* tab instead of a dialog. The top bar holds the transport and the command line (arguments split, quotes kept), URL or mock file, with **Connect** and **Save** (Ctrl+S); a new **Settings** tab has every field (working directory, environment variables, headers) and **Edit JSON**. Connect saves first; Ping, Save as mock and Remove are in the **⋯** menu.
+- **The same menu on every tab**: GraphQL, gRPC, WebSocket and MCP tabs now have **Pin tab**, **Rename…**, **Duplicate tab** and **Save as test file…** like REST tabs (one shared menu for every tab; what doesn't apply is greyed out). Pinned tabs come first in the strip and stay open on *Close other / all tabs*; a duplicate is an unsaved copy in a new tab.
+
 ## 0.13.0 — 2026-09-30
 
 Highlights: the **Collections sidebar** now reads workspace → collections → categories (REST, SOAP, GraphQL, gRPC, WebSocket & MQTT); several GraphQL, gRPC and WebSocket tabs; a **Payload** tab in traces; tab menus on every tab.

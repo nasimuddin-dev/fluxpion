@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench, Bookmark, History, KeyRound } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Radio, Save, Sparkles, Trash2, Unplug, Wrench, Bookmark, History, KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -18,7 +18,7 @@ import { FolderList, type FolderListOps } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
 import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
 
 interface Tool {
   name: string;
@@ -51,7 +51,7 @@ interface McpEvent {
   metadata?: Record<string, unknown>;
 }
 
-type Tab = 'tools' | 'resources' | 'prompts' | 'trace' | 'info';
+type Tab = 'tools' | 'resources' | 'prompts' | 'trace' | 'info' | 'settings';
 
 /** Merge event lists by id — the connect snapshot and the live stream overlap. */
 function mergeEvents(a: McpEvent[], b: McpEvent[]): McpEvent[] {
@@ -64,7 +64,8 @@ function mergeEvents(a: McpEvent[], b: McpEvent[]): McpEvent[] {
 export function McpView() {
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [selected, setSelected] = useState<string>();
-  const [editing, setEditing] = useState<McpServerConfig | null>(null);
+  // a server being added: edited inline like any request, saved with Save (or on Connect)
+  const [draft, setDraft] = useState<McpServerConfig | null>(null);
   const [discovery, setDiscovery] = useState<Record<string, Discovery>>({});
   const [events, setEvents] = useState<Record<string, McpEvent[]>>({});
   const [connecting, setConnecting] = useState<string>();
@@ -87,13 +88,30 @@ export function McpView() {
       }),
     );
   }, [load]);
+  const addServer = (folder?: string) => {
+    setDraft({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) });
+    setTab('settings');
+  };
+  const selectServer = (id: string) => {
+    setDraft(null);
+    setSelected(id);
+  };
   useIntent('mcp', (p) => {
-    if (p?.serverId) setSelected(p.serverId);
-    if (p?.addServer) setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [] });
+    if (p?.serverId) selectServer(p.serverId);
+    if (p?.addServer) addServer();
   });
 
   const server = servers.find((s) => s.id === selected);
-  const disc = selected ? discovery[selected] : undefined;
+  const disc = !draft && selected ? discovery[selected] : undefined;
+  // the server on screen: the one being added, or the selected one; `form` holds its edits until saved
+  const current = draft ?? server;
+  const savedJson = !draft && server ? JSON.stringify(configOf(server)) : '';
+  const [form, setForm] = useState<McpServerConfig | undefined>(current && configOf(current));
+  useEffect(() => {
+    setForm(current ? configOf(current) : undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, savedJson]);
+  const dirty = !!draft || (!!form && JSON.stringify(form) !== savedJson);
 
   const connect = async (id: string) => {
     setConnecting(id);
@@ -165,21 +183,67 @@ export function McpView() {
     await call('mcp.saveServers', { servers: list.map(({ connected: _c, ...s }) => s) });
     await load();
   };
+  /** Save the server on screen (new or edited); returns its id. */
+  const saveForm = async (quiet = false): Promise<string | undefined> => {
+    if (!form) return undefined;
+    if (!form.name.trim()) {
+      useApp.getState().toast('Give the server a name first', 'error');
+      setTab('settings');
+      return undefined;
+    }
+    try {
+      const exists = servers.some((x) => x.id === form.id);
+      await saveServers(exists ? servers.map((x) => (x.id === form.id ? form : x)) : [...servers, form]);
+      setDraft(null);
+      setSelected(form.id);
+      if (!quiet) useApp.getState().toast(`Saved "${form.name}"`, 'success');
+      return form.id;
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+      return undefined;
+    }
+  };
+  /** Connect the server on screen, saving it first when it's new or changed. */
+  const connectCurrent = async () => {
+    const id = dirty ? await saveForm(true) : current?.id;
+    if (id) await connect(id);
+  };
+  const removeCurrent = async () => {
+    if (!current) return;
+    if (draft) return setDraft(null);
+    if (!(await confirmAction({ title: 'Remove MCP server', message: `Remove the MCP server "${current.name}"?`, detail: 'Saved tests that call it will fail until you add it again.', confirmLabel: 'Remove server', danger: true }))) return;
+    if (server?.connected) await disconnect(current.id);
+    await saveServers(servers.filter((s) => s.id !== current.id));
+    setSelected(undefined);
+  };
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'mcp' && form) {
+        e.preventDefault();
+        void saveForm();
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  });
 
   // this editor's tab in the shared tab strip (while a server is selected)
   useSingleEditorTab(
     'mcp',
-    server
+    current && form
       ? {
-          title: server.name,
+          title: form.name || 'MCP server',
           badge: 'MCP',
           badgeClass: 'text-accent',
-          // an MCP tab is its server: renaming or duplicating the tab renames or copies the server
+          dirty,
+          item: draft ? undefined : current.id,
           onRename: async () => {
-            const name = (await promptText('Rename server', { message: 'Name', value: server.name, okLabel: 'Rename' }))?.trim();
-            if (name) await serverOps.renameItem(server.id, name);
+            const name = (await promptText('Rename server', { message: 'Name', value: form.name, okLabel: 'Rename' }))?.trim();
+            if (!name) return;
+            if (draft) setForm({ ...form, name });
+            else await serverOps.renameItem(current.id, name);
           },
-          onDuplicate: () => void serverOps.duplicateItem?.(server.id),
+          onDuplicate: draft ? undefined : () => void serverOps.duplicateItem?.(current.id),
         }
       : undefined,
   );
@@ -200,9 +264,9 @@ export function McpView() {
                 itemNoun="server"
                 addLabel="Add MCP server"
                 folders={folders}
-                selected={selected}
-                onSelect={setSelected}
-                onAdd={(folder) => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) })}
+                selected={draft ? undefined : selected}
+                onSelect={selectServer}
+                onAdd={(folder) => addServer(folder)}
                 items={servers.map((s) => ({
                   id: s.id,
                   name: s.name,
@@ -213,8 +277,8 @@ export function McpView() {
                 itemMenu={(id) => {
                   const s = servers.find((x) => x.id === id)!;
                   return [
-                    { label: 'Edit…', icon: <Pencil size={14} />, onSelect: () => setEditing(s) },
-                    s.connected ? { label: 'Disconnect', icon: <Unplug size={14} />, onSelect: () => void disconnect(id) } : { label: 'Connect', icon: <Plug size={14} />, onSelect: () => (setSelected(id), void connect(id)) },
+                    { label: 'Settings', icon: <Pencil size={14} />, onSelect: () => (selectServer(id), setTab('settings')) },
+                    s.connected ? { label: 'Disconnect', icon: <Unplug size={14} />, onSelect: () => void disconnect(id) } : { label: 'Connect', icon: <Plug size={14} />, onSelect: () => (selectServer(id), void connect(id)) },
                   ];
                 }}
                 ops={serverOps}
@@ -231,38 +295,42 @@ export function McpView() {
         ]}
       />
       <div className="h-full flex flex-col min-w-0">
-        {server ? (
+        {current && form ? (
           <>
-            <div className="flex items-center gap-2 px-3 h-11 border-b border-line shrink-0">
-              <Plug size={16} className="text-muted" />
-              <span className="font-semibold">{server.name}</span>
-              <Badge>{server.transport}</Badge>
-              {disc?.serverInfo && (
-                <span className="text-xs text-muted">
-                  {disc.serverInfo.name} v{disc.serverInfo.version}
-                </span>
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-line shrink-0">
+              <Select className="w-44 shrink-0" aria-label="Transport" value={form.transport} onChange={(e) => setForm(withTransport(form, e.target.value as McpServerConfig['transport']))}>
+                {TRANSPORTS.map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+              <TargetInput s={form} onChange={setForm} />
+              {server?.connected && !draft ? (
+                <Button variant="primary" icon={<Unplug size={14} />} onClick={() => disconnect(current.id)}>
+                  Disconnect
+                </Button>
+              ) : (
+                <Button variant="primary" icon={<Plug size={14} />} loading={connecting === current.id} onClick={() => void connectCurrent()} title={dirty ? 'Save and connect' : 'Connect'}>
+                  Connect
+                </Button>
               )}
-              <div className="ml-auto flex gap-2">
-                {server.connected ? (
-                  <>
-                    <Button size="sm" onClick={() => call<number>('mcp.ping', { serverId: server.id }).then((ms) => useApp.getState().toast(`Ping ${ms} ms`))}>
-                      Ping
-                    </Button>
-                    {server.transport !== 'mock' && (
-                      <Button size="sm" icon={<Copy size={12} />} title="Record this server's tools, resources, prompts and the calls made so far as a mock server" onClick={() => saveMock(server.id)}>
-                        Save as mock
-                      </Button>
-                    )}
-                    <Button size="sm" icon={<Unplug size={12} />} onClick={() => disconnect(server.id)}>
-                      Disconnect
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" variant="primary" icon={<Plug size={12} />} loading={connecting === server.id} onClick={() => connect(server.id)}>
-                    Connect
-                  </Button>
-                )}
-              </div>
+              <Button icon={<Save size={14} />} onClick={() => void saveForm()} title="Save (Ctrl+S)">
+                Save
+              </Button>
+              <Menu
+                width={230}
+                trigger={
+                  <IconButton label="More server actions">
+                    <MoreHorizontal size={15} />
+                  </IconButton>
+                }
+                items={[
+                  { label: 'Ping', icon: <Radio size={14} />, disabled: !server?.connected || !!draft, onSelect: () => void call<number>('mcp.ping', { serverId: current.id }).then((ms) => useApp.getState().toast(`Ping ${ms} ms`)) },
+                  { label: 'Save as mock', icon: <Copy size={14} />, disabled: !server?.connected || !!draft || form.transport === 'mock', onSelect: () => void saveMock(current.id) },
+                  { label: draft ? 'Discard' : 'Remove server…', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void removeCurrent() },
+                ]}
+              />
             </div>
             <Tabs
               value={tab}
@@ -271,14 +339,17 @@ export function McpView() {
                 { id: 'tools', label: 'Tools', badge: disc?.tools.length },
                 { id: 'resources', label: 'Resources', badge: disc ? disc.resources.length + disc.resourceTemplates.length : undefined },
                 { id: 'prompts', label: 'Prompts', badge: disc?.prompts.length },
-                { id: 'trace', label: 'Protocol trace', badge: events[server.id]?.length },
+                { id: 'trace', label: 'Protocol trace', badge: draft ? undefined : events[current.id]?.length },
                 { id: 'info', label: 'Server info' },
+                { id: 'settings', label: 'Settings' },
               ]}
             />
             <div className="flex-1 min-h-0">
-              {connError && tab !== 'trace' && <ErrorPanel error={connError} context={{ server }} />}
-              {tab === 'trace' ? (
-                <McpTrace events={events[server.id] ?? []} error={connError} />
+              {connError && tab !== 'trace' && tab !== 'settings' && <ErrorPanel error={connError} context={{ server }} />}
+              {tab === 'settings' ? (
+                <ServerSettings s={form} onChange={setForm} folders={folders} />
+              ) : tab === 'trace' ? (
+                <McpTrace events={draft ? [] : events[current.id] ?? []} error={connError} />
               ) : !disc ? (
                 !connError && (
                   <Empty icon={<Plug size={26} />} title="Not connected">
@@ -286,11 +357,11 @@ export function McpView() {
                   </Empty>
                 )
               ) : tab === 'tools' ? (
-                <ToolsPanel serverId={server.id} tools={disc.tools} />
+                <ToolsPanel serverId={current.id} tools={disc.tools} />
               ) : tab === 'resources' ? (
-                <ResourcesPanel serverId={server.id} disc={disc} />
+                <ResourcesPanel serverId={current.id} disc={disc} />
               ) : tab === 'prompts' ? (
-                <PromptsPanel serverId={server.id} prompts={disc.prompts} />
+                <PromptsPanel serverId={current.id} prompts={disc.prompts} />
               ) : (
                 <div className="h-full">
                   <JsonTree data={{ serverInfo: disc.serverInfo, capabilities: disc.capabilities, instructions: disc.instructions }} />
@@ -299,32 +370,20 @@ export function McpView() {
             </div>
           </>
         ) : (
-          <Empty icon={<Plug size={28} />} title="Select or add an MCP server" />
+          <Empty
+            icon={<Plug size={28} />}
+            title="Select or add an MCP server"
+            action={
+              <Button variant="primary" icon={<Plus size={14} />} onClick={() => addServer()}>
+                Add server
+              </Button>
+            }
+          >
+            A local command (stdio), Streamable HTTP, legacy SSE or a mock definition.
+          </Empty>
         )}
       </div>
     </Split>
-      {editing && (
-        <ServerModal
-          server={editing}
-          folders={folders}
-          onClose={() => setEditing(null)}
-          onDelete={
-            servers.some((s) => s.id === editing.id)
-              ? async () => {
-                  if (!(await confirmAction({ title: 'Remove MCP server', message: `Remove the MCP server "${editing.name}"?`, detail: 'Saved tests that call it will fail until you add it again.', confirmLabel: 'Remove server', danger: true }))) return;
-                  void saveServers(servers.filter((s) => s.id !== editing.id));
-                  setEditing(null);
-                }
-              : undefined
-          }
-          onSave={(s) => {
-            const exists = servers.some((x) => x.id === s.id);
-            void saveServers(exists ? servers.map((x) => (x.id === s.id ? s : x)) : [...servers, s]);
-            setSelected(s.id);
-            setEditing(null);
-          }}
-        />
-      )}
     </>
   );
 }
@@ -335,111 +394,167 @@ function serverSummary(s: McpServerConfig): string {
   return s.url;
 }
 
-function ServerModal({ server, folders = [], onClose, onSave, onDelete }: { server: McpServerConfig; folders?: string[]; onClose(): void; onSave(s: McpServerConfig): void; onDelete?(): void }) {
-  const [s, setS] = useState<McpServerConfig>(server);
+/** A server's saved configuration (without its live connection state). */
+function configOf(s: McpServerConfig & { connected?: boolean }): McpServerConfig {
+  const { connected: _c, ...config } = s;
+  return config as McpServerConfig;
+}
+
+const TRANSPORTS: Array<[McpServerConfig['transport'], string]> = [
+  ['stdio', 'stdio (local)'],
+  ['streamable-http', 'Streamable HTTP'],
+  ['sse', 'SSE (legacy)'],
+  ['mock', 'Mock'],
+];
+
+/** Switch transport, keeping the name and folder. */
+function withTransport(s: McpServerConfig, t: McpServerConfig['transport']): McpServerConfig {
+  if (t === s.transport) return s;
+  const base = { id: s.id, name: s.name, folder: s.folder };
+  return t === 'stdio' ? { ...base, transport: 'stdio', command: 'node', args: [] } : t === 'mock' ? { ...base, transport: 'mock', mockFile: 'mocks/server.mcp-mock.yaml' } : { ...base, transport: t, url: 'http://127.0.0.1:3000/mcp', headers: [] };
+}
+
+/** "node server.js --flag" ⇄ command + arguments (quotes keep spaces). */
+export function splitCommandLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let quote: string | undefined;
+  let has = false;
+  for (const ch of line) {
+    if (quote) {
+      if (ch === quote) quote = undefined;
+      else cur += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      has = true;
+    } else if (/\s/.test(ch)) {
+      if (cur || has) out.push(cur);
+      cur = '';
+      has = false;
+    } else cur += ch;
+  }
+  if (cur || has) out.push(cur);
+  return out;
+}
+export function joinCommandLine(parts: string[]): string {
+  return parts.map((p) => (p === '' || /[\s"']/.test(p) ? `"${p.replace(/"/g, "'")}"` : p)).join(' ');
+}
+
+/** The request bar's target: the command line (stdio), the URL (HTTP, SSE) or the mock file. */
+function TargetInput({ s, onChange }: { s: McpServerConfig; onChange(s: McpServerConfig): void }) {
+  const cmd = s.transport === 'stdio' ? [s.command, ...(s.args ?? [])] : [];
+  const [text, setText] = useState(() => joinCommandLine(cmd));
+  // edits made elsewhere (Settings, another server) replace the text; typing keeps it as typed
+  const key = JSON.stringify(cmd);
+  useEffect(() => {
+    if (JSON.stringify(splitCommandLine(text)) !== key) setText(joinCommandLine(cmd));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const cls = 'mono flex-1 min-w-0';
+  if (s.transport === 'stdio')
+    return (
+      <Input
+        className={cls}
+        aria-label="Command"
+        placeholder="npx -y @modelcontextprotocol/server-everything"
+        title="The command and its arguments. On Windows use npx.cmd or the full path to node.exe; {{variables}} are resolved."
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const [command = '', ...args] = splitCommandLine(e.target.value);
+          onChange({ ...s, command, args });
+        }}
+      />
+    );
+  if (s.transport === 'mock') return <Input className={cls} aria-label="Mock definition file" placeholder="mocks/server.mcp-mock.yaml" value={s.mockFile} onChange={(e) => onChange({ ...s, mockFile: e.target.value })} />;
+  return <Input className={cls} aria-label="Server URL" placeholder="https://example.com/mcp" value={s.url} onChange={(e) => onChange({ ...s, url: e.target.value })} />;
+}
+
+/** The Settings tab: every field of the server, or its JSON. */
+function ServerSettings({ s, onChange, folders = [] }: { s: McpServerConfig; onChange(s: McpServerConfig): void; folders?: string[] }) {
   const [json, setJson] = useState(false);
-  const [jsonText, setJsonText] = useState(JSON.stringify(server, null, 2));
+  const [jsonText, setJsonText] = useState('');
   const envRows = s.transport === 'stdio' ? Object.entries(s.env ?? {}).map(([key, value]) => ({ key, value })) : [];
   return (
-    <Modal
-      title="MCP server"
-      onClose={onClose}
-      width={620}
-      footer={
-        <>
-          {onDelete && (
-            <Button variant="danger" className="mr-auto" icon={<Trash2 size={13} />} onClick={onDelete}>
-              Remove
-            </Button>
-          )}
-          <Button onClick={() => setJson(!json)}>{json ? 'Form' : 'Edit JSON'}</Button>
+    <div className="h-full overflow-auto">
+      <div className="max-w-3xl p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <SectionTitle>Server settings</SectionTitle>
           <Button
-            variant="primary"
+            size="sm"
+            className="ml-auto"
+            icon={<Braces size={12} />}
             onClick={() => {
-              if (!json) return onSave(s);
+              if (!json) {
+                setJsonText(JSON.stringify(s, null, 2));
+                return setJson(true);
+              }
               try {
-                onSave(JSON.parse(jsonText));
+                onChange({ ...(JSON.parse(jsonText) as McpServerConfig), id: s.id });
+                setJson(false);
               } catch (e) {
                 useApp.getState().toast(`Invalid JSON: ${(e as Error).message}`, 'error');
               }
             }}
           >
-            Save
+            {json ? 'Apply JSON' : 'Edit JSON'}
           </Button>
-        </>
-      }
-    >
-      {json ? (
-        <div className="h-72">
-          <CodeEditor value={jsonText} onChange={setJsonText} />
         </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Name">
-              <Input value={s.name} onChange={(e) => setS({ ...s, name: e.target.value })} />
-            </Field>
-            <Field label="Transport">
-              <Select
-                value={s.transport}
-                onChange={(e) => {
-                  const t = e.target.value as McpServerConfig['transport'];
-                  setS(
-                    t === 'stdio'
-                      ? { id: s.id, name: s.name, folder: s.folder, transport: 'stdio', command: 'node', args: [] }
-                      : t === 'mock'
-                        ? { id: s.id, name: s.name, folder: s.folder, transport: 'mock', mockFile: 'mocks/server.mcp-mock.yaml' }
-                        : { id: s.id, name: s.name, folder: s.folder, transport: t, url: 'http://127.0.0.1:3000/mcp', headers: [] },
-                  );
-                }}
-              >
-                <option value="stdio">stdio (local process)</option>
-                <option value="streamable-http">Streamable HTTP</option>
-                <option value="sse">SSE (legacy)</option>
-                <option value="mock">Mock (definition file)</option>
-              </Select>
-            </Field>
+        {json ? (
+          <div className="h-80 border border-line rounded-lg overflow-hidden">
+            <CodeEditor language="json" value={jsonText} onChange={setJsonText} />
           </div>
-          <Field label="Folder" hint="Optional: groups servers in the list.">
-            <Input list="mcp-folders" value={s.folder ?? ''} placeholder="(top level)" onChange={(e) => setS({ ...s, folder: e.target.value.trim() ? e.target.value : undefined })} />
-            <datalist id="mcp-folders">
-              {folders.map((f) => (
-                <option key={f} value={f} />
-              ))}
-            </datalist>
-          </Field>
-          {s.transport === 'stdio' ? (
-            <>
-              <Field label="Command" hint="On Windows use npx.cmd or the full path to node.exe. Variables like {{workspaceDir}} are resolved.">
-                <Input className="mono" value={s.command} onChange={(e) => setS({ ...s, command: e.target.value })} />
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Name">
+                <Input value={s.name} onChange={(e) => onChange({ ...s, name: e.target.value })} />
               </Field>
-              <Field label="Arguments (one per line)">
-                <textarea className="field mono min-h-16" value={(s.args ?? []).join('\n')} onChange={(e) => setS({ ...s, args: e.target.value.split('\n').filter((x) => x !== '') })} />
+              <Field label="Folder" hint="Optional: groups servers in the list.">
+                <Input list="mcp-folders" value={s.folder ?? ''} placeholder="(top level)" onChange={(e) => onChange({ ...s, folder: e.target.value.trim() ? e.target.value : undefined })} />
+                <datalist id="mcp-folders">
+                  {folders.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
               </Field>
-              <Field label="Working directory">
-                <Input className="mono" value={s.cwd ?? ''} onChange={(e) => setS({ ...s, cwd: e.target.value || undefined })} />
+            </div>
+            {s.transport === 'stdio' ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Command" hint="On Windows use npx.cmd or the full path to node.exe. Variables like {{workspaceDir}} are resolved.">
+                    <Input className="mono" value={s.command} onChange={(e) => onChange({ ...s, command: e.target.value })} />
+                  </Field>
+                  <Field label="Working directory">
+                    <Input className="mono" value={s.cwd ?? ''} onChange={(e) => onChange({ ...s, cwd: e.target.value || undefined })} />
+                  </Field>
+                </div>
+                <Field label="Arguments (one per line)">
+                  <textarea className="field mono min-h-20" value={(s.args ?? []).join('\n')} onChange={(e) => onChange({ ...s, args: e.target.value.split('\n').filter((x) => x !== '') })} />
+                </Field>
+                <Field label="Environment variables" hint="Use {{variables}} to reference secrets instead of pasting them here.">
+                  <KeyValueEditor rows={envRows} onChange={(rows) => onChange({ ...s, env: Object.fromEntries(rows.filter((r) => r.key).map((r) => [r.key, r.value])) })} />
+                </Field>
+              </>
+            ) : s.transport === 'mock' ? (
+              <Field label="Mock definition" hint="A *.mcp-mock.yaml file in this workspace, with tools and their canned responses, resources and prompts. Connect to a real server and use Save as mock to record one.">
+                <Input className="mono" value={s.mockFile} onChange={(e) => onChange({ ...s, mockFile: e.target.value })} />
               </Field>
-              <Field label="Environment variables" hint="Use {{variables}} to reference secrets instead of pasting them here.">
-                <KeyValueEditor rows={envRows} onChange={(rows) => setS({ ...s, env: Object.fromEntries(rows.filter((r) => r.key).map((r) => [r.key, r.value])) })} />
-              </Field>
-            </>
-          ) : s.transport === 'mock' ? (
-            <Field label="Mock definition" hint="A *.mcp-mock.yaml file in this workspace, with tools and their canned responses, resources and prompts. Connect to a real server and use Save as mock to record one.">
-              <Input className="mono" value={s.mockFile} onChange={(e) => setS({ ...s, mockFile: e.target.value })} />
-            </Field>
-          ) : (
-            <>
-              <Field label="URL">
-                <Input className="mono" value={s.url} onChange={(e) => setS({ ...s, url: e.target.value })} />
-              </Field>
-              <Field label="Headers">
-                <KeyValueEditor rows={s.headers ?? []} onChange={(headers) => setS({ ...s, headers })} />
-              </Field>
-            </>
-          )}
-        </div>
-      )}
-    </Modal>
+            ) : (
+              <>
+                <Field label="URL">
+                  <Input className="mono" value={s.url} onChange={(e) => onChange({ ...s, url: e.target.value })} />
+                </Field>
+                <Field label="Headers" hint="Use {{variables}} for tokens and keys.">
+                  <KeyValueEditor rows={s.headers ?? []} onChange={(headers) => onChange({ ...s, headers })} />
+                </Field>
+              </>
+            )}
+          </>
+        )}
+        <p className="text-xs text-muted">Save with Ctrl+S; Connect saves first. Servers are kept in the workspace (mcp-servers.json).</p>
+      </div>
+    </div>
   );
 }
 

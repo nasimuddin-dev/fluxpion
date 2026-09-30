@@ -7,6 +7,12 @@ description: "Configure stdio, Streamable HTTP and SSE MCP server connections."
 
 # Connecting
 
+A server is edited like any request. **New ▸ MCP server** (or **+** next to *MCP servers* in the sidebar) opens a *New server* tab:
+
+- The bar at the top holds the **transport** (stdio, Streamable HTTP, SSE or a mock) and the **command line** (`npx -y @modelcontextprotocol/server-everything`; quotes keep spaces in an argument), the **URL** or the **mock file**, then **Connect** and **Save**.
+- The **Settings** tab, next to Tools, Resources, Prompts, Protocol trace and Server info, has every field: name, folder, command, arguments, working directory and environment variables (stdio) or URL and headers, and **Edit JSON**.
+- **Save** (Ctrl+S) keeps it in the workspace; **Connect** saves first. The tab shows a dot while there are unsaved changes, and its right-click menu is the same as every other tab's (rename, duplicate, pin, close).
+
 Servers are saved in `mcp-servers.json` in the workspace:
 
 ```json
