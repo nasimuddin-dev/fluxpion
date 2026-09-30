@@ -33,11 +33,12 @@ export function collectionsHandlers(be: Backend): Handlers {
       return r;
     },
 
-    'mock.start': async ({ collectionId, port, delayMs }: { collectionId: string; port?: number; delayMs?: number }) => {
+    'mock.start': async ({ collectionId, port, delayMs, fallbackUrl }: { collectionId: string; port?: number; delayMs?: number; fallbackUrl?: string }) => {
       await be.mocks.get(collectionId)?.close();
       be.mocks.delete(collectionId);
       const c = be.ws.getCollection(collectionId);
-      const m = await startMockServer(c, { port: port ?? 0, delayMs, onRequest: (e) => be.host.emit('mock.request', { collectionId, ...e, time: new Date().toISOString() }) });
+      if (fallbackUrl && !/^https?:\/\/.+/i.test(fallbackUrl.trim())) throw new ApsError('ValidationError', 'The fallback must be an http(s) URL');
+      const m = await startMockServer(c, { port: port ?? 0, delayMs, fallbackUrl: fallbackUrl?.trim() || undefined, onRequest: (e) => be.host.emit('mock.request', { collectionId, ...e, time: new Date().toISOString() }) });
       be.mocks.set(collectionId, m);
       be.logger.info(`Mock server for ${c.name} listening on ${m.url}`, { routes: m.routes.length });
       return be.mockInfo(collectionId);

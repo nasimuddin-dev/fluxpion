@@ -55,6 +55,8 @@ Every example is a route: the method and path of the example's request (or of th
 
 The response has the example's status, headers and body, plus `x-mock-example: <name>` and permissive CORS headers so a browser app on another port can call it. A request that matches no example gets `404` with a JSON list of the available routes.
 
+**Partial mocking:** set **Forward the rest to** in the Mock tab (or `testpion mock "My API" --fallback https://api.example.com`) and requests that match no example are sent to the real API instead of getting a `404`. Mock just the endpoints that aren't built yet, or the error cases that are hard to trigger, and use the real API for everything else. Forwarded responses carry `x-mock-forwarded: true`.
+
 **Fresh data on every call:** [dynamic variables](/api-testing/environments#built-in-variables) in an example's body or headers are filled in each time, as in Postman's mocks. An example body like `{"id": "{{$guid}}", "name": "{{$randomFullName}}", "createdAt": "{{$isoTimestamp}}"}` returns a new id, name and time for every request. Other `{{variables}}` are sent as written.
 
 :::

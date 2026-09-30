@@ -16,6 +16,7 @@ interface MockHit {
   path: string;
   status: number;
   example?: string;
+  forwarded?: boolean;
   time: string;
 }
 
@@ -36,6 +37,13 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
     }
   });
   const [delay, setDelay] = useState('');
+  const [fallback, setFallback] = useState(() => {
+    try {
+      return localStorage.getItem(`aps.mockFallback.${collectionId}`) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [busy, setBusy] = useState(false);
   const [hits, setHits] = useState<MockHit[]>([]);
   const [copied, setCopied] = useState(false);
@@ -51,7 +59,12 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
     try {
       const p = port.trim() ? Number(port) : undefined;
       if (p !== undefined && !(p > 0 && p < 65536)) throw new Error('Port must be between 1 and 65535, or empty for any free port');
-      const r = await call<MockInfo>('mock.start', { collectionId, port: p, delayMs: delay ? Number(delay) : undefined });
+      try {
+        localStorage.setItem(`aps.mockFallback.${collectionId}`, fallback.trim());
+      } catch {
+        /* private mode */
+      }
+      const r = await call<MockInfo>('mock.start', { collectionId, port: p, delayMs: delay ? Number(delay) : undefined, fallbackUrl: fallback.trim() || undefined });
       setInfo(r);
       try {
         localStorage.setItem(portKey(collectionId), p ? String(p) : '');
@@ -83,6 +96,9 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
         </Field>
         <Field label="Delay (ms)">
           <Input value={delay} onChange={(e) => setDelay(e.target.value.replace(/\D/g, ''))} placeholder="0" className="w-28 mono" disabled={info.running} />
+        </Field>
+        <Field label="Forward the rest to" hint="Optional: requests without an example go to this API" className="flex-1">
+          <Input value={fallback} onChange={(e) => setFallback(e.target.value)} placeholder="https://api.example.com" className="mono" disabled={info.running} aria-label="Fallback URL" />
         </Field>
         {info.running ? (
           <Button variant="danger" icon={<Square size={12} />} onClick={() => void stop()}>
@@ -146,12 +162,12 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
           {hits.length ? (
             <div className="border border-line rounded-md max-h-64 overflow-auto text-sm">
               {hits.map((h, i) => (
-                <div key={i} className={cx('flex items-center gap-3 px-3 py-1 border-t border-line first:border-t-0', !h.example && 'text-muted')}>
+                <div key={i} className={cx('flex items-center gap-3 px-3 py-1 border-t border-line first:border-t-0', !h.example && !h.forwarded && 'text-muted')}>
                   <span className="text-xs text-muted tabular-nums">{new Date(h.time).toLocaleTimeString()}</span>
                   <span className="mono text-xs w-14">{h.method}</span>
                   <span className="mono flex-1 truncate">{h.path}</span>
                   <Badge tone={statusTone(h.status)}>{h.status}</Badge>
-                  <span className="text-xs w-48 truncate">{h.example ?? 'no matching example'}</span>
+                  <span className="text-xs w-48 truncate">{h.example ?? (h.forwarded ? 'forwarded to the API' : 'no matching example')}</span>
                 </div>
               ))}
             </div>

@@ -104,8 +104,9 @@ export function registerServeCommands(program: Command): void {
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-p, --port <port>', 'port to listen on (default: any free port)')
     .option('--delay <ms>', 'delay every response by this many ms')
+    .option('--fallback <url>', 'forward requests that match no example to this API (partial mocking)')
     .option('-q, --quiet', 'do not log requests')
-    .action(async (ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }) => {
+    .action(async (ref: string, o: { workspace?: string; port?: string; delay?: string; fallback?: string; quiet?: boolean }) => {
       process.exitCode = await executeMock(ref, o);
     });
   program

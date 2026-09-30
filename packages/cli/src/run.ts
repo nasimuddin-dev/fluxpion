@@ -422,7 +422,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
 }
 
 /** `testpion mock`: serve saved examples until interrupted. */
-export async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }): Promise<number> {
+export async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; fallback?: string; quiet?: boolean }): Promise<number> {
   const collection = await loadCollectionRef(ref, o.workspace);
   const port = o.port ? Number(o.port) : 0;
   if (!(port >= 0 && port < 65536)) throw new CliError('--port must be between 0 and 65535', EXIT.CONFIG_ERROR);
@@ -431,10 +431,11 @@ export async function executeMock(ref: string, o: { workspace?: string; port?: s
     mock = await startMockServer(collection, {
       port,
       delayMs: o.delay ? Number(o.delay) : undefined,
+      fallbackUrl: o.fallback,
       onRequest: (e) => {
         if (o.quiet) return;
         const status = e.status < 400 ? green(String(e.status)) : e.example ? yellow(String(e.status)) : red(String(e.status));
-        console.log(`${dim(new Date().toLocaleTimeString())} ${e.method} ${e.path} ${status} ${e.example ? dim(e.example) : red('no matching example')}`);
+        console.log(`${dim(new Date().toLocaleTimeString())} ${e.method} ${e.path} ${status} ${e.example ? dim(e.example) : e.forwarded ? cyan('forwarded') : red('no matching example')}`);
       },
     });
   } catch (e) {

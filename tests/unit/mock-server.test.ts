@@ -162,6 +162,37 @@ describe('mock server: matching on the request body and headers', () => {
     }
   });
 
+  it('forwards requests without an example to a fallback API (partial mocking)', async () => {
+    const { createServer } = await import('node:http');
+    const real = createServer((req, res) => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ real: true, path: req.url, method: req.method })));
+    await new Promise<void>((r) => real.listen(0, '127.0.0.1', r));
+    const realUrl = `http://127.0.0.1:${(real.address() as { port: number }).port}`;
+    const c: Collection = {
+      schemaVersion: '1.0',
+      id: 'fb',
+      name: 'Fallback',
+      version: 1,
+      variables: [],
+      updatedAt: new Date(0).toISOString(),
+      items: [{ kind: 'http', id: 'r', name: 'Mocked', request: { method: 'GET', url: '{{baseUrl}}/mocked' }, examples: [{ id: 'e', name: 'ok', status: 200, headers: [], body: '{"mock":true}' }] }],
+    };
+    const events: Array<{ path: string; forwarded?: boolean }> = [];
+    const m = await startMockServer(c, { fallbackUrl: realUrl, onRequest: (e) => events.push(e) });
+    try {
+      expect(await (await fetch(`${m.url}/mocked`)).json()).toEqual({ mock: true });
+      const f = await fetch(`${m.url}/live?x=1`, { method: 'POST', body: 'hi' });
+      expect(f.headers.get('x-mock-forwarded')).toBe('true');
+      expect(await f.json()).toEqual({ real: true, path: '/live?x=1', method: 'POST' });
+      expect(events.map((e) => [e.path, !!e.forwarded])).toEqual([
+        ['/mocked', false],
+        ['/live', true],
+      ]);
+    } finally {
+      await m.close();
+      await new Promise<void>((r) => real.close(() => r()));
+    }
+  });
+
   it('fills dynamic variables in example bodies and headers on every response', async () => {
     const c: Collection = {
       schemaVersion: '1.0',

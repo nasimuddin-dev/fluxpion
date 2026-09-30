@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Partial mocking.** A mock server can forward requests that match no example to the real API (**Forward the rest to** in the Mock tab, `testpion mock --fallback <url>`), so only the endpoints you saved examples for are mocked.
 - **Record traffic into a collection.** **Record traffic** (Collections view, command palette, or `testpion record https://api.example.com -w my-workspace`) runs a small reverse proxy on localhost: point an app at it, use the app, and every request and response is listed. Save them as a collection, with responses as examples and tokens replaced by variables, then replay, test or mock them. Browser apps work (CORS, redirects and cookies are handled).
 - **Saved WebSocket messages.** A WebSocket or Socket.IO connection can keep named messages (with their event for Socket.IO): **Save message** above the editor, pick one to send it again. They are saved with the connection.
 - **Generate an OpenAPI document from a collection.** **Export ▸ OpenAPI 3.1** (and `testpion export "My API" --format openapi`) describes the collection's HTTP requests: paths with path parameters, query and header parameters, request bodies and saved examples with inferred schemas, folders as tags and auth as security schemes. AI agents get it from the MCP tool `collection_openapi`.

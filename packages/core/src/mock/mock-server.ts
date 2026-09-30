@@ -148,7 +148,27 @@ export interface MockServerOptions {
   host?: string;
   /** Extra delay before every response, in ms. */
   delayMs?: number;
-  onRequest?: (e: { method: string; path: string; status: number; example?: string; request?: string }) => void;
+  onRequest?: (e: { method: string; path: string; status: number; example?: string; request?: string; forwarded?: boolean }) => void;
+  /** Forward requests that match no example to this API (partial mocking); without it they get a 404. */
+  fallbackUrl?: string;
+}
+
+const FORWARD_SKIP = /^(connection|keep-alive|proxy-authenticate|proxy-authorization|te|trailer|transfer-encoding|upgrade|host|content-length|accept-encoding|content-encoding)$/i;
+
+/** Send an unmatched request on to the real API and relay its answer. */
+async function forward(base: string, req: IncomingMessage, body: string | undefined, res: ServerResponse, cors: Record<string, string>): Promise<number> {
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !FORWARD_SKIP.test(k)) for (const x of Array.isArray(v) ? v : [v]) headers.append(k, x);
+  const method = (req.method ?? 'GET').toUpperCase();
+  const upstream = await fetch(base.replace(/\/+$/, '') + (req.url ?? '/'), { method, headers, body: method === 'GET' || method === 'HEAD' || !body ? undefined : body, redirect: 'manual' });
+  const buf = Buffer.from(await upstream.arrayBuffer());
+  const out: Record<string, string> = { ...cors, 'x-mock-forwarded': 'true', 'content-length': String(buf.length) };
+  upstream.headers.forEach((v, k) => {
+    if (!FORWARD_SKIP.test(k) && !k.startsWith('access-control-')) out[k] = v;
+  });
+  res.writeHead(upstream.status, upstream.statusText, out);
+  res.end(method === 'HEAD' ? undefined : buf);
+  return upstream.status;
 }
 
 export interface MockServer {
@@ -249,6 +269,17 @@ export async function startMockServer(collection: Collection, opts: MockServerOp
     const body = await readBody(req);
     const r = matchMockRoute(routes, { method: req.method ?? 'GET', path: u.pathname, query, headers: req.headers, body });
     if (opts.delayMs) await new Promise((ok) => setTimeout(ok, opts.delayMs));
+    if (!r && opts.fallbackUrl) {
+      try {
+        const status = await forward(opts.fallbackUrl, req, body, res, cors);
+        opts.onRequest?.({ method: req.method ?? 'GET', path: u.pathname, status, forwarded: true });
+      } catch (e) {
+        if (!res.headersSent) res.writeHead(502, { ...cors, 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'fallback_failed', message: (e as Error).message, fallback: opts.fallbackUrl }));
+        opts.onRequest?.({ method: req.method ?? 'GET', path: u.pathname, status: 502, forwarded: true });
+      }
+      return;
+    }
     if (!r) {
       const body = JSON.stringify(
         {
