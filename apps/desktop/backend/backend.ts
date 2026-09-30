@@ -1013,6 +1013,8 @@ export class Backend {
         'These are security findings in an API collection (no secret values are included). For each kind of finding, explain the risk in one sentence and the exact fix in TestPion (secret variables, headers instead of query parameters, https, TLS settings). Be concise.',
       'analyze-load':
         'Analyse these load test results: throughput, latency percentiles, errors and per-request numbers. Point out the bottleneck requests, whether errors grow with load, and what to investigate or tune next. Be specific and concise.',
+      'explain-test-failure':
+        'A test failed: here are its failed and passed checks with expected and actual values, and its input and output. Say in plain words why it failed, whether the API or the test looks wrong (e.g. a changed field, a stale expected value, a timing issue), and the exact change to make (the check to edit, or what to fix in the API). Be concise; use short headings: Why it failed, What to change.',
       free: 'Answer the developer question about their API/protocol/AI testing work.',
     };
     // request generation may use the names (never the values) of the variables in scope

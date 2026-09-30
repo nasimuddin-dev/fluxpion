@@ -1,4 +1,4 @@
-import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target, RotateCcw } from 'lucide-react';
+import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target, RotateCcw, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
@@ -258,6 +258,33 @@ export function ResultDetail({ r }: { r: TestResult }) {
           <>
             {r.error && <ErrorPanel error={{ ...r.error, details: undefined }} context={{ test: r.name, input: r.input }} />}
             {r.status === 'skipped' && <div className="p-3 text-sm text-warn">Skipped: {String(r.metadata?.reason ?? '')}</div>}
+            {r.status === 'failed' && (
+              <div className="px-3 pt-3">
+                <Button
+                  size="sm"
+                  icon={<Sparkles size={12} />}
+                  title="Ask the AI assistant why the checks failed and what to change (the test or the API)"
+                  onClick={() =>
+                    useApp.getState().set({
+                      assistant: {
+                        task: 'explain-test-failure',
+                        title: `Why "${r.name}" failed`,
+                        context: {
+                          test: r.name,
+                          type: r.type,
+                          failedChecks: r.checks.filter((c) => !c.passed).map((c) => ({ name: c.name, type: c.type, message: c.message, expected: c.expected, actual: c.actual })),
+                          passedChecks: r.checks.filter((c) => c.passed).map((c) => c.name),
+                          input: String(r.input ?? '').slice(0, 4000),
+                          output: String(r.output ?? '').slice(0, 8000),
+                        },
+                      },
+                    })
+                  }
+                >
+                  Explain with AI
+                </Button>
+              </div>
+            )}
             <CheckList checks={r.checks} />
           </>
         )}
