@@ -16,6 +16,10 @@ The **gRPC** view calls any gRPC service described by `.proto` files, or by the 
 
 The response shows the gRPC status (`0 OK`, `5 NOT_FOUND` …) with its details, the time, the response message as a tree, the response **Metadata** and **Trailers**.
 
+## Saved requests and history
+
+**Save** keeps the request (address, method, message, metadata, its `.proto` files or reflected definition, and settings) in the **Saved requests** list, in folders like the REST collections (new folder, move by menu or drag and drop, rename, duplicate, delete). The client private key is never saved with a request. Every call also appears in **History** (with the method, address, status and time); double-click an entry to open it in the gRPC view again.
+
 ## Server reflection
 
 Many servers describe their own services (gRPC server reflection). Enter the address and click **Use server reflection** on the **Proto files** tab: TestPion asks the server for its services and their message types, and the methods appear without any `.proto` file. **Refresh** asks again after the server changes; **Use proto files** switches back. Metadata is sent with the reflection request, for servers that require authentication.

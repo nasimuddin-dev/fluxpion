@@ -1,7 +1,10 @@
-import { FileCode2, Plus, RefreshCw, ScanSearch, Send, Sparkles, Square, Trash2, Waypoints } from 'lucide-react';
+import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Trash2, Waypoints } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
-import { persisted, useApp } from '../store';
+import { persisted, promptText, useApp } from '../store';
+import { FolderList } from '../components/FolderList';
+import { useLibrary } from '../lib/library';
+import { useIntent } from '../hooks';
 import type { KeyValue } from '../types';
 import { CodeEditor } from '../components/CodeEditor';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -75,6 +78,38 @@ export function GrpcView() {
   const [selected, setSelected] = useState<number>();
   const [editing, setEditing] = useState<number>();
   const [reflecting, setReflecting] = useState(false);
+  // saved requests (address, method, message, metadata, service definition, settings) with folders;
+  // the client private key is never part of them
+  type Saved = Omit<typeof d, 'keyRef'> & { keyRef?: string };
+  const saved = useLibrary<Saved>('grpc');
+  const [savedId, setSavedId] = useSticky<string | undefined>('grpc:saved', undefined);
+  const currentSaved = saved.lib.items.find((i) => i.id === savedId);
+  const savedDirty = !!currentSaved && JSON.stringify(currentSaved.data) !== JSON.stringify(d);
+  const openSaved = (id: string) => {
+    const it = saved.lib.items.find((i) => i.id === id);
+    if (!it) return;
+    setSavedId(id);
+    setD({ ...drafts.load(), ...it.data });
+    setResult(undefined);
+    setError(undefined);
+  };
+  const saveRequest = async (asNew = false, folder?: string) => {
+    if (currentSaved && !asNew) {
+      await saved.put({ ...currentSaved, data: d });
+      useApp.getState().toast(`Saved "${currentSaved.name}"`, 'success');
+      return;
+    }
+    const name = await promptText('Save gRPC request', { message: 'Name', value: d.method.split('/').pop() || 'gRPC request', okLabel: 'Save' });
+    if (!name) return;
+    setSavedId(await saved.put({ name, folder, data: d }));
+  };
+  // History → open: fill in the address, method, message and metadata
+  useIntent('grpc', (p) => {
+    const r = p?.request as { target?: string; method?: string; message?: string; metadata?: KeyValue[] } | undefined;
+    if (!r) return;
+    setSavedId(undefined);
+    setD((cur) => ({ ...cur, target: r.target ?? cur.target, method: r.method ?? cur.method, message: r.message || cur.message, metadata: r.metadata ?? cur.metadata }));
+  });
   // a pasted private key stays in memory; a {{variable}} reference may be kept with the draft
   const [keyText, setKeyText] = useSticky('grpc:key', drafts.load().keyRef ?? '');
   useEffect(() => set({ keyRef: /^\s*\{\{[^}]+\}\}\s*$/.test(keyText) ? keyText.trim() : undefined }), [keyText]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -165,7 +200,27 @@ export function GrpcView() {
   const example = useMemo(() => (current ? JSON.stringify(current.example) : ''), [current]);
 
   return (
-    <div className="h-full flex flex-col">
+    <Split id="grpc-saved" sidebar initial={18} min={12}>
+    <div className="h-full bg-panel/50">
+      <FolderList
+        id="grpc-saved"
+        title="Saved requests"
+        itemNoun="request"
+        addLabel="Save current request"
+        folders={saved.lib.folders}
+        selected={savedId}
+        onSelect={openSaved}
+        onAdd={(folder) => void saveRequest(true, folder)}
+        ops={saved.ops}
+        items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: i.data.method || i.data.target, icon: <Waypoints size={12} className="text-muted" /> }))}
+        empty={
+          <Empty title="No saved requests">
+            Save a request (address, method, message, metadata and its .proto files or reflection) to call it again later, and group requests in folders.
+          </Empty>
+        }
+      />
+    </div>
+    <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <VarInput ariaLabel="gRPC server" className="w-72 h-8" value={d.target} onChange={(target) => set({ target })} placeholder="localhost:50051 or grpcs://api.example.com" />
         <select className="field h-8 flex-1 min-w-0 mono text-xs" aria-label="Method" value={d.method} onChange={(e) => set({ method: e.target.value })} disabled={!methods.length}>
@@ -185,6 +240,9 @@ export function GrpcView() {
             Invoke
           </Button>
         )}
+        <Button icon={<Save size={13} />} title={currentSaved ? `Save changes to "${currentSaved.name}"` : 'Save this request'} onClick={() => void saveRequest()}>
+          {savedDirty ? 'Save*' : 'Save'}
+        </Button>
       </div>
       <div className="flex-1 min-h-0">
         <Split id="grpc-main" initial={45}>
@@ -421,5 +479,6 @@ export function GrpcView() {
         </Split>
       </div>
     </div>
+    </Split>
   );
 }

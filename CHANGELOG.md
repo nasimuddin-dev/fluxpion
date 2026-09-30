@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **gRPC: saved requests and history.** The gRPC view has a **Saved requests** list with folders, and every call appears in History (filter *grpc*, double-click to open it again).
 - **Editor help everywhere.** Code editors now autocomplete `{{variables}}` (with their value and scope, secrets hidden), show defined variables in blue and unknown ones in red with a wavy underline, and explain a variable on hover. Scripts get ready-made `pm.*` / `tp.*` snippets (tests for status, JSON fields, headers, body text, JSON Schema and response time; setting variables; `pm.sendRequest` …). JSON editors with a schema complete and validate as you type: MCP tool arguments (raw JSON) from the tool's input schema, gRPC messages from the proto message type. Header, param and form values in tables highlight and autocomplete `{{variables}}` too, and header values suggest common values.
 - **gRPC certificates.** Custom CA certificates and client certificates for mutual TLS (app: gRPC **Settings**; the private key is never saved with the draft, use a secret `{{variable}}`), also for server reflection. TLS to an IP address works.
 

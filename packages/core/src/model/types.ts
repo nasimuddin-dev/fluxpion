@@ -580,7 +580,7 @@ export interface Collection {
 export interface HistoryEntry {
   id: string;
   timestamp: string;
-  kind: 'http' | 'graphql' | 'mcp' | 'llm' | 'websocket';
+  kind: 'http' | 'graphql' | 'grpc' | 'mcp' | 'llm' | 'websocket';
   name: string;
   method?: string;
   url?: string;

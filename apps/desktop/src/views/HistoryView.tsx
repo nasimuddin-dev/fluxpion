@@ -54,6 +54,7 @@ export function HistoryView() {
     else if (e.kind === 'llm') useApp.getState().openIntent('ai', {});
     else if (e.kind === 'mcp') useApp.getState().openIntent('mcp', {});
     else if (e.kind === 'graphql') useApp.getState().openIntent('graphql', {});
+    else if (e.kind === 'grpc') useApp.getState().openIntent('grpc', { request: e.request });
   };
   return (
     <Split id="history" initial={45}>
@@ -62,7 +63,7 @@ export function HistoryView() {
           <Input className="flex-1" placeholder="Search history (name, URL, method, status)" value={query} onChange={(e) => setQuery(e.target.value)} />
           <Select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Kind">
             <option value="">All</option>
-            {['http', 'graphql', 'mcp', 'llm'].map((k) => (
+            {['http', 'graphql', 'grpc', 'mcp', 'llm'].map((k) => (
               <option key={k}>{k}</option>
             ))}
           </Select>
