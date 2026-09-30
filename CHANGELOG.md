@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Copy a gRPC call as grpcurl**: the gRPC view's **grpcurl** button copies the call as a ready-to-run command (plaintext or TLS, proto files or reflection, metadata and message).
 - **Set environment variables from the terminal and from AI agents:** `testpion env set Staging baseUrl=https://… [--create]`, `env unset`, `env get`, and the MCP tool `set_environment_variable`. Only plain values: secret variables are still set in the app (or as `TESTPION_SECRET_*` in CI).
 - **Retries for flaky endpoints.** A request's Settings can retry it up to 5 times after a network error, timeout, 429 or 5xx, with exponential backoff that honours `Retry-After` (POST and PATCH only when the connection failed). It applies to sends, runs, monitors and the CLI, and the response shows how many attempts it took.
 - **`testpion send`**: send one saved request by name (with its scripts, auth and checks) or a URL, and print the response like `curl` (`-i` for headers, `--json`, `--fail`).

@@ -1,4 +1,4 @@
-import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Trash2, Waypoints } from 'lucide-react';
+import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
@@ -250,6 +250,18 @@ export function GrpcView() {
             Invoke
           </Button>
         )}
+        <Button
+          icon={<Terminal size={13} />}
+          disabled={!d.method}
+          title="Copy the call as a grpcurl command ({{variables}} resolved)"
+          onClick={() =>
+            void call<string>('grpc.grpcurl', { target: d.target, method: d.method, message: d.message, metadata: d.metadata, tls: d.tls, protoFiles: d.descriptorSet ? [] : d.protoFiles.map((f) => f.name), timeoutMs: d.timeoutMs, environment: env })
+              .then((cmd) => navigator.clipboard.writeText(cmd))
+              .then(() => useApp.getState().toast('Copied as grpcurl', 'success'), (e) => useApp.getState().toast(asError(e).message, 'error'))
+          }
+        >
+          grpcurl
+        </Button>
         <Button icon={<Save size={13} />} title={currentSaved ? `Save changes to "${currentSaved.name}"` : 'Save this request'} onClick={() => void saveRequest()}>
           {savedDirty ? 'Save*' : 'Save'}
         </Button>

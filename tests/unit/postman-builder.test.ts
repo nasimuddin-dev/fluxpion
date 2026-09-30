@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCurl, shellSplit, isCurlCommand, generateCode, CODE_LANGUAGES, buildUrl, pathVariableNames, applyPathVariables } from '../../packages/core/src/index.js';
+import { parseCurl, shellSplit, isCurlCommand, generateCode, grpcurlCommand, CODE_LANGUAGES, buildUrl, pathVariableNames, applyPathVariables } from '../../packages/core/src/index.js';
 
 describe('cURL import', () => {
   it('splits shell arguments with quotes, escapes and continuations', () => {
@@ -63,6 +63,11 @@ describe('code generation', () => {
     expect(generateCode(dollar, 'kotlin')).toContain('.url("https://api.test/\\$price")');
     expect(generateCode(dollar, 'dart')).toContain('request.headers["X-Key"] = "a\\$b";');
     expect(generateCode(jsonReq, 'java-httpclient')).toContain('HttpRequest.BodyPublishers.ofString(');
+    // gRPC: grpcurl
+    expect(grpcurlCommand({ target: 'localhost:50051', method: 'vet.v1.Patients/GetPatient', message: '{\n "id": "7"\n}', metadata: [{ key: 'authorization', value: "Bearer it's" }], protoFiles: ['vet.proto'], timeoutMs: 5000 })).toBe(
+      `grpcurl -plaintext -proto 'vet.proto' -H 'authorization: Bearer it'\\''s' -max-time 5 -d '{"id":"7"}' 'localhost:50051' 'vet.v1.Patients/GetPatient'`,
+    );
+    expect(grpcurlCommand({ target: 'grpcs://api.test:443', method: '/svc.S/M', message: '{}' })).toBe(`grpcurl 'api.test:443' 'svc.S/M'`);
     expect(generateCode(req, 'fetch')).toContain('body: JSON.stringify({');
     expect(generateCode(req, 'raw').split('\n')[0]).toBe('POST /pets?x=1 HTTP/1.1');
     expect(generateCode({ method: 'POST', url: 'https://a.test/u', headers: [], form: [{ key: 'f', value: '/a.png', file: true }] }, 'curl')).toContain(`--form 'f=@/a.png'`);

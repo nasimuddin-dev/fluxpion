@@ -3,6 +3,7 @@ import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   ApsError,
   applyAuth,
+  grpcurlCommand,
   startGraphQLSubscription,
   WebSocketSession,
   introspect,
@@ -44,6 +45,15 @@ export function requestsHandlers(be: Backend): Handlers {
       return { left: summary(a), right: summary(b), diff: diffResponses(comparable(a), comparable(b)) };
     },
     'http.cancel': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
+    /** A grpcurl command for the call, with {{variables}} resolved (like Copy as cURL, secrets included). */
+    'grpc.grpcurl': (p: { target: string; method: string; message?: string; metadata?: Array<{ key: string; value: string; enabled?: boolean }>; tls?: boolean; protoFiles?: string[]; timeoutMs?: number; environment?: string }) => {
+      const ctx = be.context({ environment: p.environment });
+      try {
+        return grpcurlCommand({ ...p, target: ctx.vars.resolve(p.target), message: ctx.vars.resolve(p.message ?? ''), metadata: ctx.vars.resolveDeep(p.metadata ?? []) });
+      } finally {
+        void ctx.dispose();
+      }
+    },
     'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => be.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
     'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => be.codeSnippet(p),
     'http.codeLanguages': () => CODE_LANGUAGES,

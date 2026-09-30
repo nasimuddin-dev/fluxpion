@@ -329,6 +329,30 @@ const generators: Record<string, (r: SnippetRequest) => string> = {
   },
 };
 
+/**
+ * A grpcurl command for a gRPC call (the gRPC counterpart of "Copy as cURL"). `grpcs://` or `tls` → TLS,
+ * otherwise -plaintext; proto files by name (-proto) or server reflection when there are none.
+ */
+export function grpcurlCommand(o: { target: string; method: string; message?: string; metadata?: Array<{ key: string; value: string; enabled?: boolean }>; tls?: boolean; protoFiles?: string[]; timeoutMs?: number }): string {
+  const tls = o.tls || /^grpcs:\/\//i.test(o.target);
+  const address = o.target.replace(/^grpcs?:\/\//i, '');
+  const method = o.method.replace(/^\//, '');
+  const parts = ['grpcurl'];
+  if (!tls) parts.push('-plaintext');
+  for (const p of o.protoFiles ?? []) parts.push('-proto', sq(p));
+  for (const m of (o.metadata ?? []).filter((x) => x.key && x.enabled !== false)) parts.push('-H', sq(`${m.key}: ${m.value}`));
+  if (o.timeoutMs) parts.push('-max-time', String(Math.ceil(o.timeoutMs / 1000)));
+  let msg = (o.message ?? '').trim();
+  try {
+    msg = JSON.stringify(JSON.parse(msg));
+  } catch {
+    /* keep as typed */
+  }
+  if (msg && msg !== '{}') parts.push('-d', sq(msg));
+  parts.push(sq(address), sq(method));
+  return parts.join(' ');
+}
+
 export function generateCode(r: SnippetRequest, language: string): string {
   const g = generators[language];
   if (!g) throw new Error(`Unknown code language ${language}`);

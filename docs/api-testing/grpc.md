@@ -16,6 +16,8 @@ The **gRPC** view calls any gRPC service described by `.proto` files, or by the 
 
 The response shows the gRPC status (`0 OK`, `5 NOT_FOUND` …) with its details, the time, the response message as a tree, the response **Metadata** and **Trailers**.
 
+**grpcurl** copies the call as a [grpcurl](https://github.com/fullstorydev/grpcurl) command, with variables resolved: `-plaintext` unless TLS is on, `-proto` for each proto file (or server reflection when the definitions came from it), metadata as `-H`, the message as `-d`. Like **Copy as cURL**, it includes secret values, so paste it with care.
+
 ## Saved requests and history
 
 **Save** keeps the request (address, method, message, metadata, its `.proto` files or reflected definition, and settings) in the **Saved requests** list, in folders like the REST collections (new folder, move by menu or drag and drop, rename, duplicate, delete). The client private key is never saved with a request. Every call also appears in **History** (with the method, address, status and time); double-click an entry to open it in the gRPC view again.
