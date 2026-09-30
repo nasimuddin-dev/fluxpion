@@ -82,7 +82,11 @@ export function MonitorsView() {
   useIntent(
     'monitors',
     (p?: { create?: { collectionId: string; selection?: string[] }; monitorId?: string }) => {
-      if (p?.monitorId) setSel(p.monitorId);
+      if (p?.monitorId) {
+        setSel(p.monitorId);
+        const m = rows.find((r) => r.id === p.monitorId);
+        if (m) setEditing(m);
+      }
       if (p?.create) setEditing({ name: '', collectionId: p.create.collectionId, selection: p.create.selection, everyMinutes: 15, enabled: true, environment: useApp.getState().environment });
     },
     'monitors',
@@ -159,7 +163,11 @@ export function MonitorsView() {
                   {shown.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setSel(m.id)}
+                      onClick={() => {
+                        // like the edit (pencil) button: select it and open its settings
+                        setSel(m.id);
+                        setEditing(m);
+                      }}
                       className={cx('w-full text-left px-2 py-1.5 rounded-md flex flex-col gap-0.5 transition-colors', sel === m.id ? 'bg-accent-soft' : 'hover:bg-hover')}
                     >
                       <div className="flex items-center gap-2 text-sm min-w-0">

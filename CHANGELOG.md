@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Monitors**: clicking a monitor in the list (or in the Collections explorer) opens its settings, like the edit button.
+
 ## 0.10.0 — 2026-09-30
 
 Highlights: the **Collections explorer**, everything saved in the workspace in one panel next to every view (Ctrl+B); **Postman-style request settings**; saved **evaluations** and **load tests** that run by name from the CLI and MCP (`testpion eval run`, `testpion load --saved`); **Export** beside Import; body types keep their content when you switch; and an update prompt that still appears if the window can't show it.
