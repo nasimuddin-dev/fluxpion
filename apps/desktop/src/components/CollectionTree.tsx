@@ -1,9 +1,10 @@
-import { AlarmClock, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
+import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';
 import { confirmAction, promptText, useApp } from '../store';
+import { MoveDialog, subtreeIds } from './MoveDialog';
 import { uid } from '../lib/format';
 import { FolderEditor } from './FolderEditor';
 import { matchesCollectionNode } from '../lib/collection-filter';
@@ -34,6 +35,11 @@ export function addToFolder(nodes: CollectionNode[], folderId: string | undefine
   return mapNodes(nodes, (n) => (n.kind === 'folder' && n.id === folderId ? { ...n, items: [...n.items, node] } : n));
 }
 
+/** Insert a copy right after the node with this id, wherever it is in the tree. */
+export function duplicateNode(nodes: CollectionNode[], id: string, copy: (n: CollectionNode) => CollectionNode): CollectionNode[] {
+  return nodes.flatMap((n) => (n.id === id ? [n, copy(n)] : n.kind === 'folder' ? [{ ...n, items: duplicateNode(n.items, id, copy) }] : [n]));
+}
+
 /** Tree of collections → folders → requests with inline actions. */
 export function CollectionTree({
   collections,
@@ -44,6 +50,7 @@ export function CollectionTree({
   onRun,
   filter,
   favoritesOnly = false,
+  onMoved,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -55,8 +62,23 @@ export function CollectionTree({
   filter?: string;
   /** Show starred requests while retaining their containing folders for context. */
   favoritesOnly?: boolean;
+  /** Requests (ids) moved from one collection to another, so open tabs can follow them. */
+  onMoved?(ids: string[], fromCollectionId: string, toCollectionId: string): void;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
+  const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
+  const move = (from: Collection, n: CollectionNode, to: Collection, folderId: string | undefined) => {
+    const without = { ...from, items: mapNodes(from.items, (x) => (x.id === n.id ? null : x)) };
+    if (to.id === from.id) onChange({ ...without, items: addToFolder(without.items, folderId, n) });
+    else {
+      // add to the new collection first: a failed save then leaves a copy rather than losing the request
+      onChange({ ...to, items: addToFolder(to.items, folderId, n) });
+      onChange(without);
+    }
+    onMoved?.(subtreeIds(n), from.id, to.id);
+    setMoving(undefined);
+    useApp.getState().toast(`Moved "${n.name}" to ${to.name}${folderId ? ` › ${findNode(to.items, folderId)?.name ?? ''}` : ''}`, 'success');
+  };
   const environment = useApp((s) => s.environment);
   /** Copy a saved request as its URL or as code, with variables resolved from the active environment. */
   const copyAs = async (c: Collection, n: SavedHttpRequest, language: string, what: string) => {
@@ -132,6 +154,7 @@ export function CollectionTree({
               </button>
               <NodeMenu
                 onEdit={() => setEditing({ c, folder: n })}
+                onMove={() => setMoving({ c, n })}
                 onRename={async () => {
                   const name = await promptText('Rename folder', { value: n.name, okLabel: 'Rename' });
                   if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
@@ -184,7 +207,8 @@ export function CollectionTree({
               if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
             }}
             onDelete={async () => (await confirmAction({ title: 'Delete request', message: `Delete the request "${n.name}"?`, detail: 'Its saved examples are deleted too. This cannot be undone.', confirmLabel: 'Delete request', danger: true })) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
-            onDuplicate={() => onChange({ ...c, items: mapNodes(c.items, (x) => x).flatMap((x) => (x.id === n.id ? [x, { ...x, id: uid('req-'), name: `${x.name} copy` }] : [x])) })}
+            onDuplicate={() => onChange({ ...c, items: duplicateNode(c.items, n.id, (x) => ({ ...x, id: uid('req-'), name: `${x.name} copy` })) })}
+            onMove={() => setMoving({ c, n })}
             onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}
             favorite={!!n.favorite}
           />
@@ -215,6 +239,7 @@ export function CollectionTree({
           onSave={(folder) => onChange({ ...editing.c, items: mapNodes(editing.c.items, (x) => (x.id === folder.id && x.kind === 'folder' ? { ...folder, items: x.items } : x)) })}
         />
       )}
+      {moving && <MoveDialog node={moving.n} from={moving.c} collections={collections} onClose={() => setMoving(undefined)} onMove={(to, folderId) => move(moving.c, moving.n, to, folderId)} />}
       {collections.map((c) => {
         const isOpen = open[c.id] ?? true;
         return (
@@ -274,6 +299,7 @@ function NodeMenu({
   onNewRequest,
   onNewFolder,
   onDuplicate,
+  onMove,
   onToggleFavorite,
   favorite,
   onRun,
@@ -291,6 +317,8 @@ function NodeMenu({
   onNewRequest?(): void;
   onNewFolder?(): void;
   onDuplicate?(): void;
+  /** Move to another folder or collection. */
+  onMove?(): void;
   onToggleFavorite?(): void;
   favorite?: boolean;
   onRun?(): void;
@@ -317,6 +345,7 @@ function NodeMenu({
   add('New folder', <FolderPlus size={14} />, onNewFolder);
   add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });
   add('Duplicate', <CopyPlus size={14} />, onDuplicate);
+  add('Move to…', <FolderInput size={14} />, onMove);
   add(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite);
   copyItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));
   extraItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));

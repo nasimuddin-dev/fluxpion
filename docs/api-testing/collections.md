@@ -23,12 +23,13 @@ Right-click a request in the tree, or click its **⋯** button:
 |---|---|
 | **Open in tab** | Open the request. |
 | **Rename**, **Duplicate**, **Add to favorites** | Manage the request. |
+| **Move to…** | Move it to another folder, or to a folder of another collection. Open tabs follow it. |
 | **Copy URL** | The URL with `{{variables}}` resolved from the active environment. |
 | **Copy as cURL (bash)**, **cURL (cmd)**, **PowerShell**, **fetch** | A runnable command or code, like the browser's *Copy as …*, with variables resolved and inherited auth applied. `fetch` code also runs in Node.js 18+. |
 | **More code snippets…** | Open the request with the code generator (Python, Go, Java, C#, HTTPie and more). |
 | **Delete** | Delete the request after a confirmation. |
 
-Copied commands include the request's real header and token values, so they run as they are, like Postman's *Copy as cURL*. When they do, the confirmation message says so. Folders have their own menu (Run, Edit folder, New request, New folder, Rename, Delete).
+Copied commands include the request's real header and token values, so they run as they are, like Postman's *Copy as cURL*. When they do, the confirmation message says so. Folders have their own menu (Run, Monitor on a schedule, Edit folder, New request, New folder, Rename, Move to…, Delete).
 
 ## Import
 

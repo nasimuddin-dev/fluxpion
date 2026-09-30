@@ -515,6 +515,7 @@ export function RestView() {
                   activeRequestId={tab.requestId}
                   onOpen={openRequest}
                   onChange={saveCollection}
+                  onMoved={(ids, from, to) => setTabs((ts) => ts.map((t) => (t.requestId && ids.includes(t.requestId) && t.collectionId === from ? { ...t, collectionId: to } : t)))}
                   onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
                   onNewRequest={async (c, folderId) => {
                     const t = blankRequest();
