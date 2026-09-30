@@ -84,7 +84,10 @@ export function McpView() {
       }),
     );
   }, [load]);
-  useIntent('mcp', (p) => p?.serverId && setSelected(p.serverId));
+  useIntent('mcp', (p) => {
+    if (p?.serverId) setSelected(p.serverId);
+    if (p?.addServer) setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [] });
+  });
 
   const server = servers.find((s) => s.id === selected);
   const disc = selected ? discovery[selected] : undefined;

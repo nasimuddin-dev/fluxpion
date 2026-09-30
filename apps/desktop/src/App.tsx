@@ -3,6 +3,7 @@ import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
+import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
 import { Spinner, TooltipProvider } from './components/ui';
 
@@ -82,12 +83,15 @@ export default function App() {
     })();
     const off = on('run.error', (p: { error: { message: string } }) => useApp.getState().toast(`Run failed: ${p.error.message}`, 'error'));
     const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
+    // application menu (File ▸ New, Import, Export, Save …)
+    const offMenu = on<{ command: MenuCommand }>('menu.command', ({ command }) => void runMenuCommand(command));
     // File menu: request tab commands (handled by the REST view)
     const offTabs = on<{ command: string }>('tabs.command', ({ command }) => useApp.getState().openIntent('rest', command === 'new' ? { newTab: true } : { tabCommand: command }));
     return () => {
       off();
       offUpdate();
       offTabs();
+      offMenu();
     };
   }, []);
 
@@ -152,6 +156,18 @@ export default function App() {
       { id: 'compare', label: 'Compare Models', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'compare' }) },
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
       { id: 'update', label: 'Check for Updates', hint: 'Help', run: () => void checkForUpdates({ manual: true }) },
+      { id: 'm-new-http', label: 'New HTTP Request', hint: 'File', run: () => void runMenuCommand('new-http') },
+      { id: 'm-new-grpc', label: 'New gRPC Request', hint: 'File', run: () => void runMenuCommand('new-grpc') },
+      { id: 'm-new-ws', label: 'New WebSocket Connection', hint: 'File', run: () => void runMenuCommand('new-websocket') },
+      { id: 'm-new-mcp', label: 'Add MCP Server', hint: 'File', run: () => void runMenuCommand('new-mcp-server') },
+      { id: 'm-new-col', label: 'New Collection', hint: 'File', run: () => void runMenuCommand('new-collection') },
+      { id: 'm-new-env', label: 'New Environment', hint: 'File', run: () => void runMenuCommand('new-environment') },
+      { id: 'm-new-workspace', label: 'New Workspace', hint: 'File', run: () => void runMenuCommand('new-workspace') },
+      { id: 'm-open-ws', label: 'Open Workspace Folder', hint: 'File', run: () => void runMenuCommand('open-workspace') },
+      { id: 'm-import', label: 'Import (Postman, OpenAPI, HAR, cURL …)', hint: 'File', run: () => void runMenuCommand('import') },
+      { id: 'm-exp-col', label: 'Export Collection (Postman)', hint: 'File', run: () => void runMenuCommand('export-collection') },
+      { id: 'm-exp-env', label: 'Export Current Environment', hint: 'File', run: () => void runMenuCommand('export-environment') },
+      { id: 'm-exp-ws', label: 'Export Workspace', hint: 'File', run: () => void runMenuCommand('export-workspace') },
     ];
     for (const n of NAV) cmds.push({ id: `go-${n.id}`, label: `Go to ${n.label}`, run: () => s.setView(n.id) });
     for (const e of workspace?.environments ?? []) cmds.push({ id: `env-${e.id}`, label: `Switch Environment: ${e.name}`, run: () => s.setEnvironment(e.name) });

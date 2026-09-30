@@ -37,6 +37,23 @@ Hover a workspace and click **⋯**, or right-click it:
 - A folder you opened yourself (for example a git checkout) is only **removed from the list**. Its files stay, and **Open folder** brings it back.
 - You can delete the open workspace: TestPion switches to another one first. Your only workspace can't be deleted; create another one first.
 
+## The File menu
+
+The **File** menu gathers what you create and move in and out of a workspace:
+
+| Item | What it does |
+|---|---|
+| **New Request Tab** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>T</kbd>) | A new REST request tab. |
+| **New ▸** HTTP Request, GraphQL Query, gRPC Request, WebSocket / Socket.IO Connection, MCP Server…, Collection…, Environment…, Workspace… | Starts each kind of work in its view. |
+| **Open Workspace Folder…** | Opens a folder that contains `workspace.json` (e.g. inside a git repository). |
+| **Import…** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>O</kbd>) | Postman collections and environments, OpenAPI / Swagger (the document is kept and contract checks added), HAR, TestPion exports, or a copied cURL / fetch / PowerShell request. |
+| **Export ▸** Collection (Postman v2.1)…, Current Environment…, Workspace… | Exports the selected collection, the active environment or the whole workspace. Secret values are never exported. |
+| **Save** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>) | Saves what you're editing (request, test file …). |
+| **Close Tab**, **Close Other Tabs**, **Close All Tabs** | Request tabs (see [REST](../api-testing/rest.md)). |
+| **Settings…** (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>,</kbd>) | App settings. |
+
+The same commands are in the command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>), which is also how to reach them in the browser version.
+
 ## From the CLI and AI agents
 
 ```bash

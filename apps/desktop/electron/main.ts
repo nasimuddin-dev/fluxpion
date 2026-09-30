@@ -95,6 +95,9 @@ function emit(channel: string, payload: unknown): void {
   if (win && !win.isDestroyed()) win.webContents.send('aps:event', channel, payload);
 }
 
+/** A command of the application menu, run by the renderer (menu-commands.ts). */
+const menu = (command: string) => emit('menu.command', { command });
+
 app.whenReady().then(() => {
   try {
     start();
@@ -170,10 +173,39 @@ function start(): void {
         label: 'File',
         submenu: [
           { label: 'New Request Tab', accelerator: 'CmdOrCtrl+T', click: () => emit('tabs.command', { command: 'new' }) },
+          {
+            label: 'New',
+            submenu: [
+              { label: 'HTTP Request', click: () => menu('new-http') },
+              { label: 'GraphQL Query', click: () => menu('new-graphql') },
+              { label: 'gRPC Request', click: () => menu('new-grpc') },
+              { label: 'WebSocket / Socket.IO Connection', click: () => menu('new-websocket') },
+              { label: 'MCP Server…', click: () => menu('new-mcp-server') },
+              { type: 'separator' },
+              { label: 'Collection…', click: () => menu('new-collection') },
+              { label: 'Environment…', click: () => menu('new-environment') },
+              { label: 'Workspace…', click: () => menu('new-workspace') },
+            ],
+          },
+          { label: 'Open Workspace Folder…', click: () => menu('open-workspace') },
+          { type: 'separator' },
+          { label: 'Import…', accelerator: 'CmdOrCtrl+O', click: () => menu('import') },
+          {
+            label: 'Export',
+            submenu: [
+              { label: 'Collection (Postman v2.1)…', click: () => menu('export-collection') },
+              { label: 'Current Environment…', click: () => menu('export-environment') },
+              { label: 'Workspace…', click: () => menu('export-workspace') },
+            ],
+          },
+          { type: 'separator' },
+          { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => menu('save') },
           { type: 'separator' },
           { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => emit('tabs.command', { command: 'close' }) },
           { label: 'Close Other Tabs', click: () => emit('tabs.command', { command: 'closeOthers' }) },
           { label: 'Close All Tabs', accelerator: 'CmdOrCtrl+Shift+W', click: () => emit('tabs.command', { command: 'closeAll' }) },
+          { type: 'separator' },
+          { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => menu('settings') },
           { type: 'separator' },
           process.platform === 'darwin' ? { role: 'close', label: 'Close Window', accelerator: 'CmdOrCtrl+Alt+W' } : { role: 'quit', label: 'Exit' },
         ],

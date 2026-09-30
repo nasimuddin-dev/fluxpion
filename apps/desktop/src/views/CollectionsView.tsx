@@ -39,6 +39,12 @@ export function CollectionsView() {
     }
     if (p?.mock) setTab('mock');
     if (p?.import) setImporting(true);
+    // File ▸ Export ▸ Collection: the selected collection (or the first one)
+    if (p?.export) {
+      const id = p.collectionId ?? sel ?? cols[0]?.id;
+      if (id) void exportAs(id, p.export === 'testpion' ? 'testpion' : 'postman');
+      else useApp.getState().toast('There is no collection to export yet.', 'error');
+    }
   });
   const save = async (c: Collection) => {
     await call('col.save', c);
