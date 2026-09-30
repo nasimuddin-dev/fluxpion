@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 — 2026-09-30
+
+Highlights: the **Collections sidebar** now reads workspace → collections → categories (REST, SOAP, GraphQL, gRPC, WebSocket & MQTT); several GraphQL, gRPC and WebSocket tabs; a **Payload** tab in traces; tab menus on every tab.
 
 - **Collections sidebar: workspace → collections → categories**: the sidebar lists the workspace's collections directly; expanding one shows what it holds by category, **REST**, **SOAP**, **GraphQL**, **gRPC** and **WebSocket & MQTT**, each with its count, its folders and a **+** that creates that kind of request in the collection (the collection's menu has them too). SOAP requests are recognised by their XML envelope or SOAPAction header. gRPC calls and WebSocket / Socket.IO / MQTT connections can now belong to a collection (a new gRPC or WebSocket request started from a collection is saved into it); ones saved before are listed under **Not in a collection**, and their menu moves them into one. MCP servers and API definitions stay below the collections, as they belong to the whole workspace. The examples workspace gains **gRPC (grpcb.in)** and **WebSocket & MQTT** collections.
 
