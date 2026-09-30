@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Export to Bruno**: **Export ▸ Bruno collection folder…** and `testpion export --format bruno --out <folder>` write a collection (with the workspace's environments, secret values never) as the folder Bruno keeps in git; it imports back unchanged.
 - **Examples**: the Examples workspace has a SOAP collection imported from a public WSDL and an MQTT test and saved connection for the public Mosquitto broker.
 - **Paste a grpcurl command** into the gRPC view's server field to fill in the call (server, TLS, method, message, metadata, time limit).
 - **Save as test**: turn the request in the REST (tab menu), GraphQL, gRPC or WebSocket / Socket.IO / MQTT view into a YAML test file under `tests/`, with its checks and scripts ({{variables}} kept), ready for the Tests view, `testpion test` and CI. AI agents use the `save_test` MCP tool.

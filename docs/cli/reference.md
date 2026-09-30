@@ -280,6 +280,7 @@ Parts that Postman can't represent are listed on standard error as `not exported
 ```bash
 testpion import openapi.yaml -w my-workspace
 testpion import ./bruno/clinic-api -w my-workspace      # a Bruno collection folder (bruno.json + .bru files)
+testpion export "Clinic API" -w my-workspace --format bruno --out ./bruno/clinic-api   # and back
 testpion import 'http://127.0.0.1:4010/soap/patients?wsdl' -w my-workspace   # a SOAP service's WSDL
 # a request copied from browser devtools (cURL for bash or cmd, fetch, PowerShell), from a file or stdin
 testpion import copied-request.txt -w my-workspace --collection "Checkout API" --folder "Cart" --json

@@ -5,6 +5,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  bruFilesToBrunoExport,
+  collectionToBru,
   detectFormat,
   importAny,
   parseBru,
@@ -196,6 +198,22 @@ describe('Bruno .bru files', () => {
     expect(seen[1]).toMatchObject({ url: '/patients/7?full=true', auth: 'Bearer tok-9', visit: 'Local', trace: 'from-collection' });
     const names = results.flatMap((r) => r.checks.map((c) => c.name));
     expect(names).toEqual(expect.arrayContaining(['res.body.token: isString', "res.headers['content-type']: contains json", 'found the dog']));
+  });
+
+  it('exports back to a Bruno folder that imports the same (and still runs)', async () => {
+    const first = importAny(readBrunoFolder(dir));
+    const files = collectionToBru(first.collection!, first.environments ?? []);
+    expect(files.map((f) => f.path).sort()).toEqual(['Log in.bru', 'Patients/Get patient.bru', 'Patients/folder.bru', 'bruno.json', 'collection.bru', 'environments/Local.bru']);
+    expect(files.find((f) => f.path === 'environments/Local.bru')!.text).toContain('vars:secret [\n  password\n]');
+    expect(files.find((f) => f.path === 'Log in.bru')!.text).toContain('res.status: eq 200');
+    const again = importAny(JSON.stringify(bruFilesToBrunoExport(files)));
+    const shape = (c: typeof first.collection) => JSON.stringify(c!.items, (k, v) => (k === 'id' ? undefined : v));
+    expect(again.collection!.name).toBe('Clinic API');
+    expect(shape(again.collection)).toBe(shape(first.collection));
+    seen.length = 0;
+    const results: TestResult[] = [];
+    await runCollection({ name: 'again', collection: again.collection!, services: services(), onEvent: (e) => void (e.type === 'test-end' && results.push(e.result)) });
+    expect(results.flatMap((r) => r.checks.filter((c) => !c.passed))).toEqual([]);
   });
 
   it('reports a failing Bruno assertion', async () => {

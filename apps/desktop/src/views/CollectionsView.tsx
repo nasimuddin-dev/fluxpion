@@ -1,4 +1,4 @@
-import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Radio, Send, ShieldCheck, Trash2, Upload } from 'lucide-react';
+import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Radio, Send, ShieldCheck, Trash2, Upload, FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -55,7 +55,7 @@ export function CollectionsView() {
     await load();
     useApp.getState().toast('Collection saved', 'success');
   };
-  const exportAs = async (id: string, format: 'testpion' | 'postman' | 'openapi') => {
+  const exportAs = async (id: string, format: 'testpion' | 'postman' | 'openapi' | 'bruno') => {
     try {
       const r = await call<{ path?: string; collection?: unknown; text?: string; name: string; notes: string[] }>('col.export', { id, format });
       if (r.collection) download(r.name, JSON.stringify(r.collection, null, 2));
@@ -153,6 +153,7 @@ export function CollectionsView() {
                     { label: 'TestPion collection (.json)', icon: <FileJson size={14} />, onSelect: () => void exportAs(draft.id, 'testpion') },
                     { label: 'Postman collection v2.1', icon: <Send size={14} />, onSelect: () => void exportAs(draft.id, 'postman') },
                     { label: 'OpenAPI 3.1 (.yaml)', icon: <FileCode size={14} />, onSelect: () => void exportAs(draft.id, 'openapi') },
+                    { label: 'Bruno collection folder…', icon: <FolderOpen size={14} />, onSelect: () => void exportAs(draft.id, 'bruno') },
                   ]}
                 />
                 <Button size="sm" variant="primary" onClick={() => save(draft)}>

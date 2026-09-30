@@ -1,10 +1,11 @@
 /** RPC handlers: Collections (requests, folders, examples, import/export) and their mock servers. */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   ApsError,
   fetchImportText,
   bruFilesToBrunoExport,
+  collectionToBru,
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
@@ -199,8 +200,24 @@ export function collectionsHandlers(be: Backend): Handlers {
       return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
     },
     /** Export a collection as TestPion JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
-    'col.export': async ({ id, format = 'testpion' }: { id: string; format?: 'testpion' | 'postman' | 'openapi' }) => {
+    'col.export': async ({ id, format = 'testpion' }: { id: string; format?: 'testpion' | 'postman' | 'openapi' | 'bruno' }) => {
       const c = be.ws.getCollection(id);
+      if (format === 'bruno') {
+        // a Bruno collection folder, with the workspace's environments (secret values never); written into a chosen folder
+        const files = collectionToBru(c, be.ws.listEnvironments());
+        const parent = await be.host.openDialog?.({ directory: true });
+        if (!parent) {
+          if (!be.host.openDialog) throw new ApsError('ValidationError', 'Exporting a Bruno folder needs the desktop app', { suggestions: ['Use testpion export "<collection>" --format bruno --out <folder>.'] });
+          return { name: c.name, notes: [] as string[] };
+        }
+        const out = join(parent, c.name.replace(/[<>:"/\\|?*]/g, '-'));
+        for (const f of files) {
+          const p = join(out, ...f.path.split('/'));
+          mkdirSync(dirname(p), { recursive: true });
+          writeFileSync(p, f.text);
+        }
+        return { path: out, name: c.name, notes: [] as string[] };
+      }
       if (format === 'openapi') {
         // an OpenAPI 3.1 description of the collection's HTTP requests (YAML)
         const text = collectionToOpenApiText(c);

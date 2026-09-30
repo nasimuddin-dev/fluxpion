@@ -1,6 +1,6 @@
 /** Moving data in and out: import, export, docs, script conversion, response history and environments. */
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { Command, Option } from 'commander';
 import {
   WorkspaceManager,
@@ -28,6 +28,8 @@ import {
   type CollectionNode,
   fetchImportText,
   readBrunoFolder,
+  collectionToBru,
+  type Environment,
   bundleWsdl,
   isWsdl,
   importIntoWorkspace,
@@ -42,7 +44,7 @@ import {
   renameVariable,
   historyToHar,
 } from '@testpion/core';
-import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
+import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
 export function registerDataCommands(program: Command): void {
   program
@@ -148,14 +150,34 @@ export function registerDataCommands(program: Command): void {
     });
   program
     .command('export')
-    .description('export a collection as a Postman v2.1 collection (default), TestPion JSON, or an OpenAPI 3.1 document (--format openapi)\n<collection> is a collection name or id in the workspace, or a collection file to convert')
+    .description('export a collection as a Postman v2.1 collection (default), TestPion JSON, an OpenAPI 3.1 document (--format openapi) or a Bruno collection folder (--format bruno --out <folder>)\n<collection> is a collection name or id in the workspace, or a collection file to convert')
     .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
-    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'testpion', 'openapi']).default('postman'))
+    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'testpion', 'openapi', 'bruno']).default('postman'))
     .option('--json', 'with --format openapi: JSON instead of YAML')
     .option('-o, --out <file>', 'write to this file instead of stdout')
-    .action(async (ref: string, o: { workspace?: string; format: 'postman' | 'testpion' | 'openapi'; json?: boolean; out?: string }) => {
+    .action(async (ref: string, o: { workspace?: string; format: 'postman' | 'testpion' | 'openapi' | 'bruno'; json?: boolean; out?: string }) => {
       const c = await loadCollectionRef(ref, o.workspace);
+      if (o.format === 'bruno') {
+        // a folder like the one Bruno keeps in git; the workspace's environments go to environments/ (secret values never)
+        if (!o.out) throw new CliError('--format bruno writes a folder: give it with --out <folder>', EXIT.CONFIG_ERROR);
+        const wsDir = o.workspace ? undefined : findWorkspaceUp(process.cwd());
+        let envs: Environment[] = [];
+        if (o.workspace || wsDir) {
+          const { store } = openWorkspace(o.workspace ?? wsDir, undefined, new WorkspaceManager());
+          envs = store.listEnvironments();
+          store.close();
+        }
+        const out = resolve(o.out);
+        const files = collectionToBru(c, envs);
+        for (const f of files) {
+          const p = join(out, ...f.path.split('/'));
+          mkdirSync(dirname(p), { recursive: true });
+          writeFileSync(p, f.text);
+        }
+        console.error(dim(`Bruno collection written to ${out} (${files.length} files${envs.length ? `, ${envs.length} environments without secret values` : ''})`));
+        return;
+      }
       if (o.format === 'openapi') {
         const text = collectionToOpenApiText(c, { format: o.json ? 'json' : 'yaml' });
         if (o.out) {

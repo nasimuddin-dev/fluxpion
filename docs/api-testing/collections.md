@@ -74,6 +74,8 @@ Bruno scripts **run as they are**: TestPion's script sandbox has Bruno's API nex
 
 From the terminal, give the folder: `testpion import ./my-bruno-collection -w my-workspace`.
 
+The other way works too: **Export ▸ Bruno collection folder…** (or `testpion export "My API" --format bruno --out ./bruno/my-api`) writes the collection as a Bruno folder, with the workspace's environments (secret variables by name only). Status and JSONPath `equals` / `exists` checks become Bruno assertions; scripts that came from Bruno go back as they were, and TestPion (`pm.*`) scripts are marked, since Bruno runs its own script API.
+
 **Import…** in the workspace menu (top bar) accepts the same files. A TestPion workspace export opens as a new workspace, and anything else (a Postman, Insomnia, Bruno or Hoppscotch file, OpenAPI, HAR) is added to the open workspace.
 
 **From a link:** paste a URL in the Import dialog's link box and press **Import link**: an OpenAPI URL (`https://petstore3.swagger.io/api/v3/openapi.json`), a file on GitHub, GitLab or Bitbucket (the file page is fine, TestPion downloads the raw file), or a Postman collection's API link. Links must be public http(s) URLs of at most 20 MB; for a private file, download it and import the file.
