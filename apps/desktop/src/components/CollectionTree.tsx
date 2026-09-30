@@ -72,6 +72,11 @@ export function CollectionTree({
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
+  /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
+  const removeWithUndo = (c: Collection, n: CollectionNode) => {
+    onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) });
+    useApp.getState().toast(`Deleted "${n.name}"`, 'info', { label: 'Undo', onClick: () => onChange(c) });
+  };
   // drag and drop: a request or folder onto a request (before it), a folder (into it) or a collection (top level)
   const [drag, setDrag] = useState<{ c: Collection; n: CollectionNode }>();
   const [dropAt, setDropAt] = useState<{ id: string; mode: 'before' | 'into' }>();
@@ -211,7 +216,7 @@ export function CollectionTree({
                   const name = await promptText('Rename folder', { value: n.name, okLabel: 'Rename' });
                   if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
                 }}
-                onDelete={async () => (await confirmAction({ title: 'Delete folder', message: `Delete the folder "${n.name}" and all requests in it?`, detail: 'This cannot be undone.', confirmLabel: 'Delete folder', danger: true })) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
+                onDelete={async () => (await confirmAction({ title: 'Delete folder', message: `Delete the folder "${n.name}" and all requests in it?`, confirmLabel: 'Delete folder', danger: true })) && removeWithUndo(c, n)}
                 onNewRequest={() => onNewRequest(c, n.id)}
                 onRun={onRun && (() => onRun(c, n.id))}
                 runLabel="Run folder"
@@ -260,7 +265,7 @@ export function CollectionTree({
               const name = await promptText('Rename request', { value: n.name, okLabel: 'Rename' });
               if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
             }}
-            onDelete={async () => (await confirmAction({ title: 'Delete request', message: `Delete the request "${n.name}"?`, detail: 'Its saved examples are deleted too. This cannot be undone.', confirmLabel: 'Delete request', danger: true })) && onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) })}
+            onDelete={async () => (await confirmAction({ title: 'Delete request', message: `Delete the request "${n.name}"?`, detail: 'Its saved examples are deleted too.', confirmLabel: 'Delete request', danger: true })) && removeWithUndo(c, n)}
             onDuplicate={() => onChange({ ...c, items: duplicateNode(c.items, n.id, (x) => ({ ...x, id: uid('req-'), name: `${x.name} copy` })) })}
             onMove={() => setMoving({ c, n })}
             onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}

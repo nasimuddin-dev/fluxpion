@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Undo deleting a request or folder.** The message after deleting one in the collection tree has an **Undo** button.
 - **Move requests and folders.** Drag them in the collection tree (onto a request to place before it, onto a folder to put inside, onto a collection name for its top level, across collections too), or use **Move to…** in their menu. Open tabs follow them.
 - Fixed: **Duplicate** did nothing for a request inside a folder.
 - **Home shows what's working.** When a workspace has monitors or test runs, Home adds a **Monitors** card (last result of each, paused ones marked) and a **Recent test runs** card (passed / failed, opens the run).

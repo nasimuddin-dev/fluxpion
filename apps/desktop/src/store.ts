@@ -99,7 +99,7 @@ interface AppState {
   dialog?: DialogRequest;
   progress?: ProgressState | null;
   set(p: Partial<AppState>): void;
-  toast(text: string, kind?: Toast['kind']): void;
+  toast(text: string, kind?: Toast['kind'], action?: { label: string; onClick(): void }): void;
   setActivity(key: string, label?: string): void;
   openIntent(view: ViewId, payload: any): void;
   refreshWorkspace(): Promise<void>;
@@ -124,11 +124,13 @@ export const useApp = create<AppState>((set, get) => ({
   activity: {},
   mcpConnected: 0,
   set: (p) => set(p),
-  toast: (text, kind = 'info') => {
+  toast: (text, kind = 'info', action) => {
     const id = ++toastId;
+    // a toast with an action (Undo) stays longer, so there is time to use it
+    const duration = action ? 8000 : kind === 'error' ? 7000 : 3500;
     set({ toasts: [...get().toasts, { id, kind, text }] });
-    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), kind === 'error' ? 7000 : 3500);
-    (kind === 'error' ? sonner.error : kind === 'success' ? sonner.success : sonner)(text, { duration: kind === 'error' ? 7000 : 3500 });
+    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), duration);
+    (kind === 'error' ? sonner.error : kind === 'success' ? sonner.success : sonner)(text, { duration, ...(action ? { action: { label: action.label, onClick: action.onClick } } : {}) });
   },
   setActivity: (key, label) => {
     const a = { ...get().activity };
