@@ -2,6 +2,8 @@ import { parse as parseYaml } from 'yaml';
 import type { AuthConfig, BodyConfig, CheckConfig, Collection, CollectionFolder, CollectionNode, Environment, KeyValue, SavedGraphQLRequest, SavedHttpRequest } from '../model/types.js';
 import { SCHEMA_VERSION } from '../model/types.js';
 import { shortId, slugify } from '../util/ids.js';
+import { bruFilesToBrunoExport, looksLikeBru } from './bru.js';
+import { brunoAssertionScript } from '../scripts/bruno.js';
 
 /**
  * Importers for other API clients' exports: Insomnia (v4 JSON export, v5 YAML), Bruno (collection
@@ -219,25 +221,64 @@ function brunoAssertions(list: Any[] | undefined): CheckConfig[] | undefined {
   return out.length ? out : undefined;
 }
 
+/** A Bruno script, kept runnable: Bruno's bru / req / res API works in TestPion's sandbox. */
+function brunoScript(...parts: Array<string | undefined>): string | undefined {
+  const s = parts.map((p) => String(p ?? '').trim()).filter(Boolean).join('\n\n');
+  return s ? `// Bruno script: runs with Bruno's bru, req and res API\n${s}` : undefined;
+}
+
+/** A request's vars:pre-request (request variables) and vars:post-response (values taken from the response). */
+function brunoVars(vars: Any | undefined): { pre?: string; post?: string } {
+  const on = (l: Any[] | undefined) => (l ?? []).filter((v: Any) => v?.name && v.enabled !== false);
+  const pre = on(vars?.req).map((v: Any) => `pm.variables.set(${JSON.stringify(v.name)}, ${JSON.stringify(normalizeTemplate(v.value ?? ''))});`);
+  // post-response values are expressions over res, e.g. res.body.token
+  const post = on(vars?.res).map((v: Any) => `bru.setVar(${JSON.stringify(v.name)}, ${String(v.value ?? 'undefined')});`);
+  return { pre: pre.join('\n') || undefined, post: post.join('\n') || undefined };
+}
+
+/** Folder and collection settings (Bruno's folder.bru / collection.bru "root"): auth, headers, variables, scripts. */
+function brunoRoot(root: Any | undefined): Partial<CollectionFolder> {
+  const r = root?.request;
+  if (!r) return {};
+  const pre = brunoScript(r.script?.req);
+  const post = brunoScript(r.script?.res, r.tests);
+  const variables = kv(r.vars?.req, 'name', (x) => x.enabled !== false);
+  return {
+    ...(brunoAuth(r.auth) ? { auth: brunoAuth(r.auth) } : {}),
+    ...(variables.length ? { variables } : {}),
+    ...(pre ? { preRequestScript: pre } : {}),
+    ...(post ? { testScript: post } : {}),
+  };
+}
+
 export function importBruno(text: string): { collection: Collection; environments: Environment[] } {
-  const d: Any = JSON.parse(text);
-  const convert = (items: Any[]): CollectionNode[] =>
+  // a single .bru request file, or a Bruno JSON export
+  const d: Any = looksLikeBru(text) ? bruFilesToBrunoExport([{ path: 'request.bru', text }], 'Bruno import') : JSON.parse(text);
+  const withHeaders = (headers: KeyValue[], root: Any[]): KeyValue[] => {
+    // folder and collection headers are sent with every request inside (the request's own win)
+    const names = new Set(headers.map((h) => h.key.toLowerCase()));
+    const extra = root.flatMap((r) => kv(r?.request?.headers, 'name', (x) => x.enabled !== false)).filter((h) => !names.has(h.key.toLowerCase()) && (names.add(h.key.toLowerCase()), true));
+    return [...headers, ...extra];
+  };
+  const convert = (items: Any[], roots: Any[]): CollectionNode[] =>
     [...(items ?? [])]
       .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
       .flatMap((it: Any): CollectionNode[] => {
-        if (it.type === 'folder') return [{ kind: 'folder', id: shortId('fld-'), name: it.name ?? 'Folder', items: convert(it.items), ...(brunoAuth(it.root?.request?.auth) ? { auth: brunoAuth(it.root.request.auth) } : {}) } as CollectionFolder];
+        if (it.type === 'folder') return [{ kind: 'folder', id: shortId('fld-'), name: it.name ?? 'Folder', items: convert(it.items, [it.root, ...roots]), ...brunoRoot(it.root) } as CollectionFolder];
         const r = it.request ?? {};
-        const headers = kv(r.headers, 'name', (x) => x.enabled !== false);
+        const headers = withHeaders(kv(r.headers, 'name', (x) => x.enabled !== false), roots);
         const auth = brunoAuth(r.auth) ?? { type: 'inherit' as const };
         const url = normalizeTemplate(r.url);
         if (it.type === 'graphql-request') {
+          const gPre = brunoScript(brunoVars(r.vars).pre, r.script?.req);
+          const gPost = brunoScript(brunoVars(r.vars).post, r.script?.res, brunoAssertionScript(r.assertions ?? []), r.tests);
           let variables: Any | undefined;
           try {
             variables = r.body?.graphql?.variables ? JSON.parse(r.body.graphql.variables) : undefined;
           } catch {
             variables = undefined;
           }
-          return [{ kind: 'graphql', id: shortId('gql-'), name: it.name || url, request: { endpoint: url, query: normalizeTemplate(r.body?.graphql?.query ?? ''), variables, headers, auth } }];
+          return [{ kind: 'graphql', id: shortId('gql-'), name: it.name || url, request: { endpoint: url, query: normalizeTemplate(r.body?.graphql?.query ?? ''), variables, headers, auth }, ...(gPre ? { preRequestScript: gPre } : {}), ...(gPost ? { testScript: gPost } : {}) }];
         }
         if (it.type !== 'http-request') return [];
         const b = r.body ?? {};
@@ -249,8 +290,11 @@ export function importBruno(text: string): { collection: Collection; environment
           : b.mode === 'multipartForm' ? { type: 'multipart', fields: (b.multipartForm ?? []).filter((f: Any) => f.name).map((f: Any) => ({ key: f.name, value: f.type === 'file' ? [].concat(f.value ?? []).join(',') : normalizeTemplate(f.value ?? ''), kind: f.type === 'file' ? 'file' : 'text', enabled: f.enabled !== false })) }
           : undefined;
         const params = (r.params ?? []) as Any[];
-        const pre = commented('Bruno', r.script?.req);
-        const post = [commented('Bruno', r.script?.res), commented('Bruno', r.tests)].filter(Boolean).join('\n');
+        const vars = brunoVars(r.vars);
+        // assertions other than a plain status check become tests
+        const asserted = (r.assertions ?? []).filter((a: Any) => !(a.name === 'res.status' && /^eq\s+\d{3}$/.test(String(a.value ?? '').trim())));
+        const pre = brunoScript(vars.pre, r.script?.req);
+        const post = brunoScript(vars.post, r.script?.res, brunoAssertionScript(asserted), r.tests);
         const pathVariables = kv(params.filter((p) => p.type === 'path'), 'name', (x) => x.enabled !== false);
         return [
           {
@@ -280,8 +324,17 @@ export function importBruno(text: string): { collection: Collection; environment
     // secret values stay out of workspace files: they become empty secret variables
     variables: (e.variables ?? []).filter((v: Any) => v.name).map((v: Any) => ({ key: v.name, value: v.secret ? '' : normalizeTemplate(v.value ?? ''), enabled: v.enabled !== false, ...(v.secret ? { secret: true } : {}) })),
   }));
-  const collectionVars = kv(d.root?.request?.vars?.req, 'name', (x) => x.enabled !== false);
-  return { collection: collectionOf(d.name ?? 'Bruno import', convert(d.items), { variables: collectionVars, ...(brunoAuth(d.root?.request?.auth) ? { auth: brunoAuth(d.root.request.auth) } : {}), ...(d.root?.docs ? { description: String(d.root.docs) } : {}) }), environments };
+  const root = brunoRoot(d.root);
+  return {
+    collection: collectionOf(d.name ?? 'Bruno import', convert(d.items, [d.root]), {
+      variables: root.variables ?? [],
+      ...(root.auth ? { auth: root.auth } : {}),
+      ...(root.preRequestScript ? { preRequestScript: root.preRequestScript } : {}),
+      ...(root.testScript ? { testScript: root.testScript } : {}),
+      ...(d.root?.docs ? { description: String(d.root.docs) } : {}),
+    }),
+    environments,
+  };
 }
 
 /* ------------------------------------------------------------------ Hoppscotch */

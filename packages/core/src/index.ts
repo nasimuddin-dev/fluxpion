@@ -28,6 +28,7 @@ export * from './protocols/grpc/grpc.js';
 export * from './protocols/grpc/reflection.js';
 export * from './protocols/socketio/socketio.js';
 export * from './protocols/mqtt/mqtt.js';
+export * from './import/bru.js';
 export * from './protocols/realtime.js';
 export * from './protocols/mcp/client.js';
 export * from './protocols/websocket/websocket.js';

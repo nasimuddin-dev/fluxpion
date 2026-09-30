@@ -38,17 +38,28 @@ Copied commands include the request's real header and token values, so they run 
 - OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, security schemes map to auth, and each documented response becomes a saved [example](#examples) (so the collection can be [mocked](/api-testing/mock-servers) right away). The document is kept in the workspace's `specs/` folder and every request gets a [**Matches OpenAPI contract**](../test-runner/assertions.md#openapi-contract-testing) check, so running the collection tests the API against its own contract (`testpion import --no-contract-checks` leaves the checks out).
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
 - Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment.
-- Bruno collection exports (JSON, from *Export collection*), with their environments. Secret variables arrive empty: set them again as secrets. `res.status: eq 200` assertions become status checks.
+- Bruno collections: the collection folder itself (**Bruno folder…**, the folder with `bruno.json` and the `.bru` files you keep in git), a single `.bru` request file, or a JSON export (*Export collection*). See [Bruno](#bruno) below.
 - Hoppscotch collections (JSON).
 - HAR files.
 
-From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Their scripts use each tool's own script API, so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
+From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Insomnia and Hoppscotch scripts use each tool's own script API, so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
 - TestPion collections and workspace exports.
 - A single request copied as cURL (bash or cmd), fetch or PowerShell. It is saved to the **Imported** collection, named after its method and path. Secrets in it (tokens, API keys, cookies, passwords) are replaced by `{{variables}}`, and a message lists the ones to add as secret environment variables. To just try the request without saving it, paste it into the REST view instead (see [paste a request](/api-testing/rest#paste-a-request-from-the-browser)).
 
 If a Postman collection's scripts use something TestPion's script sandbox doesn't have (`cheerio`, `pm.vault`, `pm.require` packages, or a `require()` of a module other than crypto-js, uuid, tv4, lodash and moment), the import says which requests and what to use instead (`scriptWarnings` in `testpion import --json` and the MCP tool).
 
 A Postman import keeps collection-level and request scripts, path variables, OAuth 2.0 settings, GraphQL bodies (as GraphQL requests), descriptions and saved responses.
+
+### Bruno
+
+A Bruno collection comes over with its folders (in Bruno's order), requests, query and path parameters, bodies, auth, headers (disabled ones stay disabled; collection and folder headers are added to their requests), collection variables, docs and the environments in `environments/`. Secret variables arrive empty: set them again as secrets.
+
+Bruno scripts **run as they are**: TestPion's script sandbox has Bruno's API next to Postman's, so `bru.setVar()`, `bru.getEnvVar()`, `req.setHeader()`, `res.getBody()`, `res('path')`, `test()` and `expect()` work. Collection and folder scripts become collection and folder scripts. The no-code parts are converted too:
+
+- **Assertions** (`res.status: eq 200`, `res.body.id: isNumber`, `res.headers['content-type']: contains json` …) become tests with the same names; a plain status check becomes a status check.
+- **vars:post-response** (`token: res.body.token`) sets the variable from the response for the requests after it, and **vars:pre-request** sets request variables.
+
+From the terminal, give the folder: `testpion import ./my-bruno-collection -w my-workspace`.
 
 **Import…** in the workspace menu (top bar) accepts the same files. A TestPion workspace export opens as a new workspace, and anything else (a Postman, Insomnia, Bruno or Hoppscotch file, OpenAPI, HAR) is added to the open workspace.
 

@@ -1,5 +1,5 @@
 /** Moving data in and out: import, export, docs, script conversion, response history and environments. */
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Command, Option } from 'commander';
 import {
@@ -27,6 +27,7 @@ import {
   exportPostmanEnvironment,
   type CollectionNode,
   fetchImportText,
+  readBrunoFolder,
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
@@ -209,7 +210,7 @@ export function registerDataCommands(program: Command): void {
   program
     .command('import')
     .description('import OpenAPI/Swagger, Postman, Insomnia, Bruno, Hoppscotch, HAR, .env or collection files, or a copied cURL / fetch / PowerShell request, into a workspace')
-    .argument('<file>', 'file to import, an http(s) link to download (OpenAPI URL, GitHub file, Postman API link), or - to read stdin (e.g. a cURL command from the clipboard)')
+    .argument('<file>', 'file to import, a Bruno collection folder, an http(s) link to download (OpenAPI URL, GitHub file, Postman API link), or - to read stdin (e.g. a cURL command from the clipboard)')
     .requiredOption('-w, --workspace <nameOrPath>')
     .option('--collection <name>', 'for a cURL / fetch / PowerShell request: the collection to add it to (created if needed)', 'Imported')
     .option('--folder <path>', 'for a request: folder path inside the collection, e.g. "Auth / Tokens"')
@@ -221,7 +222,9 @@ export function registerDataCommands(program: Command): void {
       const { store } = openWorkspace(o.workspace, undefined, mgr);
       try {
         const link = /^https?:\/\//i.test(file) ? await fetchImportText(file) : undefined;
-        const text = link ? link.text : file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
+        // a folder is a Bruno collection (bruno.json and .bru files)
+        const folder = !link && file !== '-' && existsSync(file) && statSync(file).isDirectory();
+        const text = link ? link.text : file === '-' ? readFileSync(0, 'utf8') : folder ? readBrunoFolder(file) : readFileSync(file, 'utf8');
         const source = link?.fileName ?? file;
         if (isRequestSnippet(text)) {
           // secrets in the command (tokens, keys, cookies) become {{variables}}; they are never written to disk

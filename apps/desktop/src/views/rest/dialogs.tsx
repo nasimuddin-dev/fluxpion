@@ -1,12 +1,12 @@
 /** Save-to-collection and Import dialogs of the REST view. */
-import { Link2, Upload } from 'lucide-react';
+import { FolderOpen, Link2, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { asError, call } from '../../api';
 import { useApp } from '../../store';
 import type { Collection, CollectionNode } from '../../types';
 import { uid } from '../../lib/format';
 
-import { pickTextFile } from '../../lib/files';
+import { pickTextFile, pickFolderFiles } from '../../lib/files';
 import { Button, Field, Input, Modal, Select } from '../../components/ui';
 
 export function SaveModal({ collections, defaultName, onClose, onSave, onCreate }: { collections: Collection[]; defaultName: string; onClose(): void; onSave(collectionId: string, name: string, folderId?: string): void; onCreate(c: Collection): Promise<void> }) {
@@ -149,13 +149,25 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
           >
             Choose file…
           </Button>
+          <Button
+            icon={<FolderOpen size={13} />}
+            title="Import a Bruno collection folder (bruno.json and .bru files, as kept in git)"
+            onClick={() =>
+              run(async () => {
+                const f = await pickFolderFiles((p) => p.endsWith('.bru') || p === 'bruno.json');
+                return f ? call('col.importBrunoFolder', { name: f.name, files: f.files }) : null;
+              })
+            }
+          >
+            Bruno folder…
+          </Button>
           <Button variant="primary" loading={busy} disabled={!text.trim()} onClick={() => run(() => call('col.import', { text }))}>
             Import pasted content
           </Button>
         </>
       }
     >
-      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, Insomnia exports (v4 JSON, v5 YAML), Bruno collection exports, Hoppscotch collections, HAR files, .env files, TestPion collections (as a file, pasted, or a link), or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
+      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, Insomnia exports (v4 JSON, v5 YAML), Bruno collection folders (<b>Bruno folder…</b>), exports and .bru files, Hoppscotch collections, HAR files, .env files, TestPion collections (as a file, pasted, or a link), or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
       <form
         className="flex gap-2 mb-2"
         onSubmit={(e) => {

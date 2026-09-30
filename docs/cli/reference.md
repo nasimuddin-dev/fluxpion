@@ -26,7 +26,7 @@ testpion export <collection>  Export a collection as Postman v2.1 (or TestPion J
 testpion export-environment <name>   Export an environment in Postman's format
 testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 testpion load <url>           Safeguarded load test
-testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
+testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, Insomnia, Bruno (a collection folder too), HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order|diff -w  List environments; set their order; compare two
 testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)
 testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
@@ -258,6 +258,7 @@ Parts that Postman can't represent are listed on standard error as `not exported
 
 ```bash
 testpion import openapi.yaml -w my-workspace
+testpion import ./bruno/clinic-api -w my-workspace      # a Bruno collection folder (bruno.json + .bru files)
 # a request copied from browser devtools (cURL for bash or cmd, fetch, PowerShell), from a file or stdin
 testpion import copied-request.txt -w my-workspace --collection "Checkout API" --folder "Cart" --json
 pbpaste | testpion import - -w my-workspace

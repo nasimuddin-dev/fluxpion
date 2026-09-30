@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Bruno collection folders**: import the folder Bruno keeps in git (`bruno.json`, `collection.bru`, `folder.bru`, request `.bru` files and `environments/`) with **Bruno folder…** in the Import dialog or `testpion import <folder>`, or a single `.bru` file. Bruno scripts now run as they are (the sandbox has Bruno's `bru`, `req`, `res` and `test` API), Bruno assertions become tests, `vars:post-response` values are taken from the response, and collection and folder headers and scripts come along.
 - **MQTT**: the WebSocket view has an MQTT mode (MQTT 3.1.1 and 5 over mqtt://, mqtts://, ws:// and wss://): subscriptions with wildcards and QoS, publish with QoS and retain, username and password (only a `{{variable}}` reference is saved), saved connections and messages. Also `type: mqtt` tests, `testpion mqtt`, `mode: mqtt` in the `realtime_exchange` MCP tool, and an MQTT broker in the demo servers (`mqtt://127.0.0.1:4016`).
 - **Confirm before changing production**: with a production environment active, sending a POST, PUT, PATCH, DELETE or other non-read request from the REST view asks first (with a "don't ask again" choice that lasts until restart).
 - **Copy a gRPC call as grpcurl**: the gRPC view's **grpcurl** button copies the call as a ready-to-run command (plaintext or TLS, proto files or reflection, metadata and message).

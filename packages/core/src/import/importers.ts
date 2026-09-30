@@ -4,6 +4,7 @@ import { SCHEMA_VERSION } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { shortId, slugify } from '../util/ids.js';
 import { WORKSPACE_FORMATS } from '../storage/workspace.js';
+import { looksLikeBru } from './bru.js';
 import { detectOtherTool, importBruno, importHoppscotch, importInsomnia } from './other-tools.js';
 import { importDotenv, isDotenv } from './dotenv.js';
 
@@ -13,6 +14,8 @@ function newCollection(name: string, items: CollectionNode[], extra: Partial<Col
 
 export function detectFormat(text: string): 'openapi' | 'swagger' | 'postman' | 'postman-env' | 'har' | 'aps-collection' | 'aps-workspace' | 'graphql-sdl' | 'insomnia' | 'bruno' | 'hoppscotch' | 'dotenv' | 'unknown' {
   const t = text.trim();
+  // a single Bruno .bru request file
+  if (looksLikeBru(t)) return 'bruno';
   if (/^(type|schema|interface|enum|input|scalar|union|directive|extend)\s/m.test(t) && !t.startsWith('{')) return 'graphql-sdl';
   if (!t.startsWith('{') && !t.startsWith('[') && isDotenv(t)) return 'dotenv';
   let d: Record<string, any>;

@@ -44,6 +44,31 @@ tp.visualizer.set(template, { response: tp.response.json() });` },
 ];
 
 /** Type declarations for Monaco so the script editor autocompletes the pm API. */
+/** Bruno's script API (bru, req, res, test, expect), for scripts imported from Bruno. */
+export const BRUNO_TYPES = `
+declare const bru: {
+  getEnvVar(key: string): any; setEnvVar(key: string, value: any): void; hasEnvVar(key: string): boolean; deleteEnvVar(key: string): void; getEnvName(): string | undefined;
+  getGlobalEnvVar(key: string): any; setGlobalEnvVar(key: string, value: any): void;
+  getVar(key: string): any; setVar(key: string, value: any): void; hasVar(key: string): boolean; deleteVar(key: string): void;
+  getCollectionVar(key: string): any; getFolderVar(key: string): any; getRequestVar(key: string): any; getProcessEnv(key: string): undefined;
+  interpolate(text: string): string; getRequestName(): string; setNextRequest(name: string | null): void;
+  runner: { setNextRequest(name: string | null): void; skipRequest(): void; stopExecution(): void };
+  sleep(ms: number): Promise<void>; cwd(): string;
+};
+declare const req: {
+  getUrl(): string; setUrl(url: string): void; getMethod(): string; setMethod(method: string): void; getName(): string;
+  getHeader(name: string): string | undefined; getHeaders(): Record<string, string>; setHeader(name: string, value: string): void; setHeaders(headers: Record<string, string>): void; deleteHeader(name: string): void;
+  getBody(): any; setBody(body: any): void; getTimeout(): number | undefined; setTimeout(ms: number): void; getAuthMode(): string;
+};
+declare const res: {
+  (path: string): any;
+  status: number; statusText: string; headers: Record<string, string>; body: any; responseTime: number;
+  getStatus(): number; getStatusText(): string; getHeader(name: string): string | undefined; getHeaders(): Record<string, string>; getBody(): any; getResponseTime(): number; getUrl(): string;
+};
+declare function test(name: string, fn: () => void): void;
+declare function expect(value: any): any;
+`;
+
 export const PM_TYPES = `
 interface PmExpect {
   to: PmExpect; be: PmExpect; been: PmExpect; is: PmExpect; that: PmExpect; which: PmExpect; and: PmExpect; has: PmExpect; have: PmExpect; with: PmExpect; not: PmExpect; deep: PmExpect;

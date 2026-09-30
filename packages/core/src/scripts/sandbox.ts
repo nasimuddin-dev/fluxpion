@@ -6,6 +6,7 @@ import { dynamicValue } from '../vars/dynamic.js';
 import { validateSchema } from '../eval/checks.js';
 import { LODASH_SOURCE } from './lodash.generated.js';
 import { MOMENT_SOURCE } from './moment.js';
+import { BRUNO_SOURCE, USES_BRUNO } from './bruno.js';
 
 const USES_MOMENT = /\bmoment\b/;
 const USES_LODASH = /(^|[^\w$.])_\s*[.(]|require\s*\(\s*['"]lodash['"]/;
@@ -201,6 +202,8 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     for (const [uses, source, file] of [
       [USES_LODASH, LODASH_SOURCE, 'lodash.js'],
       [USES_MOMENT, MOMENT_SOURCE, 'moment.js'],
+      // … and Bruno's bru / req / res API for scripts imported from Bruno
+      [USES_BRUNO, BRUNO_SOURCE, 'bruno.js'],
     ] as const) {
       if (!uses.test(code)) continue;
       const lib = vm.evalCode(source, file);

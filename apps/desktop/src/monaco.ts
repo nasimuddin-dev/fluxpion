@@ -3,7 +3,7 @@ import { loader } from '@monaco-editor/react';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import JsonWorker from 'monaco-editor/language/json/json.worker?worker';
 import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker';
-import { PM_TYPES } from './lib/snippets';
+import { BRUNO_TYPES, PM_TYPES } from './lib/snippets';
 import { installEditorIntel } from './editor-intel';
 import { buildSchema, type GraphQLSchema } from 'graphql';
 import { getAutocompleteSuggestions, getDiagnostics, Position } from 'graphql-language-service';
@@ -23,6 +23,28 @@ loader.config({ monaco });
 monaco.typescript.javascriptDefaults.addExtraLib(PM_TYPES, 'file:///testpion/pm.d.ts');
 monaco.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false, diagnosticCodesToIgnore: [1108] });
 monaco.typescript.javascriptDefaults.setCompilerOptions({ target: monaco.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, checkJs: false, lib: ['es2020'] });
+
+// Bruno's bru / req / res / test globals, only while a script that uses them is open: always
+// declaring `res` would clash with the common Postman `const res = pm.response.json()`.
+let brunoLib: monaco.IDisposable | undefined;
+let brunoTimer: ReturnType<typeof setTimeout> | undefined;
+const syncBrunoTypes = () => {
+  clearTimeout(brunoTimer);
+  brunoTimer = setTimeout(() => {
+    const uses = monaco.editor.getModels().some((m) => !m.isDisposed() && m.getLanguageId() === 'javascript' && /^\/\/ Bruno script|\bbru\./m.test(m.getValue()));
+    if (uses && !brunoLib) brunoLib = monaco.typescript.javascriptDefaults.addExtraLib(BRUNO_TYPES, 'file:///testpion/bruno.d.ts');
+    else if (!uses && brunoLib) {
+      brunoLib.dispose();
+      brunoLib = undefined;
+    }
+  }, 300);
+};
+monaco.editor.onDidCreateModel((m) => {
+  syncBrunoTypes();
+  m.onDidChangeContent(syncBrunoTypes);
+  m.onDidChangeLanguage(syncBrunoTypes);
+});
+monaco.editor.onWillDisposeModel(syncBrunoTypes);
 
 // match the app's navy/blue tokens (styles.css) so editors blend into the panels
 monaco.editor.defineTheme('aps-dark', {

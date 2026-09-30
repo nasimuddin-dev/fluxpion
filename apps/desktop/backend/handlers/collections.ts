@@ -4,6 +4,7 @@ import { basename, join } from 'node:path';
 import {
   ApsError,
   fetchImportText,
+  bruFilesToBrunoExport,
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
@@ -160,6 +161,12 @@ export function collectionsHandlers(be: Backend): Handlers {
     'col.importUrl': async ({ url }: { url: string }) => {
       const f = await fetchImportText(url);
       return { ...((await be.handlers['col.import']!({ text: f.text, fileName: f.fileName })) as object), url: f.url };
+    },
+    /** A Bruno collection folder, as the picked files (path inside the folder + text): bruno.json and .bru files. */
+    'col.importBrunoFolder': ({ name, files }: { name?: string; files: Array<{ path: string; text: string }> }) => {
+      if (!files?.some((f) => f.path.endsWith('.bru'))) throw new ApsError('ValidationError', 'That folder has no .bru files', { suggestions: ['Choose the folder that holds bruno.json.'] });
+      const exported = bruFilesToBrunoExport(files, files.some((f) => f.path === 'bruno.json') ? undefined : name);
+      return be.handlers['col.import']!({ text: JSON.stringify(exported), fileName: name });
     },
     'col.importFile': async () => {
       const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions, collections and .env files', extensions: ['json', 'yaml', 'yml', 'har', 'env'] }, { name: 'All files', extensions: ['*'] }] });
