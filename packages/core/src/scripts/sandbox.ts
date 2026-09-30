@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
-import { newQuickJSWASMModuleFromVariant, shouldInterruptAfterDeadline, type QuickJSWASMModule } from 'quickjs-emscripten-core';
+import { newQuickJSWASMModuleFromVariant, shouldInterruptAfterDeadline, type QuickJSHandle, type QuickJSWASMModule } from 'quickjs-emscripten-core';
 import variant from '@jitl/quickjs-singlefile-mjs-release-sync';
 import { EPILOGUE, PRELUDE } from './prelude.js';
 import { dynamicValue } from '../vars/dynamic.js';
@@ -220,11 +220,30 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
       else lib.value.dispose();
     }
 
-    const wrapped = `${PRELUDE}\ntry { (function(){\n${code}\n})(); __runTimers(); } catch (e) { __out.error = e && e.stack ? String(e) + '\\n' + e.stack : String(e); }\n${EPILOGUE}\nJSON.stringify(__out);`;
-    const result = vm.evalCode(wrapped, 'user-script.js');
-    if (result.error) {
-      const err = vm.dump(result.error);
-      result.error.dispose();
+    // The script is the body of an async function, so `await pm.sendRequest(…)` and `await pm.vault.get(…)`
+    // work. A request that hasn't been sent yet leaves its promise pending: the run stops there, the host
+    // sends it, and the next pass (a replay) goes on with the response.
+    const wrapped = `${PRELUDE}\n(async function(){\n${code}\n})().then(() => { __runTimers(); }, (e) => { __out.error = e && e.stack ? String(e) + '\\n' + e.stack : String(e); });`;
+    let failure: QuickJSHandle | undefined;
+    let json = '';
+    const started = vm.evalCode(wrapped, 'user-script.js');
+    if (started.error) failure = started.error;
+    else {
+      started.value.dispose();
+      const jobs = runtime.executePendingJobs();
+      if (jobs.error) failure = jobs.error;
+      else {
+        const finished = vm.evalCode(`${EPILOGUE}\nJSON.stringify(__out);`, 'epilogue.js');
+        if (finished.error) failure = finished.error;
+        else {
+          json = vm.getString(finished.value);
+          finished.value.dispose();
+        }
+      }
+    }
+    if (failure) {
+      const err = vm.dump(failure);
+      failure.dispose();
       const msg = typeof err === 'object' && err ? `${(err as { name?: string }).name ?? 'Error'}: ${(err as { message?: string }).message ?? JSON.stringify(err)}` : String(err);
       return {
         vars: {},
@@ -237,8 +256,6 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
         durationMs: Math.round(performance.now() - t0),
       };
     }
-    const json = vm.getString(result.value);
-    result.value.dispose();
     const out = JSON.parse(json) as Omit<ScriptOutput, 'durationMs'> & { error: string | null };
     return { ...out, error: out.error ? userErrorLines(out.error, USER_LINE_OFFSET, code.split('\n').length) : undefined, request: out.request ?? undefined, durationMs: Math.round(performance.now() - t0) };
   } finally {

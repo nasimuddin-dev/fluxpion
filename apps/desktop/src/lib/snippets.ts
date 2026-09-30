@@ -122,8 +122,12 @@ declare const pm: {
   /** Send another HTTP request from a script. The callback runs with the response (or an error). */
   sendRequest(
     request: string | { url: string; method?: string; header?: Array<{ key: string; value: string }> | Record<string, string>; body?: { mode: 'raw'; raw: string } | { mode: 'urlencoded'; urlencoded: Array<{ key: string; value: string }> } },
-    callback?: (err: Error | null, res: { code: number; status: string; responseTime: number; headers: PmHeaderList; json(): any; text(): string } | null) => void,
+    callback: (err: Error | null, res: { code: number; status: string; responseTime: number; headers: PmHeaderList; json(): any; text(): string } | null) => void,
   ): void;
+  /** Without a callback: a promise of the response, for const res = await pm.sendRequest(…). */
+  sendRequest(request: string | { url: string; method?: string; header?: any; body?: any }): Promise<{ code: number; status: string; responseTime: number; headers: PmHeaderList; json(): any; text(): string }>;
+  /** Postman Vault: TestPion keeps secrets in (secret) variables; the vault reads and writes those. */
+  vault: { get(key: string): Promise<any>; set(key: string, value: any): Promise<void>; unset(key: string): Promise<void> };
   /** A workspace script package (packages/<name>.js), like Postman's package library. */
   require(name: string): any;
   uuid(): string;

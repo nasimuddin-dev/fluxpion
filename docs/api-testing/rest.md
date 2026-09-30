@@ -218,8 +218,18 @@ pm.sendRequest({
 
 - The request is a URL string or a Postman request object (`url`, `method`, `header` as a list or map, `body` with `mode: "raw"` or `"urlencoded"`). As in Postman, `{{variables}}` are not resolved automatically: use `pm.variables.replaceIn()`.
 - The response has `code`, `status`, `responseTime`, `headers`, `json()` and `text()`. On a network error, the callback gets `err` and `null`.
+- Without a callback, `pm.sendRequest` returns a promise, and scripts may use `await` at the top level, as in newer Postman scripts:
+
+  ```js
+  const res = await pm.sendRequest(pm.variables.replaceIn("{{baseUrl}}/auth/token"));
+  pm.environment.set("accessToken", res.json().access_token);
+  ```
+
+  A failed request rejects the promise (use `try` / `catch`).
 - Requests share the run's cookie jar, time out like other requests, and appear in the [Console](#console) under the script's request, whether the request was sent from a tab or by a run (they are also recorded as `sentRequests` in the run's results).
-- **How it works:** the sandbox is synchronous, so the script runs, its requests are sent, then the script runs again from the start with the responses, and callbacks run immediately. Only the last run's variables, tests and logs count. So a request made inside a callback also has its callback run inside, before later callbacks. Keep scripts deterministic around `pm.sendRequest` (avoid a random URL per run). A script may send at most 20 requests.
+- **How it works:** the sandbox is synchronous, so the script runs, its requests are sent, then the script runs again from the start with the responses, and callbacks run immediately (an `await` on a request that hasn't been sent yet waits for the next run). Only the last run's variables, tests and logs count. So a request made inside a callback also has its callback run inside, before later callbacks. Keep scripts deterministic around `pm.sendRequest` (avoid a random URL per run). A script may send at most 20 requests.
+
+**`pm.vault`** (Postman Vault) works with TestPion's secret variables: `await pm.vault.get("apiKey")` reads the variable `apiKey` (keep it a [secret variable](./environments.md#secrets)), `pm.vault.set` / `unset` change the environment, and `{{vault:apiKey}}` in a request resolves like `{{apiKey}}`.
 
 ### Visualize responses (`pm.visualizer`)
 

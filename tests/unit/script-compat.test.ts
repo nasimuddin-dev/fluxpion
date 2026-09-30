@@ -28,12 +28,12 @@ describe('script compatibility on import', () => {
     const store = WorkspaceStore.create(join(dir, 'ws'), 'W');
     try {
       const r = importIntoWorkspace(store, JSON.stringify(collection));
+      // pm.vault works (it reads secret variables), so only cheerio and the unknown module are listed
       expect(r.scriptWarnings?.map((w) => [w.where, w.script, w.api])).toEqual([
-        ['(collection)', 'pre-request', 'pm.vault'],
         ['Pages / Home', 'test', 'cheerio'],
         ['Pages / Home', 'test', "require('csv-parse/lib/sync')"],
       ]);
-      expect(r.scriptWarnings![2]!.hint).toContain('lodash');
+      expect(r.scriptWarnings![1]!.hint).toContain('lodash');
       // a collection without problems has no warnings
       const clean = importIntoWorkspace(store, JSON.stringify({ ...collection, event: [], item: [collection.item[1]] }));
       expect(clean.scriptWarnings).toBeUndefined();

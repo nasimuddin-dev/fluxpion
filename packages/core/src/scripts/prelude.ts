@@ -458,10 +458,14 @@ function __sendRequest(req, cb) {
     if (typeof cb === 'function') {
       if (done.error) cb(new Error(done.error), null);
       else cb(null, __responseObject(done.response));
+      return;
     }
-    return;
+    // without a callback: a promise, for "const res = await pm.sendRequest(…)"
+    return done.error ? Promise.reject(new Error(done.error)) : Promise.resolve(__responseObject(done.response));
   }
   __out.pendingRequests.push({ key: key, request: n });
+  // not sent yet: the script waits here; the next pass has the response
+  if (typeof cb !== 'function') return new Promise(() => {});
 }
 
 /* ---------------- libraries ---------------- */
@@ -520,6 +524,12 @@ const pm = {
   info: Object.assign({ eventName: __in.response ? 'test' : 'prerequest', iteration: 0, iterationCount: 1, requestName: '', requestId: '' }, __in.info || {}),
   cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}), jar: __cookieJar },
   sendRequest: __sendRequest,
+  // Postman Vault: TestPion keeps secrets in (secret) variables, so the vault reads and writes those
+  vault: {
+    get: (k) => Promise.resolve(__variables.get(String(k))),
+    set: (k, v) => Promise.resolve(void pm.environment.set(String(k), v)),
+    unset: (k) => Promise.resolve(void pm.environment.unset(String(k))),
+  },
   // Postman's package library: workspace packages (packages/<name>.js) as CommonJS modules
   require: (name) => __requirePackage(String(name)),
   execution: { setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); }, skipRequest: () => { __out.skipRequest = true; } },

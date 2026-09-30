@@ -18,10 +18,10 @@ self.MonacoEnvironment = {
 };
 loader.config({ monaco });
 
-// Script editor IntelliSense for the Postman-compatible pm API. Scripts run as a function body,
-// so a top-level `return` is allowed (TS 1108).
+// Script editor IntelliSense for the Postman-compatible pm API. Scripts run as the body of an async
+// function, so a top-level `return` (TS 1108) and `await` (TS 1308, 1375, 1378) are allowed.
 monaco.typescript.javascriptDefaults.addExtraLib(PM_TYPES, 'file:///testpion/pm.d.ts');
-monaco.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false, diagnosticCodesToIgnore: [1108] });
+monaco.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false, diagnosticCodesToIgnore: [1108, 1308, 1375, 1378] });
 monaco.typescript.javascriptDefaults.setCompilerOptions({ target: monaco.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, checkJs: false, lib: ['es2020'] });
 
 // Bruno's bru / req / res / test globals, only while a script that uses them is open: always

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`await` in scripts**: scripts run as async functions, so `const res = await pm.sendRequest(…)` works (the promise form of `pm.sendRequest`), and **`pm.vault`** (`await pm.vault.get("key")`, `{{vault:key}}`) reads TestPion's secret variables. Postman scripts that use them no longer get import warnings.
 - **Script packages (`pm.require`)**: shared script modules like Postman's package library, kept in the workspace's `packages/` folder and edited in **Scripts ▸ Packages…**. Packages can require each other and the built-in modules; imports only warn about packages the workspace doesn't have; workspace exports include them.
 - **OpenTelemetry export**: send traces to Jaeger, Grafana Tempo, Honeycomb or any OTLP/HTTP collector: `--otlp <url>` (or the standard `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS`) on `testpion test`, `run` and `run-collection`, **Send to OpenTelemetry** in the Traces view, and the `export_traces` MCP tool. Traces are redacted; a new docs page covers traces.
 - **GraphQL code snippets**: the GraphQL view's **Code** button shows the call as cURL, fetch, Python, Go and the other snippet languages.

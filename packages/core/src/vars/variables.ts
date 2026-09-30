@@ -105,6 +105,8 @@ export class VariableScope {
   private lookup(expr: string): unknown {
     const name = expr.trim();
     if (name.startsWith('$')) return this.dynamic(name);
+    // Postman Vault references ({{vault:apiKey}}) read the variable of the same name (keep it secret)
+    if (name.startsWith('vault:')) return this.lookup(name.slice(6));
     for (let i = SCOPE_ORDER.length - 1; i >= 0; i--) {
       const m = this.scopes.get(SCOPE_ORDER[i]!)!;
       if (m.has(name)) return m.get(name);
