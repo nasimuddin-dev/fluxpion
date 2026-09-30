@@ -27,7 +27,7 @@ Key facts for agents:
 - [WebSocket and Socket.IO](https://nasimuddin-dev.github.io/testpion/api-testing/websocket): connect, send messages or emit Socket.IO events (with acknowledgements); `testpion ws`; MCP tool `realtime_exchange`; saved connections in folders; clear connection errors
 - [Server-Sent Events](https://nasimuddin-dev.github.io/testpion/api-testing/rest#server-sent-events): text/event-stream responses parsed event by event (live, Stop keeps events); MCP send_request returns them
 - [OpenAPI contract testing](https://nasimuddin-dev.github.io/testpion/test-runner/assertions#openapi-contract-testing): the `openapi` check validates status, content type and body schema against an OpenAPI 3 / Swagger 2 document (`spec: openapi.yaml`)
-- [Authentication](https://nasimuddin-dev.github.io/testpion/api-testing/authentication): API key, Basic, Bearer, JWT, OAuth 2.0, AWS Signature v4, Digest, mTLS
+- [Authentication](https://nasimuddin-dev.github.io/testpion/api-testing/authentication): API key, Basic, Bearer, JWT, OAuth 1.0, OAuth 2.0, AWS Signature v4, Digest, mTLS
 - [Environments and variables](https://nasimuddin-dev.github.io/testpion/api-testing/environments): scopes and precedence, secrets, quick look, export
 - [Cookies](https://nasimuddin-dev.github.io/testpion/api-testing/cookies): the workspace cookie jar, `pm.cookies.jar()`, CLI cookie jar files
 - [Mock servers](https://nasimuddin-dev.github.io/testpion/api-testing/mock-servers): serve saved examples on localhost

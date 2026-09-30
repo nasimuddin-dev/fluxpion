@@ -65,6 +65,10 @@ export async function applyAuth(auth: AuthConfig | undefined, headers: Headers, 
     case 'digest':
       r?.addSecret(auth.password);
       return;
+    case 'oauth1':
+      r?.addSecret(auth.consumerSecret);
+      r?.addSecret(auth.tokenSecret);
+      return;
     case 'awsv4':
       r?.addSecret(auth.secretKey);
       r?.addSecret(auth.sessionToken);

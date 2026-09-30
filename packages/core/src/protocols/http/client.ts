@@ -6,7 +6,7 @@ import { Agent, ProxyAgent, fetch as undiciFetch, FormData as UndiciFormData, ty
 import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelinePhase } from '../../model/types.js';
 import { ApsError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
-import { digestAuthorization, parseDigestChallenge, signAwsV4 } from './signing.js';
+import { digestAuthorization, parseDigestChallenge, signAwsV4, signOAuth1 } from './signing.js';
 import { isEventStream, SseParser, type SseEvent } from './sse.js';
 
 /** Events kept per SSE response (the stream itself can be endless). */
@@ -186,6 +186,10 @@ export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOp
   const { body, preview } = await buildBody(spec.body, headers);
   const method = (spec.method || 'GET').toUpperCase();
   const sent = method === 'GET' || method === 'HEAD' ? undefined : body;
+  if (spec.auth?.type === 'oauth1') {
+    signOAuth1(method, url, headers, sent, spec.auth);
+    opts.redactor?.addSecret(headers.get('authorization') ?? undefined);
+  }
   if (spec.auth?.type === 'awsv4') {
     signAwsV4(method, url, headers, sent, spec.auth);
     opts.redactor?.addSecret(headers.get('authorization') ?? undefined);

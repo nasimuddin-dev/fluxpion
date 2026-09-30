@@ -32,7 +32,9 @@ export type AuthConfig =
   /** HTTP Digest (RFC 7616): the first request gets the server's challenge, the second answers it. */
   | { type: 'digest'; username: string; password: string }
   /** AWS Signature Version 4 (API Gateway, S3, Lambda URLs, any AWS API). */
-  | { type: 'awsv4'; accessKey: string; secretKey: string; sessionToken?: string; region: string; service: string };
+  | { type: 'awsv4'; accessKey: string; secretKey: string; sessionToken?: string; region: string; service: string }
+  /** OAuth 1.0a (RFC 5849), signed per request. */
+  | { type: 'oauth1'; consumerKey: string; consumerSecret: string; token?: string; tokenSecret?: string; signatureMethod?: 'HMAC-SHA1' | 'HMAC-SHA256' | 'PLAINTEXT'; realm?: string; addTo?: 'header' | 'query' };
 
 export type BodyConfig =
   | { type: 'none' }

@@ -109,3 +109,61 @@ export function digestAuthorization(
   if (challenge.opaque !== undefined) parts.push(`opaque=${q(challenge.opaque)}`);
   return `Digest ${parts.join(', ')}`;
 }
+
+export interface OAuth1Config {
+  consumerKey: string;
+  consumerSecret: string;
+  token?: string;
+  tokenSecret?: string;
+  signatureMethod?: 'HMAC-SHA1' | 'HMAC-SHA256' | 'PLAINTEXT';
+  realm?: string;
+  /** Put the oauth_* parameters in the Authorization header (default) or in the query string. */
+  addTo?: 'header' | 'query';
+  /** Fixed values, for tests; normally generated per request. */
+  timestamp?: string;
+  nonce?: string;
+}
+
+/**
+ * OAuth 1.0a (RFC 5849): signs the method, URL (with its query) and form-urlencoded body parameters,
+ * and adds the oauth_* parameters to the Authorization header or the query string.
+ */
+export function signOAuth1(method: string, url: URL, headers: Headers, body: unknown, cfg: OAuth1Config): void {
+  if (!cfg.consumerKey) throw new ApsError('ConfigurationError', 'OAuth 1.0 needs a consumer key');
+  const sigMethod = cfg.signatureMethod ?? 'HMAC-SHA1';
+  const oauth: Record<string, string> = {
+    oauth_consumer_key: cfg.consumerKey,
+    oauth_nonce: cfg.nonce ?? randomBytes(16).toString('hex'),
+    oauth_signature_method: sigMethod,
+    oauth_timestamp: cfg.timestamp ?? String(Math.floor(Date.now() / 1000)),
+    oauth_version: '1.0',
+    ...(cfg.token ? { oauth_token: cfg.token } : {}),
+  };
+  const key = `${rfc3986(cfg.consumerSecret ?? '')}&${rfc3986(cfg.tokenSecret ?? '')}`;
+  let signature: string;
+  if (sigMethod === 'PLAINTEXT') signature = key;
+  else {
+    // form-urlencoded body parameters are signed too (other bodies are not)
+    const form = typeof body === 'string' && /application\/x-www-form-urlencoded/i.test(headers.get('content-type') ?? '') ? body : undefined;
+    const base = oauth1BaseString(method, url, oauth, form);
+    signature = createHmac(sigMethod === 'HMAC-SHA256' ? 'sha256' : 'sha1', key).update(base).digest('base64');
+  }
+  oauth.oauth_signature = signature;
+  if (cfg.addTo === 'query') {
+    for (const [k, v] of Object.entries(oauth)) url.searchParams.set(k, v);
+    return;
+  }
+  const parts = Object.entries(oauth).map(([k, v]) => `${k}="${rfc3986(v)}"`);
+  headers.set('authorization', `OAuth ${cfg.realm ? `realm="${cfg.realm}", ` : ''}${parts.join(', ')}`);
+}
+
+/** The signature base string of a request (exposed for tests and for showing what was signed). */
+export function oauth1BaseString(method: string, url: URL, params: Record<string, string>, formBody?: string): string {
+  const all: Array<[string, string]> = [...url.searchParams.entries(), ...Object.entries(params), ...(formBody ? [...new URLSearchParams(formBody).entries()] : [])];
+  const normalized = all
+    .map(([k, v]) => [rfc3986(k), rfc3986(v)] as const)
+    .sort(([a, x], [b, y]) => (a < b ? -1 : a > b ? 1 : x < y ? -1 : x > y ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+  return [method.toUpperCase(), rfc3986(`${url.protocol}//${url.host.toLowerCase()}${url.pathname}`), rfc3986(normalized)].join('&');
+}

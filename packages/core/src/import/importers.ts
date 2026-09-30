@@ -161,6 +161,20 @@ function pmAuth(a: any): AuthConfig | undefined {
       return { type: 'apiKey', key: get(a.apikey, 'key'), value: get(a.apikey, 'value'), in: get(a.apikey, 'in') === 'query' ? 'query' : 'header' };
     case 'digest':
       return { type: 'digest', username: get(a.digest, 'username'), password: get(a.digest, 'password') };
+    case 'oauth1': {
+      const opt = (k: string) => get(a.oauth1, k) || undefined;
+      const sm = get(a.oauth1, 'signatureMethod');
+      return {
+        type: 'oauth1',
+        consumerKey: get(a.oauth1, 'consumerKey'),
+        consumerSecret: get(a.oauth1, 'consumerSecret'),
+        ...(opt('token') ? { token: opt('token') } : {}),
+        ...(opt('tokenSecret') ? { tokenSecret: opt('tokenSecret') } : {}),
+        ...(sm === 'HMAC-SHA256' || sm === 'PLAINTEXT' ? { signatureMethod: sm } : sm === 'HMAC-SHA1' ? { signatureMethod: 'HMAC-SHA1' as const } : {}),
+        ...(opt('realm') ? { realm: opt('realm') } : {}),
+        ...(get(a.oauth1, 'addParamsToHeader') === 'false' ? { addTo: 'query' as const } : {}),
+      };
+    }
     case 'awsv4':
       return {
         type: 'awsv4',

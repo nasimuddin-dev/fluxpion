@@ -56,6 +56,20 @@ function pmAuth(a: AuthConfig | undefined, notes: string[], where: string): PmAu
       };
     case 'digest':
       return { type: 'digest', digest: attr({ username: a.username, password: a.password, algorithm: 'MD5' }) };
+    case 'oauth1':
+      return {
+        type: 'oauth1',
+        oauth1: attr({
+          consumerKey: a.consumerKey,
+          consumerSecret: a.consumerSecret,
+          token: a.token,
+          tokenSecret: a.tokenSecret,
+          signatureMethod: a.signatureMethod ?? 'HMAC-SHA1',
+          realm: a.realm,
+          version: '1.0',
+          addParamsToHeader: a.addTo === 'query' ? 'false' : 'true',
+        }),
+      };
     case 'awsv4':
       return { type: 'awsv4', awsv4: attr({ accessKey: a.accessKey, secretKey: a.secretKey, region: a.region, service: a.service, sessionToken: a.sessionToken }) };
     case 'headers':

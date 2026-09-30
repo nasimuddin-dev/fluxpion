@@ -9,6 +9,7 @@ const TYPES: Array<{ id: AuthConfig['type']; label: string }> = [
   { id: 'basic', label: 'Basic auth' },
   { id: 'apiKey', label: 'API key' },
   { id: 'oauth2', label: 'OAuth 2.0' },
+  { id: 'oauth1', label: 'OAuth 1.0' },
   { id: 'awsv4', label: 'AWS Signature' },
   { id: 'digest', label: 'Digest auth' },
   { id: 'jwt', label: 'JWT (HMAC signed)' },
@@ -31,6 +32,8 @@ function defaults(type: AuthConfig['type']): AuthConfig {
       return { type, headers: [] };
     case 'digest':
       return { type, username: '', password: '{{password}}' };
+    case 'oauth1':
+      return { type, consumerKey: '{{consumerKey}}', consumerSecret: '{{consumerSecret}}', token: '{{accessToken}}', tokenSecret: '{{tokenSecret}}', signatureMethod: 'HMAC-SHA1' };
     case 'awsv4':
       return { type, accessKey: '{{awsAccessKey}}', secretKey: '{{awsSecretKey}}', region: 'us-east-1', service: 'execute-api' };
     default:
@@ -172,6 +175,41 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth?: Aut
             </Field>
           </div>
           <p className="text-xs text-muted">The first request receives the server's challenge (401); TestPion answers it and sends the request again. MD5, SHA-256 and their -sess variants.</p>
+        </>
+      )}
+      {a.type === 'oauth1' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Consumer key">
+              <Input className="mono" value={a.consumerKey} onChange={(e) => set({ consumerKey: e.target.value })} />
+            </Field>
+            <Field label="Consumer secret">
+              <Input className="mono" type="password" value={a.consumerSecret} onChange={(e) => set({ consumerSecret: e.target.value })} />
+            </Field>
+            <Field label="Access token">
+              <Input className="mono" value={a.token ?? ''} onChange={(e) => set({ token: e.target.value || undefined })} />
+            </Field>
+            <Field label="Token secret">
+              <Input className="mono" type="password" value={a.tokenSecret ?? ''} onChange={(e) => set({ tokenSecret: e.target.value || undefined })} />
+            </Field>
+            <Field label="Signature method">
+              <Select value={a.signatureMethod ?? 'HMAC-SHA1'} onChange={(e) => set({ signatureMethod: e.target.value })}>
+                <option>HMAC-SHA1</option>
+                <option>HMAC-SHA256</option>
+                <option>PLAINTEXT</option>
+              </Select>
+            </Field>
+            <Field label="Add parameters to">
+              <Select value={a.addTo ?? 'header'} onChange={(e) => set({ addTo: e.target.value })}>
+                <option value="header">Authorization header</option>
+                <option value="query">Query string</option>
+              </Select>
+            </Field>
+            <Field label="Realm (optional)">
+              <Input value={a.realm ?? ''} onChange={(e) => set({ realm: e.target.value || undefined })} />
+            </Field>
+          </div>
+          <p className="text-xs text-muted">Each request is signed when it is sent (method, URL and form fields), with a new nonce and timestamp. Keep secrets in secret variables.</p>
         </>
       )}
       {a.type === 'awsv4' && (
