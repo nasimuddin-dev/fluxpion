@@ -20,7 +20,7 @@ testpion export-environment <name>   Export an environment in Postman's format
 testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 testpion load <url>           Safeguarded load test
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
-testpion env list|order -w    List environments; set their order
+testpion env list|order|diff -w  List environments; set their order; compare two
 testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)
 testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
 testpion history list|stats|diff -w  Response history of saved requests; response times; compare two responses
@@ -243,6 +243,7 @@ Writes a pipeline for GitHub Actions, GitLab CI, Azure Pipelines or Jenkins that
 
 ```bash
 testpion env list -w my-workspace --json          # environments in display order, variable names only
+testpion env diff Staging Production -w my-workspace --values   # what differs (exit 1 if anything does)
 testpion env order Development Staging Production -w my-workspace
 ```
 

@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import {
   ApsError,
+  compareEnvironments,
   WorkspaceStore,
   WORKSPACE_FORMATS,
   exportPostmanEnvironment,
@@ -40,6 +41,15 @@ export function workspaceHandlers(be: Backend): Handlers {
       if (!info) throw new ApsError('ConfigurationError', 'This installation has no examples workspace', { suggestions: [] });
       be.openStore(info.path);
       return be.handlers['ws.current']!({});
+    },
+    /** Two environments side by side: values (secrets masked, never sent) and what differs. */
+    'env.diff': ({ left, right }: { left: string; right: string }) => {
+      const get = (ref: string) => {
+        const e = be.ws.getEnvironment(ref);
+        if (!e) throw new ApsError('ConfigurationError', `No environment "${ref}"`, { suggestions: [] });
+        return e;
+      };
+      return compareEnvironments(get(left), get(right), { values: true, secrets: be.secrets, redactor: be.logger.redactor });
     },
     'ws.open': async ({ ref }: { ref?: string }) => {
       let path = ref ? be.manager.resolve(ref) : undefined;

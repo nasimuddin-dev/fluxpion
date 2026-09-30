@@ -23,6 +23,7 @@ import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
 import { ciConfig, type CiConfigOptions } from '../runner/ci-config.js';
+import { compareEnvironments } from '../storage/env-compare.js';
 import { executeMonitor, findMonitor, listMonitors, monitorResults, monitorStatus } from '../runner/monitors.js';
 
 /**
@@ -399,6 +400,21 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           return e.id;
         });
         return store.reorderEnvironments(ids).map((e) => e.name);
+      },
+    },
+    {
+      name: 'compare_environments',
+      description:
+        'Compare two environments variable by variable: keys only in one of them, keys whose values differ, disabled variables, and secrets that are set on one side only. Returns statuses, never values. Use it when a request works in one environment and fails in another.',
+      inputSchema: { type: 'object', properties: { left: str('Environment name or id'), right: str('Environment name or id'), includeSame: { type: 'boolean', description: 'Also list variables that are the same' } }, required: ['left', 'right'] },
+      run: (a) => {
+        const get = (ref: unknown) => {
+          const e = store.getEnvironment(String(ref));
+          if (!e) throw new ApsError('ConfigurationError', `No environment "${String(ref)}". Available: ${store.listEnvironments().map((x) => x.name).join(', ') || 'none'}`);
+          return e;
+        };
+        const d = compareEnvironments(get(a.left), get(a.right), { secrets, redactor });
+        return a.includeSame ? d : { ...d, rows: d.rows.filter((r) => r.status !== 'same') };
       },
     },
     {

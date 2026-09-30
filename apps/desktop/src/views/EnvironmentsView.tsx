@@ -1,4 +1,4 @@
-import { Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -6,12 +6,14 @@ import { useIntent } from '../hooks';
 import type { Environment, KeyValue } from '../types';
 import { download, uid } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
+import { EnvCompare } from '../components/EnvCompare';
 import { Badge, Button, cx, Empty, Field, Input, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
   const settings = useApp((s) => s.settings);
   const [envs, setEnvs] = useState<Environment[]>([]);
+  const [comparing, setComparing] = useState(false);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Environment>();
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
@@ -177,6 +179,11 @@ export function EnvironmentsView() {
                   </Field>
                   <Toggle checked={!!draft.isProduction} onChange={(isProduction) => setDraft({ ...draft, isProduction })} label="Production (blocks load tests, shows a warning)" />
                   <div className="ml-auto flex gap-2">
+                    {envs.length > 1 && (
+                      <Button icon={<ArrowLeftRight size={13} />} onClick={() => setComparing(true)} title="Compare with another environment">
+                        Compare
+                      </Button>
+                    )}
                     <Button
                       icon={<Copy size={13} />}
                       onClick={async () => {
@@ -276,6 +283,7 @@ export function EnvironmentsView() {
           </div>
         )}
       </div>
+      {comparing && sel && <EnvCompare environments={envs} initialLeft={sel} onClose={() => setComparing(false)} />}
     </div>
   );
 }

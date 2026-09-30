@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Compare environments.** **Compare** in the Envs view shows two environments side by side: variables missing on one side, different values, disabled variables and secrets set on one side only (secret values are never shown). `testpion env diff` does the same from the terminal (exit 1 when they differ, handy in CI), and AI agents get `compare_environments`.
 - **Publish collection docs as HTML.** The collection **Docs** tab has **Export HTML**: one self-contained web page with a searchable sidebar, copy buttons and light/dark themes, ready to host or share (`testpion docs --html` from the terminal). HTML in descriptions is shown as text, links are limited to http(s), and secrets are masked.
 - **Run in CI.** TestPion writes the pipeline file that runs a suite, a collection (or some folders) or all tests on every push: GitHub Actions, GitLab CI, Azure Pipelines or Jenkins. It installs the TestPion CLI pinned to your version, publishes JUnit results, keeps the reports, and lists the CI secrets to create (never their values). Open it from the Tests view, a collection's menu (**Run in CI…**) or the command palette; from the terminal it is `testpion ci`, and AI agents get `ci_config`.
 - Docs: the CI/CD page no longer says `npx testpion` (the CLI isn't on npm); it shows how pipelines install it.

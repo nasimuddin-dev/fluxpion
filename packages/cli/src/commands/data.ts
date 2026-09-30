@@ -9,6 +9,8 @@ import {
   compareHistory,
   responseTimeStats,
   ciConfig,
+  compareEnvironments,
+  EnvSecretStore,
   type CiProvider,
   type WorkspaceStore,
   convertCollectionScripts,
@@ -22,7 +24,7 @@ import {
   type CollectionNode,
   importIntoWorkspace,
 } from '@testpion/core';
-import { EXIT, green, red, yellow, dim, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
+import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
 
 export function registerDataCommands(program: Command): void {
   program
@@ -275,6 +277,41 @@ export function registerDataCommands(program: Command): void {
         });
         const names = store.reorderEnvironments(ids).map((e) => e.name);
         console.log(o.json ? JSON.stringify(names) : names.join('\n'));
+      } finally {
+        store.close();
+      }
+    });
+  envCmd
+    .command('diff')
+    .description('compare two environments: variables missing on one side, different, disabled, or secrets set on one side only (exit 1 when they differ)')
+    .argument('<left>', 'environment name or id')
+    .argument('<right>', 'environment name or id')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--values', 'show values (secrets and sensitive-looking keys stay masked)')
+    .option('--all', 'also list variables that are the same')
+    .option('--json', 'print as JSON')
+    .action((left: string, right: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const get = (ref: string) => {
+          const e = store.getEnvironment(ref);
+          if (!e) throw new CliError(`No environment "${ref}". Available: ${store.listEnvironments().map((x) => x.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+          return e;
+        };
+        const d = compareEnvironments(get(left), get(right), { values: !!o.values, secrets: new EnvSecretStore(), redactor: new Redactor(new WorkspaceManager().loadSettings().redactFields) });
+        if (!o.all) d.rows = d.rows.filter((r) => r.status !== 'same');
+        if (o.json) console.log(JSON.stringify(d, null, 2));
+        else {
+          const { summary: s } = d;
+          console.log(`${bold(d.left)} vs ${bold(d.right)}: ${s.different} different, ${s.onlyLeft} only in ${d.left}, ${s.onlyRight} only in ${d.right}, ${s.same} same`);
+          for (const r of d.rows) {
+            const mark = r.status === 'same' ? dim('=') : r.status === 'different' ? yellow('~') : r.status === 'only-left' ? red('<') : green('>');
+            const extra = [r.secret ? 'secret' : '', r.disabledLeft ? `disabled in ${d.left}` : '', r.disabledRight ? `disabled in ${d.right}` : ''].filter(Boolean).join(', ');
+            const vals = o.values ? `  ${r.left ?? dim('(none)')} ${dim('→')} ${r.right ?? dim('(none)')}` : '';
+            console.log(`  ${mark} ${r.key}${vals}${extra ? dim(`  (${extra})`) : ''}`);
+          }
+        }
+        process.exitCode = d.summary.different + d.summary.onlyLeft + d.summary.onlyRight ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
       } finally {
         store.close();
       }

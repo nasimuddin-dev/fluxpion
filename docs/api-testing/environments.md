@@ -38,6 +38,19 @@ Mark a variable as **secret** (lock icon) and its value is encrypted in the OS c
 
 Click the **eye** button next to the environment selector to see the active environment's and the global variables at a glance, like Postman's quick look. Each variable shows its initial value (what is saved) and its current value (what scripts set on this machine). *same* means no script has changed it. Secret and sensitive values are always shown as `••••••`. **Edit** opens the environment or the globals.
 
+## Compare
+
+**Compare** (at the top of an environment) shows two environments side by side. Differences come first:
+
+- variables missing on one side;
+- different values;
+- variables that are disabled on one side;
+- secrets that are set on one side only.
+
+Use it when a request works on Staging but fails on Production. Secret and sensitive-looking values (tokens, passwords, keys) are masked; secrets are compared by their stored values without being shown.
+
+From the terminal, `testpion env diff Staging Production -w my-workspace` lists the differences and exits with 1 when there are any. Add `--values` to see non-secret values, `--all` to include the variables that are the same, and `--json` for scripts. AI agents get the `compare_environments` tool, which returns statuses, never values.
+
 ## Export
 
 **Export** in an environment's toolbar writes it in Postman's environment format, which Postman and Newman read, and so does `testpion run-collection -e`. Secret variables are included by name only: the value is empty and the type is `secret`. The CLI equivalent is `testpion export-environment <name> -o file.json`.
