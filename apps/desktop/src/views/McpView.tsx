@@ -194,9 +194,6 @@ export function McpView() {
           empty={
             <Empty title="No MCP servers">
               Add a server using stdio (a local command), Streamable HTTP, legacy SSE or a mock definition.
-              <Button className="mt-2" onClick={() => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-everything'] })}>
-                Add server
-              </Button>
             </Empty>
           }
         />

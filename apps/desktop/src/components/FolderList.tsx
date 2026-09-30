@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, Copy, Folder, FolderInput, FolderOpen, FolderPlus, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { confirmAction, promptText } from '../store';
-import { cx, IconButton, Menu, type MenuItem } from './ui';
+import { Button, cx, IconButton, Menu, type MenuItem } from './ui';
 
 export interface FolderListItem {
   id: string;
@@ -217,7 +217,19 @@ export function FolderList({
         })}
         <div {...dropProps(null)} className={cx(dropTarget === null && 'bg-accent-soft/60')}>
           {top.map((it) => row(it, false))}
-          {!items.length && !allFolders.length && empty}
+          {!items.length && !allFolders.length && (
+            <>
+              {empty}
+              <div className="flex flex-wrap justify-center gap-2 px-3 pb-3">
+                <Button size="sm" icon={<Plus size={12} />} onClick={() => onAdd()}>
+                  {addLabel}
+                </Button>
+                <Button size="sm" variant="ghost" icon={<FolderPlus size={12} />} onClick={() => void newFolder()}>
+                  New folder
+                </Button>
+              </div>
+            </>
+          )}
           {allFolders.length > 0 && <div className="h-6" aria-hidden />}
         </div>
       </div>

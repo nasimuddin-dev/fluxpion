@@ -56,6 +56,7 @@ export function CollectionTree({
   filter,
   favoritesOnly = false,
   onMoved,
+  newRequestLabel,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -69,6 +70,8 @@ export function CollectionTree({
   favoritesOnly?: boolean;
   /** Requests (ids) moved from one collection to another, so open tabs can follow them. */
   onMoved?(ids: string[], fromCollectionId: string, toCollectionId: string): void;
+  /** Label of the "New request" menu entry (e.g. "New GraphQL request"). */
+  newRequestLabel?: string;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
@@ -218,6 +221,7 @@ export function CollectionTree({
                 }}
                 onDelete={async () => (await confirmAction({ title: 'Delete folder', message: `Delete the folder "${n.name}" and all requests in it?`, confirmLabel: 'Delete folder', danger: true })) && removeWithUndo(c, n)}
                 onNewRequest={() => onNewRequest(c, n.id)}
+                newRequestLabel={newRequestLabel}
                 onRun={onRun && (() => onRun(c, n.id))}
                 runLabel="Run folder"
                 onMonitor={() => useApp.getState().openIntent('monitors', { create: { collectionId: c.id, selection: [n.id] } })}
@@ -328,6 +332,7 @@ export function CollectionTree({
                     { label: 'Convert scripts to pm.*', icon: <Undo2 size={14} />, onSelect: () => void convertScripts(c, 'pm') },
                   ]}
                   onNewRequest={() => onNewRequest(c)}
+                  newRequestLabel={newRequestLabel}
                   onRun={onRun && (() => onRun(c))}
                   runLabel="Run collection"
                   onMonitor={() => useApp.getState().openIntent('monitors', { create: { collectionId: c.id } })}
@@ -370,7 +375,9 @@ function NodeMenu({
   extraItems,
   open,
   onOpenChange,
+  newRequestLabel = 'New request',
 }: {
+  newRequestLabel?: string;
   onEdit?(): void;
   onRename?(): void;
   onDelete?(): void;
@@ -401,7 +408,7 @@ function NodeMenu({
   add(runLabel, <Play size={14} />, onRun);
   add('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor);
   add('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit, { separator: !!onRun });
-  add('New request', <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
+  add(newRequestLabel, <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
   add('New folder', <FolderPlus size={14} />, onNewFolder);
   add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });
   add('Duplicate', <CopyPlus size={14} />, onDuplicate);

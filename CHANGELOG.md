@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Collections in the GraphQL view**: a Collections / Schema switch in the sidebar shows the same collection tree as REST (new collections and folders, **New GraphQL request** in any folder, drag and drop, run, move), **Save** (now also Ctrl+S) asks for the collection and folder, and HTTP requests in the tree open in REST.
+- **Clearer saved lists**: an empty WebSocket, gRPC, AI Lab or MCP sidebar shows **Save current …** and **New folder** buttons.
 - **Navigation regrouped**: the left rail is now grouped as Requests (REST, GraphQL, gRPC, WebSocket, MCP), Testing (Tests, Monitors, Load), AI (AI Lab, Evaluations) and Workspace (Collections, Environments, History, Traces); tooltips say what each covers (WebSocket includes Socket.IO and MQTT), and on short windows the rail becomes a compact icon bar with no scrolling.
 - **Explain a failed test with AI**: a failed result in a test or collection run has **Explain with AI**, which says why the checks failed and whether to change the test or the API.
 - **Run tests from AI agents**: the MCP server's `list_tests` and `run_tests` tools (filters, `rerunFailed`), so agents can run the tests they save with `save_test`.
