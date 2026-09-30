@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request', 'variable_usages']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'security_review', 'send_request', 'variable_usages']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -312,6 +312,7 @@ describe('example workspace (end-to-end)', () => {
       expect(diff.nonBreaking.map((c: { kind: string }) => c.kind)).toEqual(['operation-added']);
       expect((await text('openapi_diff', { old: '../../outside.json', new: spec })).isError).toBe(true);
       expect((await text('collection_openapi', { collection: 'Veterinary API' })).text).toMatch(/^openapi: 3\.1\.0/);
+      expect(Array.isArray(JSON.parse((await text('security_review', { collection: 'Veterinary API' })).text))).toBe(true);
       // variable usages (read) — the rename itself is covered by the unit test
       const uses = JSON.parse((await text('variable_usages', { name: 'clientSecret' })).text);
       expect(uses.map((u: { where: string }) => u.where)).toContain('Environment Development');

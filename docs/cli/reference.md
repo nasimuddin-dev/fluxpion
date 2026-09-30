@@ -13,6 +13,7 @@ testpion run --suite <name>   Run tests/<name>.suite.yaml from a workspace
 testpion run-collection <collection>   Run a collection like Postman's Collection Runner / Newman
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
+testpion lint <collection>    Security review of a collection's requests (--fail-on high for CI)
 testpion record <target>      Record traffic through a local reverse proxy; -w saves it as a collection (see Record traffic)
 testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
 testpion vars usages|rename -w   Where a variable is used; rename it everywhere

@@ -6,6 +6,7 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  securityLint,
   startRecorder,
   recordingToCollection,
   type RecordedExchange,
@@ -132,6 +133,8 @@ export function collectionsHandlers(be: Backend): Handlers {
       return { collectionId: saved.id, name: saved.name, requests: r.requests, placeholders: r.placeholders.map((p) => p.variable) };
     },
     'record.clear': () => void be.recorder?.exchanges.splice(0),
+    /** Security findings in a collection's request definitions (typed-in secrets, secrets in URLs, plain http …). */
+    'col.securityLint': ({ id }: { id: string }) => securityLint(be.ws.getCollection(id), be.settings.redactFields),
     /** OpenAPI documents kept in the workspace (specs/), for comparing versions. */
     'openapi.specs': () => {
       const dir = be.ws.path('specs');

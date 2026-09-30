@@ -139,6 +139,7 @@ const docsSidebar = [
     text: 'Security',
     items: [
       { text: 'Secrets', link: '/security/secrets' },
+      { text: 'API Security Checks', link: '/security/api-security' },
       { text: 'Privacy & Redaction', link: '/security/privacy' },
     ],
   },

@@ -29,6 +29,7 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  securityLint,
   collectionToOpenApiText,
   variableUsages,
   renameVariable,
@@ -37,6 +38,25 @@ import {
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
 
 export function registerDataCommands(program: Command): void {
+  program
+    .command('lint')
+    .description("security review of a collection's requests: secrets typed in instead of secret variables, secrets in query strings, plain http to other hosts, turned-off TLS checks")
+    .argument('<collection>', 'collection name or id, a file, or an http(s) link')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .addOption(new Option('--fail-on <severity>', 'exit 1 when a finding is at least this severe').choices(['high', 'medium', 'low']))
+    .option('--json', 'print the findings as JSON')
+    .action(async (ref: string, o: { workspace?: string; failOn?: 'high' | 'medium' | 'low'; json?: boolean }) => {
+      const c = await loadCollectionRef(ref, o.workspace);
+      const findings = securityLint(c, new WorkspaceManager().loadSettings().redactFields);
+      if (o.json) console.log(JSON.stringify(findings, null, 2));
+      else if (!findings.length) console.log(green(`No findings in "${c.name}".`));
+      else {
+        for (const f of findings) console.log(`${f.severity === 'high' ? red('high  ') : f.severity === 'medium' ? yellow('medium') : dim('low   ')} ${f.message}\n       ${dim(f.where)}`);
+        console.log(bold(`\n${findings.length} finding${findings.length > 1 ? 's' : ''}`));
+      }
+      const rank = { high: 3, medium: 2, low: 1 };
+      if (o.failOn && findings.some((f) => rank[f.severity] >= rank[o.failOn!])) process.exitCode = EXIT.TEST_FAILURE;
+    });
   const varsCmd = program.command('vars').description('where a variable is used, and renaming it everywhere in a workspace');
   varsCmd
     .command('usages')

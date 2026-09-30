@@ -1,0 +1,126 @@
+import type { AuthConfig, CheckConfig, CheckResult, Collection, KeyValue } from '../model/types.js';
+import { registerCheck, type CheckContext } from './checks.js';
+import { collectionRequests } from '../runner/collection-run.js';
+import { Redactor } from '../util/redact.js';
+
+/**
+ * API security basics.
+ * - `security-headers` check: the response sets HSTS (on https), `X-Content-Type-Options: nosniff`, a
+ *   clickjacking defence (X-Frame-Options or CSP frame-ancestors), doesn't allow any origin together
+ *   with credentials, and doesn't reveal server versions. `values` lists items to skip.
+ * - `securityLint(collection)`: request definitions that leak or weaken: hard-coded secrets, secrets in
+ *   query strings, plain http to non-local hosts, disabled TLS verification, Basic auth over http.
+ */
+export const SECURITY_HEADER_ITEMS = ['hsts', 'nosniff', 'frame', 'cors', 'server-version'] as const;
+
+registerCheck('security-headers', (cfg: CheckConfig, ctx: CheckContext): CheckResult => {
+  const skip = new Set((Array.isArray(cfg.values) ? cfg.values : []).map((v) => String(v).toLowerCase()));
+  const get = (n: string) => ctx.headers?.find(([k]) => k.toLowerCase() === n)?.[1];
+  const https = /^https:/i.test(ctx.request?.url ?? '');
+  const problems: string[] = [];
+  if (!skip.has('hsts') && https && !get('strict-transport-security')) problems.push('no Strict-Transport-Security');
+  if (!skip.has('nosniff') && !/nosniff/i.test(get('x-content-type-options') ?? '')) problems.push('no X-Content-Type-Options: nosniff');
+  const html = /text\/html/i.test(get('content-type') ?? '');
+  if (!skip.has('frame') && html && !get('x-frame-options') && !/frame-ancestors/i.test(get('content-security-policy') ?? '')) problems.push('HTML without X-Frame-Options or CSP frame-ancestors');
+  if (!skip.has('cors') && get('access-control-allow-origin') === '*' && /true/i.test(get('access-control-allow-credentials') ?? '')) problems.push('CORS allows any origin with credentials');
+  const server = [get('server'), get('x-powered-by'), get('x-aspnet-version')].filter(Boolean).join(', ');
+  if (!skip.has('server-version') && /\d+\.\d+/.test(server)) problems.push(`server version exposed (${server})`);
+  return {
+    type: 'security-headers',
+    name: cfg.name ?? 'security headers',
+    passed: problems.length === 0,
+    source: 'deterministic',
+    message: problems.length ? problems.join('; ') : 'security headers look good',
+  };
+});
+
+export interface SecurityFinding {
+  severity: 'high' | 'medium' | 'low';
+  where: string;
+  message: string;
+  requestId?: string;
+}
+
+const isVar = (s: string | undefined) => !!s && /^\s*\{\{[^}]+\}\}\s*$/.test(s);
+const hasVar = (s: string | undefined) => !!s && /\{\{[^}]+\}\}/.test(s);
+const localHost = (host: string) => /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?|0\.0\.0\.0)/i.test(host) || /\.(test|local|localhost)$/i.test(host);
+
+/** Secrets typed as plain values in auth settings (they belong in secret variables). */
+function literalSecrets(auth: AuthConfig | undefined): string[] {
+  if (!auth) return [];
+  const out: string[] = [];
+  const check = (label: string, v: string | undefined) => {
+    if (v && !hasVar(v)) out.push(label);
+  };
+  switch (auth.type) {
+    case 'bearer':
+      check('bearer token', auth.token);
+      break;
+    case 'basic':
+    case 'digest':
+      check('password', auth.password);
+      break;
+    case 'apiKey':
+      check(`API key ${auth.key}`, auth.value);
+      break;
+    case 'jwt':
+      check('JWT secret', auth.secret);
+      break;
+    case 'oauth2':
+      check('client secret', auth.clientSecret);
+      check('password', auth.password);
+      break;
+    case 'oauth1':
+      check('consumer secret', auth.consumerSecret);
+      check('token secret', auth.tokenSecret);
+      break;
+    case 'awsv4':
+      check('secret key', auth.secretKey);
+      break;
+  }
+  return out;
+}
+
+/** Security findings in a collection's request definitions, most severe first. */
+export function securityLint(collection: Collection, redactFields?: string[]): SecurityFinding[] {
+  const red = new Redactor(redactFields);
+  const out: SecurityFinding[] = [];
+  const add = (f: SecurityFinding) => out.push(f);
+  for (const s of literalSecrets(collection.auth)) add({ severity: 'high', where: collection.name, message: `The collection's auth has a ${s} typed in: use a secret variable` });
+  for (const ref of collectionRequests(collection)) {
+    const where = [collection.name, ...ref.path, ref.name].join(' › ');
+    if (ref.node.kind !== 'http') continue;
+    const r = ref.node.request;
+    const own = r.auth && r.auth.type !== 'inherit' ? r.auth : undefined;
+    for (const s of literalSecrets(own)) add({ severity: 'high', where, message: `A ${s} is typed into the request: use a secret variable`, requestId: ref.id });
+    const kvSecret = (rows: KeyValue[] | undefined) => (rows ?? []).filter((h) => h.enabled !== false && h.key && h.value && red.isSensitiveKey(h.key) && !hasVar(h.value));
+    for (const h of kvSecret(r.headers)) add({ severity: 'high', where, message: `Header ${h.key} holds a value typed in: use a secret variable`, requestId: ref.id });
+    const querySecrets = [...kvSecret(r.params), ...(r.params ?? []).filter((p) => p.enabled !== false && red.isSensitiveKey(p.key) && isVar(p.value))];
+    for (const p of querySecrets) add({ severity: 'medium', where, message: `The secret "${p.key}" is sent in the query string, where proxies and server logs keep it: send it in a header`, requestId: ref.id });
+    let host = '';
+    let protocol = '';
+    const m = /^([a-z]+):\/\/([^/:?#]+)/i.exec(r.url);
+    if (m) {
+      protocol = m[1]!.toLowerCase();
+      host = m[2]!;
+    }
+    if (protocol === 'http' && host && !localHost(host)) {
+      add({ severity: 'medium', where, message: `Plain http to ${host}: requests and credentials travel unencrypted`, requestId: ref.id });
+      if (ref.auth && ['basic', 'bearer', 'apiKey', 'digest', 'oauth2'].includes(ref.auth.type)) add({ severity: 'high', where, message: `Credentials (${ref.auth.type}) over plain http to ${host}`, requestId: ref.id });
+    }
+    if (r.settings?.insecure) add({ severity: 'medium', where, message: 'TLS certificate verification is turned off for this request', requestId: ref.id });
+    if (r.body && 'content' in r.body && r.body.type === 'json') {
+      try {
+        const walk = (v: unknown, key = ''): void => {
+          if (typeof v === 'string' && key && red.isSensitiveKey(key) && v && !hasVar(v)) add({ severity: 'high', where, message: `The body field "${key}" holds a value typed in: use a secret variable`, requestId: ref.id });
+          else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, Array.isArray(v) ? key : k);
+        };
+        walk(JSON.parse(r.body.content));
+      } catch {
+        /* not JSON (variables in it) */
+      }
+    }
+  }
+  const rank = { high: 0, medium: 1, low: 2 };
+  return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
+}

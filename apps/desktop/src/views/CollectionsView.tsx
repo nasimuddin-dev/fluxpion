@@ -1,4 +1,4 @@
-import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Radio, Send, Trash2, Upload } from 'lucide-react';
+import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Radio, Send, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -15,9 +15,11 @@ import { TrashDialog } from '../components/TrashDialog';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, IconButton, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
 import { ImportModal } from './rest/dialogs';
+import { SecurityReviewDialog } from '../components/SecurityReviewDialog';
 
 export function CollectionsView() {
   const [trashOpen, setTrashOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const [cols, setCols] = useState<Collection[]>([]);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Collection>();
@@ -112,6 +114,7 @@ export function CollectionsView() {
               </div>
             </button>
           ))}
+          {securityOpen && draft && <SecurityReviewDialog collectionId={draft.id} name={draft.name} onClose={() => setSecurityOpen(false)} />}
           {trashOpen && <TrashDialog kind="collection" onClose={() => setTrashOpen(false)} onRestored={(r) => void load().then(() => setSel(r.id))} />}
           {!cols.length && <Empty icon={<FolderTree size={24} />} title="No collections">Create one or import OpenAPI, Postman, Insomnia, Bruno, Hoppscotch or HAR.</Empty>}
         </div>
@@ -135,6 +138,9 @@ export function CollectionsView() {
                   }}
                 >
                   Run
+                </Button>
+                <Button size="sm" icon={<ShieldCheck size={12} />} title="Secrets typed in, secrets in URLs, plain http, turned-off TLS checks" onClick={() => setSecurityOpen(true)}>
+                  Security
                 </Button>
                 <Menu
                   trigger={

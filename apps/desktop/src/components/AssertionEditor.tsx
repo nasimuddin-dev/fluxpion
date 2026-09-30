@@ -14,6 +14,7 @@ export const CHECK_DEFS: CheckDef[] = [
   { type: 'status', label: 'Status code', group: 'Response', fields: ['expected'], hint: '200, 2xx, [200,201], success, error' },
   { type: 'latency', label: 'Latency ≤ (ms)', group: 'Response', fields: ['max'] },
   { type: 'header', label: 'Header', group: 'Response', fields: ['header', 'expected'] },
+  { type: 'security-headers', label: 'Security headers', group: 'Response', fields: ['values'], hint: 'HSTS, nosniff, clickjacking, CORS with credentials, server version; list items to skip: hsts, nosniff, frame, cors, server-version' },
   { type: 'exists', label: 'Exists', group: 'Body', fields: ['path'] },
   { type: 'not-exists', label: 'Does not exist', group: 'Body', fields: ['path'] },
   { type: 'equals', label: 'Equals', group: 'Body', fields: ['path', 'expected'] },
