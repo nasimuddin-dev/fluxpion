@@ -515,10 +515,9 @@ export function RestView() {
         })
     : undefined;
 
-  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
     <>
-    <Split id="rest-sidebar" sidebar collapsed={explorerOpen} initial={20} min={12}>
+    <Split id="rest-sidebar" sidebar collapsed initial={20} min={12}>
       <SidebarShell
         id="rest"
         value={side}

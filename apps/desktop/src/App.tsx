@@ -5,6 +5,7 @@ import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { ViewBoundary } from './components/ViewBoundary';
+import { isRequestView } from './store';
 import { Explorer } from './components/Explorer';
 import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
@@ -180,7 +181,9 @@ export default function App() {
         else useApp.getState().goForward();
       } else if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
         e.preventDefault();
-        useApp.getState().toggleExplorer();
+        const st = useApp.getState();
+        if (isRequestView(st.view)) st.toggleExplorer();
+        else (st.setView(st.lastRequestView), st.toggleExplorer(true));
       } else if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         set({ paletteOpen: true, searchOpen: false });
@@ -282,7 +285,7 @@ export default function App() {
       <TopBar />
       <div className="flex-1 flex min-h-0">
         <Sidebar />
-        {explorerOpen && (
+        {explorerOpen && isRequestView(view) && (
           <ViewBoundary view="explorer">
             <Explorer />
           </ViewBoundary>

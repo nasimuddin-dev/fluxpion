@@ -256,6 +256,7 @@ export function GraphQLView() {
     await call('col.save', c);
     await loadCollections();
   };
+  const [schemaOpen, setSchemaOpen] = useSticky<boolean>('gql:schemaOpen', false);
   const [side, setSide] = useSticky<'collections' | 'schema' | 'environments' | 'history'>('gql:side', 'collections');
   const [treeFilter, setTreeFilter] = useState('');
   const [saving, setSaving] = useState(false);
@@ -321,15 +322,19 @@ export function GraphQLView() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
+      {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}
+      <div className="@container flex items-center gap-2 p-2 border-b border-line shrink-0">
         <Badge tone="accent">{isSubscription ? 'WS' : 'POST'}</Badge>
-        <VarInput ariaLabel="GraphQL endpoint" className="flex-1 h-8" value={d.endpoint} onChange={(endpoint) => set({ endpoint })} placeholder="https://api.example.com/graphql" />
-        <Button icon={<RefreshCw size={13} className={introspecting ? 'spin' : ''} />} onClick={introspectNow} disabled={introspecting}>
-          Introspect
+        <VarInput ariaLabel="GraphQL endpoint" className="flex-1 min-w-40 h-8" value={d.endpoint} onChange={(endpoint) => set({ endpoint })} placeholder="https://api.example.com/graphql" />
+        <Button icon={<RefreshCw size={13} className={introspecting ? 'spin' : ''} />} onClick={introspectNow} disabled={introspecting} title="Introspect the schema (autocomplete, validation, schema explorer)">
+          <span className="hidden @[52rem]:inline">Introspect</span>
+        </Button>
+        <Button icon={<Network size={13} />} variant={schemaOpen ? 'soft' : 'default'} aria-pressed={schemaOpen} title="Show or hide the schema explorer" onClick={() => setSchemaOpen(!schemaOpen)}>
+          <span className="hidden @[52rem]:inline">Schema</span>
         </Button>
         <Tooltip content={mockUrl ? `Mock running at ${mockUrl}: click to stop` : sdl ? 'Serve fake data for this schema on localhost' : 'Introspect a schema first'}>
           <Button variant={mockUrl ? 'soft' : 'default'} icon={<FlaskConical size={13} />} onClick={() => void toggleMock()} disabled={!mockUrl && !sdl}>
-            {mockUrl ? 'Mock on' : 'Mock'}
+            <span className="hidden @[52rem]:inline">{mockUrl ? 'Mock on' : 'Mock'}</span>
           </Button>
         </Tooltip>
         {operations.length > 1 && (
@@ -355,7 +360,7 @@ export function GraphQLView() {
           </Button>
         )}
         <Button icon={<Code2 size={13} />} title="The request as code: cURL, fetch, Python and more" onClick={() => setShowCode(true)}>
-          Code
+          <span className="hidden @[52rem]:inline">Code</span>
         </Button>
         <Button
           icon={<FileCheck2 size={13} />}
@@ -370,10 +375,10 @@ export function GraphQLView() {
             void saveAsTestFile(d.name || selectedOp?.name || 'GraphQL query', { kind: 'graphql', endpoint: d.endpoint, query: d.query, variables, operationName: operations.length > 1 ? selectedOp?.name : undefined, headers: d.headers, auth: d.auth }, d.assertions);
           }}
         >
-          Test
+          <span className="hidden @[52rem]:inline">Test</span>
         </Button>
-        <Button icon={<Save size={13} />} onClick={save}>
-          Save
+        <Button icon={<Save size={13} />} onClick={save} title="Save to a collection (Ctrl+S)">
+          <span className="hidden @[52rem]:inline">Save</span>
         </Button>
       </div>
       {saving && (
@@ -387,7 +392,7 @@ export function GraphQLView() {
       )}
       {showCode && <CodeModal request={asHttpRequest()} collectionId={d.collectionId} requestId={d.requestId} onClose={() => setShowCode(false)} />}
       <div className="flex-1 min-h-0">
-        <Split id="gql-explorer" sidebar initial={22} min={12}>
+        <Split id="gql-explorer" sidebar collapsed initial={22} min={12}>
           <SidebarShell
             id="graphql"
             value={side}
@@ -469,122 +474,135 @@ export function GraphQLView() {
               },
             ]}
           />
-          <Split id="gql-main" initial={50}>
-            <div className="h-full flex flex-col">
-              <div className="flex items-center h-8 px-2 border-b border-line gap-1 text-xs text-muted shrink-0">
-                <span className="font-medium text-fg">{d.name}</span>
-                {operations[0] && <Badge>{operations[0].type}</Badge>}
-                <Button size="sm" variant="ghost" className="ml-auto" icon={<Wand2 size={12} />} onClick={prettify}>
-                  Prettify
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<Sparkles size={12} />}
-                  onClick={() => useApp.getState().set({ assistant: { task: 'generate-query', title: 'Generate GraphQL query', context: { schemaSdl: sdl?.slice(0, 20000) ?? 'unknown — introspect first', currentQuery: d.query }, question: '' } })}
-                >
-                  Generate
-                </Button>
-              </div>
-              <div className="flex-1 min-h-0">
-                <Split id="gql-editor-vars" direction="vertical" initial={65}>
-                  <CodeEditor language="graphql" path="query.graphql" value={d.query} onChange={(query) => set({ query })} />
-                  <div className="h-full flex flex-col">
-                    <Tabs
-                      value={sub}
-                      onChange={setSub}
-                      tabs={[
-                        { id: 'variables', label: 'Variables' },
-                        { id: 'headers', label: 'Headers', badge: d.headers.length },
-                        { id: 'auth', label: 'Auth' },
-                        { id: 'scripts', label: 'Scripts', badge: (d.preRequestScript?.trim() ? 1 : 0) + (d.testScript?.trim() ? 1 : 0) || undefined },
-                        ...(isSubscription ? [{ id: 'connection' as const, label: 'Connection' }] : []),
-                        { id: 'tests', label: 'Tests', badge: d.assertions.length },
-                      ]}
-                    />
-                    <div className="flex-1 min-h-0 overflow-auto">
-                      {sub === 'variables' && <CodeEditor language="json" value={d.variables} onChange={(variables) => set({ variables })} minimal />}
-                      {sub === 'headers' && (
-                        <div className="p-2">
-                          <KeyValueEditor rows={d.headers} onChange={(headers) => set({ headers })} keyPlaceholder="Header" />
-                        </div>
-                      )}
-                      {sub === 'auth' && <AuthEditor auth={d.auth} onChange={(auth) => set({ auth })} />}
-                      {sub === 'connection' && (
-                        <div className="h-full flex flex-col">
-                          <p className="px-2 py-1.5 text-xs text-muted border-b border-line">Payload of <span className="mono">connection_init</span> (JSON), for servers that read auth there, e.g. {'{ "authorization": "Bearer {{token}}" }'}. The Auth tab is also sent as a handshake header.</p>
-                          <div className="flex-1 min-h-0">
-                            <CodeEditor language="json" value={d.connectionParams ?? ''} onChange={(connectionParams) => set({ connectionParams })} minimal />
-                          </div>
-                        </div>
-                      )}
-                      {sub === 'scripts' && <ScriptsPanel pre={d.preRequestScript ?? ''} post={d.testScript ?? ''} onPre={(v) => set({ preRequestScript: v })} onPost={(v) => set({ testScript: v })} />}
-                      {sub === 'tests' && <AssertionEditor checks={d.assertions} onChange={(assertions) => set({ assertions })} groups={['Response', 'Body', 'GraphQL']} />}
-                    </div>
-                  </div>
-                </Split>
-              </div>
-            </div>
-            <div className="h-full flex flex-col min-h-0">
-              {events && !result?.error ? (
-                <div className="h-full flex flex-col min-h-0">
-                  <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm shrink-0">
-                    <Badge tone={subscription ? 'ok' : 'default'}>{subscription ? 'subscribed' : 'ended'}</Badge>
-                    {subscription?.protocol && <span className="text-xs text-muted mono">{subscription.protocol}</span>}
-                    <span className="text-muted ml-auto">{events.filter((e) => e.type === 'next').length} events</span>
-                  </div>
-                  <Split id="gql-sub-events" direction="vertical" initial={45}>
-                    <div className="h-full overflow-auto">
-                      {events.map((e, i) => (
-                        <button key={i} onClick={() => setEventSel(i)} className={cx('w-full flex items-center gap-2 px-3 py-1 text-left text-sm border-b border-line/50 hover:bg-hover', eventSel === i && 'bg-accent/10')}>
-                          <span className="text-xs text-muted tabular-nums shrink-0">{new Date(e.time).toLocaleTimeString()}</span>
-                          <Badge tone={e.type === 'next' ? 'accent' : e.type === 'error' ? 'bad' : 'default'}>{e.type}</Badge>
-                          <span className="mono text-xs truncate">{e.message ?? JSON.stringify(e.data)}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="h-full overflow-auto">{eventSel !== undefined && events[eventSel]?.data !== undefined ? <JsonTree data={events[eventSel]!.data} /> : <Empty title="Select an event" />}</div>
-                  </Split>
+          <Split id="gql-schema" initial={74} min={40} collapsedSecond={!schemaOpen}>
+            <Split id="gql-main" initial={50}>
+              <div className="h-full flex flex-col">
+                <div className="flex items-center h-8 px-2 border-b border-line gap-1 text-xs text-muted shrink-0">
+                  <span className="font-medium text-fg">{d.name}</span>
+                  {operations[0] && <Badge>{operations[0].type}</Badge>}
+                  <Button size="sm" variant="ghost" className="ml-auto" icon={<Wand2 size={12} />} onClick={prettify}>
+                    Prettify
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Sparkles size={12} />}
+                    onClick={() => useApp.getState().set({ assistant: { task: 'generate-query', title: 'Generate GraphQL query', context: { schemaSdl: sdl?.slice(0, 20000) ?? 'unknown — introspect first', currentQuery: d.query }, question: '' } })}
+                  >
+                    Generate
+                  </Button>
                 </div>
-              ) : result?.error ? (
-                <ErrorPanel error={result.error} context={{ endpoint: d.endpoint, query: d.query }} />
-              ) : result?.response ? (
-                <>
-                  <div className="flex items-center gap-3 px-3 h-9 border-b border-line text-sm shrink-0">
-                    <Badge tone={statusTone(result.response.status)}>{result.response.status}</Badge>
-                    <span className="text-muted">{formatMs(result.response.durationMs)}</span>
-                    {!!result.errors?.length && <Badge tone="bad">{result.errors.length} GraphQL error(s)</Badge>}
-                  </div>
-                  <Tabs
-                    value={resTab}
-                    onChange={setResTab}
-                    tabs={[
-                      { id: 'response', label: 'Response' },
-                      { id: 'raw', label: 'Raw' },
-                      { id: 'tests', label: 'Tests', badge: result.checks?.length },
-                    ]}
-                  />
-                  <div className="flex-1 min-h-0">
-                    {resTab === 'response' && (result.response.json !== undefined ? <JsonTree data={result.response.json} onAssert={(a) => (set({ assertions: [...d.assertions, a as never] }), useApp.getState().toast(`Added a check on ${a.path} (Tests tab)`, 'success'))} onSaveVariable={(v) => void saveResponseVariable(v, env, d.testScript).then((testScript) => testScript !== undefined && set({ testScript }))} /> : <RawView text={result.response.bodyPreview} />)}
-                    {resTab === 'raw' && <RawView text={result.response.bodyPreview} />}
-                    {resTab === 'tests' && (
-                      <div className="h-full overflow-auto">
-                        <CheckList checks={result.checks ?? []} />
-                        {!!result.scriptLogs?.length && (
-                          <div className="border-t border-line p-3">
-                            <div className="text-xs font-medium text-muted mb-1">Script output</div>
-                            <pre className="mono text-xs whitespace-pre-wrap break-all">{result.scriptLogs.map((l) => `[${l.phase}] ${l.message}`).join('\n')}</pre>
+                <div className="flex-1 min-h-0">
+                  <Split id="gql-editor-vars" direction="vertical" initial={65}>
+                    <CodeEditor language="graphql" path="query.graphql" value={d.query} onChange={(query) => set({ query })} />
+                    <div className="h-full flex flex-col">
+                      <Tabs
+                        value={sub}
+                        onChange={setSub}
+                        tabs={[
+                          { id: 'variables', label: 'Variables' },
+                          { id: 'headers', label: 'Headers', badge: d.headers.length },
+                          { id: 'auth', label: 'Auth' },
+                          { id: 'scripts', label: 'Scripts', badge: (d.preRequestScript?.trim() ? 1 : 0) + (d.testScript?.trim() ? 1 : 0) || undefined },
+                          ...(isSubscription ? [{ id: 'connection' as const, label: 'Connection' }] : []),
+                          { id: 'tests', label: 'Tests', badge: d.assertions.length },
+                        ]}
+                      />
+                      <div className="flex-1 min-h-0 overflow-auto">
+                        {sub === 'variables' && <CodeEditor language="json" value={d.variables} onChange={(variables) => set({ variables })} minimal />}
+                        {sub === 'headers' && (
+                          <div className="p-2">
+                            <KeyValueEditor rows={d.headers} onChange={(headers) => set({ headers })} keyPlaceholder="Header" />
                           </div>
                         )}
+                        {sub === 'auth' && <AuthEditor auth={d.auth} onChange={(auth) => set({ auth })} />}
+                        {sub === 'connection' && (
+                          <div className="h-full flex flex-col">
+                            <p className="px-2 py-1.5 text-xs text-muted border-b border-line">Payload of <span className="mono">connection_init</span> (JSON), for servers that read auth there, e.g. {'{ "authorization": "Bearer {{token}}" }'}. The Auth tab is also sent as a handshake header.</p>
+                            <div className="flex-1 min-h-0">
+                              <CodeEditor language="json" value={d.connectionParams ?? ''} onChange={(connectionParams) => set({ connectionParams })} minimal />
+                            </div>
+                          </div>
+                        )}
+                        {sub === 'scripts' && <ScriptsPanel pre={d.preRequestScript ?? ''} post={d.testScript ?? ''} onPre={(v) => set({ preRequestScript: v })} onPost={(v) => set({ testScript: v })} />}
+                        {sub === 'tests' && <AssertionEditor checks={d.assertions} onChange={(assertions) => set({ assertions })} groups={['Response', 'Body', 'GraphQL']} />}
                       </div>
-                    )}
+                    </div>
+                  </Split>
+                </div>
+              </div>
+              <div className="h-full flex flex-col min-h-0">
+                {events && !result?.error ? (
+                  <div className="h-full flex flex-col min-h-0">
+                    <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm shrink-0">
+                      <Badge tone={subscription ? 'ok' : 'default'}>{subscription ? 'subscribed' : 'ended'}</Badge>
+                      {subscription?.protocol && <span className="text-xs text-muted mono">{subscription.protocol}</span>}
+                      <span className="text-muted ml-auto">{events.filter((e) => e.type === 'next').length} events</span>
+                    </div>
+                    <Split id="gql-sub-events" direction="vertical" initial={45}>
+                      <div className="h-full overflow-auto">
+                        {events.map((e, i) => (
+                          <button key={i} onClick={() => setEventSel(i)} className={cx('w-full flex items-center gap-2 px-3 py-1 text-left text-sm border-b border-line/50 hover:bg-hover', eventSel === i && 'bg-accent/10')}>
+                            <span className="text-xs text-muted tabular-nums shrink-0">{new Date(e.time).toLocaleTimeString()}</span>
+                            <Badge tone={e.type === 'next' ? 'accent' : e.type === 'error' ? 'bad' : 'default'}>{e.type}</Badge>
+                            <span className="mono text-xs truncate">{e.message ?? JSON.stringify(e.data)}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="h-full overflow-auto">{eventSel !== undefined && events[eventSel]?.data !== undefined ? <JsonTree data={events[eventSel]!.data} /> : <Empty title="Select an event" />}</div>
+                    </Split>
                   </div>
-                </>
-              ) : (
-                <Empty icon={<Play size={26} />} title="Run the operation to see the response">
-                  Introspect the endpoint to enable autocomplete, validation and the schema explorer.
-                </Empty>
-              )}
+                ) : result?.error ? (
+                  <ErrorPanel error={result.error} context={{ endpoint: d.endpoint, query: d.query }} />
+                ) : result?.response ? (
+                  <>
+                    <div className="flex items-center gap-3 px-3 h-9 border-b border-line text-sm shrink-0">
+                      <Badge tone={statusTone(result.response.status)}>{result.response.status}</Badge>
+                      <span className="text-muted">{formatMs(result.response.durationMs)}</span>
+                      {!!result.errors?.length && <Badge tone="bad">{result.errors.length} GraphQL error(s)</Badge>}
+                    </div>
+                    <Tabs
+                      value={resTab}
+                      onChange={setResTab}
+                      tabs={[
+                        { id: 'response', label: 'Response' },
+                        { id: 'raw', label: 'Raw' },
+                        { id: 'tests', label: 'Tests', badge: result.checks?.length },
+                      ]}
+                    />
+                    <div className="flex-1 min-h-0">
+                      {resTab === 'response' && (result.response.json !== undefined ? <JsonTree data={result.response.json} onAssert={(a) => (set({ assertions: [...d.assertions, a as never] }), useApp.getState().toast(`Added a check on ${a.path} (Tests tab)`, 'success'))} onSaveVariable={(v) => void saveResponseVariable(v, env, d.testScript).then((testScript) => testScript !== undefined && set({ testScript }))} /> : <RawView text={result.response.bodyPreview} />)}
+                      {resTab === 'raw' && <RawView text={result.response.bodyPreview} />}
+                      {resTab === 'tests' && (
+                        <div className="h-full overflow-auto">
+                          <CheckList checks={result.checks ?? []} />
+                          {!!result.scriptLogs?.length && (
+                            <div className="border-t border-line p-3">
+                              <div className="text-xs font-medium text-muted mb-1">Script output</div>
+                              <pre className="mono text-xs whitespace-pre-wrap break-all">{result.scriptLogs.map((l) => `[${l.phase}] ${l.message}`).join('\n')}</pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <Empty icon={<Play size={26} />} title="Run the operation to see the response">
+                    Introspect the endpoint to enable autocomplete, validation and the schema explorer.
+                  </Empty>
+                )}
+              </div>
+            </Split>
+            <div className="h-full flex flex-col min-h-0 bg-panel/50">
+              <div className="flex items-center gap-2 px-3 h-8 border-b border-line text-xs font-semibold uppercase tracking-wider text-muted shrink-0">
+                <Network size={13} /> Schema
+                <button className="ml-auto normal-case font-normal text-muted hover:text-fg" onClick={() => setSchemaOpen(false)} aria-label="Hide the schema">
+                  Hide
+                </button>
+              </div>
+              <div className="flex-1 min-h-0">
+                <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onBuild={(f) => void buildOperation(f)} onIntrospect={introspectNow} loading={introspecting} />
+              </div>
             </div>
           </Split>
         </Split>

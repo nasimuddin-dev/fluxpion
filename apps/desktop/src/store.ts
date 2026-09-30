@@ -118,6 +118,8 @@ interface AppState {
   /** Back / forward through the places visited (views and the items opened in them), like a browser. */
   nav: { back: NavLocation[]; forward: NavLocation[]; current: NavLocation };
   goBack(): void;
+  /** The request editor used last (Collections on the rail returns to it). */
+  lastRequestView: ViewId;
   /** Record the item a view just opened by itself (e.g. a click in its own list), so Back returns to it. */
   markPlace(view: ViewId, payload: Record<string, unknown>): void;
   goForward(): void;
@@ -127,6 +129,10 @@ interface AppState {
 }
 
 let toastId = 0;
+
+/** The request editors: they use the Collections explorer as their (only) sidebar and aren't on the rail. */
+export const REQUEST_VIEWS: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp', 'collections'];
+export const isRequestView = (v: ViewId) => REQUEST_VIEWS.includes(v);
 
 /** A place in the app: a view, and the item opened in it when there is one. */
 export interface NavLocation {
@@ -145,6 +151,15 @@ function replayable(payload: unknown): Record<string, unknown> | undefined {
   const out = Object.fromEntries(PLACE_KEYS.filter((k) => p[k] !== undefined).map((k) => [k, p[k]]));
   return Object.keys(out).length ? out : undefined;
 }
+function lastRequest(view: ViewId): { lastRequestView?: ViewId } {
+  if (!isRequestView(view) || view === 'collections') return {};
+  try {
+    localStorage.setItem('aps.lastRequestView', view);
+  } catch {
+    /* storage unavailable */
+  }
+  return { lastRequestView: view };
+}
 const sameLocation = (a: NavLocation, b: NavLocation) => a.view === b.view && JSON.stringify(a.payload ?? null) === JSON.stringify(b.payload ?? null);
 const NAV_LIMIT = 50;
 type Get = () => AppState;
@@ -162,7 +177,7 @@ function travel(get: Get, set: Set, dir: 'back' | 'forward') {
   if (!to) return;
   const nav = dir === 'back' ? { back: back.slice(0, -1), forward: [...forward, current].slice(-NAV_LIMIT), current: to } : { back: [...back, current].slice(-NAV_LIMIT), forward: forward.slice(0, -1), current: to };
   localStorage.setItem('aps.view', to.view);
-  set({ nav, view: to.view, ...(to.payload ? { intent: { view: to.view, payload: to.payload, nonce: Date.now() } } : {}) });
+  set({ nav, view: to.view, ...lastRequest(to.view), ...(to.payload ? { intent: { view: to.view, payload: to.payload, nonce: Date.now() } } : {}) });
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -171,8 +186,16 @@ export const useApp = create<AppState>((set, get) => ({
   setView: (view) => {
     localStorage.setItem('aps.view', view);
     if (view !== get().view) record(get, set, { view });
-    set({ view });
+    set({ view, ...lastRequest(view) });
   },
+  lastRequestView: ((): ViewId => {
+    try {
+      const v = localStorage.getItem('aps.lastRequestView') as ViewId | null;
+      return v && isRequestView(v) && v !== 'collections' ? v : 'rest';
+    } catch {
+      return 'rest';
+    }
+  })(),
   nav: { back: [], forward: [], current: { view: (localStorage.getItem('aps.view') as ViewId) || 'rest' } },
   goBack: () => travel(get, set, 'back'),
   markPlace: (view, payload) => record(get, set, { view, payload: replayable(payload) }),
@@ -218,7 +241,7 @@ export const useApp = create<AppState>((set, get) => ({
   openIntent: (view, payload) => {
     localStorage.setItem('aps.view', view);
     record(get, set, { view, payload: replayable(payload) });
-    set({ view, intent: { view, payload, nonce: Date.now() } });
+    set({ view, ...lastRequest(view), intent: { view, payload, nonce: Date.now() } });
   },
   refreshWorkspace: async () => {
     const ws = await call<WorkspaceCurrent>('ws.current');

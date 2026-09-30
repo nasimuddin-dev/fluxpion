@@ -105,6 +105,8 @@ function Row({ icon, label, sub, onClick, badge, title, active }: { icon?: React
 export function Explorer() {
   const ws = useApp((s) => s.workspace);
   const env = useApp((s) => s.environment);
+  // the request that's open (as recorded for Back / Forward) is highlighted in the tree
+  const openRequestId = useApp((s) => s.nav.current.payload?.requestId as string | undefined);
   const sections = useOpenSections();
   const [filter, setFilter] = useState('');
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -185,6 +187,8 @@ export function Explorer() {
             { label: 'Collection', icon: <FolderPlus size={14} />, onSelect: () => void newCollection() },
             { label: 'HTTP request', icon: <Plus size={14} />, onSelect: () => intent('rest', { newTab: true }) },
             { label: 'GraphQL request', icon: <Plus size={14} />, onSelect: () => intent('graphql', { reset: true }) },
+            { label: 'gRPC request', icon: <Waypoints size={14} />, onSelect: () => useApp.getState().setView('grpc') },
+            { label: 'WebSocket, Socket.IO or MQTT', icon: <Radio size={14} />, onSelect: () => useApp.getState().setView('websocket') },
             { label: 'Environment', icon: <KeyRound size={14} />, separator: true, onSelect: () => void newEnvironment() },
             { label: 'MCP server', icon: <Plug size={14} />, onSelect: () => intent('mcp', { addServer: true }) },
             { label: 'Monitor', icon: <AlarmClock size={14} />, onSelect: () => useApp.getState().setView('monitors') },
@@ -223,6 +227,7 @@ export function Explorer() {
             <CollectionTree
               collections={collections}
               filter={filter}
+              activeRequestId={openRequestId}
               onOpen={(c, n) => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
               onChange={(c) => void saveCollection(c)}
               onRun={(c, folderId) => intent('collections', { collectionId: c.id, run: true, folderId })}

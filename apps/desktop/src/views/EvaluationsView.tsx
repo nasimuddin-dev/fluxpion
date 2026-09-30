@@ -142,9 +142,8 @@ export function EvaluationsView() {
     }
   };
 
-  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
-    <Split id="eval-sidebar" sidebar collapsed={explorerOpen} initial={18} min={12}>
+    <Split id="eval-sidebar" sidebar initial={18} min={12}>
       <SidebarShell
         id="evaluations"
         panes={[

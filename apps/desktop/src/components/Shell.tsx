@@ -40,7 +40,7 @@ import wordmarkUrl from '../../build/wordmark-nav.png';
 import { ConsolePanel } from './ConsolePanel';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
-import { useApp, type ViewId, type DialogRequest, type DialogTone, type NavLocation } from '../store';
+import { isRequestView, useApp, type ViewId, type DialogRequest, type DialogTone, type NavLocation } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Menu, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
@@ -65,6 +65,9 @@ export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: str
   { id: 'history', label: 'History', icon: <History size={18} />, group: 'Workspace' },
   { id: 'traces', label: 'Traces', icon: <Activity size={18} />, group: 'Workspace', hint: 'Traces of every request and run' },
 ];
+
+/** The rail: the request editors are reached through Collections (explorer, New menu), not listed one by one. */
+const RAIL = NAV.filter((n) => n.group !== 'Requests');
 
 export function Sidebar() {
   const view = useApp((s) => s.view);
@@ -95,19 +98,27 @@ export function Sidebar() {
     </Tooltip>
   );
   const explorerOpen = useApp((s) => s.explorerOpen);
-  // Collections is not a view: it shows or hides the explorer next to the rail, in every view
+  const inRequests = isRequestView(view);
+  // Collections: every request editor (REST, GraphQL, gRPC, WebSocket, MCP) with the explorer as its sidebar;
+  // clicking it again while there shows or hides the explorer (like VS Code's activity bar)
   const explorerToggle = (
-    <Tooltip content={`${explorerOpen ? 'Hide' : 'Show'} collections, saved requests and environments  ·  ${modKey}+B`} side="right">
+    <Tooltip content={inRequests ? `${explorerOpen ? 'Hide' : 'Show'} the Collections sidebar  ·  ${modKey}+B` : 'Collections: requests of every kind (REST, GraphQL, gRPC, WebSocket, MCP)'} side="right">
       <button
-        onClick={() => useApp.getState().toggleExplorer()}
-        aria-pressed={explorerOpen}
+        onClick={() => {
+          const s = useApp.getState();
+          if (inRequests) return s.toggleExplorer();
+          s.setView(s.lastRequestView);
+          s.toggleExplorer(true);
+        }}
+        aria-current={inRequests ? 'page' : undefined}
         aria-label="Collections"
         className={cx(
           'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:820px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
-          explorerOpen ? 'text-fg' : 'text-muted hover:text-fg',
+          inRequests ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
-        <span className={cx('grid place-items-center h-7 w-11 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90', explorerOpen ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover')}>
+        {inRequests && <span aria-hidden className="absolute -left-1.5 top-1.5 h-6 w-[3px] rounded-r-full bg-[image:var(--brand-gradient)]" />}
+        <span className={cx('grid place-items-center h-7 w-11 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90', inRequests ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover')}>
           <FolderTree size={18} />
         </span>
         <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:820px)]:hidden">Collections</span>
@@ -116,10 +127,10 @@ export function Sidebar() {
   );
   return (
     <nav aria-label="Main navigation" className="w-[84px] [@media(max-height:820px)]:w-[64px] shrink-0 border-r border-line bg-chrome flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none]">
-      {NAV.map((n, i) => (
+      {RAIL.map((n, i) => (
         <div key={n.id}>
-          {i > 0 && NAV[i - 1]!.group !== n.group && <div className="mx-3 my-1 [@media(max-height:820px)]:my-0.5 border-t border-line/70" />}
-          {item(n.id, n.label, n.icon, i < 9 ? `${modKey}+Alt+${i + 1}` : undefined, n.hint)}
+          {i > 0 && RAIL[i - 1]!.group !== n.group && <div className="mx-3 my-1 [@media(max-height:820px)]:my-0.5 border-t border-line/70" />}
+          {item(n.id, n.label, n.icon, NAV.indexOf(n) < 9 ? `${modKey}+Alt+${NAV.indexOf(n) + 1}` : undefined, n.hint)}
           {n.id === 'home' && <div className="mt-0.5">{explorerToggle}</div>}
         </div>
       ))}

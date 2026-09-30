@@ -345,11 +345,10 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
     await call('tests.write', { path, content: stringifyYaml(test) });
     useApp.getState().toast(`Saved tests/${path}`, 'success');
   };
-  const explorerOpen = useApp((s) => s.explorerOpen);
   if (!providers.length) return <NoProviders />;
   const r = result && !('error' in result) ? result : undefined;
   return (
-    <Split id="ai-saved" sidebar collapsed={explorerOpen} initial={18} min={12}>
+    <Split id="ai-saved" sidebar initial={18} min={12}>
     <SidebarShell
       id="ai"
       panes={[

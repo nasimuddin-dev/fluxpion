@@ -224,9 +224,8 @@ export function LoadView() {
   }, [startWhenReady, d]);
   const collection = collections.find((c) => c.id === (d.collectionId || collections[0]?.id));
   const s = snap;
-  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
-    <Split id="load-sidebar" sidebar collapsed={explorerOpen} initial={18} min={12}>
+    <Split id="load-sidebar" sidebar initial={18} min={12}>
       <SidebarShell
         id="load"
         panes={[

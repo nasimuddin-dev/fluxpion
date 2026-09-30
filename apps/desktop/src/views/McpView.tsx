@@ -167,7 +167,7 @@ export function McpView() {
 
   return (
     <>
-    <Split id="mcp-servers" sidebar initial={20} min={14}>
+    <Split id="mcp-servers" sidebar collapsed initial={20} min={14}>
       <SidebarShell
         id="mcp"
         panes={[

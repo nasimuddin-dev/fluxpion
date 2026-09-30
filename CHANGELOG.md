@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **One sidebar at a time, and a shorter rail**:
+  - REST, GraphQL, gRPC, WebSocket and MCP are no longer separate rail items. **Collections** opens them all, with the Collections explorer as their only sidebar; clicking it again (or Ctrl+B) hides the sidebar.
+  - Tests, Monitors, Load, AI Lab, Evaluations, Environments and History keep their own single sidebar.
+  - The explorer's **New** menu creates every kind of request, and it highlights the open request.
+  - GraphQL's schema explorer is a **Schema** toggle on the right of the editor, and its toolbar shrinks to icons on narrow windows.
+
 ## 0.10.1 — 2026-09-30
 
 Highlights: **Back and Forward** navigation (top bar, Alt+← / Alt+→, mouse buttons) that reopens what you had open, and clicking a monitor opens its settings.
