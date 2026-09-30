@@ -421,8 +421,9 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
   const [filter, setFilter] = useState('');
   const [args, setArgs] = useSticky<Record<string, Record<string, unknown>>>(`${k}args`, {});
   const [raw, setRaw] = useSticky(`${k}raw`, false);
-  const [rawText, setRawText] = useSticky(`${k}rawText`, '{}');
-  const [assertions, setAssertions] = useSticky<CheckConfig[]>(`${k}assertions`, [{ type: 'status', expected: 'success' }]);
+  // raw JSON arguments and assertions belong to each tool (switching tools shows that tool's own)
+  const [rawText, setRawText] = useSticky(`${k}rawText:${sel ?? ''}`, () => JSON.stringify((sel && args[sel]) || {}, null, 2));
+  const [assertions, setAssertions] = useSticky<CheckConfig[]>(`${k}assertions:${sel ?? ''}`, [{ type: 'status', expected: 'success' }]);
   const [results, setResults] = useSticky<Record<string, ToolRun>>(`${k}results`, {});
   const result = sel ? results[sel] : undefined;
   const setResult = (r: ToolRun | undefined) => sel && setResults((all) => ({ ...all, [sel]: r! }));
@@ -430,13 +431,6 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
   const [sub, setSub] = useSticky<'form' | 'schema' | 'tests'>(`${k}sub`, 'form');
   const tool = tools.find((t) => t.name === sel);
   const value = (sel && args[sel]) || {};
-  const firstSel = useRef(sel);
-  useEffect(() => {
-    // keep a draft of raw JSON across tab switches; start from the form values when another tool is picked
-    if (firstSel.current === sel) return;
-    firstSel.current = sel;
-    setRawText(JSON.stringify(value, null, 2));
-  }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const exec = async () => {
     if (!tool) return;
     let a = value;

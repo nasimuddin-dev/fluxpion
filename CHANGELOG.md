@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed: in the MCP view, assertions (and the raw JSON arguments) were shared by all tools of a server, so picking another tool kept showing the previous tool's checks. Each tool now has its own.
 - **Rename from the request tab.** Right-click a request tab and choose **Rename…**, or double-click it. A saved request is renamed in its collection too.
 - **Filter responses with JSONPath.** The Pretty view of a JSON response (REST and GraphQL) has a JSONPath box: `$.items[*].name` shows just those values, with the number of matches.
 - **Undo deleting a request or folder.** The message after deleting one in the collection tree has an **Undo** button.
