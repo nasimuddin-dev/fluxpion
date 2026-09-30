@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { formatBytes, formatMs, timeAgo } from '../lib/format';
 import { JsonTree, RawView } from './JsonView';
+import { LatencyTrend } from './LatencyTrend';
 import { Badge, Button, cx, Empty, IconButton, Spinner, statusTone } from './ui';
 
 interface Entry {
@@ -107,6 +108,7 @@ export function ResponseHistory({ requestId, latestId }: { requestId: string; la
             <RefreshCw size={13} />
           </IconButton>
         </div>
+        <LatencyTrend entries={entries} onPick={(id) => void view(id)} />
         <div className="flex-1 overflow-auto">
           {entries.map((e, i) => (
             <div key={e.id} className={cx('group flex items-center gap-2 px-2 py-1.5 border-b border-line/60 text-sm', picked.includes(e.id) ? 'bg-accent-soft' : 'hover:bg-hover')}>

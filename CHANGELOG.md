@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Response-time trend.** A saved request's response **History** tab starts with a chart of its recent response times (median, p95 and slowest), with failed responses marked in red. Hover a point for its time, status and when it was sent; click it to open that response.
 - **File menu.** New ▸ (HTTP request, GraphQL query, gRPC request, WebSocket / Socket.IO connection, MCP server, collection, environment, workspace), Open Workspace Folder, Import (Ctrl+O), Export ▸ (collection as Postman v2.1, current environment, workspace), Save (Ctrl+S) and Settings (Ctrl+,), next to the tab commands. The same commands are in the command palette.
 - **Search finds saved items.** Global search (Ctrl+Shift+F) also finds saved WebSocket connections, gRPC requests and AI prompts (by name, folder, URL, method or prompt text) and opens them.
 - **Warning for secrets typed into saved items.** Saving a WebSocket connection, gRPC request or AI prompt with a credential typed in (an `Authorization` header, a token in the auth payload …) instead of a `{{variable}}` now says which field it is, since saved items are workspace files that may be shared.

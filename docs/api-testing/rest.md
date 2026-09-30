@@ -86,6 +86,7 @@ A `text/event-stream` response (live feeds, notifications, streaming LLM APIs) i
 
 For a saved request, the response panel has a **History** tab: every response you sent from the app, newest first, with its status, time, size and when it was sent.
 
+- Above the list, a **Response time** chart shows the recent responses oldest to newest, with the median, p95 and slowest time; failed responses are red dots. Hover a point for details, click it to open that response.
 - Click a response to view its body.
 - To see what changed, tick two responses and click **Compare selected**, or use the compare button on a row to compare it with the response before it.
 - The comparison shows the status and time change, then the **body** field by field: each change is listed with its JSON path (`$.items[2]`, `$.total` …) as **added**, **removed**, **changed** or a **type** change. Text bodies get a line-by-line diff.
