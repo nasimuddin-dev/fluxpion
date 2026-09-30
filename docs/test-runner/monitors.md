@@ -9,6 +9,10 @@ A monitor runs a collection (or chosen folders and requests) on a schedule, ever
 
 ## In the app
 
+<figure class="aps-screenshot">
+  <img src="/images/monitors.jpg" alt="The Monitors view: a monitor with its last result, success rate, run time, next run, a bar per recent run and the list of runs" width="1440" height="900" loading="lazy">
+</figure>
+
 Open **Monitors** in the sidebar and click **New monitor**. You can also right-click a collection or folder and choose **Monitor on a schedule…**, or use **File ▸ New ▸ Monitor**. Then choose:
 
 - **Collection** and **Environment**.

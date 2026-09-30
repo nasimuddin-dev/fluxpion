@@ -145,4 +145,15 @@ module.exports = async function run(win) {
   await js(`__cap.click('Start load test'); true`);
   await sleep(9000);
   await shot('load');
+
+  // Monitors: one scheduled check with a few runs, one paused
+  await js(`(async () => {
+    const a = await window.aps.invoke('monitor.save', { monitor: { name: 'Diagnostics', collectionId: 'veterinary-api', selection: ['fld-diag'], environment: 'Development', everyMinutes: 15, enabled: true } });
+    await window.aps.invoke('monitor.save', { monitor: { name: 'Whole API (nightly)', collectionId: 'veterinary-api', environment: 'Development', everyMinutes: 1440, enabled: false } });
+    for (let i = 0; i < 5; i++) await window.aps.invoke('monitor.run', { id: a.id });
+    return true;
+  })()`);
+  await js(`__cap.nav('Monitors'); true`);
+  await sleep(1500);
+  await shot('monitors');
 };
