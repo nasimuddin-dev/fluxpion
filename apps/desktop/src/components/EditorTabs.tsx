@@ -212,6 +212,19 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
   );
 }
 
+/** Close every tab that shows one of these saved items (they were deleted), whatever the editor. */
+export function closeTabsFor(itemIds: string[]) {
+  const ids = new Set(itemIds);
+  const open = Object.values(useEditorTabsStore.getState().byView)
+    .flat()
+    .filter((t) => t?.item && ids.has(t.item));
+  for (const view of new Set(open.map((t) => t.view))) {
+    const mine = open.filter((t) => t.view === view);
+    if (mine[0]?.closeMany) mine[0].closeMany(mine.map((t) => t.key));
+    else mine.forEach((t) => t.onClose());
+  }
+}
+
 /** "New request" everywhere (tab strip +, empty editor, explorer): every kind of request, the same list. */
 export function newRequestItems(): MenuItem[] {
   const s = useApp.getState();

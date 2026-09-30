@@ -15,6 +15,8 @@ import { addToFolder, CollectionTree } from '../components/CollectionTree';
 import { TrashDialog } from '../components/TrashDialog';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Badge, Button, cx, Empty, IconButton, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
+import { closeTabsFor } from '../components/EditorTabs';
+import { subtreeIds } from '../components/MoveDialog';
 import { ImportModal } from './rest/dialogs';
 import { SecurityReviewDialog } from '../components/SecurityReviewDialog';
 
@@ -200,6 +202,7 @@ export function CollectionsView() {
                   onClick={async () => {
                     if (!(await confirmAction({ title: 'Delete collection', message: `Delete the collection "${draft.name}" and all its requests?`, detail: 'You can restore it from Recently deleted for 30 days.', confirmLabel: 'Delete collection', danger: true }))) return;
                     await call('col.delete', { id: draft.id });
+                    closeTabsFor(draft.items.flatMap(subtreeIds));
                     setSel(undefined);
                     await load();
                   }}

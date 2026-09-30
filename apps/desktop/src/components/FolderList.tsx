@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, Copy, Folder, FolderInput, FolderOpen, Folde
 import { useState, type ReactNode } from 'react';
 import { confirmAction, promptText } from '../store';
 import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
+import { closeTabsFor } from './EditorTabs';
 
 export interface FolderListItem {
   id: string;
@@ -253,7 +254,10 @@ export function libraryOps<T>(lib: { folders: string[]; items: Array<{ id: strin
   return {
     renameItem: (id, name) => save({ ...lib, items: items.map((i) => (i.id === id ? { ...i, name } : i)) }),
     moveItem: (id, folder) => save({ ...lib, items: items.map((i) => (i.id === id ? { ...i, folder } : i)) }),
-    deleteItem: (id) => save({ ...lib, items: items.filter((i) => i.id !== id) }),
+    deleteItem: (id) => {
+      closeTabsFor([id]);
+      return save({ ...lib, items: items.filter((i) => i.id !== id) });
+    },
     duplicateItem: (id) => {
       const it = items.find((i) => i.id === id);
       if (it) return save({ ...lib, items: [...items, { ...it, id: newId(), name: `${it.name} copy` }] });

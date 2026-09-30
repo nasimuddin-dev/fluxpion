@@ -5,6 +5,7 @@ import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
+import { closeTabsFor } from './EditorTabs';
 import { uid } from '../lib/format';
 import { FolderEditor } from './FolderEditor';
 import { countCategory, hasCategory, isEmptyFolder, matchesCollectionNode, requestCategory, type RequestCategory } from '../lib/collection-filter';
@@ -107,6 +108,8 @@ export function CollectionTree({
   /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
   const removeWithUndo = (c: Collection, n: CollectionNode) => {
     onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) });
+    // its tabs (and those of everything in a deleted folder) close too
+    closeTabsFor(subtreeIds(n));
     useApp.getState().toast(`Deleted "${n.name}"`, 'info', { label: 'Undo', onClick: () => onChange(c) });
   };
   // drag and drop: a request or folder onto a request (before it), a folder (into it) or a collection (top level)
