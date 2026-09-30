@@ -107,6 +107,8 @@ From the terminal: `testpion env diff Staging Production --request "List patient
 
 ## Checks from the response
 
+To find something in a big response, type a JSONPath in **Filter with JSONPath** above the tree (for example `$.items[*].name` or `$..id`): the tree then shows only the matches.
+
 In the **Pretty** view of a JSON response, click a key to open its menu:
 
 - **Copy JSONPath** copies the key's path (like `$.items[0].id`).

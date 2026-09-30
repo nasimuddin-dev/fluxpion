@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Filter responses with JSONPath.** The Pretty view of a JSON response (REST and GraphQL) has a JSONPath box: `$.items[*].name` shows just those values, with the number of matches.
 - **Undo deleting a request or folder.** The message after deleting one in the collection tree has an **Undo** button.
 - **Move requests and folders.** Drag them in the collection tree (onto a request to place before it, onto a folder to put inside, onto a collection name for its top level, across collections too), or use **Move to…** in their menu. Open tabs follow them.
 - Fixed: **Duplicate** did nothing for a request inside a folder.

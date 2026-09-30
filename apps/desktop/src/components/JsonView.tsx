@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Copy, Equal, ListChecks, ListOrdered, Search, Shapes, WrapText } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { JSONPath } from 'jsonpath-plus';
 import { cx, IconButton, Input, Menu, VirtualList, type MenuItem } from './ui';
 
 const ROW = 20;
@@ -51,7 +52,22 @@ function assertionItems(r: { path: string; value: unknown; expandable: boolean }
   return items;
 }
 
-export function JsonTree({ data, query, onAssert }: { data: unknown; query?: string; onAssert?(a: TreeAssertion): void }) {
+export function JsonTree({ data: full, query, onAssert: assertOnFull }: { data: unknown; query?: string; onAssert?(a: TreeAssertion): void }) {
+  // "Filter with JSONPath": show only what the expression selects
+  const [filter, setFilter] = useState('');
+  const filtered = useMemo(() => {
+    const f = filter.trim();
+    if (!f) return undefined;
+    try {
+      const r = JSONPath({ path: f, json: full as object, wrap: true }) as unknown[];
+      return { data: r, error: undefined };
+    } catch (e) {
+      return { data: undefined, error: (e as Error).message };
+    }
+  }, [filter, full]);
+  const data = useMemo(() => filtered?.data ?? (filtered ? [] : full), [filtered, full]);
+  // paths inside a filtered result aren't the response's paths, so checks are only offered unfiltered
+  const onAssert = filtered ? undefined : assertOnFull;
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['$']));
   useEffect(() => {
     // auto-expand first level on new data
@@ -99,14 +115,23 @@ export function JsonTree({ data, query, onAssert }: { data: unknown; query?: str
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex gap-2 px-2 py-1 text-xs text-muted shrink-0">
+      <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted shrink-0">
         <button className="hover:text-fg" onClick={expandAll}>
           Expand all
         </button>
         <button className="hover:text-fg" onClick={() => setExpanded(new Set(['$']))}>
           Collapse all
         </button>
-        <span className="ml-auto">{onAssert ? 'Click a key to copy its JSONPath or turn it into an assertion' : 'Click a key to copy its JSONPath'}</span>
+        <input
+          className="field h-6 text-xs mono w-72 max-w-[45%] ml-2"
+          placeholder="Filter with JSONPath, e.g. $.items[*].name"
+          aria-label="Filter with JSONPath"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          spellCheck={false}
+        />
+        {filtered && <span className={filtered.error ? 'text-bad' : ''}>{filtered.error ? 'Not a valid JSONPath' : `${(filtered.data ?? []).length} match${(filtered.data ?? []).length === 1 ? '' : 'es'}`}</span>}
+        <span className="ml-auto">{filtered ? 'Showing the matches as a list' : onAssert ? 'Click a key to copy its JSONPath or turn it into an assertion' : 'Click a key to copy its JSONPath'}</span>
       </div>
       <VirtualList
         className="flex-1 mono text-[0.9em]"

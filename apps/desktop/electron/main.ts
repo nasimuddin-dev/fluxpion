@@ -81,7 +81,14 @@ function createWindow(): void {
     const w = win;
     w.webContents.once('did-finish-load', () => {
       // runtime require of the capture steps (not bundled); only used when building docs screenshots
-      const run = createRequire(__filename)(capture) as (win: BrowserWindow) => Promise<void>;
+      let run: (win: BrowserWindow) => Promise<void>;
+      try {
+        run = createRequire(__filename)(capture) as (win: BrowserWindow) => Promise<void>;
+      } catch (e) {
+        // a capture script that doesn't load must end the run, not leave the app open
+        console.error('[capture] could not load the script:', e);
+        return app.exit(1);
+      }
       run(w).then(
         () => app.quit(),
         (e: Error) => {
