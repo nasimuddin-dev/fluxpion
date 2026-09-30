@@ -12,6 +12,7 @@ import {
   DEFAULT_BASE_URLS,
   type Environment,
   type WorkspaceBundle,
+  findLiteralSecrets,
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
@@ -129,7 +130,16 @@ export function workspaceHandlers(be: Backend): Handlers {
 
     /** Saved items with folders of one kind (websocket, ai-prompts, mcp …), stored in library/<kind>.json. */
     'lib.get': ({ kind }: { kind: string }) => be.ws.getLibrary(kind),
-    'lib.save': ({ kind, library }: { kind: string; library: { folders: string[]; items: Array<{ id: string; name: string; folder?: string; data: unknown }> } }) => be.ws.saveLibrary(kind, library),
+    'lib.save': ({ kind, library }: { kind: string; library: { folders: string[]; items: Array<{ id: string; name: string; folder?: string; data: unknown }> } }) => {
+      const before = new Map(be.ws.getLibrary(kind).items.map((i) => [i.id, JSON.stringify(i.data)]));
+      const saved = be.ws.saveLibrary(kind, library);
+      // workspace files are shared (git, exports): point out credentials typed in instead of {{variables}}
+      // (only for new or changed items, so renaming or moving doesn't repeat the warning)
+      const warnings = library.items
+        .filter((i) => before.get(i.id) !== JSON.stringify(i.data))
+        .flatMap((i) => findLiteralSecrets(i.data, be.logger.redactor).map((where) => `${i.name}: ${where}`));
+      return { ...saved, warnings };
+    },
     'env.list': () => be.ws.listEnvironments(),
     'env.save': async ({ env, secrets }: { env: Environment; secrets?: Record<string, string> }) => {
       for (const [k, v] of Object.entries(secrets ?? {})) if (v) await be.secrets.set(secretKeys.envVar(env.id, k), v);

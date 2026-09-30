@@ -20,7 +20,10 @@ export function useLibrary<T>(kind: string) {
     async (next: Library<T>) => {
       setLib(next);
       try {
-        setLib(await call<Library<T>>('lib.save', { kind, library: next }));
+        const saved = await call<Library<T> & { warnings?: string[] }>('lib.save', { kind, library: next });
+        setLib(saved);
+        if (saved.warnings?.length)
+          useApp.getState().toast(`Saved, but ${saved.warnings.slice(0, 3).join(', ')}${saved.warnings.length > 3 ? ' …' : ''} holds a secret typed in: it is now in a workspace file. Use a secret {{variable}} instead.`, 'error');
       } catch (e) {
         useApp.getState().toast(`Could not save: ${asError(e).message}`, 'error');
         void reload();

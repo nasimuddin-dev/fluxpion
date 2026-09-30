@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Warning for secrets typed into saved items.** Saving a WebSocket connection, gRPC request or AI prompt with a credential typed in (an `Authorization` header, a token in the auth payload …) instead of a `{{variable}}` now says which field it is, since saved items are workspace files that may be shared.
 - **OAuth 1.0 auth.** OAuth 1.0a (HMAC-SHA1, HMAC-SHA256, PLAINTEXT) signs each request when it is sent, with the parameters in the Authorization header or the query string; round-trips through Postman collections.
 - **Socket.IO.** The WebSocket view has a **Socket.IO** mode: connect to a namespace (with path, auth payload and headers), see every event by name, emit events with JSON arguments and wait for acknowledgements. The demo servers include a Socket.IO namespace (`http://127.0.0.1:4015/chat`). From the terminal, `testpion ws <url>` sends messages or emits events and prints the replies; AI agents get the `realtime_exchange` MCP tool.
 - **gRPC: saved requests and history.** The gRPC view has a **Saved requests** list with folders, and every call appears in History (filter *grpc*, double-click to open it again).

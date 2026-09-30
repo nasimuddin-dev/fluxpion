@@ -109,3 +109,42 @@ function norm(s: string): string {
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Literal secret values in data about to be saved in a workspace file: `{ key, value }` rows (headers,
+ * metadata) with a sensitive key, and sensitive-looking properties (token, password, secret …), whose
+ * value is typed in rather than a {{variable}}. Returns where they are, e.g. `headers.Authorization`.
+ */
+export function findLiteralSecrets(data: unknown, redactor: Redactor, path = ''): string[] {
+  const out: string[] = [];
+  const literal = (v: unknown): v is string => typeof v === 'string' && v.trim().length >= 6 && !/\{\{[^}]+\}\}/.test(v);
+  const walk = (v: unknown, p: string, depth: number) => {
+    if (depth > 6 || out.length > 20 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) {
+      for (const [i, item] of v.entries()) {
+        const row = item as { key?: unknown; value?: unknown; enabled?: unknown };
+        if (row && typeof row === 'object' && typeof row.key === 'string' && 'value' in row) {
+          // "Bearer " / "Basic " prefixes still count as a literal credential
+          if (row.enabled !== false && redactor.isSensitiveKey(row.key) && literal(String(row.value).replace(/^(Bearer|Basic|Token)\s+/i, 'x'.repeat(6)))) out.push(`${p}.${row.key}`);
+        } else walk(item, `${p}[${i}]`, depth + 1);
+      }
+      return;
+    }
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      const q = p ? `${p}.${k}` : k;
+      if (typeof x === 'string') {
+        if (redactor.isSensitiveKey(k) && literal(x)) out.push(q);
+        // JSON text (a message, an auth payload) may hold secrets too
+        else if (/^\s*[{[]/.test(x) && x.length < 100_000) {
+          try {
+            walk(JSON.parse(x), q, depth + 1);
+          } catch {
+            /* not JSON */
+          }
+        }
+      } else walk(x, q, depth + 1);
+    }
+  };
+  walk(data, path, 0);
+  return out;
+}
