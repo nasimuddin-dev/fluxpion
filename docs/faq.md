@@ -31,7 +31,7 @@ Yes. Tests are YAML files in your repository, and the [`testpion` CLI](/installa
 
 ## Can I import my Postman collections or OpenAPI specs?
 
-Yes: OpenAPI 3 and Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, and HAR files. See [collections](/api-testing/collections).
+Yes: OpenAPI 3 and Swagger 2 (JSON or YAML, from a file or a link), Postman v2.0 and v2.1 collections and environments (their scripts run, and `testpion run-collection` accepts Newman's options), Insomnia, Bruno (a collection folder too), Hoppscotch, WSDL (SOAP services) and HAR files, or a request copied as cURL, fetch or PowerShell. See [collections](/api-testing/collections).
 
 ## Are LLM-as-judge scores reliable?
 

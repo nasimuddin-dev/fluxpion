@@ -33,6 +33,6 @@ registerCheck('is-uuid', (cfg, ctx) => ({
 }));
 ```
 
-Planned adapters: gRPC, SSE-as-protocol, MQTT, Kafka.
+Built-in adapters include HTTP, GraphQL, gRPC, WebSocket, Socket.IO, MQTT and MCP; Kafka is planned.
 
 :::
