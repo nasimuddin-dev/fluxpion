@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Info, Plug, Radio, Save, Send, Trash2, Unplug } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Radio, Save, Send, Trash2, Unplug } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
@@ -11,7 +11,7 @@ import { CodeEditor } from '../components/CodeEditor';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { JsonTree } from '../components/JsonView';
 import { VarInput } from '../components/VarInput';
-import { Badge, Button, cx, Empty, Input, Split, Tabs, VirtualList } from '../components/ui';
+import { Badge, Button, cx, Empty, Input, Select, Split, Tabs, VirtualList } from '../components/ui';
 
 interface WsMessage {
   id: string;
@@ -37,6 +37,8 @@ type Draft = {
   /** Socket.IO endpoint path (default /socket.io) and handshake auth payload (JSON). */
   path?: string;
   auth?: string;
+  /** Messages kept with the connection, to send again (Socket.IO: with their event). */
+  savedMessages?: Array<{ name: string; message: string; event?: string }>;
 };
 const hostOf = (url: string) => url.replace(/^wss?:\/\//, '').split(/[/?#]/)[0] || 'Connection';
 
@@ -107,6 +109,26 @@ export function WebSocketView() {
       setSelected(line);
       useApp.getState().toast(`Could not connect: ${err.message || 'the connection failed'}`, 'error');
     }
+  };
+  // saved messages: pick one into the editor, save the current one under a name, delete one
+  const [pickedMessage, setPickedMessage] = useState('');
+  const saveMessage = async () => {
+    const name = (await promptText('Save message', { message: 'Name', value: pickedMessage || (sio ? d.event : '') || 'Message', okLabel: 'Save' }))?.trim();
+    if (!name) return;
+    const others = (d.savedMessages ?? []).filter((m) => m.name !== name);
+    setD({ ...d, savedMessages: [...others, { name, message: d.message, ...(sio ? { event: d.event } : {}) }] });
+    setPickedMessage(name);
+    useApp.getState().toast(current ? `Saved message "${name}". Save the connection to keep it.` : `Saved message "${name}" (kept with this draft; save the connection to keep it with the connection)`, 'success');
+  };
+  const pickMessage = (name: string) => {
+    setPickedMessage(name);
+    const m = d.savedMessages?.find((x) => x.name === name);
+    if (m) setD({ ...d, message: m.message, ...(m.event !== undefined ? { event: m.event } : {}) });
+  };
+  const deleteMessage = () => {
+    if (!pickedMessage) return;
+    setD({ ...d, savedMessages: (d.savedMessages ?? []).filter((m) => m.name !== pickedMessage) });
+    setPickedMessage('');
   };
   const disconnect = () => session && call(sio ? 'sio.close' : 'wsock.close', { id: session }).then(() => setStatus('closed'));
   const send = () =>
@@ -191,6 +213,22 @@ export function WebSocketView() {
                     </label>
                   </div>
                 )}
+                <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
+                  <Select className="h-7 min-h-7 text-xs flex-1" aria-label="Saved messages" value={pickedMessage} onChange={(e) => pickMessage(e.target.value)}>
+                    <option value="">{d.savedMessages?.length ? `Saved messages (${d.savedMessages.length})…` : 'No saved messages'}</option>
+                    {(d.savedMessages ?? []).map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.event ? `${m.name} · ${m.event}` : m.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button size="sm" icon={<BookmarkPlus size={12} />} title="Keep this message to send again" onClick={() => void saveMessage()}>
+                    Save message
+                  </Button>
+                  {pickedMessage && (
+                    <Button size="sm" variant="ghost" icon={<Trash2 size={12} />} title={`Delete "${pickedMessage}"`} aria-label="Delete saved message" onClick={deleteMessage} />
+                  )}
+                </div>
                 {sio && <div className="px-2 pt-1 text-[11px] text-muted">Arguments as JSON; a JSON list sends several arguments.</div>}
                 <div className="flex-1 min-h-0">
                   <CodeEditor language="json" value={d.message} onChange={(message) => setD({ ...d, message })} />

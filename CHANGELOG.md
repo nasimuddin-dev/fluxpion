@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Saved WebSocket messages.** A WebSocket or Socket.IO connection can keep named messages (with their event for Socket.IO): **Save message** above the editor, pick one to send it again. They are saved with the connection.
 - **Generate an OpenAPI document from a collection.** **Export ▸ OpenAPI 3.1** (and `testpion export "My API" --format openapi`) describes the collection's HTTP requests: paths with path parameters, query and header parameters, request bodies and saved examples with inferred schemas, folders as tags and auth as security schemes. AI agents get it from the MCP tool `collection_openapi`.
 - **Find where a variable is used, and rename it everywhere.** **Usages** in the Environments view (or the command palette) lists every place a variable is used or defined, in requests, scripts, environments, collection and folder variables and test files, and renames it in one go. Secret values move with it. Also `testpion vars usages|rename` and the MCP tools `variable_usages` / `rename_variable`.
 - **Load-test a whole collection.** The Load view's new **Collection** target (and `testpion load --collection "My API" --warm-up`) has every virtual user send a collection's (or folder's) requests in order, with its auth, per-user cookies and variables, and shows p50/p95/p99 and errors per request. An optional warm-up runs it once with scripts first, so a login token set by a script is used under load. AI agents get the MCP tool `load_test` (local hosts only, capped at 50 users for 60 seconds).
