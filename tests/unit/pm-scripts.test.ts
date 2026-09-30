@@ -253,4 +253,72 @@ describe('Postman-compatible scripts (pm.*)', () => {
       now: true,
     });
   });
+
+  it('xml2Json turns XML (SOAP) into objects like Postman', async () => {
+    const xml = [
+      '<?xml version="1.0"?>',
+      '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">',
+      '  <soap:Body>',
+      '    <GetPetResponse>',
+      '      <pet id="7" kind="dog">Rex &amp; co</pet>',
+      '      <tag>a</tag><tag>b</tag>',
+      '      <!-- a comment -->',
+      '      <note><![CDATA[<raw>]]></note>',
+      '      <empty/>',
+      '    </GetPetResponse>',
+      '  </soap:Body>',
+      '</soap:Envelope>',
+    ].join('\n');
+    const out = await runScript(`pm.environment.set('j', JSON.stringify(xml2Json(${JSON.stringify(xml)})));`, { variables: {} });
+    expect(out.error).toBeUndefined();
+    expect(JSON.parse(String(out.scopeSets.environment.j))).toEqual({
+      'soap:Envelope': {
+        $: { 'xmlns:soap': 'http://schemas.xmlsoap.org/soap/envelope/' },
+        'soap:Body': { GetPetResponse: { pet: { $: { id: '7', kind: 'dog' }, _: 'Rex & co' }, tag: ['a', 'b'], note: '<raw>', empty: '' } },
+      },
+    });
+    const bad = await runScript(`xml2Json('<a><b></a>')`, { variables: {} });
+    // errors keep their message and point at the user's own lines
+    expect(bad.error).toBe('Error: xml2Json: the XML is not well-formed (</a> closes <b>)\n    at line 1:9');
+    const thrown = await runScript('let a = 1;\nfunction f() {\n  throw new Error("boom");\n}\nf();', { variables: {} });
+    expect(thrown.error).toBe('Error: boom\n    at line 3:18\n    at line 5:2');
+  });
+
+  it('runs setTimeout callbacks after the script in delay order, and has the legacy postman.* helpers', async () => {
+    const res = { ...response, headers: [['Content-Type', 'application/json'], ['X-Id', 'é']] as Array<[string, string]> };
+    const out = await runScript(
+      `const order = [];
+       setTimeout(() => { order.push('b'); setTimeout(() => order.push('d'), 5); }, 20);
+       setTimeout(() => order.push('a'), 10);
+       const t = setTimeout(() => order.push('never'), 1);
+       clearTimeout(t);
+       setTimeout(() => {
+         order.push('c');
+         pm.test('order', () => pm.expect(order).to.eql(['a', 'b', 'c']));
+       }, 20);
+       setTimeout(() => pm.test('late order', () => pm.expect(order).to.eql(['a', 'b', 'c', 'd'])), 100);
+       pm.test('legacy helpers', () => {
+         pm.expect(postman.getResponseHeader('x-id')).to.equal('é');
+         postman.setEnvironmentVariable('gone', 1);
+         postman.clearEnvironmentVariable('gone');
+         pm.expect(pm.environment.has('gone')).to.be.false;
+       });
+       pm.test('size', () => {
+         const s = pm.response.size();
+         pm.expect(s.body).to.equal(pm.response.text().length);
+         pm.expect(s.header).to.be.above(20);
+         pm.expect(s.total).to.equal(s.body + s.header);
+       });
+       pm.test('fail', () => pm.expect.fail('on purpose'));`,
+      { variables: {}, response: res },
+    );
+    expect(out.error).toBeUndefined();
+    expect(out.tests.map((t) => [t.name, t.passed, t.message ?? ''])).toEqual([
+      ['legacy helpers', true, ''],
+      ['size', true, ''],
+      ['fail', false, expect.stringContaining('on purpose')],
+      ['order', true, ''],
+      ['late order', true, ''],
+    ]);
+  });
 });

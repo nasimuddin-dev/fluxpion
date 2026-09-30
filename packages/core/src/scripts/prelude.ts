@@ -167,6 +167,84 @@ function __chai(actual, state) {
   return self;
 }
 const expect = (v) => __chai(v);
+expect.fail = (msg) => { throw new Error(msg === undefined ? 'expect.fail()' : String(msg)); };
+
+/* ---------------- xml2Json (Postman: xml2js with explicitArray false) ---------------- */
+// attributes go under "$", text under "_" when the element also has attributes or children,
+// repeated elements become arrays, an empty element is "".
+function __xmlDecode(s) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|lt|gt|amp|quot|apos);/gi, (m, e) => {
+    const k = e.toLowerCase();
+    if (k[0] === '#') return String.fromCodePoint(k[1] === 'x' ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10));
+    return { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" }[k];
+  });
+}
+function xml2Json(xml) {
+  const src = String(xml);
+  const re = /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<\/([^\s>]+)\s*>|<([^\s/>]+)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/gi;
+  const root = { children: {}, text: '', attrs: null, order: [] };
+  const stack = [root];
+  let m;
+  const add = (parent, name, value) => {
+    if (Object.prototype.hasOwnProperty.call(parent.children, name)) {
+      const cur = parent.children[name];
+      parent.children[name] = Array.isArray(cur) && cur.__many ? cur : Object.assign([cur], { __many: true });
+      parent.children[name].push(value);
+    } else parent.children[name] = value;
+  };
+  const finish = (node) => {
+    const text = node.text.trim();
+    const keys = Object.keys(node.children);
+    if (!keys.length && !node.attrs) return text;
+    const o = {};
+    if (node.attrs) o.$ = node.attrs;
+    if (text) o._ = text;
+    for (const k of keys) { const v = node.children[k]; o[k] = Array.isArray(v) && v.__many ? v.slice() : v; }
+    return o;
+  };
+  while ((m = re.exec(src))) {
+    const top = stack[stack.length - 1];
+    if (m[1] !== undefined) top.text += m[1];
+    else if (m[2] !== undefined) {
+      if (stack.length < 2) throw new Error('xml2Json: </' + m[2] + '> has no opening tag');
+      if (top.name !== m[2]) throw new Error('xml2Json: the XML is not well-formed (</' + m[2] + '> closes <' + top.name + '>)');
+      const node = stack.pop();
+      add(stack[stack.length - 1], node.name, finish(node));
+    } else if (m[3] !== undefined) {
+      let attrs = null;
+      const ar = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+      let a;
+      while ((a = ar.exec(m[4] || ''))) (attrs = attrs || {})[a[1]] = __xmlDecode(a[2] !== undefined ? a[2] : a[3]);
+      const node = { name: m[3], children: {}, text: '', attrs };
+      if (m[5]) add(top, node.name, finish(node));
+      else stack.push(node);
+    } else if (m[6] !== undefined) top.text += __xmlDecode(m[6]);
+  }
+  if (stack.length > 1) throw new Error('xml2Json: the XML is not well-formed (unclosed <' + stack[stack.length - 1].name + '>)');
+  const out = {};
+  for (const k of Object.keys(root.children)) out[k] = root.children[k];
+  return out;
+}
+
+/* ---------------- timers: callbacks run after the script, in delay order (no real waiting) ---------------- */
+const __timers = [];
+let __timerSeq = 0;
+function setTimeout(fn, ms) { const id = ++__timerSeq; if (typeof fn === 'function') __timers.push({ id: id, fn: fn, at: Number(ms) || 0, args: Array.prototype.slice.call(arguments, 2) }); return id; }
+const setInterval = setTimeout; // runs once: there is no clock to repeat on
+const clearTimeout = (id) => { const i = __timers.findIndex((t) => t.id === id); if (i >= 0) __timers.splice(i, 1); };
+const clearInterval = clearTimeout;
+const setImmediate = (fn) => setTimeout(fn, 0);
+function __runTimers() {
+  for (let n = 0; __timers.length && n < 1000; n++) {
+    __timers.sort((a, b) => a.at - b.at || a.id - b.id);
+    const t = __timers.shift();
+    const base = t.at;
+    // timers created inside a callback are relative to its time
+    const before = __timers.length;
+    t.fn.apply(null, t.args);
+    for (let i = before; i < __timers.length; i++) __timers[i].at += base;
+  }
+}
 
 /* ---------------- request ---------------- */
 function __headerList(list) {
@@ -245,6 +323,11 @@ if (__in.response) {
     header(name) { return this.headers.get(name); },
     cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}) },
     get to() { return respAssert(false).to; },
+    size() {
+      const body = Number(__host_bytelen(res.body || ''));
+      const header = hdrs.reduce((n, h) => n + Number(__host_bytelen(h.key + ': ' + h.value)) + 2, 0);
+      return { body: body, header: header, total: body + header };
+    },
   };
 }
 
@@ -401,6 +484,12 @@ const postman = {
   getEnvironmentVariable: (k) => pm.environment.get(k),
   setGlobalVariable: (k, v) => pm.globals.set(k, v),
   getGlobalVariable: (k) => pm.globals.get(k),
+  clearEnvironmentVariable: (k) => pm.environment.unset(k),
+  clearGlobalVariable: (k) => pm.globals.unset(k),
+  clearEnvironmentVariables: () => pm.environment.clear(),
+  clearGlobalVariables: () => pm.globals.clear(),
+  getResponseHeader: (n) => (__response ? __response.headers.get(n) : undefined),
+  getResponseCookie: (n) => { const v = (__in.cookies || {})[n]; return v === undefined ? undefined : { name: n, value: v }; },
 };
 const tests = {};
 // TestPion's own name for the API: tp.* and Postman's pm.* are the same object

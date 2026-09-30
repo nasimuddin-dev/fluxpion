@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **More Postman scripts run as they are.** `xml2Json()` for XML and SOAP responses, `setTimeout` / `setInterval` (callbacks run after the script in delay order), `pm.response.size()`, `pm.expect.fail()`, and the legacy `postman.getResponseHeader`, `getResponseCookie`, `clearEnvironmentVariable` and `clearGlobalVariable`.
+- Fixed: a script error showed only a stack trace pointing into TestPion's own code. It now shows the message and the line in your script (`Error: boom` / `at line 3:18`).
 - **Import from a link.** The Import dialog has a link box: an OpenAPI URL, a file on GitHub / GitLab / Bitbucket (the page link works) or a Postman collection's API link is downloaded and imported. `testpion import <url>` does the same, and AI agents can use the new MCP tool `import_definition`. Also fixed: a `.env.staging` file chosen with **Choose file…** now becomes the *staging* environment.
 - **Newman command lines work.** `testpion run-collection` now also takes Newman's `-g/--globals`, `--env-var`, `--global-var`, `--export-environment`, `--export-globals` (with the values scripts set; secret values left empty), `-k/--insecure`, `--suppress-exit-code`, `--timeout-request`, `--reporters` and `--reporter-junit-export`. Postman globals files import too.
 - Importing (or running) a JSON file that has a syntax error now says so, with the line and column, instead of "Unrecognised import format".

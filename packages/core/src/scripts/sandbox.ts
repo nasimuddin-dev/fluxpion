@@ -142,6 +142,22 @@ export async function runScript(code: string, input: ScriptInput, opts: ScriptOp
   }
 }
 
+/** Lines before the user's code in the evaluated source (the prelude plus the wrapper's first line). */
+const USER_LINE_OFFSET = PRELUDE.split('\n').length + 1;
+
+/**
+ * Stack frames point into the evaluated source (prelude + wrapper + script). Keep the message and the
+ * frames in the user's script, numbered as the user sees them ("at line 3:12").
+ */
+export function userErrorLines(error: string, offset: number, lines = Infinity): string {
+  const [message, ...frames] = error.split('\n');
+  const own = frames
+    .map((f) => /user-script\.js:(\d+):(\d+)/.exec(f))
+    .filter((m): m is RegExpExecArray => !!m && Number(m[1]) > offset && Number(m[1]) <= offset + lines)
+    .map((m) => `    at line ${Number(m[1]) - offset}:${m[2]}`);
+  return [message, ...own].join('\n');
+}
+
 async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptions = {}): Promise<ScriptOutput> {
   const t0 = performance.now();
   if (!code?.trim()) return { vars: {}, unset: [], ...emptyScopes(), tests: [], logs: [], request: input.request, durationMs: 0 };
@@ -159,6 +175,7 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     };
     const alg = (a: string) => (HASHES.has(a) ? a : 'sha256');
     fn('__host_uuid', () => randomUUID());
+    fn('__host_bytelen', (s) => String(Buffer.byteLength(s ?? '', 'utf8')));
     fn('__host_schema', (schema, data) => {
       try {
         const r = validateSchema(JSON.parse(schema ?? '{}'), JSON.parse(data ?? 'null'));
@@ -191,7 +208,7 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
       else lib.value.dispose();
     }
 
-    const wrapped = `${PRELUDE}\ntry { (function(){\n${code}\n})(); } catch (e) { __out.error = String((e && e.stack) || e); }\n${EPILOGUE}\nJSON.stringify(__out);`;
+    const wrapped = `${PRELUDE}\ntry { (function(){\n${code}\n})(); __runTimers(); } catch (e) { __out.error = e && e.stack ? String(e) + '\\n' + e.stack : String(e); }\n${EPILOGUE}\nJSON.stringify(__out);`;
     const result = vm.evalCode(wrapped, 'user-script.js');
     if (result.error) {
       const err = vm.dump(result.error);
@@ -211,7 +228,7 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     const json = vm.getString(result.value);
     result.value.dispose();
     const out = JSON.parse(json) as Omit<ScriptOutput, 'durationMs'> & { error: string | null };
-    return { ...out, error: out.error ?? undefined, request: out.request ?? undefined, durationMs: Math.round(performance.now() - t0) };
+    return { ...out, error: out.error ? userErrorLines(out.error, USER_LINE_OFFSET, code.split('\n').length) : undefined, request: out.request ?? undefined, durationMs: Math.round(performance.now() - t0) };
   } finally {
     vm.dispose();
     runtime.dispose();
