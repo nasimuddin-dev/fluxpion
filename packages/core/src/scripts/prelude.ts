@@ -548,11 +548,30 @@ const require = (name) => {
 };
 
 /* ---------------- pm / aps ---------------- */
+// tests with a done callback that is never called fail at the end
+const __pendingDone = [];
+function __pmTest(name, fn) {
+  const rec = (err) => __out.tests.push(err ? { name: String(name), passed: false, message: String((err && err.message) || err) } : { name: String(name), passed: true });
+  try {
+    if (typeof fn !== 'function') return rec(new Error('pm.test needs a function'));
+    // function (done) { … done(); } as in Postman
+    if (fn.length > 0) {
+      let settled = false;
+      const done = (err) => { if (!settled) { settled = true; rec(err); } };
+      __pendingDone.push(() => done(new Error('done() was not called')));
+      fn(done);
+      return;
+    }
+    const r = fn();
+    // async tests: the result counts when the promise settles
+    if (r && typeof r.then === 'function') return void r.then(() => rec(), (e) => rec(e || new Error('rejected')));
+    rec();
+  } catch (e) { rec(e); }
+}
+// pm.test.skip: listed as skipped, not run
+__pmTest.skip = (name) => { __out.tests.push({ name: String(name), passed: true, skipped: true, message: 'skipped' }); };
 const pm = {
-  test(name, fn) {
-    try { fn(); __out.tests.push({ name: String(name), passed: true }); }
-    catch (e) { __out.tests.push({ name: String(name), passed: false, message: String((e && e.message) || e) }); }
-  },
+  test: __pmTest,
   expect,
   variables: __variables,
   // pm.environment.name is the active environment's name, as in Postman
@@ -632,5 +651,6 @@ console.info = console.log; console.warn = console.log; console.error = console.
 
 /** Appended after the user script: legacy `tests["name"] = bool` assertions from old Postman scripts. */
 export const EPILOGUE = String.raw`
+for (const f of __pendingDone) f();
 for (const k of Object.keys(tests)) __out.tests.push({ name: k, passed: !!tests[k], message: tests[k] ? undefined : 'tests["' + k + '"] was false' });
 `;

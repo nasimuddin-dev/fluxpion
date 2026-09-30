@@ -226,6 +226,7 @@ pm.sendRequest({
   ```
 
   A failed request rejects the promise (use `try` / `catch`).
+- `pm.test` takes async functions (`pm.test('name', async () => { … await … })`) and Postman's `function (done) { … done(); }` style (a `done` that is never called fails the test); `pm.test.skip(name, fn)` lists a test as skipped without running it.
 - Requests share the run's cookie jar, time out like other requests, and appear in the [Console](#console) under the script's request, whether the request was sent from a tab or by a run (they are also recorded as `sentRequests` in the run's results).
 - **How it works:** the sandbox is synchronous, so the script runs, its requests are sent, then the script runs again from the start with the responses, and callbacks run immediately (an `await` on a request that hasn't been sent yet waits for the next run). Only the last run's variables, tests and logs count. So a request made inside a callback also has its callback run inside, before later callbacks. Keep scripts deterministic around `pm.sendRequest` (avoid a random URL per run). A script may send at most 20 requests.
 

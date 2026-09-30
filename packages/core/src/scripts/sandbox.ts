@@ -50,7 +50,7 @@ export interface ScriptOutput {
   /** Values set via pm.environment / pm.globals / pm.collectionVariables. */
   scopeSets: Record<ScriptScope, Record<string, unknown>>;
   scopeUnsets: Record<ScriptScope, string[]>;
-  tests: Array<{ name: string; passed: boolean; message?: string }>;
+  tests: Array<{ name: string; passed: boolean; message?: string; skipped?: boolean }>;
   logs: string[];
   request?: ScriptInput['request'];
   /** `postman.setNextRequest(name)`: undefined = not called, null = stop the run. */

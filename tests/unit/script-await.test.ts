@@ -44,6 +44,27 @@ describe('async scripts', () => {
     expect(vars.resolve('key={{vault:apiKey}}')).toBe('key=abc123');
   });
 
+  it('pm.test: async functions, done callbacks and pm.test.skip', async () => {
+    const out = await runScript(
+      `pm.test('async passes', async () => { const r = await pm.sendRequest('http://api.test/x'); pm.expect(r.code).to.equal(200); });
+       pm.test('async fails', async () => { throw new Error('nope'); });
+       pm.test('done later', function (done) { setTimeout(() => { pm.expect(1).to.equal(1); done(); }, 5); });
+       pm.test('done with error', (done) => done(new Error('bad')));
+       pm.test('done forgotten', function (done) {});
+       pm.test.skip('not yet', () => { throw new Error('should not run'); });`,
+      input(),
+      { sendRequest: async () => ({ status: 200, headers: [], body: '{}', time: 1 }) as never },
+    );
+    expect(out.error).toBeUndefined();
+    const by = Object.fromEntries(out.tests.map((t) => [t.name, t]));
+    expect(by['async passes']!.passed).toBe(true);
+    expect(by['async fails']).toMatchObject({ passed: false, message: 'nope' });
+    expect(by['done later']!.passed).toBe(true);
+    expect(by['done with error']).toMatchObject({ passed: false, message: 'bad' });
+    expect(by['done forgotten']).toMatchObject({ passed: false, message: 'done() was not called' });
+    expect(by['not yet']).toMatchObject({ passed: true, skipped: true });
+  });
+
   it('plain synchronous scripts behave as before (timers after the script)', async () => {
     const out = await runScript("const order = []; setTimeout(() => { order.push('t'); pm.environment.set('order', order.join()); }, 5); order.push('s');", input());
     expect(out.scopeSets.environment).toEqual({ order: 's,t' });
