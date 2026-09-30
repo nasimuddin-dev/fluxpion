@@ -211,4 +211,46 @@ describe('Postman-compatible scripts (pm.*)', () => {
     expect(plain.tests[0]!.passed).toBe(true);
     expect(out.durationMs).toBeLessThan(1500);
   });
+
+  it('has moment like Postman (UTC)', async () => {
+    const out = await runScript(
+      `const m = require("moment");
+       const t = moment("2024-01-31T10:05:09.007Z");
+       const r = {
+         fmt: t.format("YYYY-MM-DD HH:mm:ss.SSS"),
+         long: t.format("dddd, MMMM Do YYYY, h:mm a [Q]Q"),
+         iso: t.clone().add(1, "month").toISOString(),
+         leap: moment("2024-02-29").add(1, "y").format("YYYY-MM-DD"),
+         sub: t.clone().subtract({ days: 1, hours: 2 }).format(),
+         start: t.clone().startOf("month").toISOString(),
+         end: t.clone().endOf("day").toISOString(),
+         diffDays: moment("2024-03-01").diff(moment("2024-02-01"), "days"),
+         diffMonths: moment("2024-03-15").diff("2024-01-15", "months"),
+         parsed: moment("31/12/2023 23:59", "DD/MM/YYYY HH:mm").toISOString(),
+         unix: moment.unix(1700000000).format("YYYY-MM-DD"),
+         before: t.isBefore("2025-01-01") && t.isSame("2024-01-31T23:00:00Z", "day"),
+         same: m === moment,
+         now: Math.abs(moment().valueOf() - Date.now()) < 5000,
+       };
+       pm.environment.set("r", JSON.stringify(r));`,
+      { variables: {} },
+    );
+    expect(out.error).toBeUndefined();
+    expect(JSON.parse(String(out.scopeSets.environment.r))).toEqual({
+      fmt: '2024-01-31 10:05:09.007',
+      long: 'Wednesday, January 31st 2024, 10:05 am Q1',
+      iso: '2024-02-29T10:05:09.007Z',
+      leap: '2025-02-28',
+      sub: '2024-01-30T08:05:09Z',
+      start: '2024-01-01T00:00:00.000Z',
+      end: '2024-01-31T23:59:59.999Z',
+      diffDays: 29,
+      diffMonths: 2,
+      parsed: '2023-12-31T23:59:00.000Z',
+      unix: '2023-11-14',
+      before: true,
+      same: true,
+      now: true,
+    });
+  });
 });

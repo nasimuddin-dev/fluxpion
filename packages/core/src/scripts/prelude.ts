@@ -355,7 +355,8 @@ const require = (name) => {
   if (name === 'uuid') return { v4: () => __host_uuid() };
   if (name === 'tv4') return tv4;
   if (name === 'lodash' && typeof _ === 'function') return _;
-  throw new Error('require("' + name + '") is not available in the sandbox (supported: crypto-js, uuid, tv4, lodash)');
+  if (name === 'moment' && typeof moment === 'function') return moment;
+  throw new Error('require("' + name + '") is not available in the sandbox (supported: crypto-js, uuid, tv4, lodash, moment)');
 };
 
 /* ---------------- pm / aps ---------------- */

@@ -5,7 +5,9 @@ import { EPILOGUE, PRELUDE } from './prelude.js';
 import { dynamicValue } from '../vars/dynamic.js';
 import { validateSchema } from '../eval/checks.js';
 import { LODASH_SOURCE } from './lodash.generated.js';
+import { MOMENT_SOURCE } from './moment.js';
 
+const USES_MOMENT = /\bmoment\b/;
 const USES_LODASH = /(^|[^\w$.])_\s*[.(]|require\s*\(\s*['"]lodash['"]/;
 import type { CookieJarOp, StoredCookie } from '../cookies/cookie-jar.js';
 
@@ -178,8 +180,13 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     inputHandle.dispose();
 
     // lodash, like Postman's sandbox: `_` and require('lodash'). Parsed only for scripts that use it.
-    if (USES_LODASH.test(code)) {
-      const lib = vm.evalCode(LODASH_SOURCE, 'lodash.js');
+    // … and moment (a UTC subset, see moment.ts)
+    for (const [uses, source, file] of [
+      [USES_LODASH, LODASH_SOURCE, 'lodash.js'],
+      [USES_MOMENT, MOMENT_SOURCE, 'moment.js'],
+    ] as const) {
+      if (!uses.test(code)) continue;
+      const lib = vm.evalCode(source, file);
       if (lib.error) lib.error.dispose();
       else lib.value.dispose();
     }
