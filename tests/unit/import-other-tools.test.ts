@@ -144,4 +144,21 @@ describe('importing into a workspace', () => {
     expect(() => importAny(text)).toThrow(/not valid JSON \(line 3, column \d+\)/);
     expect(() => importAny('hello there')).toThrow(/Unrecognised import format/);
   });
+
+  it('imports Postman v2.0 collections, whose auth attributes are objects', () => {
+    const v20 = {
+      info: { name: 'Old', schema: 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json' },
+      auth: { type: 'bearer', bearer: { token: '{{tok}}' } },
+      item: [
+        { name: 'Basic', request: { url: 'https://a.test/x', method: 'GET', auth: { type: 'basic', basic: { username: 'u', password: 'p' } } } },
+        { name: 'Key', request: { url: 'https://a.test/y', method: 'GET', auth: { type: 'apikey', apikey: { key: 'X-Key', value: 'k', in: 'header' } } } },
+      ],
+    };
+    const r = importAny(JSON.stringify(v20));
+    expect(r.collection!.auth).toEqual({ type: 'bearer', token: '{{tok}}' });
+    expect(r.collection!.items.map((i) => (i as SavedHttpRequest).request.auth)).toEqual([
+      { type: 'basic', username: 'u', password: 'p' },
+      { type: 'apiKey', key: 'X-Key', value: 'k', in: 'header' },
+    ]);
+  });
 });

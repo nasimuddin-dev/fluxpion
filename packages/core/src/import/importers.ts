@@ -199,7 +199,9 @@ function sampleRef(ref: string, spec: any): any {
 
 function pmAuth(a: any): AuthConfig | undefined {
   if (!a) return undefined;
-  const get = (arr: any[] | undefined, k: string) => String(arr?.find((x: any) => x.key === k)?.value ?? '');
+  // v2.1 stores auth attributes as [{ key, value }]; v2.0 as a plain object ({ token: "…" })
+  const get = (arr: any[] | Record<string, unknown> | undefined, k: string) =>
+    String((Array.isArray(arr) ? arr.find((x: any) => x.key === k)?.value : (arr as Record<string, unknown> | undefined)?.[k]) ?? '');
   switch (a.type) {
     case 'noauth':
       return { type: 'none' };
