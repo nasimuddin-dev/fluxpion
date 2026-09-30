@@ -9,6 +9,7 @@ import { JsonTree } from '../components/JsonView';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Split, Tabs, VirtualList } from '../components/ui';
 import { pickTextFile } from '../lib/files';
+import { useSticky } from '../lib/sticky';
 
 interface ProtoFile {
   name: string;
@@ -47,9 +48,14 @@ const drafts = persisted('grpc', {
   protoFiles: [] as ProtoFile[],
   tls: false,
   timeoutMs: 30000,
+  /** Public certificates (PEM or {{variables}}); the private key is never saved here. */
+  ca: undefined as string | undefined,
+  cert: undefined as string | undefined,
   /** Descriptors from server reflection (used instead of the proto files while set). */
   descriptorSet: undefined as string | undefined,
   reflectedFrom: undefined as string | undefined,
+  /** A {{variable}} holding the client key (the key itself is never stored in the draft). */
+  keyRef: undefined as string | undefined,
 });
 
 const kind = (m: MethodInfo) => (m.clientStreaming && m.serverStreaming ? 'bidi stream' : m.clientStreaming ? 'client stream' : m.serverStreaming ? 'server stream' : 'unary');
@@ -68,6 +74,10 @@ export function GrpcView() {
   const [selected, setSelected] = useState<number>();
   const [editing, setEditing] = useState<number>();
   const [reflecting, setReflecting] = useState(false);
+  // a pasted private key stays in memory; a {{variable}} reference may be kept with the draft
+  const [keyText, setKeyText] = useSticky('grpc:key', drafts.load().keyRef ?? '');
+  useEffect(() => set({ keyRef: /^\s*\{\{[^}]+\}\}\s*$/.test(keyText) ? keyText.trim() : undefined }), [keyText]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tlsOptions = d.ca?.trim() || d.cert?.trim() || keyText.trim() ? { ca: d.ca, cert: d.cert, key: keyText } : undefined;
   const env = useApp((s) => s.environment);
   const sendingRef = useRef<string | undefined>(undefined);
   sendingRef.current = sending;
@@ -116,7 +126,7 @@ export function GrpcView() {
   const reflect = async () => {
     setReflecting(true);
     try {
-      const r = await call<{ services: string[]; descriptorSet: string; methods: MethodInfo[] }>('grpc.reflect', { target: d.target, tls: d.tls || undefined, metadata: d.metadata, environment: env });
+      const r = await call<{ services: string[]; descriptorSet: string; methods: MethodInfo[] }>('grpc.reflect', { target: d.target, tls: d.tls || undefined, tlsOptions, metadata: d.metadata, environment: env });
       set({ descriptorSet: r.descriptorSet, reflectedFrom: d.target });
       useApp.getState().toast(`Server reflection: ${r.services.length} services, ${r.methods.length} methods`, 'success');
       setTab('message');
@@ -135,7 +145,7 @@ export function GrpcView() {
     setError(undefined);
     setSelected(undefined);
     try {
-      const r = await call<GrpcResult>('grpc.send', { id, target: d.target, method: d.method, message: d.message, metadata: d.metadata, ...(d.descriptorSet ? { descriptorSet: d.descriptorSet } : { protoFiles: d.protoFiles }), tls: d.tls || undefined, timeoutMs: d.timeoutMs, environment: env });
+      const r = await call<GrpcResult>('grpc.send', { id, target: d.target, method: d.method, message: d.message, metadata: d.metadata, ...(d.descriptorSet ? { descriptorSet: d.descriptorSet } : { protoFiles: d.protoFiles }), tls: d.tls || undefined, tlsOptions, timeoutMs: d.timeoutMs, environment: env });
       setResult(r);
       setResTab('response');
       if (r.unresolved?.length) useApp.getState().toast(`Unresolved variables: ${r.unresolved.join(', ')}`, 'error');
@@ -299,6 +309,31 @@ export function GrpcView() {
                 </label>
                 <Field label="Deadline (ms)">
                   <Input type="number" value={d.timeoutMs} onChange={(e) => set({ timeoutMs: Number(e.target.value) || 30000 })} />
+                </Field>
+                <div className="text-sm font-medium mt-2">Certificates</div>
+                <p className="text-xs text-muted -mt-2">For servers with a private CA, or that require a client certificate (mutual TLS). PEM text, or a {'{{variable}}'} that holds it. Setting any of them turns TLS on.</p>
+                {(
+                  [
+                    ['ca', 'CA certificate', 'Trusted CA (default: the system CAs)'],
+                    ['cert', 'Client certificate', 'For mutual TLS'],
+                  ] as const
+                ).map(([k, label, hint]) => (
+                  <Field key={k} label={label} hint={hint}>
+                    <div className="flex gap-2">
+                      <textarea className="field mono text-xs min-h-16 flex-1" placeholder="-----BEGIN CERTIFICATE-----" value={d[k] ?? ''} onChange={(e) => set({ [k]: e.target.value } as Partial<typeof d>)} />
+                      <Button size="sm" onClick={() => void pickTextFile('.pem,.crt,.cer').then((f) => f && set({ [k]: f.text } as Partial<typeof d>))}>
+                        Load…
+                      </Button>
+                    </div>
+                  </Field>
+                ))}
+                <Field label="Client private key" hint="Not saved with the draft (it's a secret): keep it in a secret environment variable and enter {{clientKey}}, or paste it for this session only.">
+                  <div className="flex gap-2">
+                    <textarea className="field mono text-xs min-h-16 flex-1" placeholder="{{clientKey}} or -----BEGIN PRIVATE KEY-----" value={keyText} onChange={(e) => setKeyText(e.target.value)} />
+                    <Button size="sm" onClick={() => void pickTextFile('.pem,.key').then((f) => f && setKeyText(f.text))}>
+                      Load…
+                    </Button>
+                  </div>
                 </Field>
               </div>
             )}

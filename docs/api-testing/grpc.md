@@ -41,6 +41,7 @@ Every value supports `{{variables}}` from the active environment, including the 
 
 - **Use TLS**: on for `grpcs://` addresses; turn it on for a TLS server given as `host:port`.
 - **Deadline**: how long the call may take (default 30 s). A call that runs out returns `DEADLINE_EXCEEDED`.
+- **Certificates**: a **CA certificate** for servers with a private CA, and a **client certificate** and **private key** for mutual TLS (PEM text, **Load…** a file, or a `{{variable}}`). The private key is never saved with the draft: keep it in a [secret environment variable](./environments.md#secrets) and enter `{{clientKey}}`, or paste it for the current session. IP addresses work with TLS too; the certificate is checked against the IP.
 
 ## Try it
 
@@ -76,8 +77,5 @@ Leave `protos` empty (`protos: []`) to describe the service through server refle
 - From a terminal: [`testpion grpc`](../cli/reference.md#grpc) lists the methods of `.proto` files or calls one.
 - AI agents using [`testpion mcp-server`](../ai-testing/mcp-server.md) get the `grpc_call` tool.
 
-## Limits
-
-- mTLS (client certificates) isn't supported yet for gRPC.
 
 :::

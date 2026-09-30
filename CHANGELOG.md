@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Nothing yet.
+- **gRPC certificates.** Custom CA certificates and client certificates for mutual TLS (app: gRPC **Settings**; the private key is never saved with the draft, use a secret `{{variable}}`), also for server reflection. TLS to an IP address works.
 
 ## 0.8.0 — 2026-09-29
 
