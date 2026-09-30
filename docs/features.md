@@ -18,7 +18,11 @@ TestPion combines an API client, a GraphQL playground, an MCP inspector, an LLM 
 - API key, Basic, Bearer, JWT, OAuth 1.0, OAuth 2.0 (client credentials, password, authorization code with PKCE), AWS Signature v4, Digest, custom headers and mTLS, inherited from folders and collections.
 - Responses as a virtualised JSON tree, raw text with search, or an HTML preview, plus headers, cookies and a timing breakdown. Large bodies stream to disk.
 - Save responses as examples of a request (success and error cases), with secrets masked. Postman saved responses import as examples.
-- Mock servers on localhost serve a collection's examples, from the app or with `testpion mock`.
+- Mock servers on localhost serve a collection's examples, from the app or with `testpion mock`, with fresh fake data from dynamic variables and optional forwarding of everything else to the real API (partial mocking). An imported OpenAPI document can be mocked straight away.
+- Postman compatibility: collections (v2.0 and v2.1) and environments import with their scripts; `pm.*`, lodash, moment, tv4, `xml2Json` and ~75 dynamic variables work in scripts; `testpion run-collection` takes Newman's command-line options.
+- OpenAPI in both directions: import (with contract checks and response examples), generate a document from a collection, and find breaking changes between two versions (`testpion openapi-diff`, also as a pull-request check in generated CI pipelines).
+- Security review of a collection (typed-in secrets, secrets in URLs, plain http) and a security-headers check for responses.
+- Find where a variable is used and rename it everywhere, with secret values moved along.
 - Markdown docs for every request and a generated documentation page per collection, exportable as Markdown or as a self-contained HTML page to publish (also `testpion docs --html`).
 - Record traffic through a local reverse proxy and save it as a collection with examples.
 - Pre-request and test scripts in a sandbox, assertions, highlighted variables, one-click cURL export, code snippets for 19 languages and libraries (cURL, HTTPie, PowerShell, fetch, Axios, Python requests and httpx, Go, Java OkHttp and HttpClient, Kotlin, C#, PHP, Ruby, Rust, Swift, Dart, raw HTTP), a response Visualizer (`pm.visualizer`), paste-to-request from browser devtools (cURL, fetch, PowerShell), and a console with every request and its script output.
@@ -32,7 +36,7 @@ TestPion combines an API client, a GraphQL playground, an MCP inspector, an LLM 
   <img src="/images/graphql.jpg" alt="The GraphQL view with the schema explorer, a query in the editor and the response" width="1440" height="900" loading="lazy">
 </figure>
 
-Introspect a schema to get autocomplete, validation and hover docs in the editor, plus a browsable schema explorer. Run operations with variables and assert on data, GraphQL errors and latency.
+Introspect a schema to get autocomplete, validation and hover docs in the editor, plus a browsable schema explorer. Run operations with variables, scripts and assertions on data, GraphQL errors and latency, and run subscriptions over WebSocket (`graphql-transport-ws` and `graphql-ws`) with events listed live.
 
 [GraphQL guide](/graphql/overview)
 
@@ -95,7 +99,7 @@ YAML tests in your repository, with parallel workers, backpressure, retries, tim
   <img src="/images/load.jpg" alt="The Load view with live throughput, latency, error and virtual-user charts" width="1440" height="900" loading="lazy">
 </figure>
 
-Configure virtual users, ramp-up and ramp-down, and an RPS cap. See p50–p99 latency, error rate and status distribution, plus AI metrics (tokens/s, TTFT, cost) for LLM targets. Safeguards block production and remote hosts unless you opt in.
+Load-test one endpoint or a whole collection (every virtual user runs its requests in order, with per-user cookies and an optional warm-up run for tokens). Configure virtual users, ramp-up and ramp-down, and an RPS cap. See p50–p99 latency, error rate and status distribution, per request for collections, plus AI metrics (tokens/s, TTFT, cost) for LLM targets. Safeguards block production and remote hosts unless you opt in.
 
 [Load testing](/performance/load-testing)
 
