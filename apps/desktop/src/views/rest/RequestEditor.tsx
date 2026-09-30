@@ -12,6 +12,7 @@ import { CodeEditor } from '../../components/CodeEditor';
 import { COMMON_HEADERS, HEADER_VALUES, KeyValueEditor } from '../../components/KeyValueEditor';
 import { Field, Input, Select, Tabs, Toggle } from '../../components/ui';
 import { RestTab } from './types';
+import { switchBodyType, type BodyStash } from '../../lib/body';
 
 export function RequestEditor({
   tab,
@@ -77,7 +78,7 @@ export function RequestEditor({
             <KeyValueEditor rows={r.headers ?? []} onChange={(headers) => setReq({ headers })} keyPlaceholder="Header" suggestions={COMMON_HEADERS} valueSuggestions={HEADER_VALUES} />
           </div>
         )}
-        {sub === 'body' && <BodyEditor body={r.body ?? { type: 'none' }} onChange={(body) => setReq({ body })} />}
+        {sub === 'body' && <BodyEditor stashKey={tab.id} body={r.body ?? { type: 'none' }} onChange={(body) => setReq({ body })} />}
         {sub === 'cookies' && (
           <div className="p-2">
             <KeyValueEditor rows={r.cookies ?? []} onChange={(cookies) => setReq({ cookies })} keyPlaceholder="Cookie" />
@@ -123,7 +124,12 @@ export function beautify(text: string, type: string): string {
     .join('\n');
 }
 
-export function BodyEditor({ body, onChange }: { body: BodyConfig; onChange(b: BodyConfig): void }) {
+/**
+ * What each body type held, per request tab, so switching type and back (JSON → None → JSON, or to a form
+ * and back) restores it, as in Postman. Kept for the session; only the selected type is saved.
+ */
+const bodyStash = new Map<string, BodyStash>();
+export function BodyEditor({ body, onChange, stashKey = 'default' }: { body: BodyConfig; onChange(b: BodyConfig): void; stashKey?: string }) {
   const types: Array<[BodyConfig['type'], string]> = [
     ['none', 'None'],
     ['json', 'JSON'],
@@ -135,10 +141,10 @@ export function BodyEditor({ body, onChange }: { body: BodyConfig; onChange(b: B
     ['binary', 'Binary file'],
   ];
   const setType = (t: BodyConfig['type']) => {
-    if (t === 'none') return onChange({ type: 'none' });
-    if (t === 'form-urlencoded' || t === 'multipart') return onChange({ type: t, fields: 'fields' in body ? body.fields : [] });
-    if (t === 'binary') return onChange({ type: 'binary', filePath: '' });
-    onChange({ type: t, content: 'content' in body ? body.content : t === 'json' ? '{\n  \n}' : '' });
+    if (t === body.type) return;
+    let stash = bodyStash.get(stashKey);
+    if (!stash) bodyStash.set(stashKey, (stash = { byType: {} }));
+    onChange(switchBodyType(body, t, stash));
   };
   return (
     <div className="h-full flex flex-col min-h-0">
