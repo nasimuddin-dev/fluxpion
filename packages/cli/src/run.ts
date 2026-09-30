@@ -88,6 +88,7 @@ export interface RunCliOptions {
   logLevel?: string;
   otlp?: string;
   otlpHeader?: string[];
+  rerunFailed?: string | boolean;
 }
 
 export async function executeRun(paths: string[], o: RunCliOptions, label?: string): Promise<number> {
@@ -141,6 +142,14 @@ export async function executeRun(paths: string[], o: RunCliOptions, label?: stri
   }
 
   const otlp = otlpExporter(o);
+  // --rerun-failed: the failed and errored tests of an earlier run
+  const rerun = o.rerunFailed ? store.failedTestIds(typeof o.rerunFailed === 'string' ? o.rerunFailed : 'last') : undefined;
+  if (rerun && !o.quiet) console.log(dim(`Re-running ${rerun.ids.length} failed test${rerun.ids.length === 1 ? '' : 's'} of ${rerun.runId}`));
+  if (rerun && !rerun.ids.length) {
+    console.log(green('Nothing failed in that run.'));
+    await ctx.dispose();
+    return EXIT.SUCCESS;
+  }
   const concurrency = Number(o.concurrency ?? suite?.concurrency ?? 4);
   const ctrl = new AbortController();
   let interrupted = 0;
@@ -160,7 +169,7 @@ export async function executeRun(paths: string[], o: RunCliOptions, label?: stri
     summary = await runTests({
       name,
       runId,
-      tests: streamTests(patterns, cwd, { tags: o.tags?.split(',').map((t) => t.trim()).filter(Boolean), grep: o.grep }),
+      tests: streamTests(patterns, cwd, { tags: o.tags?.split(',').map((t) => t.trim()).filter(Boolean), grep: o.grep, ...(rerun ? { ids: rerun.ids } : {}) }),
       setup: await loadList(suite?.setup),
       teardown: await loadList(suite?.teardown),
       concurrency,
@@ -653,6 +662,7 @@ export function runOptions(cmd: Command): Command {
     .option('-q, --quiet', 'only print the summary exit code')
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
     .option('--watch', 'run again whenever a test, collection, environment or data file changes (until Ctrl+C)')
+    .option('--rerun-failed [runId]', 'only the tests that failed or errored in a run (default: the last one)')
     .option('--otlp <url>', 'send the traces to an OpenTelemetry collector (OTLP/HTTP, e.g. http://localhost:4318); default: OTEL_EXPORTER_OTLP_ENDPOINT')
     .option('--otlp-header <key:value...>', 'headers for the collector, e.g. an API key (also OTEL_EXPORTER_OTLP_HEADERS)');
 }

@@ -59,6 +59,7 @@ testpion report <results.jsonl>              Re-generate reports
 | `--trace all\|failures\|none` | Trace persistence. |
 | `--log-level` | Enable debug logging; secrets stay redacted. |
 | `--watch` | Run again whenever a test, collection, environment or data file in the workspace (or the given paths) changes, until Ctrl+C. Results and reports the run writes don't count as changes. |
+| `--rerun-failed [runId]` | Run only the tests that failed or errored in a run (default: the last one). In the app: **Re-run failed** on a finished run. |
 | `--otlp <url>`, `--otlp-header k:v` | Send the run's traces to an OpenTelemetry collector (OTLP/HTTP); without `--otlp`, `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` are used. See [traces](/test-runner/traces). Also for `run-collection`. |
 
 ## `send`

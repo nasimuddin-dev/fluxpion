@@ -347,9 +347,10 @@ export async function loadSuite(path: string): Promise<SuiteConfig> {
 }
 
 /** Stream every test for a list of path/glob patterns. */
-export async function* streamTests(patterns: string[], cwd: string, filter?: { tags?: string[]; grep?: string }): AsyncGenerator<TestCase> {
+export async function* streamTests(patterns: string[], cwd: string, filter?: { tags?: string[]; grep?: string; ids?: string[] }): AsyncGenerator<TestCase> {
   const seen = new Set<string>();
   const grep = filter?.grep ? new RegExp(filter.grep, 'i') : undefined;
+  const ids = filter?.ids ? new Set(filter.ids) : undefined;
   for (const p of patterns) {
     for await (const f of discoverFiles(p, cwd)) {
       if (seen.has(f)) continue;
@@ -357,6 +358,7 @@ export async function* streamTests(patterns: string[], cwd: string, filter?: { t
       for await (const t of loadTestsFromFile(f)) {
         if (filter?.tags?.length && !filter.tags.some((tag) => t.tags?.includes(tag))) continue;
         if (grep && !grep.test(t.name) && !grep.test(t.id ?? '')) continue;
+        if (ids && !ids.has(t.id ?? '')) continue;
         yield t;
       }
     }

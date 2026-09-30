@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Re-run failed tests**: **Re-run failed** on a finished test run, and `testpion test --rerun-failed [runId]` (default: the last run), run only the tests that failed or errored.
 - **Paste an HTTPie command**: `http` / `https` / `xh` commands paste into the REST view (and import with `testpion import -`) like cURL: JSON fields, raw JSON, query parameters, headers, files, forms and auth.
 - **`pm.test` async and skip**: tests can be async functions or use Postman's `done` callback (never calling it fails the test), and `pm.test.skip` lists a test without running it.
 - **Export to Bruno**: **Export ▸ Bruno collection folder…** and `testpion export --format bruno --out <folder>` write a collection (with the workspace's environments, secret values never) as the folder Bruno keeps in git; it imports back unchanged.

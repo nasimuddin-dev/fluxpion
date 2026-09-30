@@ -52,6 +52,12 @@ export function testingHandlers(be: Backend): Handlers {
       return be.saveOrDownload(name, undefined, (dest) => writeFileSync(dest, c.content), () => Buffer.from(c.content));
     },
     'tests.run': (p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[] }) => be.startTestRun(p),
+    /** Run again only the tests that failed or errored in a run. */
+    'tests.rerunFailed': ({ runId, environment, concurrency, retries }: { runId: string; environment?: string; concurrency?: number; retries?: number }) => {
+      const r = be.ws.failedTestIds(runId);
+      if (!r.ids.length) throw new ApsError('ValidationError', 'Nothing failed in that run');
+      return be.startTestRun({ paths: [], environment, concurrency, retries, name: `Failed tests of ${r.runId}`, ids: r.ids });
+    },
     'eval.run': (p: EvalRunParams) => be.startEvalRun(p),
     'runs.cancel': ({ runId }: { runId: string }) => be.runs.get(runId)?.ctrl.abort(),
     'runs.list': (q: { query?: string; limit?: number; offset?: number }) => be.ws.meta.listRuns(q),

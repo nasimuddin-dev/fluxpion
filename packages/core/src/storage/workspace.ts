@@ -389,6 +389,26 @@ export class WorkspaceStore {
     writeJson(this.path('baselines', `${slugify(b.name)}.json`), b);
   }
 
+  /** Ids of the tests that failed or errored in a run ("last": the newest run), for re-running them. */
+  failedTestIds(runId: string): { runId: string; ids: string[] } {
+    const id = runId === 'last' ? this.meta.listRuns({ limit: 1 }).items[0]?.id : runId;
+    if (!id) throw new ApsError('ValidationError', 'There are no runs yet');
+    const file = join(this.runDir(id), 'results.jsonl');
+    if (!existsSync(file)) throw new ApsError('ValidationError', `No results for run ${id}`);
+    const ids = new Set<string>();
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const r = JSON.parse(line) as { id?: string; status?: string };
+        // results carry the attempt number after @ for retried tests
+        if (r.id && (r.status === 'failed' || r.status === 'error')) ids.add(r.id.replace(/@\d+$/, ''));
+      } catch {
+        /* a partial line from an interrupted run */
+      }
+    }
+    return { runId: id, ids: [...ids] };
+  }
+
   runDir(runId: string): string {
     return this.path('runs', runId);
   }

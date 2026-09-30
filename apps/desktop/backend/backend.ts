@@ -1118,15 +1118,15 @@ export class Backend {
     return { runId };
   }
 
-  startTestRun(p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[] }) {
+  startTestRun(p: { paths: string[]; environment?: string; concurrency?: number; retries?: number; name?: string; grep?: string; tags?: string[]; ids?: string[] }) {
     const base = this.ws.path('tests');
     const suitePath = p.paths.length === 1 && isSuiteFile(p.paths[0]!) ? join(base, p.paths[0]!) : undefined;
     const store = this.ws;
     const tests = (async function* () {
       if (suitePath) {
         const suite = await loadSuite(suitePath);
-        yield* streamTests(suite.tests, dirname(suitePath), { grep: p.grep, tags: p.tags });
-      } else yield* streamTests(p.paths.length ? p.paths : ['.'], store.path('tests'), { grep: p.grep, tags: p.tags });
+        yield* streamTests(suite.tests, dirname(suitePath), { grep: p.grep, tags: p.tags, ids: p.ids });
+      } else yield* streamTests(p.paths.length ? p.paths : ['.'], store.path('tests'), { grep: p.grep, tags: p.tags, ids: p.ids });
     })();
     return this.startRun(p.name ?? (p.paths.join(', ') || 'All tests'), tests, p);
   }

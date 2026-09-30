@@ -1,4 +1,4 @@
-import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target } from 'lucide-react';
+import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
@@ -30,7 +30,7 @@ function displayPath(file: string): string {
 /** Live progress + paged, virtualised results for a test/evaluation run. Results are read from disk page by page. */
 const humanize = (k: string) => k.replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTotal?: number }) {
+export function RunPanel({ runId, expectedTotal, onRerunFailed }: { runId: string; expectedTotal?: number; onRerunFailed?(runId: string): void }) {
   const [progress, setProgress] = useState<Progress>({ completed: 0, passed: 0, failed: 0, skipped: 0, errors: 0, running: 0 });
   const [summary, setSummary] = useState<RunSummary | null>(null);
   const [done, setDone] = useState(false);
@@ -120,7 +120,12 @@ export function RunPanel({ runId, expectedTotal }: { runId: string; expectedTota
           {!done && progress.running > 0 && <span className="text-muted text-xs">{progress.running} running</span>}
         </span>
         {done && (
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex flex-wrap gap-1">
+            {onRerunFailed && s && s.failed + s.errors > 0 && (
+              <Button size="sm" icon={<RotateCcw size={12} />} title="Run only the tests that failed or errored" onClick={() => onRerunFailed(runId)}>
+                Re-run failed
+              </Button>
+            )}
             <Button size="sm" icon={<FileBarChart size={12} />} onClick={() =>
               call<{ path: string; view?: { content: string; encoding: 'base64'; type: string } }>('runs.openReport', { runId, format: 'html' })
                 .then((r) => r.view && viewContent(r.view))

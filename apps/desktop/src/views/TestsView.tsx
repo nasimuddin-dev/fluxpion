@@ -344,7 +344,19 @@ export function TestsView() {
           ) : runId ? (
             <Split id="tests-runs" initial={22} min={12}>
               <RunList runs={runs} active={runId} onSelect={setRunId} />
-              <RunPanel key={runId} runId={runId} />
+              <RunPanel
+                key={runId}
+                runId={runId}
+                onRerunFailed={(id) =>
+                  void call<{ runId: string }>('tests.rerunFailed', { runId: id, environment: env, concurrency: opts.concurrency, retries: opts.retries }).then(
+                    (r) => {
+                      setRunId(r.runId);
+                      setTimeout(loadRuns, 500);
+                    },
+                    (e) => useApp.getState().toast(asError(e).message, 'error'),
+                  )
+                }
+              />
             </Split>
           ) : (
             <Split id="tests-runs" initial={22} min={12}>
