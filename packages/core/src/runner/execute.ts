@@ -38,7 +38,7 @@ import { applyScriptOutput, scriptRequestSender, scriptScopes, type PersistVaria
 import { query, tryParseJson } from '../util/jsonpath.js';
 import { withTimeout } from '../util/concurrency.js';
 import { applyCookieJarOps, type CookieJar } from '../cookies/cookie-jar.js';
-import { runRealtimeExchange } from '../protocols/realtime.js';
+import { realtimeModeFor, runRealtimeExchange } from '../protocols/realtime.js';
 
 export interface ExecServices {
   vars: VariableScope;
@@ -375,13 +375,26 @@ async function runGrpc(test: GrpcTest, scope: VariableScope, svc: ExecServices, 
 }
 
 async function runWebSocket(test: WebSocketTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {
-  const r = scope.resolveDeep({ url: test.url, send: test.send ?? [], headers: test.headers, auth: test.auth, path: test.path });
-  const mode = test.mode ?? (/^https?:/i.test(r.url) ? 'socketio' : 'websocket');
+  const r = scope.resolveDeep({ url: test.url, send: test.send ?? [], headers: test.headers, auth: test.auth, path: test.path, subscribe: test.subscribe, clientId: test.clientId, username: test.username, password: test.password });
+  const mode = test.mode ?? realtimeModeFor(r.url);
   // WebSocket frames are text: objects are sent as JSON. Socket.IO items are { event, args, ack } (or an event name).
-  const send = r.send.map((m) => (mode === 'websocket' ? (typeof m === 'string' ? m : JSON.stringify(m)) : typeof m === 'string' ? m : { event: String(m.event ?? 'message'), args: Array.isArray(m.args) ? m.args : m.data !== undefined ? [m.data] : [], ack: !!m.ack }));
-  const s = span.child(`${mode} ${svc.redactor.redactUrl(r.url)}`, 'internal', { input: { send } });
+  // MQTT items are { topic, payload, qos, retain }.
+  const send = r.send.map((m) =>
+    mode === 'websocket'
+      ? typeof m === 'string'
+        ? m
+        : JSON.stringify(m)
+      : mode === 'mqtt'
+        ? typeof m === 'string'
+          ? { topic: m }
+          : { topic: String(m.topic ?? ''), payload: m.payload ?? m.data ?? m.message, qos: (Number(m.qos) || 0) as 0 | 1 | 2, retain: !!m.retain }
+        : typeof m === 'string'
+          ? m
+          : { event: String(m.event ?? 'message'), args: Array.isArray(m.args) ? m.args : m.data !== undefined ? [m.data] : [], ack: !!m.ack },
+  );
+  const s = span.child(`${mode} ${svc.redactor.redactUrl(r.url)}`, 'internal', { input: { send, ...(r.subscribe ? { subscribe: r.subscribe } : {}) } });
   const out = await runRealtimeExchange(
-    { url: r.url, mode, send, waitMs: test.waitMs, headers: r.headers, protocols: test.protocols, auth: r.auth, path: r.path },
+    { url: r.url, mode, send, waitMs: test.waitMs, headers: r.headers, protocols: test.protocols, auth: r.auth, path: r.path, subscribe: r.subscribe, clientId: r.clientId, username: r.username, password: r.password },
     { redactor: svc.redactor, cookieJar: svc.cookieJar, signal },
   );
   if (!out.connected) {
@@ -396,7 +409,7 @@ async function runWebSocket(test: WebSocketTest, scope: VariableScope, svc: Exec
       return t;
     }
   };
-  const received = out.messages.filter((m) => m.direction === 'received').map((m) => (mode === 'socketio' ? { event: m.event, data: parse(m.data) } : parse(m.data)));
+  const received = out.messages.filter((m) => m.direction === 'received').map((m) => (mode === 'socketio' ? { event: m.event, data: parse(m.data) } : mode === 'mqtt' ? { topic: m.topic, data: parse(m.data) } : parse(m.data)));
   const body = { connected: true, received, messages: out.messages };
   s.setAttributes({ mode, received: received.length });
   s.end({ status: 'ok', output: summarize(received, 16_000) });

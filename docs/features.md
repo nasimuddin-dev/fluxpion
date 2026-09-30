@@ -1,6 +1,6 @@
 ---
 title: Features
-description: Everything TestPion does — REST, GraphQL, gRPC, WebSocket and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
+description: Everything TestPion does — REST, GraphQL, gRPC, WebSocket, MQTT and MCP testing, an AI Lab with model comparison, evaluations for LLMs, RAG and agents, a scalable test runner, load testing and traces.
 ---
 
 # Features
@@ -48,6 +48,15 @@ Introspect a schema to get autocomplete, validation and hover docs in the editor
 - Streamed responses appear live; **Stop** keeps what arrived.
 
 See [gRPC](./api-testing/grpc.md).
+
+## WebSocket, Socket.IO and MQTT
+
+- WebSocket with subprotocols and handshake headers; Socket.IO events with acknowledgements.
+- MQTT 3.1.1 and 5 brokers (mqtt://, mqtts://, ws://, wss://): subscriptions with wildcards and QoS, publish with QoS and retain.
+- A live message log with a filter and JSON tree, saved connections in folders, and saved messages to send again.
+- `type: websocket`, `socketio` and `mqtt` tests, `testpion ws` and `testpion mqtt`, and the `realtime_exchange` MCP tool.
+
+See [WebSocket](./api-testing/websocket.md).
 
 ## MCP inspector
 

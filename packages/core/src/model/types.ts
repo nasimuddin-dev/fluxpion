@@ -302,11 +302,17 @@ export interface GrpcTest extends TestBase {
  */
 export interface WebSocketTest extends TestBase {
   type: 'websocket';
-  /** ws:// or wss:// (WebSocket), http(s)://host/namespace (Socket.IO). */
+  /** ws:// or wss:// (WebSocket), http(s)://host/namespace (Socket.IO), mqtt(s):// (MQTT). */
   url: string;
-  mode?: 'websocket' | 'socketio';
-  /** WebSocket: text frames (objects are sent as JSON). Socket.IO: `{ event, args?, ack? }`. */
+  mode?: 'websocket' | 'socketio' | 'mqtt';
+  /** WebSocket: text frames (objects are sent as JSON). Socket.IO: `{ event, args?, ack? }`. MQTT: `{ topic, payload?, qos?, retain? }`. */
   send?: Array<string | Record<string, unknown>>;
+  /** MQTT: topic filters to subscribe to first. */
+  subscribe?: Array<string | { topic: string; qos?: 0 | 1 | 2 }>;
+  /** MQTT: client ID, username and password (use {{variables}} for secrets). */
+  clientId?: string;
+  username?: string;
+  password?: string;
   /** How long to listen after the last message (ms, default 1500). */
   waitMs?: number;
   headers?: KeyValue[];

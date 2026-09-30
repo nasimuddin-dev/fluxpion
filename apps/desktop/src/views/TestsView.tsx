@@ -52,7 +52,7 @@ assertions:
     expected: OK
 `,
   websocket: `name: Echo server replies
-type: websocket                  # socketio for Socket.IO
+type: websocket                  # socketio for Socket.IO, mqtt for MQTT
 url: "{{wsUrl}}"
 send:
   - hello

@@ -279,17 +279,27 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       name: 'realtime_exchange',
       write: true,
       description:
-        'Talk to a WebSocket or Socket.IO server: connect, send messages (WebSocket text frames) or emit events (Socket.IO, optionally waiting for acknowledgements) in order, collect everything the server sends for waitMs, then close. Returns the messages with their direction, time and event name. {{variables}} resolve from the environment.',
+        'Talk to a WebSocket, Socket.IO or MQTT server: connect, send messages (WebSocket text frames), emit events (Socket.IO, optionally waiting for acknowledgements) or subscribe and publish (MQTT), in order, collect everything the server sends for waitMs, then close. Returns the messages with their direction, time, event name or topic. {{variables}} resolve from the environment (use one for an MQTT password).',
       inputSchema: {
         type: 'object',
         properties: {
-          url: str('ws:// / wss:// for WebSocket; http(s)://host/namespace for Socket.IO'),
-          mode: { type: 'string', enum: ['websocket', 'socketio'], description: 'Default: socketio for http(s) URLs, websocket otherwise' },
+          url: str('ws:// / wss:// for WebSocket; http(s)://host/namespace for Socket.IO; mqtt(s)://host:port for MQTT'),
+          mode: { type: 'string', enum: ['websocket', 'socketio', 'mqtt'], description: 'Default: mqtt for mqtt(s):// URLs, socketio for http(s) URLs, websocket otherwise (give mqtt for a broker behind ws://)' },
           send: {
             type: 'array',
-            description: 'WebSocket: strings (JSON as text). Socket.IO: { event, args?, ack? } objects',
-            items: { anyOf: [{ type: 'string' }, { type: 'object', properties: { event: { type: 'string' }, args: { type: 'array' }, ack: { type: 'boolean' } }, required: ['event'] }] },
+            description: 'WebSocket: strings (JSON as text). Socket.IO: { event, args?, ack? } objects. MQTT: { topic, payload?, qos?, retain? } messages to publish',
+            items: {
+              anyOf: [
+                { type: 'string' },
+                { type: 'object', properties: { event: { type: 'string' }, args: { type: 'array' }, ack: { type: 'boolean' } }, required: ['event'] },
+                { type: 'object', properties: { topic: { type: 'string' }, payload: {}, qos: { type: 'number', enum: [0, 1, 2] }, retain: { type: 'boolean' } }, required: ['topic'] },
+              ],
+            },
           },
+          subscribe: { type: 'array', items: { type: 'string' }, description: 'MQTT: topic filters to subscribe to before publishing (+ and # wildcards)' },
+          clientId: str('MQTT client ID'),
+          username: str('MQTT username'),
+          password: str('MQTT password: give a {{variable}} holding it, not the value'),
           waitMs: { type: 'number', description: 'How long to listen after sending (default 1500, max 60000)' },
           headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Handshake headers' },
           auth: { type: 'object', description: 'Socket.IO handshake auth payload' },
@@ -301,9 +311,28 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const environment = checkEnvironment(a.environment);
         const ctx = createEngineContext({ store, secrets, settings, environment });
         try {
-          const r = ctx.vars.resolveDeep({ url: String(a.url), send: a.send, headers: Object.entries((a.headers as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value })), auth: a.auth });
+          const r = ctx.vars.resolveDeep({
+            url: String(a.url),
+            send: a.send,
+            headers: Object.entries((a.headers as Record<string, string>) ?? {}).map(([key, value]) => ({ key, value })),
+            auth: a.auth,
+            username: a.username as string | undefined,
+            password: a.password as string | undefined,
+            clientId: a.clientId as string | undefined,
+          });
           return await runRealtimeExchange(
-            { url: r.url, mode: a.mode as 'websocket' | 'socketio' | undefined, send: r.send as RealtimeExchange['send'], waitMs: Number(a.waitMs) || undefined, headers: r.headers, auth: r.auth as Record<string, unknown> | undefined },
+            {
+              url: r.url,
+              mode: a.mode as RealtimeExchange['mode'],
+              send: r.send as RealtimeExchange['send'],
+              subscribe: Array.isArray(a.subscribe) ? (a.subscribe as string[]) : undefined,
+              waitMs: Number(a.waitMs) || undefined,
+              headers: r.headers,
+              auth: r.auth as Record<string, unknown> | undefined,
+              username: r.username,
+              password: r.password,
+              clientId: r.clientId,
+            },
             { redactor: ctx.redactor, cookieJar: ctx.services.cookieJar },
           );
         } finally {

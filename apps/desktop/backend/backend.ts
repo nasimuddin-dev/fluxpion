@@ -20,6 +20,7 @@ import {
   Tracer,
   WebSocketSession,
   SocketIoSession,
+  MqttSession,
   WorkspaceManager,
   WorkspaceSearch,
   WorkspaceStore,
@@ -178,6 +179,7 @@ export class Backend {
   wsSessions = new Map<string, WebSocketSession>();
   /** Socket.IO sessions (the WebSocket view's Socket.IO mode). */
   sioSessions = new Map<string, SocketIoSession>();
+  mqttSessions = new Map<string, MqttSession>();
   /** Running mock servers by collection id. */
   mocks = new Map<string, MockServer>();
   /** Rendered pm.visualizer pages by id (served on an isolated origin: tpviz:// or /__aps/viz/). */
@@ -1198,6 +1200,7 @@ export class Backend {
     for (const s of this.mcpSessions.values()) await s.close();
     for (const s of this.wsSessions.values()) s.close();
     for (const s of this.sioSessions.values()) s.close();
+    for (const s of this.mqttSessions.values()) s.close();
     for (const m of this.mocks.values()) await m.close();
     await this.gqlMock?.close();
     await this.recorder?.close();

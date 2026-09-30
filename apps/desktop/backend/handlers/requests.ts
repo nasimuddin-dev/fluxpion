@@ -21,6 +21,7 @@ import {
   historyResponse,
   historyToHar,
   SocketIoSession,
+  MqttSession,
   diffResponses,
   type HttpResponseData,
 } from '@testpion/core';
@@ -262,6 +263,54 @@ export function requestsHandlers(be: Backend): Handlers {
     'sio.close': ({ id }: { id: string }) => {
       be.sioSessions.get(id)?.close();
       be.sioSessions.delete(id);
+    },
+
+    /* MQTT: messages and status arrive on the WebSocket channels too (with the topic) */
+    'mqtt.connect': async (p: { url: string; clientId?: string; username?: string; password?: string; protocolVersion?: 4 | 5; clean?: boolean; keepaliveSec?: number; subscriptions?: Array<{ topic: string; qos?: 0 | 1 | 2 }>; environment?: string }) => {
+      const ctx = be.context({ environment: p.environment });
+      const s = new MqttSession(ctx.vars.resolve(p.url), {
+        clientId: p.clientId ? ctx.vars.resolve(p.clientId) : undefined,
+        username: p.username ? ctx.vars.resolve(p.username) : undefined,
+        password: p.password ? ctx.vars.resolve(p.password) : undefined,
+        protocolVersion: p.protocolVersion,
+        clean: p.clean,
+        keepaliveSec: p.keepaliveSec,
+      });
+      const b = be.batched<unknown>('wsock.messages');
+      s.onMessage((m) => b.push({ id: s.id, message: m }));
+      s.onStatus((st) => be.host.emit('wsock.status', { id: s.id, status: st }));
+      be.mqttSessions.set(s.id, s);
+      try {
+        await s.connect();
+        for (const sub of p.subscriptions ?? []) if (sub.topic.trim()) await s.subscribe(ctx.vars.resolve(sub.topic), sub.qos ?? 0);
+      } catch (e) {
+        s.close();
+        be.mqttSessions.delete(s.id);
+        throw e;
+      } finally {
+        await ctx.dispose();
+      }
+      return { id: s.id };
+    },
+    'mqtt.subscribe': async ({ id, topic, qos, environment }: { id: string; topic: string; qos?: 0 | 1 | 2; environment?: string }) => {
+      const s = be.mqttSessions.get(id);
+      if (!s) throw new ApsError('ProtocolError', 'MQTT is not connected');
+      return s.subscribe(await be.resolveText(topic, environment), qos ?? 0);
+    },
+    'mqtt.unsubscribe': async ({ id, topic, environment }: { id: string; topic: string; environment?: string }) => {
+      const s = be.mqttSessions.get(id);
+      if (!s) throw new ApsError('ProtocolError', 'MQTT is not connected');
+      await s.unsubscribe(await be.resolveText(topic, environment));
+    },
+    'mqtt.publish': async ({ id, topic, payload, qos, retain, environment }: { id: string; topic: string; payload?: string; qos?: 0 | 1 | 2; retain?: boolean; environment?: string }) => {
+      const s = be.mqttSessions.get(id);
+      if (!s) throw new ApsError('ProtocolError', 'MQTT is not connected');
+      // {{variables}} in the topic and payload resolve like in requests
+      await s.publish(await be.resolveText(topic, environment), await be.resolveText(payload ?? '', environment), { qos, retain });
+    },
+    'mqtt.close': ({ id }: { id: string }) => {
+      be.mqttSessions.get(id)?.close();
+      be.mqttSessions.delete(id);
     },
   };
 }

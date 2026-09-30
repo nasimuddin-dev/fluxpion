@@ -10,6 +10,7 @@
  *   Mock LLM        http://127.0.0.1:4012/v1  (OpenAI-compatible: chat completions, streaming, tools, embeddings)
  *   WebSocket echo  ws://127.0.0.1:4013
  *   Socket.IO       http://127.0.0.1:4015/chat (events: say → said, with acknowledgement; welcome on connect)
+ *   MQTT broker     mqtt://127.0.0.1:4016  (clinic/<id>/vitals every 2 s; clinic/<id>/commands → clinic/<id>/acks)
  *   gRPC            127.0.0.1:4014        (vet.v1.PetService, examples/veterinary-workspace/protos/vet/v1/pets.proto)
  */
 import { createServer } from 'node:http';
@@ -21,6 +22,8 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ReflectionService } from '@grpc/reflection';
 import { Server as SocketIoServer } from 'socket.io';
+import { createServer as createTcpServer } from 'node:net';
+import { Aedes } from 'aedes';
 
 const json = (res, status, body, headers = {}) => {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
@@ -359,6 +362,45 @@ async function startSocketIo(port) {
   return { http, sio };
 }
 
+/**
+ * MQTT: a broker where two monitors publish clinic/7/vitals and clinic/8/vitals every 2 s, and a
+ * command published to clinic/<id>/commands is acknowledged on clinic/<id>/acks.
+ */
+async function startMqtt(port) {
+  const broker = await Aedes.createBroker();
+  const publish = (topic, body) => broker.publish({ cmd: 'publish', topic, payload: Buffer.from(JSON.stringify(body)), qos: 0, dup: false, retain: false }, () => {});
+  let beat = 0;
+  const timer = setInterval(() => {
+    beat++;
+    for (const id of [7, 8]) publish(`clinic/${id}/vitals`, { patient: id, heartRate: 70 + ((beat * id) % 15), temperature: 38.2 + (beat % 4) / 10, time: new Date().toISOString() });
+  }, 2000);
+  timer.unref();
+  broker.on('publish', (packet, client) => {
+    const m = client && /^clinic\/([^/]+)\/commands$/.exec(packet.topic);
+    if (!m) return;
+    let command;
+    try {
+      command = JSON.parse(packet.payload.toString());
+    } catch {
+      command = packet.payload.toString();
+    }
+    publish(`clinic/${m[1]}/acks`, { ok: true, patient: m[1], command, by: client.id });
+  });
+  const server = createTcpServer(broker.handle);
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  return {
+    server,
+    close: async () => {
+      clearInterval(timer);
+      await new Promise((r) => server.close(r));
+      await new Promise((r) => broker.close(r));
+    },
+  };
+}
+
 export async function startAll(base = 4010) {
   const rest = await listen(createRestServer(), base);
   const gql = await listen(createGraphQLServer(), base + 1);
@@ -370,6 +412,7 @@ export async function startAll(base = 4010) {
   });
   const grpcServer = await startGrpcServer(base + 4);
   const socketIo = await startSocketIo(base + 5);
+  const mqtt = await startMqtt(base + 6);
   return {
     rest,
     gql,
@@ -379,6 +422,7 @@ export async function startAll(base = 4010) {
     close: async () => {
       grpcServer.forceShutdown();
       socketIo.sio.close();
+      await mqtt.close();
       for (const s of [rest, gql, llm]) {
         s.closeAllConnections?.();
         await new Promise((r) => s.close(r));
@@ -399,5 +443,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   console.log(`WebSocket  ws://127.0.0.1:${base + 3}`);
   console.log(`Socket.IO  http://127.0.0.1:${base + 5}/chat   (say → said, acknowledged)`);
   console.log(`gRPC       127.0.0.1:${base + 4}   (vet.v1.PetService; proto: examples/veterinary-workspace/protos/vet/v1/pets.proto)`);
+  console.log(`MQTT       mqtt://127.0.0.1:${base + 6}   (clinic/+/vitals every 2 s; publish to clinic/7/commands, read clinic/7/acks)`);
   console.log('MCP        node examples/servers/mcp-server.mjs   (stdio)');
 }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **MQTT**: the WebSocket view has an MQTT mode (MQTT 3.1.1 and 5 over mqtt://, mqtts://, ws:// and wss://): subscriptions with wildcards and QoS, publish with QoS and retain, username and password (only a `{{variable}}` reference is saved), saved connections and messages. Also `type: mqtt` tests, `testpion mqtt`, `mode: mqtt` in the `realtime_exchange` MCP tool, and an MQTT broker in the demo servers (`mqtt://127.0.0.1:4016`).
 - **Confirm before changing production**: with a production environment active, sending a POST, PUT, PATCH, DELETE or other non-read request from the REST view asks first (with a "don't ask again" choice that lasts until restart).
 - **Copy a gRPC call as grpcurl**: the gRPC view's **grpcurl** button copies the call as a ready-to-run command (plaintext or TLS, proto files or reflection, metadata and message).
 - **Set environment variables from the terminal and from AI agents:** `testpion env set Staging baseUrl=https://… [--create]`, `env unset`, `env get`, and the MCP tool `set_environment_variable`. Only plain values: secret variables are still set in the app (or as `TESTPION_SECRET_*` in CI).

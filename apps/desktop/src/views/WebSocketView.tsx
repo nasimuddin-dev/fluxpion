@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Radio, Save, Send, Trash2, Unplug } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
@@ -23,24 +23,47 @@ interface WsMessage {
   /** Socket.IO: the event name, and whether this is an acknowledgement. */
   event?: string;
   ack?: boolean;
+  /** MQTT: the topic, QoS and retained flag. */
+  topic?: string;
+  qos?: number;
+  retain?: boolean;
 }
+
+type Qos = 0 | 1 | 2;
 
 type Draft = {
   url: string;
   protocols: string;
   headers: KeyValue[];
   message: string;
-  /** Plain WebSocket, or a Socket.IO server (events with JSON arguments, acknowledgements). */
-  mode?: 'websocket' | 'socketio';
+  /** Plain WebSocket, a Socket.IO server (events with JSON arguments, acknowledgements), or an MQTT broker. */
+  mode?: 'websocket' | 'socketio' | 'mqtt';
   event?: string;
   ack?: boolean;
   /** Socket.IO endpoint path (default /socket.io) and handshake auth payload (JSON). */
   path?: string;
   auth?: string;
-  /** Messages kept with the connection, to send again (Socket.IO: with their event). */
-  savedMessages?: Array<{ name: string; message: string; event?: string }>;
+  /** Messages kept with the connection, to send again (Socket.IO: with their event; MQTT: with their topic). */
+  savedMessages?: Array<{ name: string; message: string; event?: string; topic?: string }>;
+  /** MQTT: topic to publish to, QoS, retained flag, topic filters subscribed on connect, and login. */
+  topic?: string;
+  qos?: Qos;
+  retain?: boolean;
+  subscriptions?: Array<{ topic: string; qos: Qos }>;
+  clientId?: string;
+  username?: string;
+  /** Only a {{variable}} reference is kept; a typed password lives in memory until the app closes. */
+  password?: string;
+  mqttVersion?: 4 | 5;
 };
-const hostOf = (url: string) => url.replace(/^wss?:\/\//, '').split(/[/?#]/)[0] || 'Connection';
+const hostOf = (url: string) => url.replace(/^(wss?|https?|mqtts?):\/\//, '').split(/[/?#]/)[0] || 'Connection';
+/** What is written to drafts and saved connections: never a typed-in MQTT password. */
+const persistable = (d: Draft): Draft => (d.password && !/^\s*\{\{[^}]+\}\}\s*$/.test(d.password) ? { ...d, password: undefined } : d);
+const MODES = [
+  { id: 'websocket', label: 'WebSocket' },
+  { id: 'socketio', label: 'Socket.IO' },
+  { id: 'mqtt', label: 'MQTT' },
+] as const;
 
 const drafts = persisted<Draft>('websocket', { url: '{{wsUrl}}', protocols: '', headers: [] as KeyValue[], message: '{\n  "type": "ping"\n}' });
 
@@ -51,14 +74,16 @@ export function WebSocketView() {
   const [messages, setMessages] = useState<WsMessage[]>([]);
   const [selected, setSelected] = useState<WsMessage>();
   const [filter, setFilter] = useState('');
-  const [tab, setTab] = useState<'message' | 'headers' | 'auth'>('message');
+  const [tab, setTab] = useState<'message' | 'headers' | 'auth' | 'subscriptions' | 'connection'>('message');
   const sio = d.mode === 'socketio';
+  const mqtt = d.mode === 'mqtt';
+  const [newSub, setNewSub] = useState<{ topic: string; qos: Qos }>({ topic: '', qos: 0 });
   const env = useApp((s) => s.environment);
   // saved connections (URL, subprotocols, handshake headers, message) with folders
   const saved = useLibrary<Draft>('websocket');
   const [savedId, setSavedId] = useSticky<string | undefined>('ws:saved', undefined);
   const current = saved.lib.items.find((i) => i.id === savedId);
-  const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(d);
+  const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(persistable(d));
   const open = async (id: string) => {
     const it = await saved.find(id);
     if (!it) return;
@@ -69,17 +94,17 @@ export function WebSocketView() {
   useIntent('websocket', (p) => p?.savedId && open(p.savedId));
   const save = async (asNew = false, folder?: string) => {
     if (current && !asNew) {
-      await saved.put({ ...current, data: d });
+      await saved.put({ ...current, data: persistable(d) });
       useApp.getState().toast(`Saved "${current.name}"`, 'success');
       return;
     }
     const name = await promptText('Save connection', { message: 'Name', value: hostOf(d.url), okLabel: 'Save' });
     if (!name) return;
-    setSavedId(await saved.put({ name, folder, data: d }));
+    setSavedId(await saved.put({ name, folder, data: persistable(d) }));
   };
   const sessionRef = useRef<string | undefined>(undefined);
   sessionRef.current = session;
-  useEffect(() => drafts.save(d), [d]);
+  useEffect(() => drafts.save(persistable(d)), [d]);
   useEffect(() => {
     const a = on<Array<{ id: string; message: WsMessage }>>('wsock.messages', (items) => {
       const mine = items.filter((i) => i.id === sessionRef.current).map((i) => i.message);
@@ -94,9 +119,11 @@ export function WebSocketView() {
   const connect = async () => {
     setStatus('connecting');
     try {
-      const r = sio
-        ? await call<{ id: string }>('sio.connect', { url: d.url, path: d.path || undefined, headers: d.headers, auth: d.auth, environment: env })
-        : await call<{ id: string }>('wsock.connect', { url: d.url, protocols: d.protocols ? d.protocols.split(',').map((s) => s.trim()) : undefined, headers: d.headers, environment: env });
+      const r = mqtt
+        ? await call<{ id: string }>('mqtt.connect', { url: d.url, clientId: d.clientId || undefined, username: d.username || undefined, password: d.password || undefined, protocolVersion: d.mqttVersion ?? 4, subscriptions: d.subscriptions ?? [], environment: env })
+        : sio
+          ? await call<{ id: string }>('sio.connect', { url: d.url, path: d.path || undefined, headers: d.headers, auth: d.auth, environment: env })
+          : await call<{ id: string }>('wsock.connect', { url: d.url, protocols: d.protocols ? d.protocols.split(',').map((s) => s.trim()) : undefined, headers: d.headers, environment: env });
       setSession(r.id);
       setStatus('open');
     } catch (e) {
@@ -113,28 +140,52 @@ export function WebSocketView() {
   // saved messages: pick one into the editor, save the current one under a name, delete one
   const [pickedMessage, setPickedMessage] = useState('');
   const saveMessage = async () => {
-    const name = (await promptText('Save message', { message: 'Name', value: pickedMessage || (sio ? d.event : '') || 'Message', okLabel: 'Save' }))?.trim();
+    const name = (await promptText('Save message', { message: 'Name', value: pickedMessage || (sio ? d.event : mqtt ? d.topic : '') || 'Message', okLabel: 'Save' }))?.trim();
     if (!name) return;
     const others = (d.savedMessages ?? []).filter((m) => m.name !== name);
-    setD({ ...d, savedMessages: [...others, { name, message: d.message, ...(sio ? { event: d.event } : {}) }] });
+    setD({ ...d, savedMessages: [...others, { name, message: d.message, ...(sio ? { event: d.event } : {}), ...(mqtt ? { topic: d.topic } : {}) }] });
     setPickedMessage(name);
     useApp.getState().toast(current ? `Saved message "${name}". Save the connection to keep it.` : `Saved message "${name}" (kept with this draft; save the connection to keep it with the connection)`, 'success');
   };
   const pickMessage = (name: string) => {
     setPickedMessage(name);
     const m = d.savedMessages?.find((x) => x.name === name);
-    if (m) setD({ ...d, message: m.message, ...(m.event !== undefined ? { event: m.event } : {}) });
+    if (m) setD({ ...d, message: m.message, ...(m.event !== undefined ? { event: m.event } : {}), ...(m.topic !== undefined ? { topic: m.topic } : {}) });
   };
   const deleteMessage = () => {
     if (!pickedMessage) return;
     setD({ ...d, savedMessages: (d.savedMessages ?? []).filter((m) => m.name !== pickedMessage) });
     setPickedMessage('');
   };
-  const disconnect = () => session && call(sio ? 'sio.close' : 'wsock.close', { id: session }).then(() => setStatus('closed'));
+  const disconnect = () => session && call(mqtt ? 'mqtt.close' : sio ? 'sio.close' : 'wsock.close', { id: session }).then(() => setStatus('closed'));
   const send = () =>
     session &&
-    (sio ? call('sio.emit', { id: session, event: d.event ?? '', args: d.message, ack: !!d.ack, environment: env }) : call('wsock.send', { id: session, data: d.message, environment: env })).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
-  const shown = filter ? messages.filter((m) => m.data.toLowerCase().includes(filter.toLowerCase())) : messages;
+    (mqtt
+      ? call('mqtt.publish', { id: session, topic: d.topic ?? '', payload: d.message, qos: d.qos ?? 0, retain: !!d.retain, environment: env })
+      : sio
+        ? call('sio.emit', { id: session, event: d.event ?? '', args: d.message, ack: !!d.ack, environment: env })
+        : call('wsock.send', { id: session, data: d.message, environment: env })
+    ).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
+  // MQTT subscriptions: kept with the connection and subscribed on connect; changes apply at once while connected
+  const addSubscription = async () => {
+    const topic = newSub.topic.trim();
+    if (!topic) return;
+    if (session && status === 'open') {
+      try {
+        await call('mqtt.subscribe', { id: session, topic, qos: newSub.qos, environment: env });
+      } catch (e) {
+        useApp.getState().toast(asError(e).message, 'error');
+        return;
+      }
+    }
+    setD({ ...d, subscriptions: [...(d.subscriptions ?? []).filter((s) => s.topic !== topic), { topic, qos: newSub.qos }] });
+    setNewSub({ topic: '', qos: newSub.qos });
+  };
+  const removeSubscription = (topic: string) => {
+    if (session && status === 'open') void call('mqtt.unsubscribe', { id: session, topic, environment: env }).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
+    setD({ ...d, subscriptions: (d.subscriptions ?? []).filter((s) => s.topic !== topic) });
+  };
+  const shown = filter ? messages.filter((m) => `${m.topic ?? ''} ${m.event ?? ''} ${m.data}`.toLowerCase().includes(filter.toLowerCase())) : messages;
   let parsed: unknown;
   try {
     parsed = selected ? JSON.parse(selected.data) : undefined;
@@ -166,14 +217,25 @@ export function WebSocketView() {
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <Badge tone={status === 'open' ? 'ok' : status === 'connecting' ? 'warn' : 'default'}>{status}</Badge>
         <div className="flex rounded-md border border-line overflow-hidden text-xs shrink-0" role="group" aria-label="Protocol">
-          {(['websocket', 'socketio'] as const).map((m) => (
-            <button key={m} type="button" disabled={status !== 'closed'} className={cx('px-2 py-1', (d.mode ?? 'websocket') === m ? 'bg-accent-soft text-fg' : 'text-muted hover:text-fg')} onClick={() => setD({ ...d, mode: m })}>
-              {m === 'websocket' ? 'WebSocket' : 'Socket.IO'}
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              disabled={status !== 'closed'}
+              className={cx('px-2 py-1', (d.mode ?? 'websocket') === m.id ? 'bg-accent-soft text-fg' : 'text-muted hover:text-fg')}
+              onClick={() => {
+                setD({ ...d, mode: m.id });
+                setTab('message');
+              }}
+            >
+              {m.label}
             </button>
           ))}
         </div>
-        <VarInput ariaLabel="WebSocket URL" className="flex-1 h-8" value={d.url} onChange={(url) => setD({ ...d, url })} placeholder={sio ? 'http://localhost:3000/namespace' : 'wss://example.com/socket'} />
-        {sio ? (
+        <VarInput ariaLabel={mqtt ? 'Broker URL' : 'WebSocket URL'} className="flex-1 h-8" value={d.url} onChange={(url) => setD({ ...d, url })} placeholder={mqtt ? 'mqtt://localhost:1883 (mqtts://, ws:// and wss:// work too)' : sio ? 'http://localhost:3000/namespace' : 'wss://example.com/socket'} />
+        {mqtt ? (
+          <Input className="w-44" placeholder="Client ID (random)" title="MQTT client ID (a random one when empty); may use {{variables}}" value={d.clientId ?? ''} onChange={(e) => setD({ ...d, clientId: e.target.value })} />
+        ) : sio ? (
           <Input className="w-40" placeholder="/socket.io" title="Socket.IO path on the server (default /socket.io)" value={d.path ?? ''} onChange={(e) => setD({ ...d, path: e.target.value })} />
         ) : (
           <Input className="w-48" placeholder="Subprotocols" title="Subprotocols, comma separated (e.g. graphql-ws, mqtt)" value={d.protocols} onChange={(e) => setD({ ...d, protocols: e.target.value })} />
@@ -198,13 +260,31 @@ export function WebSocketView() {
               value={tab}
               onChange={setTab}
               tabs={[
-                { id: 'message', label: sio ? 'Emit' : 'Message' },
-                { id: 'headers', label: 'Handshake headers', badge: d.headers.length },
+                { id: 'message', label: mqtt ? 'Publish' : sio ? 'Emit' : 'Message' },
+                ...(mqtt
+                  ? [
+                      { id: 'subscriptions' as const, label: 'Subscriptions', badge: d.subscriptions?.length },
+                      { id: 'connection' as const, label: 'Connection' },
+                    ]
+                  : [{ id: 'headers' as const, label: 'Handshake headers', badge: d.headers.length }]),
                 ...(sio ? [{ id: 'auth' as const, label: 'Auth' }] : []),
               ]}
             />
             {tab === 'message' ? (
               <>
+                {mqtt && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
+                    <Input className="h-7 min-h-7 mono flex-1" placeholder="Topic, e.g. clinic/7/vitals" aria-label="Topic" value={d.topic ?? ''} onChange={(e) => setD({ ...d, topic: e.target.value })} />
+                    <Select className="h-7 min-h-7 text-xs w-20 shrink-0" aria-label="QoS" title="Quality of service: 0 at most once, 1 at least once, 2 exactly once" value={String(d.qos ?? 0)} onChange={(e) => setD({ ...d, qos: Number(e.target.value) as Qos })}>
+                      <option value="0">QoS 0</option>
+                      <option value="1">QoS 1</option>
+                      <option value="2">QoS 2</option>
+                    </Select>
+                    <label className="text-xs text-muted flex items-center gap-1.5 shrink-0" title="The broker keeps the last retained message of a topic for new subscribers">
+                      <input type="checkbox" checked={!!d.retain} onChange={(e) => setD({ ...d, retain: e.target.checked })} /> Retain
+                    </label>
+                  </div>
+                )}
                 {sio && (
                   <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
                     <Input className="h-7 min-h-7 mono flex-1" placeholder="Event name, e.g. message" aria-label="Event name" value={d.event ?? ''} onChange={(e) => setD({ ...d, event: e.target.value })} />
@@ -218,7 +298,7 @@ export function WebSocketView() {
                     <option value="">{d.savedMessages?.length ? `Saved messages (${d.savedMessages.length})…` : 'No saved messages'}</option>
                     {(d.savedMessages ?? []).map((m) => (
                       <option key={m.name} value={m.name}>
-                        {m.event ? `${m.name} · ${m.event}` : m.name}
+                        {m.event || m.topic ? `${m.name} · ${m.event || m.topic}` : m.name}
                       </option>
                     ))}
                   </Select>
@@ -234,11 +314,72 @@ export function WebSocketView() {
                   <CodeEditor language="json" value={d.message} onChange={(message) => setD({ ...d, message })} />
                 </div>
                 <div className="p-2 border-t border-line flex justify-end">
-                  <Button variant="primary" icon={<Send size={13} />} disabled={status !== 'open' || (sio && !d.event?.trim())} onClick={send}>
-                    {sio ? 'Emit' : 'Send'}
+                  <Button variant="primary" icon={<Send size={13} />} disabled={status !== 'open' || (sio && !d.event?.trim()) || (mqtt && !d.topic?.trim())} onClick={send}>
+                    {mqtt ? 'Publish' : sio ? 'Emit' : 'Send'}
                   </Button>
                 </div>
               </>
+            ) : tab === 'subscriptions' ? (
+              <div className="h-full flex flex-col">
+                <p className="px-2 py-1.5 text-xs text-muted border-b border-line">Topic filters to receive, subscribed when you connect. <span className="mono">+</span> matches one level, <span className="mono">#</span> the rest. While connected, changes apply at once.</p>
+                <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
+                  <Input
+                    className="h-7 min-h-7 mono flex-1"
+                    placeholder="e.g. clinic/+/vitals or alerts/#"
+                    aria-label="Topic filter"
+                    value={newSub.topic}
+                    onChange={(e) => setNewSub({ ...newSub, topic: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && void addSubscription()}
+                  />
+                  <Select className="h-7 min-h-7 text-xs w-20 shrink-0" aria-label="Subscription QoS" value={String(newSub.qos)} onChange={(e) => setNewSub({ ...newSub, qos: Number(e.target.value) as Qos })}>
+                    <option value="0">QoS 0</option>
+                    <option value="1">QoS 1</option>
+                    <option value="2">QoS 2</option>
+                  </Select>
+                  <Button size="sm" icon={<Plus size={12} />} disabled={!newSub.topic.trim()} onClick={() => void addSubscription()}>
+                    {status === 'open' ? 'Subscribe' : 'Add'}
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto">
+                  {d.subscriptions?.length ? (
+                    d.subscriptions.map((s) => (
+                      <div key={s.topic} className="flex items-center gap-2 px-2 h-8 border-b border-line/50 text-sm">
+                        <span className="mono text-xs truncate flex-1">{s.topic}</span>
+                        <Badge>QoS {s.qos}</Badge>
+                        <Button size="sm" variant="ghost" icon={<X size={12} />} aria-label={`Remove ${s.topic}`} title={status === 'open' ? 'Unsubscribe and remove' : 'Remove'} onClick={() => removeSubscription(s.topic)} />
+                      </div>
+                    ))
+                  ) : (
+                    <Empty title="No subscriptions">Add a topic filter to receive messages; you can publish without subscribing.</Empty>
+                  )}
+                </div>
+              </div>
+            ) : tab === 'connection' ? (
+              <div className="p-3 space-y-3 overflow-auto">
+                <label className="block text-xs text-muted">
+                  Username
+                  <VarInput ariaLabel="Username" className="mt-1 h-8" value={d.username ?? ''} onChange={(username) => setD({ ...d, username })} placeholder="optional" />
+                </label>
+                <label className="block text-xs text-muted">
+                  Password
+                  {!d.password || d.password.trimStart().startsWith('{') ? (
+                    <VarInput ariaLabel="Password" className="mt-1 h-8" value={d.password ?? ''} onChange={(password) => setD({ ...d, password })} placeholder="{{mqttPassword}}" />
+                  ) : (
+                    // a typed password is masked (a {{variable}} reference is shown as it is)
+                    <Input type="password" autoFocus aria-label="Password" className="mt-1 h-8 w-full" value={d.password} onChange={(e) => setD({ ...d, password: e.target.value })} />
+                  )}
+                  <span className="block mt-1">
+                    Use a secret variable such as {'{{mqttPassword}}'}: only a variable reference is saved. A typed password is used until you close the app.
+                  </span>
+                </label>
+                <label className="block text-xs text-muted">
+                  Protocol version
+                  <Select className="mt-1 h-8 w-48" aria-label="MQTT version" value={String(d.mqttVersion ?? 4)} onChange={(e) => setD({ ...d, mqttVersion: Number(e.target.value) as 4 | 5 })}>
+                    <option value="4">MQTT 3.1.1</option>
+                    <option value="5">MQTT 5</option>
+                  </Select>
+                </label>
+              </div>
             ) : tab === 'auth' ? (
               <div className="h-full flex flex-col">
                 <p className="px-2 py-1.5 text-xs text-muted border-b border-line">The handshake's auth payload (JSON), e.g. {'{ "token": "{{accessToken}}" }'}. Values may use {'{{variables}}'}.</p>
@@ -272,6 +413,7 @@ export function WebSocketView() {
                       {m.direction === 'sent' ? <ArrowUpRight size={13} className="text-accent shrink-0" /> : m.direction === 'received' ? <ArrowDownLeft size={13} className="text-ok shrink-0" /> : <Info size={13} className="text-muted shrink-0" />}
                       <span className="text-xs text-muted tabular-nums shrink-0">{new Date(m.time).toLocaleTimeString()}</span>
                       {m.event && <Badge tone={m.ack ? 'ok' : 'accent'}>{m.ack ? `ack ${m.event}` : m.event}</Badge>}
+                      {m.topic && <Badge tone="accent">{m.retain ? `${m.topic} · retained` : m.topic}</Badge>}
                       <span className={cx('truncate mono text-xs', m.direction === 'system' && 'text-muted')}>{m.data}</span>
                     </button>
                   )}

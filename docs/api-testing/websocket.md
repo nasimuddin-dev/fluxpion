@@ -1,6 +1,6 @@
 ---
 title: "WebSocket"
-description: "Connect to WebSocket and Socket.IO servers, send messages and events (with acknowledgements), save connections in folders, and read clear connection errors."
+description: "Connect to WebSocket, Socket.IO and MQTT servers, send messages and events (with acknowledgements), subscribe and publish, save connections in folders, and read clear connection errors."
 ---
 
 ::: v-pre
@@ -26,6 +26,18 @@ Switch the protocol to **Socket.IO** to talk to a [Socket.IO](https://socket.io)
 
 The demo servers include a Socket.IO namespace: `http://127.0.0.1:4015/chat` (emit `say`; the server broadcasts `said` and acknowledges).
 
+## MQTT
+
+Switch the protocol to **MQTT** to talk to an MQTT broker (MQTT 3.1.1 or 5), e.g. for IoT devices or event pipelines:
+
+- The URL is the broker: `mqtt://host:1883`, `mqtts://host:8883` for TLS, or `ws://` / `wss://` with the path (often `/mqtt`) for brokers behind WebSocket. Leave **Client ID** empty for a random one.
+- **Subscriptions** lists the topic filters to receive (`+` matches one level, `#` the rest), each with its QoS. They are subscribed when you connect; while connected, adding or removing one subscribes or unsubscribes at once.
+- **Connection** has the username, the password and the protocol version. Put the password in a [secret variable](./environments.md#secrets) and enter `{{mqttPassword}}`: only a variable reference is saved. A typed password is masked and used until you close the app, never written to the draft or the saved connection.
+- On **Publish**, give the topic, the QoS (0 at most once, 1 at least once, 2 exactly once) and **Retain** if the broker should keep the message for new subscribers. The payload is text (JSON or anything else); `{{variables}}` resolve in the topic and the payload.
+- Every message shows its topic (and *retained* for a retained message); the filter matches topics too.
+
+The demo servers include a broker: `mqtt://127.0.0.1:4016`. Subscribe to `clinic/+/vitals` to see two monitors report every 2 seconds, and publish `{ "action": "recheck" }` to `clinic/7/commands` to get an answer on `clinic/7/acks`.
+
 ## Saved connections
 
 The **Saved connections** list keeps connections (URL, subprotocols, handshake headers and the message) in folders:
@@ -42,7 +54,7 @@ Saved connections live in the workspace (`library/websocket.json`). Use `{{varia
 
 A test file with `type: websocket` connects, sends messages in order, listens for `waitMs`, and closes. The assertions run on:
 
-- `$.received`: each message the server sent, parsed as JSON when it is JSON. With Socket.IO, each item is `{ event, data }`.
+- `$.received`: each message the server sent, parsed as JSON when it is JSON. With Socket.IO, each item is `{ event, data }`; with MQTT, `{ topic, data }`.
 - `$.messages`: everything, with direction and time.
 - The plain text of the received messages, for `contains` without a path.
 
@@ -63,6 +75,23 @@ assertions:
 ```
 
 For Socket.IO, `send` items are `{ event, args, ack }`. Add `path:` if the server doesn't use `/socket.io`, and `auth:` for a handshake payload. The same exchange works from the terminal with [`testpion ws`](../cli/reference.md), and for AI agents with the `realtime_exchange` MCP tool.
+
+For MQTT, use `type: mqtt` (or an `mqtt://` URL): `subscribe` lists topic filters, `send` items are `{ topic, payload, qos, retain }` and are published after subscribing, and `username` / `password` log in (use a variable for the password).
+
+```yaml
+name: A recheck command is acknowledged
+type: mqtt
+url: "{{mqttBroker}}"          # mqtt://127.0.0.1:4016
+subscribe: [clinic/7/acks]
+send:
+  - { topic: clinic/7/commands, payload: { action: recheck }, qos: 1 }
+waitMs: 1000
+assertions:
+  - { type: equals, path: "$.received[0].topic", expected: clinic/7/acks }
+  - { type: equals, path: "$.received[0].data.ok", expected: true }
+```
+
+From the terminal, [`testpion mqtt`](../cli/reference.md#mqtt) subscribes, publishes and prints what arrives; AI agents use `realtime_exchange` with `mode: mqtt`.
 
 ## When a connection fails
 

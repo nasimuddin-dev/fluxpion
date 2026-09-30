@@ -271,6 +271,53 @@ export function registerServeCommands(program: Command): void {
     });
 
   program
+    .command('mqtt')
+    .description('talk to an MQTT broker: subscribe to topics, publish messages, print what arrives, disconnect')
+    .argument('<url>', 'mqtt://host:1883, mqtts://host:8883, or ws(s)://host/mqtt for brokers behind WebSocket')
+    .option('-s, --subscribe <topic...>', 'topic filters to subscribe to first (+ and # wildcards)')
+    .option('-p, --publish <topic=payload...>', "messages to publish, in order, e.g. clinic/7/vitals='{\"hr\":80}'")
+    .option('-q, --qos <0|1|2>', 'QoS for subscriptions and messages', '0')
+    .option('--retain', 'publish retained messages')
+    .option('-i, --client-id <id>', 'client ID (default: random)')
+    .option('-u, --username <name>', 'username')
+    .option('--password-env <name>', 'environment variable holding the password (never type it on the command line)', 'MQTT_PASSWORD')
+    .option('--mqtt5', 'use MQTT 5 (default 3.1.1)')
+    .option('-w, --wait <ms>', 'how long to listen after publishing', '1500')
+    .option('--json', 'print the result as JSON (for scripts and AI agents)')
+    .action(async (url: string, o) => {
+      const qos = Number(o.qos);
+      if (![0, 1, 2].includes(qos)) throw new CliError('--qos must be 0, 1 or 2', EXIT.CONFIG_ERROR);
+      const publish = ((o.publish as string[] | undefined) ?? []).map((p) => {
+        const i = p.indexOf('=');
+        if (i <= 0) throw new CliError(`--publish expects topic=payload, got "${p}"`, EXIT.CONFIG_ERROR);
+        return { topic: p.slice(0, i), payload: p.slice(i + 1), qos: qos as 0 | 1 | 2, retain: !!o.retain };
+      });
+      const password = o.username ? process.env[String(o.passwordEnv)] : undefined;
+      const redactor = new Redactor();
+      if (password) redactor.addSecret(password);
+      const r = await runRealtimeExchange(
+        {
+          url,
+          mode: 'mqtt',
+          subscribe: ((o.subscribe as string[] | undefined) ?? []).map((topic) => ({ topic, qos: qos as 0 | 1 | 2 })),
+          send: publish,
+          waitMs: Number(o.wait),
+          clientId: o.clientId,
+          username: o.username,
+          password,
+          protocolVersion: o.mqtt5 ? 5 : 4,
+        },
+        { redactor },
+      );
+      if (o.json) console.log(JSON.stringify(r, null, 2));
+      else {
+        console.log(`${r.connected ? green('connected') : red('not connected')} ${dim(`mqtt · ${url} · ${r.durationMs} ms`)}`);
+        for (const m of r.messages) console.log(`${dim(`${(m.atMs / 1000).toFixed(2)}s`)} ${m.direction === 'sent' ? cyan('→') : m.direction === 'received' ? green('←') : dim('·')} ${m.topic ? bold(`${m.topic} `) : ''}${m.data}`);
+      }
+      process.exitCode = r.connected ? EXIT.SUCCESS : EXIT.EXECUTION_ERROR;
+    });
+
+  program
     .command('grpc')
     .description('call a gRPC method (or list the methods in the .proto files when no method is given)')
     .argument('<target>', 'server address: host:port, or grpcs://host:port for TLS')

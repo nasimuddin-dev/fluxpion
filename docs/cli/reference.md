@@ -35,6 +35,7 @@ testpion history list|stats|diff|export-har -w  Response history of saved reques
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
+testpion mqtt <url> [-s topic] [-p topic=msg] Subscribe and publish on an MQTT broker and print what arrives
 testpion grpc <target> [method] [-p protos]   Call a gRPC method, or list the methods (.proto files or server reflection)
 testpion report <results.jsonl>              Re-generate reports
 ```
@@ -177,6 +178,27 @@ testpion ws http://127.0.0.1:4015/chat -e 'say={"text":"hi"}' --ack --json
 | `-H, --header <key:value...>` | Handshake headers. |
 | `--auth <json>` | Socket.IO handshake auth payload. |
 | `-w, --wait <ms>` | How long to listen after sending (default 1500). |
+| `--json` | Print the result as JSON, for scripts and AI agents. |
+
+## `mqtt`
+
+Connects to an [MQTT broker](/api-testing/websocket#mqtt), subscribes to topic filters, publishes messages in order, prints everything that arrives while it listens, then disconnects. The exit code is 3 when it can't connect (for example when the broker refuses the login).
+
+```bash
+testpion mqtt mqtt://127.0.0.1:4016 -s 'clinic/+/vitals' -w 5000
+MQTT_PASSWORD=… testpion mqtt mqtts://broker.example.com -u vet -s 'clinic/7/acks' -p 'clinic/7/commands={"action":"recheck"}' -q 1 --json
+```
+
+| Option | Description |
+|---|---|
+| `-s, --subscribe <topic...>` | Topic filters to subscribe to first (`+` and `#` wildcards). |
+| `-p, --publish <topic=payload...>` | Messages to publish, in order. |
+| `-q, --qos <0\|1\|2>` | QoS for the subscriptions and messages (default 0). |
+| `--retain` | Publish retained messages. |
+| `-i, --client-id <id>` | Client ID (default: random). |
+| `-u, --username <name>` | Username. The password is read from the environment variable named by `--password-env` (default `MQTT_PASSWORD`), never from the command line. |
+| `--mqtt5` | Use MQTT 5 (default 3.1.1). |
+| `-w, --wait <ms>` | How long to listen after publishing (default 1500). |
 | `--json` | Print the result as JSON, for scripts and AI agents. |
 
 ## `grpc`

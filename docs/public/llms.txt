@@ -5,7 +5,7 @@
 Key facts for agents:
 
 - Workspaces are folders of JSON/YAML files (`workspace.json`, `collections/*.json`, `environments/*.json`, `tests/**/*.yaml`) that can be committed to git. Secret values are never in these files.
-- Test types: http, graphql, grpc, websocket (or socketio: connect, `send` messages / `{event,args,ack}`, assert on `$.received[n]`), mcp, llm, rag, agent.
+- Test types: http, graphql, grpc, websocket (or socketio / mqtt: connect, `send` messages / `{event,args,ack}` / `{topic,payload,qos,retain}` after `subscribe: [filters]`, assert on `$.received[n]`), mcp, llm, rag, agent.
 - Same request, two environments: `testpion env diff <a> <b> --request <name> --json` or MCP `compare_request_across_environments` (response diff).
 - Environment drift: `testpion env diff <a> <b> --json` (exit 1 when they differ) or MCP `compare_environments` (statuses only, no values).
 - Proxy: the CLI honours HTTP_PROXY / HTTPS_PROXY / NO_PROXY (TESTPION_NO_PROXY=1 disables); the app has Settings ▸ Proxy (env, custom URL + bypass list, or off).
@@ -48,7 +48,7 @@ Key facts for agents:
 ## API testing
 
 - [REST and HTTP](https://nasimuddin-dev.github.io/testpion/api-testing/rest): requests, responses, `pm.*` scripts, console, tabs and history
-- [WebSocket and Socket.IO](https://nasimuddin-dev.github.io/testpion/api-testing/websocket): connect, send messages or emit Socket.IO events (with acknowledgements); `testpion ws`; MCP tool `realtime_exchange`; saved connections in folders; clear connection errors
+- [WebSocket, Socket.IO and MQTT](https://nasimuddin-dev.github.io/testpion/api-testing/websocket): connect, send messages, emit Socket.IO events (with acknowledgements), subscribe and publish on MQTT brokers (3.1.1 and 5, QoS, retained); `testpion ws`, `testpion mqtt`; MCP tool `realtime_exchange` (`mode: mqtt`, `subscribe`); saved connections in folders; clear connection errors
 - [Server-Sent Events](https://nasimuddin-dev.github.io/testpion/api-testing/rest#server-sent-events): text/event-stream responses parsed event by event (live, Stop keeps events); MCP send_request returns them
 - [OpenAPI contract testing](https://nasimuddin-dev.github.io/testpion/test-runner/assertions#openapi-contract-testing): the `openapi` check validates status, content type and body schema against an OpenAPI 3 / Swagger 2 document (`spec: openapi.yaml`)
 - [Authentication](https://nasimuddin-dev.github.io/testpion/api-testing/authentication): API key, Basic, Bearer, JWT, OAuth 1.0, OAuth 2.0, AWS Signature v4, Digest, mTLS
