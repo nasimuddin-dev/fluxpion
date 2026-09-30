@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.8.0 — 2026-09-29
+
 - **Folders for MCP servers, WebSocket connections and AI prompts.** Like the REST collections: the MCP server list, the new **Saved connections** list in the WebSocket view and the new **Saved prompts** list in the AI Lab Playground group items in folders (new folder, rename, move to folder, drag and drop, duplicate, delete, right-click menus). WebSocket connections (URL, subprotocols, headers, message) and AI prompts (model, parameters, prompt, variables, structured output, evaluators) can now be saved and reopened; they're stored in the workspace's `library/` folder. New docs page: WebSocket.
 - **UI fixes from a hands-on pass (MCP and AI first).** MCP: executing a tool with required arguments left empty now says which ones (with *Execute anyway* to test the server's validation); a single result or resource fills the panel instead of a small fixed box; prompts show their messages as a conversation (JSON one click away) and an empty state before the first call. AI Lab and Evaluations keep their results, tabs and selected run when you switch tabs or views; empty Top P / Max tokens / Seed fields say what they mean; the evaluation settings no longer overflow a narrow pane. Raw text views wrap long lines at the width of the view. Smaller fixes: the environment colour picker lines up with the name, the WebSocket subprotocols field is readable, and Home mentions gRPC and WebSocket.
 - **MCP results stay put, with display options.** A tool's result (and arguments, assertions, the resource you read and prompt output) is kept while the app runs: switching the Tools / Resources / Prompts tabs, another tool, another server or another view no longer empties it, and each tool keeps its own last result. Tool output can be shown **Pretty** (JSON as a tree), **Raw** (searchable text) or as rendered **Markdown**, copied, or saved to a file.
