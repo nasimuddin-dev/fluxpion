@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 — 2026-09-30
+
+Highlights: a clearer **Collections sidebar**, organised by what you work with (collections, gRPC, WebSocket & MQTT, MCP servers, API definitions), with a create button in every section.
 
 - **A clearer Collections sidebar**:
   - The panel is titled with your workspace name. Its sections follow what you work with: **Collections** (HTTP and GraphQL), **gRPC**, **WebSocket & MQTT**, **MCP servers** (with a connected dot) and **API definitions** (API coverage, compare versions).
