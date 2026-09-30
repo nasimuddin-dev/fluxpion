@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scripts: typing a quote in `pm.environment.get('`, `pm.variables.set('`, `pm.globals.has('` … suggests the variable names of that scope, with their values (secrets hidden).
 - **Mock an OpenAPI API at once.** Importing an OpenAPI / Swagger document now saves an example for each documented response (from its example, a named example or the schema), so the collection can be mocked straight away. `testpion mock`, `docs` and `export` also take a file or an http(s) link, e.g. `testpion mock https://petstore3.swagger.io/api/v3/openapi.json`.
 - **More code snippets:** Python httpx, Java 11+ HttpClient, Kotlin (OkHttp) and Dart (http). Fixed: the Python snippet changed `true` / `false` / `null` inside JSON strings (a body like `{"note": "is true"}` became `"is True"`).
 - **Save a response field to a variable.** Click a key in a JSON response and choose **Save to variable…**: the request's test script gets a `pm.environment.set(...)` line for it (so it's refreshed after every send) and the variable is set right away, ready for `{{name}}` in the next request.

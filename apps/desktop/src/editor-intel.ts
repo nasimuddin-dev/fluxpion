@@ -215,6 +215,30 @@ export function installEditorIntel(monaco: typeof Monaco): void {
     schedule();
   });
 
+  // variable names inside pm.environment.get('…') / pm.variables.set("…") / pm.globals.has(`…`) …
+  const SCOPE_OF: Record<string, string | undefined> = { environment: 'environment', globals: 'global', collectionVariables: 'collection', variables: undefined, iterationData: undefined };
+  monaco.languages.registerCompletionItemProvider('javascript', {
+    triggerCharacters: ["'", '"', '`'],
+    provideCompletionItems: async (model, position) => {
+      const lineBefore = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+      const m = /(?:pm|tp)\.(environment|globals|collectionVariables|variables|iterationData)\.(?:get|set|has|unset)\(\s*(['"`])([\w.$-]*)$/.exec(lineBefore);
+      if (!m) return { suggestions: [] };
+      const scope = SCOPE_OF[m[1]!];
+      const vars = (await editorVariables()).filter((v) => v.scope !== 'dynamic' && (!scope || v.scope === scope));
+      const range = new monaco.Range(position.lineNumber, position.column - m[3]!.length, position.lineNumber, position.column);
+      return {
+        suggestions: vars.map((v, i) => ({
+          label: { label: v.name, description: v.scope },
+          kind: monaco.languages.CompletionItemKind.Variable,
+          detail: v.secret ? '•••••• (secret)' : v.value,
+          insertText: v.name,
+          range,
+          sortText: String(i).padStart(4, '0'),
+        })),
+      };
+    },
+  });
+
   // pm / tp snippets in scripts
   monaco.languages.registerCompletionItemProvider('javascript', {
     // after "pm." only providers registered for '.' are asked
