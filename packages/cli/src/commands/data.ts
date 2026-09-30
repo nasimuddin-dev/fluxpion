@@ -30,6 +30,7 @@ import {
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
+  variableFlow,
   collectionToOpenApiText,
   variableUsages,
   renameVariable,
@@ -40,14 +41,27 @@ import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadColle
 export function registerDataCommands(program: Command): void {
   program
     .command('lint')
-    .description("security review of a collection's requests: secrets typed in instead of secret variables, secrets in query strings, plain http to other hosts, turned-off TLS checks")
+    .description("review a collection's requests: secrets typed in instead of secret variables, secrets in query strings, plain http to other hosts, turned-off TLS checks, and {{variables}} nothing defines")
     .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-e, --environment <name>', 'environment whose variables count as defined (for the variables check)')
     .addOption(new Option('--fail-on <severity>', 'exit 1 when a finding is at least this severe').choices(['high', 'medium', 'low']))
     .option('--json', 'print the findings as JSON')
-    .action(async (ref: string, o: { workspace?: string; failOn?: 'high' | 'medium' | 'low'; json?: boolean }) => {
+    .action(async (ref: string, o: { workspace?: string; environment?: string; failOn?: 'high' | 'medium' | 'low'; json?: boolean }) => {
       const c = await loadCollectionRef(ref, o.workspace);
-      const findings = securityLint(c, new WorkspaceManager().loadSettings().redactFields);
+      const settings = new WorkspaceManager().loadSettings();
+      // variables: those of the environment, collection, workspace and globals count as defined
+      let known: string[] = [];
+      try {
+        const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+        const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings, environment: o.environment });
+        known = Object.keys(ctx.vars.toObject());
+        await ctx.dispose();
+        store.close();
+      } catch {
+        /* a collection file outside a workspace: only its own variables */
+      }
+      const findings = [...securityLint(c, settings.redactFields), ...variableFlow(c, known)];
       if (o.json) console.log(JSON.stringify(findings, null, 2));
       else if (!findings.length) console.log(green(`No findings in "${c.name}".`));
       else {

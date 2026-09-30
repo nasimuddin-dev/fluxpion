@@ -39,6 +39,49 @@ export interface SecurityFinding {
   where: string;
   message: string;
   requestId?: string;
+  /** What kind of finding: a security weakness, or a variable nothing defines. */
+  category?: 'security' | 'variables';
+}
+
+const SET_RE = /(?:pm|tp|aps)\.(?:environment|globals|collectionVariables|variables)\.set\(\s*['"`]([\w.-]+)['"`]/g;
+const USE_RE = /\{\{\s*([\w.-]+)\s*\}\}/g;
+
+/**
+ * Variables a collection's requests use that nothing defines: not in the environment / collection /
+ * folder / workspace variables (`known`) and not set by a script of an earlier request. A variable set
+ * only by a later request's script is reported as an order problem.
+ */
+export function variableFlow(collection: Collection, known: Iterable<string>): SecurityFinding[] {
+  const defined = new Set(known);
+  for (const v of collection.variables ?? []) if (v.key) defined.add(v.key);
+  const refs = collectionRequests(collection);
+  const setBy = new Map<string, number>();
+  const scriptsOf = (i: number) => {
+    const r = refs[i]!;
+    return [collection.preRequestScript, collection.testScript, ...r.folders.flatMap((f) => [f.preRequestScript, f.testScript]), 'preRequestScript' in r.node ? r.node.preRequestScript : undefined, 'testScript' in r.node ? r.node.testScript : undefined].filter(Boolean).join('\n');
+  };
+  refs.forEach((_, i) => {
+    for (const m of scriptsOf(i).matchAll(SET_RE)) if (!setBy.has(m[1]!)) setBy.set(m[1]!, i);
+  });
+  const out: SecurityFinding[] = [];
+  refs.forEach((r, i) => {
+    const folderVars = new Set(r.folders.flatMap((f) => (f.variables ?? []).map((v) => v.key)));
+    const { preRequestScript: _p, testScript: _t, ...fields } = r.node as unknown as Record<string, unknown>;
+    const used = new Set<string>();
+    for (const m of JSON.stringify({ ...fields, auth: r.auth }).matchAll(USE_RE)) used.add(m[1]!);
+    const where = [collection.name, ...r.path, r.name].join(' › ');
+    for (const name of used) {
+      if (name.startsWith('$') || defined.has(name) || folderVars.has(name) || name === 'workspaceDir') continue;
+      const setter = setBy.get(name);
+      // set by a pre-request script of the same request, or by any script of an earlier one
+      if (setter !== undefined && setter < i) continue;
+      if (setter === i && /\.set\(/.test(String(_p ?? '') + (collection.preRequestScript ?? '') + r.folders.map((f) => f.preRequestScript ?? '').join(''))) continue;
+      if (setter !== undefined)
+        out.push({ severity: 'low', category: 'variables', where, message: `{{${name}}} is set by a script of "${[...refs[setter]!.path, refs[setter]!.name].join(' / ')}", which runs after this request`, requestId: r.id });
+      else out.push({ severity: 'medium', category: 'variables', where, message: `{{${name}}} is not defined anywhere (environment, collection, folder or workspace variables) and no script sets it`, requestId: r.id });
+    }
+  });
+  return out;
 }
 
 const isVar = (s: string | undefined) => !!s && /^\s*\{\{[^}]+\}\}\s*$/.test(s);
@@ -85,7 +128,7 @@ function literalSecrets(auth: AuthConfig | undefined): string[] {
 export function securityLint(collection: Collection, redactFields?: string[]): SecurityFinding[] {
   const red = new Redactor(redactFields);
   const out: SecurityFinding[] = [];
-  const add = (f: SecurityFinding) => out.push(f);
+  const add = (f: SecurityFinding) => out.push({ category: 'security', ...f });
   for (const s of literalSecrets(collection.auth)) add({ severity: 'high', where: collection.name, message: `The collection's auth has a ${s} typed in: use a secret variable` });
   for (const ref of collectionRequests(collection)) {
     const where = [collection.name, ...ref.path, ref.name].join(' › ');

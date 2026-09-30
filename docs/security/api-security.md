@@ -19,10 +19,12 @@ description: "Find secrets typed into requests, secrets in URLs and plain http, 
 | medium | Plain http to a host that isn't local |
 | medium | TLS certificate verification turned off for a request |
 
+The review also checks **variables**: a `{{variable}}` a request uses that the active environment, the collection, its folders, the workspace and the globals don't define, and that no script sets, is reported, and so is one that's set only by a script of a request that runs later (a common cause of a run that fails on its first request).
+
 From the terminal, and in CI:
 
 ```bash
-testpion lint "My API" -w .                    # prints the findings
+testpion lint "My API" -w . -e Staging         # prints the findings (variables checked against Staging)
 testpion lint "My API" -w . --fail-on high     # exit 1 when there is a high finding
 testpion lint api.postman_collection.json --json
 ```

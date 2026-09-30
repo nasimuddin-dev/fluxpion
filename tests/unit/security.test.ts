@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runChecks, securityLint, type Collection } from '../../packages/core/src/index.js';
+import { runChecks, securityLint, variableFlow, type Collection } from '../../packages/core/src/index.js';
 
 describe('security-headers check', () => {
   const run = (headers: Array<[string, string]>, url = 'https://api.test/x', values?: string[]) => runChecks([{ type: 'security-headers', ...(values ? { values } : {}) }], { testType: 'http', status: 200, headers, request: { method: 'GET', url } });
@@ -55,5 +55,31 @@ describe('security lint of a collection', () => {
       'medium | Shop › Plain http | Plain http to api.shop.example: requests and credentials travel unencrypted',
       'medium | Shop › Insecure | TLS certificate verification is turned off for this request',
     ]);
+  });
+});
+
+describe('variable flow', () => {
+  it('reports variables nothing defines, and ones set only by a later request', () => {
+    const c: Collection = {
+      schemaVersion: '1.0',
+      id: 'c',
+      name: 'Shop',
+      version: 1,
+      variables: [{ key: 'apiVersion', value: 'v1', enabled: true }],
+      updatedAt: new Date(0).toISOString(),
+      auth: { type: 'bearer', token: '{{token}}' },
+      items: [
+        { kind: 'http', id: 'o', name: 'Order', request: { method: 'GET', url: '{{baseUrl}}/{{apiVersion}}/orders/{{orderId}}' } },
+        { kind: 'http', id: 'l', name: 'Login', request: { method: 'POST', url: '{{baseUrl}}/login', auth: { type: 'none' } }, testScript: "pm.environment.set('token', pm.response.json().token);" },
+        { kind: 'http', id: 'm', name: 'Me', request: { method: 'GET', url: '{{baseUrl}}/me?at={{$timestamp}}' } },
+        { kind: 'http', id: 'p', name: 'Pre', request: { method: 'GET', url: '{{baseUrl}}/x?n={{nonce}}', auth: { type: 'none' } }, preRequestScript: "pm.variables.set('nonce', Date.now());" },
+      ],
+    };
+    expect(variableFlow(c, ['baseUrl']).map((f) => `${f.severity} | ${f.where} | ${f.message}`)).toEqual([
+      'medium | Shop › Order | {{orderId}} is not defined anywhere (environment, collection, folder or workspace variables) and no script sets it',
+      'low | Shop › Order | {{token}} is set by a script of "Login", which runs after this request',
+    ]);
+    // with everything defined, nothing to report
+    expect(variableFlow(c, ['baseUrl', 'orderId', 'token'])).toEqual([]);
   });
 });

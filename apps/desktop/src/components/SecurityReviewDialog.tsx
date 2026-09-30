@@ -10,22 +10,24 @@ interface SecurityFinding {
   where: string;
   message: string;
   requestId?: string;
+  category?: 'security' | 'variables';
 }
 
 /** Security review of a collection's request definitions (the same lint as `testpion lint`). */
 export function SecurityReviewDialog({ collectionId, name, onClose }: { collectionId: string; name: string; onClose(): void }) {
   const [findings, setFindings] = useState<SecurityFinding[]>();
-  useEffect(() => void call<SecurityFinding[]>('col.securityLint', { id: collectionId }).then(setFindings), [collectionId]);
+  const env = useApp((s) => s.environment);
+  useEffect(() => void call<SecurityFinding[]>('col.securityLint', { id: collectionId, environment: env }).then(setFindings), [collectionId, env]);
   const open = (f: SecurityFinding) => {
     if (!f.requestId) return;
     useApp.getState().openIntent('rest', { collectionId, requestId: f.requestId });
     onClose();
   };
   return (
-    <Modal title={`Security review · ${name}`} onClose={onClose} width={720}>
+    <Modal title={`Review · ${name}`} onClose={onClose} width={720}>
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted">
-          Checks the requests for secrets typed in instead of kept in secret variables, secrets in query strings, plain http to other hosts, and turned-off TLS verification. For responses, add the <b>Security headers</b> check to a request's Tests.
+          Checks the requests for secrets typed in instead of kept in secret variables, secrets in query strings, plain http to other hosts and turned-off TLS verification, and for <span className="mono">{'{{variables}}'}</span> that nothing defines{env ? ` in ${env}` : ''} or that are set only by a later request. For responses, add the <b>Security headers</b> check to a request's Tests.
         </p>
         {findings === undefined ? null : findings.length ? (
           <>
@@ -37,7 +39,7 @@ export function SecurityReviewDialog({ collectionId, name, onClose }: { collecti
                 className="ml-auto"
                 icon={<Sparkles size={12} />}
                 onClick={() => {
-                  useApp.getState().set({ assistant: { task: 'fix-security', title: `Security fixes · ${name}`, context: { collection: name, findings: findings.slice(0, 60).map(({ severity, where, message }) => ({ severity, where, message })) } } });
+                  useApp.getState().set({ assistant: { task: 'fix-security', title: `Fixes · ${name}`, context: { collection: name, findings: findings.slice(0, 60).map(({ severity, where, message, category }) => ({ severity, category, where, message })) } } });
                   onClose();
                 }}
               >
@@ -48,7 +50,7 @@ export function SecurityReviewDialog({ collectionId, name, onClose }: { collecti
               {findings.map((f, i) => (
                 <li key={i}>
                   <button className="w-full text-left flex items-start gap-2 px-2 py-1.5 rounded hover:bg-panel disabled:hover:bg-transparent disabled:cursor-default" disabled={!f.requestId} onClick={() => open(f)} title={f.requestId ? 'Open the request' : undefined}>
-                    <Badge tone={f.severity === 'high' ? 'bad' : f.severity === 'medium' ? 'warn' : 'default'}>{f.severity}</Badge>
+                    <Badge tone={f.severity === 'high' ? 'bad' : f.severity === 'medium' ? 'warn' : 'default'}>{f.category === 'variables' ? 'variable' : f.severity}</Badge>
                     <span className="flex flex-col min-w-0">
                       <span className="text-sm">{f.message}</span>
                       <span className="text-xs text-muted truncate">{f.where}</span>

@@ -7,6 +7,7 @@ import {
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
+  variableFlow,
   startRecorder,
   recordingToCollection,
   type RecordedExchange,
@@ -134,7 +135,16 @@ export function collectionsHandlers(be: Backend): Handlers {
     },
     'record.clear': () => void be.recorder?.exchanges.splice(0),
     /** Security findings in a collection's request definitions (typed-in secrets, secrets in URLs, plain http …). */
-    'col.securityLint': ({ id }: { id: string }) => securityLint(be.ws.getCollection(id), be.settings.redactFields),
+    'col.securityLint': ({ id, environment }: { id: string; environment?: string }) => {
+      const c = be.ws.getCollection(id);
+      // variables the requests use that the environment, collection, workspace and globals don't define
+      const ctx = be.context({ environment, collectionId: id });
+      try {
+        return [...securityLint(c, be.settings.redactFields), ...variableFlow(c, Object.keys(ctx.vars.toObject()))];
+      } finally {
+        void ctx.dispose();
+      }
+    },
     /** OpenAPI documents kept in the workspace (specs/), for comparing versions. */
     'openapi.specs': () => {
       const dir = be.ws.path('specs');

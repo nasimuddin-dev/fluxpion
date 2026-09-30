@@ -22,7 +22,7 @@ import { addRequestToCollection, externalizeSecrets } from '../import/save-reque
 import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
-import { securityLint } from '../eval/security.js';
+import { securityLint, variableFlow } from '../eval/security.js';
 import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { collectionToOpenApiText } from '../openapi/from-collection.js';
 import { renameVariable, variableUsages } from '../storage/variable-refactor.js';
@@ -432,8 +432,16 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
     {
       name: 'security_review',
       description: "Security review of a collection's request definitions: secrets typed in instead of kept in secret variables, secrets in query strings, plain http to non-local hosts, credentials over http, turned-off TLS verification. Returns findings (high / medium / low) with where they are. Values are never returned.",
-      inputSchema: { type: 'object', properties: { collection: str('Collection name or id') }, required: ['collection'] },
-      run: (a) => securityLint(findCollection(a.collection), settings.redactFields),
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), environment: str('Environment whose variables count as defined') }, required: ['collection'] },
+      run: async (a) => {
+        const c = findCollection(a.collection);
+        const ctx = createEngineContext({ store, secrets, settings, environment: checkEnvironment(a.environment), collectionId: c.id });
+        try {
+          return [...securityLint(c, settings.redactFields), ...variableFlow(c, Object.keys(ctx.vars.toObject()))];
+        } finally {
+          await ctx.dispose();
+        }
+      },
     },
     {
       name: 'collection_openapi',
