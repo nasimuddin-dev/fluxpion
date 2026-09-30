@@ -26,7 +26,7 @@ Right-click a request in the tree, or click its **⋯** button:
 | **Move to…** | Move it to another folder, or to a folder of another collection. Open tabs follow it. You can also drag it: onto a request to place it before that one, onto a folder to put it inside, or onto a collection's name for its top level. |
 | **Copy URL** | The URL with `{{variables}}` resolved from the active environment. |
 | **Copy as cURL (bash)**, **cURL (cmd)**, **PowerShell**, **fetch** | A runnable command or code, like the browser's *Copy as …*, with variables resolved and inherited auth applied. `fetch` code also runs in Node.js 18+. |
-| **More code snippets…** | Open the request with the code generator (Python, Go, Java, C#, HTTPie and more). |
+| **More code snippets…** | Open the request with the code generator (Python requests and httpx, Go, Java, Kotlin, C#, Dart, HTTPie and more). |
 | **Delete** | Delete the request after a confirmation. The message that follows has **Undo** for a few seconds. |
 
 Copied commands include the request's real header and token values, so they run as they are, like Postman's *Copy as cURL*. When they do, the confirmation message says so. Folders have their own menu (Run, Monitor on a schedule, Edit folder, New request, New folder, Rename, Move to…, Delete).

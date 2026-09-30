@@ -52,6 +52,17 @@ describe('code generation', () => {
     // POSIX single-quote escaping: it's → 'it'\''s'
     expect(generateCode(req, 'curl')).toContain("--header 'X-Id: it'\\''s'");
     expect(generateCode(req, 'python')).toContain('"ok": True');
+    // JSON → Python: only real booleans / nulls change, never text inside strings
+    const jsonReq = { method: 'POST', url: 'https://api.test/x', headers: [['Content-Type', 'application/json']] as Array<[string, string]>, body: '{"note":"is true, not null","n":null,"list":[false]}' };
+    const py = generateCode(jsonReq, 'python-httpx');
+    expect(py).toContain('"note": "is true, not null"');
+    expect(py).toContain('"n": None');
+    expect(py).toContain('json=payload');
+    // Kotlin and Dart interpolate "$" in strings
+    const dollar = { method: 'GET', url: 'https://api.test/$price', headers: [['X-Key', 'a$b']] as Array<[string, string]> };
+    expect(generateCode(dollar, 'kotlin')).toContain('.url("https://api.test/\\$price")');
+    expect(generateCode(dollar, 'dart')).toContain('request.headers["X-Key"] = "a\\$b";');
+    expect(generateCode(jsonReq, 'java-httpclient')).toContain('HttpRequest.BodyPublishers.ofString(');
     expect(generateCode(req, 'fetch')).toContain('body: JSON.stringify({');
     expect(generateCode(req, 'raw').split('\n')[0]).toBe('POST /pets?x=1 HTTP/1.1');
     expect(generateCode({ method: 'POST', url: 'https://a.test/u', headers: [], form: [{ key: 'f', value: '/a.png', file: true }] }, 'curl')).toContain(`--form 'f=@/a.png'`);

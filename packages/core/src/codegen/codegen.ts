@@ -26,8 +26,12 @@ export const CODE_LANGUAGES: CodeLanguage[] = [
   { id: 'fetch', label: 'JavaScript – fetch', syntax: 'javascript' },
   { id: 'axios', label: 'JavaScript – Axios', syntax: 'javascript' },
   { id: 'python', label: 'Python – requests', syntax: 'python' },
+  { id: 'python-httpx', label: 'Python – httpx', syntax: 'python' },
   { id: 'go', label: 'Go – net/http', syntax: 'go' },
   { id: 'java', label: 'Java – OkHttp', syntax: 'java' },
+  { id: 'java-httpclient', label: 'Java – HttpClient (11+)', syntax: 'java' },
+  { id: 'kotlin', label: 'Kotlin – OkHttp', syntax: 'kotlin' },
+  { id: 'dart', label: 'Dart – http', syntax: 'dart' },
   { id: 'csharp', label: 'C# – HttpClient', syntax: 'csharp' },
   { id: 'php', label: 'PHP – cURL', syntax: 'php' },
   { id: 'ruby', label: 'Ruby – Net::HTTP', syntax: 'ruby' },
@@ -38,10 +42,33 @@ export const CODE_LANGUAGES: CodeLanguage[] = [
 
 const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 const dq = (s: string) => JSON.stringify(s);
+/** A double-quoted string for Kotlin and Dart, where "$" starts an interpolation. */
+const kq = (s: string) => dq(s).replace(/\$/g, '\\$');
 const isJson = (r: SnippetRequest) => r.headers.some(([k, v]) => /^content-type$/i.test(k) && /json/i.test(v));
 const hasBody = (r: SnippetRequest) => (r.body !== undefined && r.body !== '') || !!r.form?.length;
 const skipHeader = (k: string) => /^(content-length|host)$/i.test(k);
 const hdrs = (r: SnippetRequest) => r.headers.filter(([k]) => !skipHeader(k) && !(r.form && /^content-type$/i.test(k)));
+
+/** A JSON body as a Python literal (True / False / None outside strings); undefined when it isn't JSON. */
+function pyLiteral(body: string): string | undefined {
+  let v: unknown;
+  try {
+    v = JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+  const lit = (x: unknown, pad: string): string => {
+    if (x === null) return 'None';
+    if (x === true) return 'True';
+    if (x === false) return 'False';
+    if (typeof x === 'number' || typeof x === 'string') return JSON.stringify(x);
+    const inner = pad + '    ';
+    if (Array.isArray(x)) return x.length ? `[\n${x.map((y) => inner + lit(y, inner)).join(',\n')}\n${pad}]` : '[]';
+    const e = Object.entries(x as object);
+    return e.length ? `{\n${e.map(([k, y]) => `${inner}${JSON.stringify(k)}: ${lit(y, inner)}`).join(',\n')}\n${pad}}` : '{}';
+  };
+  return lit(v, '');
+}
 
 function indentJson(body: string, pad: string): string {
   return body
@@ -119,8 +146,9 @@ const generators: Record<string, (r: SnippetRequest) => string> = {
       lines.push(`files = {${r.form.filter((f) => f.file).map((f) => `${dq(f.key)}: open(${dq(f.value)}, "rb")`).join(', ')}}`);
       args += ', data=data, files=files';
     } else if (r.body) {
-      if (isJson(r)) {
-        lines.push(`payload = ${r.body.replace(/\btrue\b/g, 'True').replace(/\bfalse\b/g, 'False').replace(/\bnull\b/g, 'None')}`);
+      const py = isJson(r) ? pyLiteral(r.body) : undefined;
+      if (py !== undefined) {
+        lines.push(`payload = ${py}`);
         args += ', json=payload';
       } else {
         lines.push(`payload = ${dq(r.body)}`);
@@ -128,6 +156,23 @@ const generators: Record<string, (r: SnippetRequest) => string> = {
       }
     }
     lines.push('', `response = requests.request(${dq(r.method)}, ${args})`, 'print(response.status_code, response.text)');
+    return lines.join('\n');
+  },
+  'python-httpx'(r) {
+    const lines = ['import httpx', '', `url = ${dq(r.url)}`];
+    const h = hdrs(r);
+    lines.push(`headers = {${h.length ? '\n' + h.map(([k, v]) => `    ${dq(k)}: ${dq(v)},`).join('\n') + '\n' : ''}}`);
+    let args = 'url, headers=headers';
+    if (r.form) {
+      lines.push(`data = {${r.form.filter((f) => !f.file).map((f) => `${dq(f.key)}: ${dq(f.value)}`).join(', ')}}`);
+      lines.push(`files = {${r.form.filter((f) => f.file).map((f) => `${dq(f.key)}: open(${dq(f.value)}, "rb")`).join(', ')}}`);
+      args += ', data=data, files=files';
+    } else if (r.body) {
+      const py = isJson(r) ? pyLiteral(r.body) : undefined;
+      lines.push(`payload = ${py ?? dq(r.body)}`);
+      args += py !== undefined ? ', json=payload' : ', content=payload';
+    }
+    lines.push('', 'with httpx.Client(follow_redirects=True) as client:', `    response = client.request(${dq(r.method)}, ${args})`, '    print(response.status_code, response.text)');
     return lines.join('\n');
   },
   go(r) {
@@ -174,6 +219,58 @@ const generators: Record<string, (r: SnippetRequest) => string> = {
     lines.push('Request request = new Request.Builder()', `  .url(${dq(r.url)})`, `  .method(${dq(r.method)}, ${body})`);
     for (const [k, v] of hdrs(r)) lines.push(`  .addHeader(${dq(k)}, ${dq(v)})`);
     lines.push('  .build();', 'Response response = client.newCall(request).execute();', 'System.out.println(response.code() + " " + response.body().string());');
+    return lines.join('\n');
+  },
+  'java-httpclient'(r) {
+    const body = r.body && !r.form ? `HttpRequest.BodyPublishers.ofString(${dq(r.body)})` : 'HttpRequest.BodyPublishers.noBody()';
+    const lines = [
+      'import java.net.URI;',
+      'import java.net.http.HttpClient;',
+      'import java.net.http.HttpRequest;',
+      'import java.net.http.HttpResponse;',
+      '',
+      'HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();',
+      'HttpRequest request = HttpRequest.newBuilder()',
+      `  .uri(URI.create(${dq(r.url)}))`,
+      `  .method(${dq(r.method)}, ${body})`,
+    ];
+    // HttpClient sets these itself and refuses them
+    for (const [k, v] of hdrs(r)) if (!/^(connection|expect|upgrade)$/i.test(k)) lines.push(`  .header(${dq(k)}, ${dq(v)})`);
+    if (r.form) lines.push('  // multipart bodies: build them with a library such as Apache HttpClient 5 (MultipartEntityBuilder)');
+    lines.push('  .build();', 'HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());', 'System.out.println(response.statusCode() + " " + response.body());');
+    return lines.join('\n');
+  },
+  kotlin(r) {
+    const ct = r.headers.find(([k]) => /^content-type$/i.test(k))?.[1] ?? 'text/plain';
+    const lines = ['import okhttp3.*', 'import okhttp3.MediaType.Companion.toMediaType', 'import okhttp3.RequestBody.Companion.asRequestBody',
+      'import okhttp3.RequestBody.Companion.toRequestBody', '', 'val client = OkHttpClient()'];
+    let body = 'null';
+    if (r.form) {
+      lines.push('val body = MultipartBody.Builder().setType(MultipartBody.FORM)');
+      for (const f of r.form) lines.push(f.file ? `  .addFormDataPart(${kq(f.key)}, ${kq(f.value)}, java.io.File(${kq(f.value)}).asRequestBody())` : `  .addFormDataPart(${kq(f.key)}, ${kq(f.value)})`);
+      lines.push('  .build()');
+      body = 'body';
+    } else if (r.body) {
+      lines.push(`val body = ${kq(r.body)}.toRequestBody(${kq(ct)}.toMediaType())`);
+      body = 'body';
+    } else if (/^(POST|PUT|PATCH)$/.test(r.method)) body = 'ByteArray(0).toRequestBody()';
+    lines.push('val request = Request.Builder()', `  .url(${kq(r.url)})`, `  .method(${kq(r.method)}, ${body})`);
+    for (const [k, v] of hdrs(r)) lines.push(`  .addHeader(${kq(k)}, ${kq(v)})`);
+    lines.push('  .build()', 'client.newCall(request).execute().use { response ->', '  println("${response.code} ${response.body?.string()}")', '}');
+    return lines.join('\n');
+  },
+  dart(r) {
+    const lines = ["import 'package:http/http.dart' as http;", '', 'Future<void> main() async {'];
+    const h = hdrs(r);
+    if (r.form) {
+      lines.push(`  final request = http.MultipartRequest(${kq(r.method)}, Uri.parse(${kq(r.url)}));`);
+      for (const f of r.form) lines.push(f.file ? `  request.files.add(await http.MultipartFile.fromPath(${kq(f.key)}, ${kq(f.value)}));` : `  request.fields[${kq(f.key)}] = ${kq(f.value)};`);
+    } else {
+      lines.push(`  final request = http.Request(${kq(r.method)}, Uri.parse(${kq(r.url)}));`);
+      if (r.body) lines.push(`  request.body = ${kq(r.body)};`);
+    }
+    for (const [k, v] of h) lines.push(`  request.headers[${kq(k)}] = ${kq(v)};`);
+    lines.push('  final response = await http.Response.fromStream(await request.send());', "  print('${response.statusCode} ${response.body}');", '}');
     return lines.join('\n');
   },
   csharp(r) {
