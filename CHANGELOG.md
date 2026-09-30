@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Request settings like Postman's**: a clearer Settings tab (one row per setting with an explanation) and new options: follow the original HTTP method on redirects, keep the Authorization header on cross-host redirects, remove the Referer header on redirect, encode the URL automatically (on by default), disable the cookie jar, allowed TLS versions and cipher suites. They're saved with the request and apply in runs, monitors and the CLI.
+
 ## 0.9.1 — 2026-09-30
 
 Highlights: fixes a **blank window on start** (after opening a GraphQL request from the TestPion Examples); **one sidebar layout in every view** (saved items, Environments, History or Runs); **saved evaluations and load tests** you can run again from their folders; and **API coverage** of an OpenAPI document by your tests (app, `testpion coverage --min`, MCP `api_coverage`).

@@ -62,12 +62,15 @@ subscribe('undici:client:connected', (message) => {
 /** Reuse connection pools per TLS / proxy / HTTP version configuration (the app-wide proxy settings apply; see net/proxy.ts). */
 function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
   const s = spec.settings ?? {};
-  if (!s.insecure && !s.proxy && !s.clientCert && !s.http1Only) return baseDispatcher();
-  const key = JSON.stringify([proxyGeneration(), s.insecure, s.proxy, s.clientCert, !!s.http1Only]);
+  if (!s.insecure && !s.proxy && !s.clientCert && !s.http1Only && !s.tlsMinVersion && !s.tlsMaxVersion && !s.ciphers?.trim()) return baseDispatcher();
+  const key = JSON.stringify([proxyGeneration(), s.insecure, s.proxy, s.clientCert, !!s.http1Only, s.tlsMinVersion, s.tlsMaxVersion, s.ciphers?.trim()]);
   let d = dispatchers.get(key);
   if (!d) {
     const connect: Record<string, unknown> = {};
     if (s.insecure) connect.rejectUnauthorized = false;
+    if (s.tlsMinVersion) connect.minVersion = s.tlsMinVersion;
+    if (s.tlsMaxVersion) connect.maxVersion = s.tlsMaxVersion;
+    if (s.ciphers?.trim()) connect.ciphers = s.ciphers.trim();
     if (s.clientCert) {
       connect.cert = readFileSync(s.clientCert.certPath);
       connect.key = readFileSync(s.clientCert.keyPath);
@@ -87,7 +90,7 @@ export function pathVariableNames(url: string): string[] {
 }
 
 /** Replace `/:name` path segments with their (URL-encoded) values. Unknown names are left as-is. */
-export function applyPathVariables(url: string, vars?: KeyValue[]): string {
+export function applyPathVariables(url: string, vars?: KeyValue[], encode = true): string {
   if (!vars?.length) return url;
   const map = new Map(vars.filter((v) => v.enabled !== false && v.key).map((v) => [v.key, v.value]));
   const m = /^([a-z][a-z0-9+.-]*:\/\/[^/]*)?(.*)$/i.exec(url)!;
@@ -95,11 +98,12 @@ export function applyPathVariables(url: string, vars?: KeyValue[]): string {
   const q = rest.search(/[?#]/);
   const path = q >= 0 ? rest.slice(0, q) : rest;
   const tail = q >= 0 ? rest.slice(q) : '';
-  return head + path.replace(/\/:([A-Za-z_][\w-]*)/g, (whole, name: string) => (map.has(name) ? '/' + encodeURIComponent(map.get(name)!) : whole)) + tail;
+  return head + path.replace(/\/:([A-Za-z_][\w-]*)/g, (whole, name: string) => (map.has(name) ? '/' + (encode ? encodeURIComponent(map.get(name)!) : map.get(name)!) : whole)) + tail;
 }
 
-export function buildUrl(raw: string, params?: KeyValue[], pathVariables?: KeyValue[]): URL {
-  let s = applyPathVariables(raw.trim(), pathVariables);
+export function buildUrl(raw: string, params?: KeyValue[], pathVariables?: KeyValue[], opts: { encode?: boolean } = {}): URL {
+  const encode = opts.encode !== false;
+  let s = applyPathVariables(raw.trim(), pathVariables, encode);
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = `http://${s}`;
   let url: URL;
   try {
@@ -109,7 +113,10 @@ export function buildUrl(raw: string, params?: KeyValue[], pathVariables?: KeyVa
       suggestions: ['Check for unresolved {{variables}} in the URL.', 'Make sure the selected environment defines the base URL.'],
     });
   }
-  for (const p of params ?? []) if (p.enabled !== false && p.key) url.searchParams.append(p.key, p.value);
+  const on = (params ?? []).filter((p) => p.enabled !== false && p.key);
+  if (encode) for (const p of on) url.searchParams.append(p.key, p.value);
+  // as typed: the URL parser still escapes what can't be sent (spaces, non-ASCII) but keeps + / ? = & etc.
+  else if (on.length) url.search = [url.search.replace(/^\?/, ''), ...on.map((p) => `${p.key}=${p.value}`)].filter(Boolean).join('&');
   return url;
 }
 
@@ -181,7 +188,7 @@ function parseSetCookie(h: string): { name: string; value: string; attributes: R
  * The spec must already have variables resolved.
  */
 export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOptions = {}) {
-  const url = buildUrl(spec.url, spec.params, spec.pathVariables);
+  const url = buildUrl(spec.url, spec.params, spec.pathVariables, { encode: spec.settings?.encodeUrl });
   const headers = new Headers();
   for (const h of spec.headers ?? []) if (h.enabled !== false && h.key) headers.append(h.key, h.value);
   const cookies = (spec.cookies ?? []).filter((c) => c.enabled !== false && c.key).map((c) => `${c.key}=${c.value}`);
@@ -217,6 +224,7 @@ const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
 
 /** Execute an HTTP request, streaming the response with bounded memory. */
 export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions = {}): Promise<{ response: HttpResponseData; prepared: PreparedRequest }> {
+  if (spec.settings?.disableCookieJar && opts.cookieJar) opts = { ...opts, cookieJar: undefined };
   const retries = Math.max(0, Math.min(5, Math.floor(spec.settings?.retries ?? 0)));
   if (!retries) return executeHttpOnce(spec, opts);
   const method = (spec.method || 'GET').toUpperCase();
@@ -280,13 +288,15 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
   let res;
   // with private networks blocked, every redirect hop is checked here (not followed inside undici)
   const guarded = getNetworkPolicy().blockPrivateNetworks;
+  // Postman's redirect options are applied hop by hop, so redirects are followed here when one is set
+  const custom = !!(s.followOriginalMethod || s.followAuthorizationHeader || s.removeRefererOnRedirect);
   for (;;) {
     await assertUrlAllowed(current);
     res = await undiciFetch(current, {
       method: curMethod,
       headers: headers as unknown as Record<string, string>,
       body: curBody as never,
-      redirect: follow && !jar && !guarded ? 'follow' : 'manual',
+      redirect: follow && !jar && !guarded && !custom ? 'follow' : 'manual',
       signal: opts.signal,
       dispatcher: dispatcherFor(spec),
       // duplex is required by undici for streamed (Blob/FormData) bodies
@@ -305,20 +315,21 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
         continue;
       }
     }
-    if (!jar && !(follow && guarded)) break;
+    if (!jar && !(follow && (guarded || custom))) break;
     jar?.storeFromResponse(current, res.headers.getSetCookie());
     const location = res.headers.get('location');
     if (!follow || !REDIRECT_CODES.has(res.status) || !location || hops >= (s.maxRedirects ?? 20)) break;
     await res.body?.cancel().catch(() => undefined);
     const next = new URL(location, current);
-    if (res.status === 303 || ((res.status === 301 || res.status === 302) && curMethod === 'POST')) {
+    if (res.status === 303 ? curMethod !== 'HEAD' : (res.status === 301 || res.status === 302) && curMethod === 'POST' && !s.followOriginalMethod) {
       curMethod = curMethod === 'HEAD' ? 'HEAD' : 'GET';
       curBody = undefined;
       headers.delete('content-type');
       headers.delete('content-length');
     }
-    // never forward credentials to another origin
-    if (next.origin !== current.origin) headers.delete('authorization');
+    // credentials don't follow a redirect to another origin (unless the request says so)
+    if (next.origin !== current.origin && !s.followAuthorizationHeader) headers.delete('authorization');
+    if (s.removeRefererOnRedirect) headers.delete('referer');
     current = next;
     hops++;
     if (jar) setJarCookies(headers, jar, current, explicitCookie);

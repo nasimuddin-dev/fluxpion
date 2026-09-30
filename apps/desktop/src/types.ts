@@ -51,6 +51,15 @@ export interface HttpSettings {
   insecure?: boolean;
   /** HTTP/1.1 only (HTTP/2 is used over https when the server supports it). */
   http1Only?: boolean;
+  maxRedirects?: number;
+  followOriginalMethod?: boolean;
+  followAuthorizationHeader?: boolean;
+  removeRefererOnRedirect?: boolean;
+  encodeUrl?: boolean;
+  disableCookieJar?: boolean;
+  tlsMinVersion?: 'TLSv1' | 'TLSv1.1' | 'TLSv1.2' | 'TLSv1.3';
+  tlsMaxVersion?: 'TLSv1' | 'TLSv1.1' | 'TLSv1.2' | 'TLSv1.3';
+  ciphers?: string;
   proxy?: string;
   clientCert?: { certPath: string; keyPath: string; caPath?: string; passphrase?: string };
   retries?: number;

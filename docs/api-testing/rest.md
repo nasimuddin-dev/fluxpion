@@ -14,6 +14,22 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Cookie jar:** cookies set by responses are kept per workspace and sent with later matching requests. Open the **Cookies** dialog with the cookie button next to Send. See [Cookies](/api-testing/cookies).
 - **Body types:** JSON, XML, text, HTML, form URL-encoded, multipart (text and file fields), and binary file. Files are streamed from disk.
 - **Settings:** timeout, **retries**, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS). Retries (up to 5) repeat a request after a network error, a timeout, `429` or a `5xx`, waiting 500 ms, then twice as long each time (at most 10 s, or what `Retry-After` says). POST and PATCH are repeated only when the connection failed, because the server may already have acted on them. They apply everywhere the request runs: sends, collection runs, monitors and the CLI; the response shows **N attempts** when it took more than one.
+- **Postman-style request settings** (the request's **Settings** tab), saved with the request so collection runs, monitors and the CLI use them too:
+
+  | Setting | What it does |
+  |---|---|
+  | HTTP version | **Auto** (HTTP/2 over https when the server supports it) or **HTTP/1.1** |
+  | Enable SSL certificate verification | Off accepts any certificate (development servers only) |
+  | TLS versions | Oldest and newest TLS version allowed in the handshake; the others are disabled |
+  | Cipher suites | OpenSSL cipher names in order of preference |
+  | Automatically follow redirects, Maximum number of redirects | Follow 3xx responses, up to a limit (default 20) |
+  | Follow original HTTP method | Keep POST (and its body) on a 301/302 instead of switching to GET; a 303 is always GET |
+  | Follow Authorization header | Keep the Authorization header when a redirect goes to another host (removed by default) |
+  | Remove referer header on redirect | Drop the Referer header from redirected requests |
+  | Encode URL automatically | Off sends query values and path variables as typed (spaces and non-ASCII are still escaped) |
+  | Disable cookie jar | Neither send jar cookies nor store the response's cookies (the Cookies tab still applies) |
+
+  Responses are always parsed strictly (invalid HTTP headers are rejected). Postman's "use server cipher suite order" is a server-side TLS option with no client equivalent.
 - **HTTP/2:** over `https://`, HTTP/2 is offered (ALPN) and used when the server supports it; the response shows an **HTTP/2** badge (and `httpVersion: "2"` in `--json` output). Turn on **HTTP/1.1 only** in the request's Settings for servers or proxies that misbehave with HTTP/2. Plain `http://` uses HTTP/1.1.
 
 ## Proxy

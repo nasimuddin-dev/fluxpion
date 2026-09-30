@@ -85,7 +85,24 @@ export interface HttpSettings {
   retryDelayMs?: number;
   /** Use HTTP/1.1 only. By default HTTP/2 is offered over https (ALPN) and used when the server supports it. */
   http1Only?: boolean;
+  /** On a 301/302 redirect keep the original method and body (by default POST becomes GET; 303 is always GET). */
+  followOriginalMethod?: boolean;
+  /** Keep the Authorization header when a redirect goes to another host (by default it's removed). */
+  followAuthorizationHeader?: boolean;
+  /** Remove the Referer header from redirected requests. */
+  removeRefererOnRedirect?: boolean;
+  /** Percent-encode the URL's query and path variable values (default true). Off sends them as typed, apart from characters that can't be sent at all (spaces, non-ASCII). */
+  encodeUrl?: boolean;
+  /** Don't send cookies from the workspace cookie jar and don't store this request's cookies in it. */
+  disableCookieJar?: boolean;
+  /** Oldest / newest TLS version to negotiate (Postman's "TLS protocols disabled during handshake"). */
+  tlsMinVersion?: TlsVersion;
+  tlsMaxVersion?: TlsVersion;
+  /** OpenSSL cipher list for the handshake, in order of preference, e.g. `ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384`. */
+  ciphers?: string;
 }
+
+export type TlsVersion = 'TLSv1' | 'TLSv1.1' | 'TLSv1.2' | 'TLSv1.3';
 
 export interface HttpRequestSpec {
   method: string;
