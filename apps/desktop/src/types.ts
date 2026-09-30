@@ -347,6 +347,8 @@ export interface LibraryItem<T = unknown> {
   id: string;
   name: string;
   folder?: string;
+  /** The collection it's shown in (gRPC calls and WebSocket connections are saved outside collection files). */
+  collectionId?: string;
   data: T;
   updatedAt?: string;
 }

@@ -1,17 +1,19 @@
-import { ChevronDown, ChevronRight, Download, FileCode2, FolderPlus, FolderTree, GitCompare, Layers, MoreHorizontal, PanelLeftClose, Plug, Plus, Radio, RefreshCw, ScanSearch, Upload, Waypoints } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Plug, Plus, RefreshCw, ScanSearch, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { promptText, useApp, type ViewId } from '../store';
-import type { Collection, Library, McpServerConfig } from '../types';
+import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
 import { uid } from '../lib/format';
-import { addToFolder, CollectionTree } from './CollectionTree';
+import { addToFolder, CATEGORY_META, CollectionTree, type ExtraGroup } from './CollectionTree';
+import type { RequestCategory } from '../lib/collection-filter';
 import { newRequestItems } from './EditorTabs';
-import { Button, cx, IconButton, Input, Menu } from './ui';
+import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
 
 /**
- * The Collections explorer: the one sidebar of the request editors. It's organised by what you work with:
- * collections (HTTP and GraphQL), gRPC requests, WebSocket / MQTT connections, MCP servers and API
- * definitions. Environments, monitors, AI prompts, evaluations and load tests live in their own views.
+ * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
+ * expanding one shows what it holds by category (REST, SOAP, GraphQL, gRPC, WebSocket & MQTT). MCP servers
+ * and API definitions belong to the whole workspace and follow the collections. Environments, monitors,
+ * AI prompts, evaluations and load tests live in their own views.
  */
 
 const openKey = 'aps.explorer.sections.v2';
@@ -81,13 +83,26 @@ function Section({
   );
 }
 
-function Row({ icon, label, sub, onClick, title }: { icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string }) {
+function Row({ icon, label, sub, onClick, title, active, menu }: { icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string; active?: boolean; menu?: MenuItem[] }) {
   return (
-    <button title={title ?? label} onClick={onClick} className="w-[calc(100%-0.5rem)] mx-1 flex items-center gap-2 h-7 pl-6 pr-2 rounded-md text-sm text-left transition-colors hover:bg-hover">
-      {icon && <span className="text-muted shrink-0">{icon}</span>}
-      <span className="truncate flex-1">{label}</span>
-      {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}
-    </button>
+    <div className={cx('group mx-1 flex items-center rounded-md pr-1 transition-colors', active ? 'bg-accent-soft' : 'hover:bg-hover')}>
+      <button title={title ?? label} onClick={onClick} className="flex-1 min-w-0 flex items-center gap-2 h-7 pl-6 pr-1 text-sm text-left">
+        {icon && <span className="text-muted shrink-0">{icon}</span>}
+        <span className="truncate flex-1">{label}</span>
+        {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}
+      </button>
+      {menu && (
+        <Menu
+          width={230}
+          trigger={
+            <button aria-label={`More actions for ${label}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
+              <MoreHorizontal size={14} />
+            </button>
+          }
+          items={menu}
+        />
+      )}
+    </div>
   );
 }
 
@@ -118,6 +133,30 @@ interface SavedItem {
   id: string;
   name: string;
   folder?: string;
+  /** The collection it's shown in (gRPC calls and WebSocket connections are saved outside collections). */
+  collectionId?: string;
+  badge?: string;
+}
+
+const SOAP_ENVELOPE = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+  </soap:Body>
+</soap:Envelope>`;
+
+/** A new request of this category as a collection node (gRPC and WebSocket open their editors instead). */
+function newNode(cat: RequestCategory): CollectionNode | undefined {
+  if (cat === 'rest') return { kind: 'http', id: uid('req-'), name: 'New request', request: { method: 'GET', url: '{{baseUrl}}/' }, assertions: [] };
+  if (cat === 'soap')
+    return {
+      kind: 'http',
+      id: uid('req-'),
+      name: 'New SOAP request',
+      request: { method: 'POST', url: '{{baseUrl}}/', headers: [{ key: 'Content-Type', value: 'text/xml; charset=utf-8', enabled: true }, { key: 'SOAPAction', value: '', enabled: true }], body: { type: 'xml', content: SOAP_ENVELOPE } },
+      assertions: [],
+    };
+  if (cat === 'graphql') return { kind: 'graphql', id: uid('gql-'), name: 'New GraphQL request', request: { endpoint: '{{baseUrl}}/graphql', query: 'query {\n  \n}', variables: '', headers: [] }, assertions: [] };
+  return undefined;
 }
 
 export function Explorer() {
@@ -126,11 +165,12 @@ export function Explorer() {
   const [filter, setFilter] = useState('');
   const [collections, setCollections] = useState<Collection[]>([]);
   const [grpc, setGrpc] = useState<SavedItem[]>([]);
+  const [looseOpen, setLooseOpen] = useState(true);
   const [sockets, setSockets] = useState<SavedItem[]>([]);
   const [servers, setServers] = useState<Array<McpServerConfig & { connected?: boolean }>>([]);
   const [specs, setSpecs] = useState<string[]>([]);
   // the request that's open (as recorded for Back / Forward) is highlighted in the tree
-  const openRequestId = useApp((s) => s.nav.current.payload?.requestId as string | undefined);
+  const openRequestId = useApp((s) => (s.nav.current.payload?.requestId ?? s.nav.current.payload?.savedId) as string | undefined);
 
   const load = useCallback(async () => {
     const quiet = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
@@ -143,8 +183,9 @@ export function Explorer() {
       quiet(call<string[]>('openapi.specs'), []),
     ]);
     setCollections(c.filter((x) => !x.problem));
-    setGrpc(g.items);
-    setSockets(w.items);
+    setGrpc(g.items.map(({ data: _, ...i }) => i));
+    const wsBadge = (d: unknown) => ((d as { mode?: string })?.mode === 'mqtt' ? 'MQTT' : (d as { mode?: string })?.mode === 'socketio' ? 'SIO' : 'WS');
+    setSockets(w.items.map(({ data, ...i }) => ({ ...i, badge: wsBadge(data) })));
     setServers(s);
     setSpecs(sp);
   }, []);
@@ -156,8 +197,11 @@ export function Explorer() {
 
   const f = filter.trim().toLowerCase();
   const match = (...t: Array<string | undefined>) => !f || t.some((x) => x?.toLowerCase().includes(f));
-  const shownGrpc = grpc.filter((i) => match(i.name, i.folder));
-  const shownSockets = sockets.filter((i) => match(i.name, i.folder));
+  // gRPC calls and connections not (or no longer) in a collection
+  const colIds = new Set(collections.map((c) => c.id));
+  const loose = (items: SavedItem[]) => items.filter((i) => !i.collectionId || !colIds.has(i.collectionId));
+  const looseGrpc = loose(grpc).filter((i) => match(i.name, i.folder));
+  const looseSockets = loose(sockets).filter((i) => match(i.name, i.folder));
   const shownServers = servers.filter((s) => match(s.name, s.transport));
   const shownSpecs = specs.filter((s) => match(s));
 
@@ -176,6 +220,33 @@ export function Explorer() {
     if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
   };
   const importDefinition = () => intent('collections', { import: true });
+  /** Show a saved gRPC call / connection in another collection (or in none). */
+  const moveItem = async (kind: 'grpc' | 'websocket', id: string, collectionId: string | undefined) => {
+    try {
+      const lib = await call<Library<unknown>>('lib.get', { kind });
+      const items = lib.items.map((i: LibraryItem<unknown>) => (i.id === id ? { ...i, collectionId } : i));
+      await call('lib.save', { kind, library: { folders: lib.folders, items } });
+      await load();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+  const moveMenu = (kind: 'grpc' | 'websocket', item: SavedItem): MenuItem[] => [
+    { label: 'Open', onSelect: () => intent(kind, { savedId: item.id }) },
+    ...collections
+      .filter((c) => c.id !== item.collectionId)
+      .map((c, i) => ({ label: `Move to ${c.name}`, icon: <FolderInput size={14} />, separator: i === 0, onSelect: () => void moveItem(kind, item.id, c.id) })),
+    ...(item.collectionId && colIds.has(item.collectionId) ? [{ label: 'Remove from the collection', icon: <FolderX size={14} />, separator: true, onSelect: () => void moveItem(kind, item.id, undefined) }] : []),
+  ];
+  const extraGroups = (c: Collection): ExtraGroup[] => [
+    { cat: 'grpc', items: grpc.filter((i) => i.collectionId === c.id), onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
+    { cat: 'websocket', items: sockets.filter((i) => i.collectionId === c.id), onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
+  ];
+  const newOfCategory = (c: Collection, cat: RequestCategory) => {
+    if (cat === 'grpc' || cat === 'websocket') return intent(cat, { newDoc: true, collectionId: c.id });
+    const node = newNode(cat)!;
+    void saveCollection({ ...c, items: addToFolder(c.items, undefined, node) }).then(() => intent(cat === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: node.id }));
+  };
 
   return (
     <aside aria-label="Collections explorer" className="w-[272px] shrink-0 border-r border-line bg-panel flex flex-col min-h-0">
@@ -214,55 +285,60 @@ export function Explorer() {
         <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter" aria-label="Filter requests, connections, servers and definitions" value={filter} onChange={(e) => setFilter(e.target.value)} />
       </div>
       <div className="flex-1 overflow-auto">
-        <Section id="collections" title="Collections" icon={<FolderTree size={14} />} count={collections.length} sections={sections} forceOpen={!!f} addLabel="New collection" onAdd={() => void newCollection()}>
-          {collections.length ? (
+        {collections.length ? (
+          <div className="pb-2 border-b border-line/60">
             <CollectionTree
               collections={collections}
               filter={filter}
+              categorize
+              extraGroups={extraGroups}
+              onNewOfCategory={newOfCategory}
               activeRequestId={openRequestId}
               onOpen={(c, n) => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
               onChange={(c) => void saveCollection(c)}
               onRun={(c, folderId) => intent('collections', { collectionId: c.id, run: true, folderId })}
               onNewRequest={(c, folderId) => {
-                const node = { kind: 'http' as const, id: uid('req-'), name: 'New request', request: { method: 'GET', url: '{{baseUrl}}/' }, assertions: [] };
+                const node = newNode('rest')!;
                 void saveCollection({ ...c, items: addToFolder(c.items, folderId, node) }).then(() => intent('rest', { collectionId: c.id, requestId: node.id }));
               }}
               onSettings={(c) => intent('collections', { collectionId: c.id })}
             />
-          ) : (
-            <EmptyHint text="HTTP and GraphQL requests, organised in folders. Save a request with Ctrl+S, or import OpenAPI, Postman, Insomnia, Bruno or HAR." action="New collection" onAction={() => void newCollection()} />
-          )}
-        </Section>
+          </div>
+        ) : (
+          <div className="border-b border-line/60 py-2">
+            <EmptyHint text="Collections hold your requests: REST, SOAP, GraphQL, gRPC and WebSocket, organised in folders. Create one, or import OpenAPI, Postman, Insomnia, Bruno, WSDL or HAR." action="New collection" onAction={() => void newCollection()} />
+          </div>
+        )}
 
-        <Section id="grpc" title="gRPC" icon={<Waypoints size={14} />} count={grpc.length} sections={sections} def={grpc.length > 0} forceOpen={!!f && shownGrpc.length > 0} addLabel="New gRPC request" onAdd={() => setView('grpc')}>
-          {grpc.length ? (
-            byFolder(shownGrpc).map((g) => (
-              <div key={g.folder ?? ''}>
-                {g.folder && <FolderLabel name={g.folder} />}
-                {g.items.map((i) => (
-                  <Row key={i.id} icon={<Waypoints size={13} />} label={i.name} onClick={() => intent('grpc', { savedId: i.id })} />
-                ))}
+        {(looseGrpc.length > 0 || looseSockets.length > 0) && (
+          <div className="border-b border-line/60">
+            <button className="flex items-center gap-1.5 w-full h-9 pl-1.5 pr-2 text-left" onClick={() => setLooseOpen((o) => !o)} aria-expanded={looseOpen || !!f} title="gRPC calls and connections saved outside a collection: use Move to collection in their menu">
+              {looseOpen || f ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+              <Inbox size={14} className="text-muted shrink-0" />
+              <span className="text-[0.82rem] font-semibold truncate flex-1">Not in a collection</span>
+              <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{looseGrpc.length + looseSockets.length}</span>
+            </button>
+            {(looseOpen || !!f) && (
+              <div className="pb-2">
+                {(
+                  [
+                    ['grpc', looseGrpc],
+                    ['websocket', looseSockets],
+                  ] as const
+                ).map(([kind, items]) =>
+                  byFolder(items).map((g) => (
+                    <div key={`${kind}:${g.folder ?? ''}`}>
+                      {g.folder && <FolderLabel name={g.folder} />}
+                      {g.items.map((i) => (
+                        <Row key={i.id} icon={<span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', CATEGORY_META[kind].cls)}>{i.badge ?? CATEGORY_META[kind].badge}</span>} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} />
+                      ))}
+                    </div>
+                  )),
+                )}
               </div>
-            ))
-          ) : (
-            <EmptyHint text="Saved gRPC calls: the server, method, message and metadata." action="New gRPC request" onAction={() => setView('grpc')} />
-          )}
-        </Section>
-
-        <Section id="websocket" title="WebSocket & MQTT" icon={<Radio size={14} />} count={sockets.length} sections={sections} def={sockets.length > 0} forceOpen={!!f && shownSockets.length > 0} addLabel="New connection" onAdd={() => setView('websocket')}>
-          {sockets.length ? (
-            byFolder(shownSockets).map((g) => (
-              <div key={g.folder ?? ''}>
-                {g.folder && <FolderLabel name={g.folder} />}
-                {g.items.map((i) => (
-                  <Row key={i.id} icon={<Radio size={13} />} label={i.name} onClick={() => intent('websocket', { savedId: i.id })} />
-                ))}
-              </div>
-            ))
-          ) : (
-            <EmptyHint text="Saved WebSocket, Socket.IO and MQTT connections with their messages." action="New connection" onAction={() => setView('websocket')} />
-          )}
-        </Section>
+            )}
+          </div>
+        )}
 
         <Section id="mcp" title="MCP servers" icon={<Plug size={14} />} count={servers.length} sections={sections} def={servers.length > 0} forceOpen={!!f && shownServers.length > 0} addLabel="Add an MCP server" onAdd={() => intent('mcp', { addServer: true })}>
           {servers.length ? (

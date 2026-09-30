@@ -6,6 +6,7 @@
       "id": "grpc-hello",
       "name": "Say hello (unary)",
       "folder": "grpcb.in",
+      "collectionId": "grpc",
       "data": {
         "target": "{{grpcHost}}",
         "method": "hello.HelloService/SayHello",
@@ -20,6 +21,7 @@
       "id": "grpc-hello-stream",
       "name": "Lots of replies (server streaming)",
       "folder": "grpcb.in",
+      "collectionId": "grpc",
       "data": {
         "target": "{{grpcHost}}",
         "method": "hello.HelloService/LotsOfReplies",
@@ -34,6 +36,7 @@
       "id": "grpc-sum",
       "name": "Add two numbers",
       "folder": "grpcb.in",
+      "collectionId": "grpc",
       "data": {
         "target": "{{grpcHost}}",
         "method": "addsvc.Add/Sum",

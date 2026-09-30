@@ -1,5 +1,5 @@
 import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';
@@ -7,7 +7,7 @@ import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
 import { uid } from '../lib/format';
 import { FolderEditor } from './FolderEditor';
-import { matchesCollectionNode } from '../lib/collection-filter';
+import { countCategory, hasCategory, isEmptyFolder, matchesCollectionNode, requestCategory, type RequestCategory } from '../lib/collection-filter';
 
 export function mapNodes(nodes: CollectionNode[], fn: (n: CollectionNode) => CollectionNode | null): CollectionNode[] {
   const out: CollectionNode[] = [];
@@ -45,6 +45,23 @@ export function duplicateNode(nodes: CollectionNode[], id: string, copy: (n: Col
   return nodes.flatMap((n) => (n.id === id ? [n, copy(n)] : n.kind === 'folder' ? [{ ...n, items: duplicateNode(n.items, id, copy) }] : [n]));
 }
 
+/** How each category of request looks in the tree. */
+export const CATEGORY_META: Record<RequestCategory, { label: string; badge: string; cls: string }> = {
+  rest: { label: 'REST', badge: 'HTTP', cls: 'text-ok' },
+  soap: { label: 'SOAP', badge: 'SOAP', cls: 'text-[#0ea5e9]' },
+  graphql: { label: 'GraphQL', badge: 'GQL', cls: 'text-[#e535ab]' },
+  grpc: { label: 'gRPC', badge: 'gRPC', cls: 'text-[#2ea99e]' },
+  websocket: { label: 'WebSocket & MQTT', badge: 'WS', cls: 'text-[#d97706]' },
+};
+
+/** Saved items of a collection that aren't collection requests (gRPC calls, WebSocket connections). */
+export interface ExtraGroup {
+  cat: 'grpc' | 'websocket';
+  items: Array<{ id: string; name: string; folder?: string; badge?: string }>;
+  onOpen(id: string): void;
+  menu?(id: string): MenuItem[];
+}
+
 /** Tree of collections → folders → requests with inline actions. */
 export function CollectionTree({
   collections,
@@ -58,6 +75,9 @@ export function CollectionTree({
   favoritesOnly = false,
   onMoved,
   newRequestLabel,
+  categorize = false,
+  extraGroups,
+  onNewOfCategory,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -75,6 +95,12 @@ export function CollectionTree({
   onMoved?(ids: string[], fromCollectionId: string, toCollectionId: string): void;
   /** Label of the "New request" menu entry (e.g. "New GraphQL request"). */
   newRequestLabel?: string;
+  /** Group each collection's requests by what they are (REST, SOAP, GraphQL, gRPC, WebSocket). */
+  categorize?: boolean;
+  /** A collection's gRPC calls and WebSocket connections (saved outside the collection file). */
+  extraGroups?(c: Collection): ExtraGroup[];
+  /** Create a request of this category in a collection (the + of a category, the collection menu). */
+  onNewOfCategory?(c: Collection, cat: RequestCategory): void;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
@@ -201,8 +227,11 @@ export function CollectionTree({
   const f = filter?.toLowerCase();
   const matches = (n: CollectionNode) => matchesCollectionNode(n, filter, favoritesOnly);
 
-  const renderNodes = (c: Collection, nodes: CollectionNode[], depth: number): React.ReactNode =>
-    nodes.filter(matches).map((n) => {
+  // in a category, a folder shows when it holds requests of that category (empty folders: the first category)
+  const inScope = (n: CollectionNode, scope?: { cat: RequestCategory; first: boolean }) =>
+    !scope || (n.kind === 'folder' ? hasCategory(n.items, scope.cat) || (scope.first && isEmptyFolder(n)) : requestCategory(n) === scope.cat);
+  const renderNodes = (c: Collection, nodes: CollectionNode[], depth: number, scope?: { cat: RequestCategory; first: boolean }): React.ReactNode =>
+    nodes.filter((n) => matches(n) && inScope(n, scope)).map((n) => {
       const pad = { paddingLeft: 8 + depth * 12 };
       if (n.kind === 'folder') {
         const isOpen = open[n.id] ?? !!f;
@@ -234,7 +263,7 @@ export function CollectionTree({
                 }}
               />
             </div>
-            {isOpen && renderNodes(c, n.items, depth + 1)}
+            {isOpen && renderNodes(c, n.items, depth + 1, scope)}
           </div>
         );
       }
@@ -296,6 +325,105 @@ export function CollectionTree({
       );
     });
 
+  const categoryRow = (c: Collection, cat: RequestCategory, count: number, isOpen: boolean) => (
+    <div className="group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors" style={{ paddingLeft: 20 }} {...(cat === 'rest' || cat === 'soap' || cat === 'graphql' ? dropProps(c, `${c.id}:${cat}`, 'into', {}) : {})}>
+      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(`${c.id}:cat:${cat}`)} aria-expanded={isOpen}>
+        {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+        <span className={cx('mono text-[0.6rem] font-bold w-8 shrink-0', CATEGORY_META[cat].cls)}>{CATEGORY_META[cat].badge}</span>
+        <span className="truncate font-medium">{CATEGORY_META[cat].label}</span>
+        <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{count}</span>
+      </button>
+      {onNewOfCategory && (
+        <button
+          aria-label={`New ${CATEGORY_META[cat].label} request in ${c.name}`}
+          title={`New ${CATEGORY_META[cat].label} request`}
+          className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100"
+          onClick={() => onNewOfCategory(c, cat)}
+        >
+          <FilePlus2 size={13} />
+        </button>
+      )}
+    </div>
+  );
+  const renderExtra = (g: ExtraGroup, depth: number) => {
+    const shown = g.items.filter((i) => !f || i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f));
+    const folders = [...new Set(shown.map((i) => i.folder ?? ''))].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
+    return folders.map((folder) => (
+      <div key={folder}>
+        {folder && (
+          <div className="flex items-center gap-1 h-7 text-xs text-muted truncate mx-1" style={{ paddingLeft: 8 + depth * 12 + 13 }}>
+            <Folder size={12} className="shrink-0" />
+            <span className="truncate">{folder}</span>
+          </div>
+        )}
+        {shown
+          .filter((i) => (i.folder ?? '') === folder)
+          .map((i) => (
+            <div key={i.id} className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === i.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover')} style={{ paddingLeft: 8 + (depth + (folder ? 1 : 0)) * 12 }}>
+              <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} title={i.name}>
+                <span className={cx('mono text-[0.64rem] font-bold w-10 shrink-0', CATEGORY_META[g.cat].cls)}>{i.badge ?? CATEGORY_META[g.cat].badge}</span>
+                <span className="truncate">{i.name}</span>
+              </button>
+              {g.menu && (
+                <Menu
+                  width={230}
+                  trigger={
+                    <button aria-label={`More actions for ${i.name}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
+                      <MoreHorizontal size={14} />
+                    </button>
+                  }
+                  items={g.menu(i.id)}
+                />
+              )}
+            </div>
+          ))}
+      </div>
+    ));
+  };
+  /** A collection's contents: grouped by category when it holds more than one kind of request. */
+  const renderContents = (c: Collection) => {
+    if (!categorize) return renderNodes(c, c.items, 1);
+    const extras = (extraGroups?.(c) ?? []).filter((g) => g.items.length);
+    const cats = (['rest', 'soap', 'graphql'] as const).filter((k) => hasCategory(c.items, k));
+    const hasEmptyFolders = c.items.some(isEmptyFolder);
+    if (!cats.length && hasEmptyFolders) cats.push('rest');
+    // the category level shows even for one kind, so every collection reads the same way
+    if (!cats.length && !extras.length)
+      return (
+        <>
+          {renderNodes(c, c.items, 1)}
+          {extras.map((g) => (
+            <div key={g.cat}>{renderExtra(g, 1)}</div>
+          ))}
+        </>
+      );
+    return (
+      <>
+        {cats.map((cat, i) => {
+          const isOpen = !!f || (open[`${c.id}:cat:${cat}`] ?? true);
+          if (f && !c.items.some((n) => matches(n) && inScope(n, { cat, first: i === 0 }))) return null;
+          return (
+            <div key={cat}>
+              {categoryRow(c, cat, countCategory(c.items, cat), isOpen)}
+              {isOpen && renderNodes(c, c.items, 2, { cat, first: i === 0 })}
+            </div>
+          );
+        })}
+        {extras.map((g) => {
+          const isOpen = !!f || (open[`${c.id}:cat:${g.cat}`] ?? true);
+          if (f && !g.items.some((i) => i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f))) return null;
+          return (
+            <div key={g.cat}>
+              {categoryRow(c, g.cat, g.items.length, isOpen)}
+              {isOpen && renderExtra(g, 2)}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+  const extraMatches = (c: Collection) => (extraGroups?.(c) ?? []).some((g) => g.items.some((i) => !f || i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f)));
+
   return (
     <div className="text-sm">
       {editing && (
@@ -307,7 +435,9 @@ export function CollectionTree({
       )}
       {moving && <MoveDialog node={moving.n} from={moving.c} collections={collections} onClose={() => setMoving(undefined)} onMove={(to, folderId) => move(moving.c, moving.n, to, folderId)} />}
       {collections.map((c) => {
-        const isOpen = open[c.id] ?? true;
+        // grouped by category, collections start folded: the workspace lists them, expanding shows the categories
+        const isOpen = categorize && f ? true : open[c.id] ?? !categorize;
+        if (categorize && f && !c.items.some(matches) && !extraMatches(c)) return null;
         return (
           <div key={c.id}>
             <div
@@ -330,6 +460,9 @@ export function CollectionTree({
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
                   extraItems={[
+                    ...(onNewOfCategory
+                      ? (['graphql', 'soap', 'grpc', 'websocket'] as const).map((cat) => ({ label: `New ${CATEGORY_META[cat].label} request`, icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }))
+                      : []),
                     ...(onSettings ? [{ label: 'Settings, runner & docs', icon: <Settings2 size={14} />, onSelect: () => onSettings(c) }] : []),
                     { label: 'Run in CI…', icon: <Workflow size={14} />, onSelect: () => useApp.getState().set({ ci: { collection: c.id } }) },
                     { label: 'Convert scripts to tp.*', icon: <Wand2 size={14} />, onSelect: () => void convertScripts(c, 'tp') },
@@ -347,12 +480,12 @@ export function CollectionTree({
                 />
               )}
             </div>
-            {isOpen && renderNodes(c, c.items, 1)}
-            {isOpen && !c.items.length && <div className="pl-8 py-1 text-xs text-muted">Empty collection</div>}
+            {isOpen && renderContents(c)}
+            {isOpen && !c.items.length && !(extraGroups?.(c) ?? []).some((g) => g.items.length) && <div className="pl-8 py-1 text-xs text-muted">Empty collection</div>}
           </div>
         );
       })}
-      {!collections.some((c) => c.items.some(matches)) && (
+      {!collections.some((c) => c.items.some(matches) || (categorize && extraMatches(c))) && (
         <p className="px-3 py-4 text-sm text-muted text-center">
           {favoritesOnly ? 'No favorite requests yet. Use a request’s menu to add one.' : f ? 'No requests match this filter.' : 'No requests in these collections yet.'}
         </p>

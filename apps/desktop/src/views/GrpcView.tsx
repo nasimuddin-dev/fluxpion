@@ -93,6 +93,8 @@ export function GrpcView() {
   const saved = useLibrary<Saved>('grpc');
   const [savedId, setSavedId] = useSticky<string | undefined>(`grpc:saved:${docId ?? 'main'}`, undefined);
   const currentSaved = saved.lib.items.find((i) => i.id === savedId);
+  // New ▸ gRPC in a collection: the call is saved into that collection
+  const [collectionId, setCollectionId] = useSticky<string | undefined>(`grpc:collection:${docId ?? 'main'}`, undefined);
   // descriptors fetched by reflection aren't an edit (a saved request without protos reflects when opened)
   const comparable = (x: Partial<typeof d>) => JSON.stringify({ ...x, descriptorSet: undefined, reflectedFrom: undefined });
   const savedDirty = !!currentSaved && comparable(currentSaved.data) !== comparable(d);
@@ -117,10 +119,11 @@ export function GrpcView() {
     }
     const name = await promptText('Save gRPC request', { message: 'Name', value: d.method.split('/').pop() || 'gRPC request', okLabel: 'Save' });
     if (!name) return;
-    setSavedId(await saved.put({ name, folder, data: d }));
+    setSavedId(await saved.put({ name, folder, collectionId, data: d }));
   };
   // History → open: fill in the address, method, message and metadata
   useIntent('grpc', (p) => {
+    if (p?.collectionId && !p.savedId) setCollectionId(p.collectionId as string);
     if (p?.savedId) return openSaved(p.savedId);
     const r = p?.request as { target?: string; method?: string; message?: string; metadata?: KeyValue[] } | undefined;
     if (!r) return;

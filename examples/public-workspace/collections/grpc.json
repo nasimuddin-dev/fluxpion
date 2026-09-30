@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "id": "grpc",
+  "name": "gRPC (grpcb.in)",
+  "description": "gRPC calls against the public grpcb.in test server: the server describes itself through reflection, so no .proto file is needed. Open a call and press **Invoke**.",
+  "version": 1,
+  "variables": [],
+  "updatedAt": "2026-09-29T00:00:00.000Z",
+  "items": []
+}

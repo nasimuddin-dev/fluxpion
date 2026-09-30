@@ -9,6 +9,7 @@
       "id": "ws-postman-echo",
       "name": "Postman echo (JSON)",
       "folder": "Echo servers",
+      "collectionId": "realtime",
       "data": {
         "url": "{{wsEcho}}",
         "protocols": "",
@@ -21,6 +22,7 @@
       "id": "ws-echo-org",
       "name": "echo.websocket.org (text)",
       "folder": "Echo servers",
+      "collectionId": "realtime",
       "data": {
         "url": "{{wsEcho2}}",
         "protocols": "",
@@ -33,6 +35,7 @@
       "id": "mqtt-mosquitto",
       "name": "Mosquitto test broker",
       "folder": "MQTT brokers",
+      "collectionId": "realtime",
       "data": {
         "url": "mqtt://test.mosquitto.org:1883",
         "protocols": "",

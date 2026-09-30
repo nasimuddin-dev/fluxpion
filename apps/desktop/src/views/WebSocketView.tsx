@@ -91,6 +91,8 @@ export function WebSocketView() {
   const saved = useLibrary<Draft>('websocket');
   const [savedId, setSavedId] = useSticky<string | undefined>(`ws:saved:${docId ?? 'main'}`, undefined);
   const current = saved.lib.items.find((i) => i.id === savedId);
+  // New ▸ WebSocket in a collection: the connection is saved into that collection
+  const [collectionId, setCollectionId] = useSticky<string | undefined>(`ws:collection:${docId ?? 'main'}`, undefined);
   const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(persistable(d));
   const open = async (id: string) => {
     const it = await saved.find(id);
@@ -99,7 +101,10 @@ export function WebSocketView() {
     setD({ ...docDrafts.load(), ...it.data });
   };
   // global search → open a saved connection
-  useIntent('websocket', (p) => p?.savedId && open(p.savedId));
+  useIntent('websocket', (p) => {
+    if (p?.collectionId && !p.savedId) setCollectionId(p.collectionId as string);
+    if (p?.savedId) void open(p.savedId);
+  });
   const save = async (asNew = false, folder?: string) => {
     if (current && !asNew) {
       await saved.put({ ...current, data: persistable(d) });
@@ -108,7 +113,7 @@ export function WebSocketView() {
     }
     const name = await promptText('Save connection', { message: 'Name', value: hostOf(d.url), okLabel: 'Save' });
     if (!name) return;
-    setSavedId(await saved.put({ name, folder, data: persistable(d) }));
+    setSavedId(await saved.put({ name, folder, collectionId, data: persistable(d) }));
   };
   const sessionRef = useRef<string | undefined>(undefined);
   sessionRef.current = session;
