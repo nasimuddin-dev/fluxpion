@@ -6,6 +6,9 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  startRecorder,
+  recordingToCollection,
+  type RecordedExchange,
   collectionToOpenApiText,
   exampleFromResponse,
   startMockServer,
@@ -107,6 +110,27 @@ export function collectionsHandlers(be: Backend): Handlers {
       const r = importIntoWorkspace(be.ws, text, { name: envName, secrets: be.secrets });
       return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks, scriptWarnings: r.scriptWarnings };
     },
+    /** Record traffic: a reverse proxy on 127.0.0.1 in front of `target`; every exchange is sent as a `record.exchange` event. */
+    'record.start': async ({ target, port }: { target: string; port?: number }) => {
+      await be.recorder?.close();
+      const summary = (e: RecordedExchange) => ({ id: e.id, time: e.time, method: e.method, path: be.logger.redactor.redactUrl(`http://x${e.path}`).slice(8), status: e.status, durationMs: e.durationMs, error: e.error });
+      be.recorder = await startRecorder({ target, port, onExchange: (e) => be.host.emit('record.exchange', summary(e)) });
+      return { url: be.recorder.url, target: be.recorder.target };
+    },
+    'record.stop': async () => {
+      await be.recorder?.close();
+      const n = be.recorder?.exchanges.length ?? 0;
+      return { exchanges: n };
+    },
+    'record.status': () => (be.recorder ? { url: be.recorder.url, target: be.recorder.target, exchanges: be.recorder.exchanges.length } : null),
+    /** Save what was recorded as a collection (secrets become {{variables}}; responses become examples). */
+    'record.save': ({ name }: { name: string }) => {
+      if (!be.recorder?.exchanges.length) throw new ApsError('ValidationError', 'Nothing recorded yet');
+      const r = recordingToCollection(be.recorder.exchanges, { name: name.trim() || 'Recorded', target: be.recorder.target, redactor: be.logger.redactor });
+      const saved = be.ws.saveCollection(r.collection);
+      return { collectionId: saved.id, name: saved.name, requests: r.requests, placeholders: r.placeholders.map((p) => p.variable) };
+    },
+    'record.clear': () => void be.recorder?.exchanges.splice(0),
     /** OpenAPI documents kept in the workspace (specs/), for comparing versions. */
     'openapi.specs': () => {
       const dir = be.ws.path('specs');

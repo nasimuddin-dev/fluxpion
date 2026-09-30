@@ -96,6 +96,8 @@ interface AppState {
   openapiDiff?: boolean;
   /** The "Variable usages" dialog, with the variable to show (true: none chosen yet). */
   variableUsages?: string | true;
+  /** The "Record traffic" dialog. */
+  recordOpen?: boolean;
   /** Bumped when environments change outside the Environments view (e.g. a variable renamed everywhere). */
   envsVersion?: number;
   toasts: Toast[];

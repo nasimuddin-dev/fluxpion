@@ -37,6 +37,7 @@ import {
   readResultsFile,
   runChecks,
   runLoadTest,
+  type Recorder,
   collectionLoadTarget,
   runScript,
   scriptScopes,
@@ -182,6 +183,8 @@ export class Backend {
   private vizPages = new Map<string, string>();
   /** The GraphQL mock started from the GraphQL view (one at a time). */
   gqlMock?: GraphQLMockServer;
+  /** The traffic recorder (reverse proxy), when one is running. */
+  recorder?: Recorder;
   /** Monitors running right now (by id), from the schedule or "Run now". */
   runningMonitors = new Set<string>();
   /** Runs monitors of the open workspace when they are due, while this backend runs. */
@@ -1179,6 +1182,7 @@ export class Backend {
     for (const s of this.sioSessions.values()) s.close();
     for (const m of this.mocks.values()) await m.close();
     await this.gqlMock?.close();
+    await this.recorder?.close();
     await this.cookieStore?.flush().catch(() => undefined);
     this.store?.close();
   }

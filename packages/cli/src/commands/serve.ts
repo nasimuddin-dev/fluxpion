@@ -5,6 +5,8 @@ import {
   ChainSecretStore,
   EnvSecretStore,
   McpSession,
+  recordingToCollection,
+  startRecorder,
   WorkspaceManager,
   loadMcpMock,
   serveMcpMockStdio,
@@ -24,7 +26,7 @@ import {
   runRealtimeExchange,
   Redactor,
 } from '@testpion/core';
-import { EXIT, dim, bold, cyan, green, red, CliError, openWorkspace } from '../shared.js';
+import { EXIT, dim, bold, cyan, green, red, yellow, CliError, openWorkspace } from '../shared.js';
 import { executeMock } from '../run.js';
 
 export function registerServeCommands(program: Command): void {
@@ -51,6 +53,48 @@ export function registerServeCommands(program: Command): void {
         await serveTestPionMcp({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: mgr.loadSettings(), readOnly: o.readOnly, allowProduction: o.allowProduction, version: ENGINE_VERSION });
       } finally {
         store.close();
+      }
+    });
+  program
+    .command('record')
+    .description('record traffic: a reverse proxy on localhost that forwards to <target> and records every request and response; on Ctrl+C, -w saves them as a collection')
+    .argument('<target>', 'the API base URL, e.g. https://api.example.com')
+    .option('-p, --port <port>', 'port to listen on (default: any free port)')
+    .option('-w, --workspace <nameOrPath>', 'save the recording to this workspace when you stop')
+    .option('--collection <name>', 'name of the saved collection', 'Recorded')
+    .option('-q, --quiet', 'do not log each exchange')
+    .action(async (targetUrl: string, o: { port?: string; workspace?: string; collection: string; quiet?: boolean }) => {
+      const rec = await startRecorder({
+        target: targetUrl,
+        port: o.port ? Number(o.port) : undefined,
+        onExchange: (e) => {
+          if (!o.quiet) console.log(`${e.error ? red(String(e.status)) : e.status >= 400 ? yellow(String(e.status)) : green(String(e.status))} ${e.method.padEnd(6)} ${e.path}  ${dim(`${e.durationMs} ms`)}`);
+        },
+      });
+      console.log(bold(`Recording ${rec.target}`));
+      console.log(`Point your client at ${cyan(rec.url)} (instead of ${rec.target}). Ctrl+C stops${o.workspace ? ' and saves the recording' : ''}.`);
+      await new Promise<void>((done) => {
+        const stop = () => {
+          process.off('SIGINT', stop);
+          process.off('SIGTERM', stop);
+          done();
+        };
+        process.on('SIGINT', stop);
+        process.on('SIGTERM', stop);
+      });
+      await rec.close();
+      console.log(dim(`\n${rec.exchanges.length} exchanges recorded.`));
+      if (o.workspace && rec.exchanges.length) {
+        const mgr = new WorkspaceManager();
+        const { store } = openWorkspace(o.workspace, undefined, mgr);
+        try {
+          const r = recordingToCollection(rec.exchanges, { name: o.collection, target: rec.target, redactor: new Redactor(mgr.loadSettings().redactFields) });
+          const saved = store.saveCollection(r.collection);
+          console.log(green(`Saved ${r.requests} requests to the collection "${saved.name}".`));
+          if (r.placeholders.length) console.log(yellow(`Secrets were replaced by variables; set them as secret environment variables: ${r.placeholders.map((p) => p.variable).join(', ')}`));
+        } finally {
+          store.close();
+        }
       }
     });
   program

@@ -1,4 +1,4 @@
-import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Send, Trash2, Upload } from 'lucide-react';
+import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Radio, Send, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -92,6 +92,9 @@ export function CollectionsView() {
               >
                 New
               </Button>
+              <IconButton label="Record traffic into a collection (reverse proxy)" onClick={() => useApp.getState().set({ recordOpen: true })}>
+                <Radio size={13} />
+              </IconButton>
               <IconButton label="Recently deleted" onClick={() => setTrashOpen(true)}>
                 <ArchiveRestore size={13} />
               </IconButton>

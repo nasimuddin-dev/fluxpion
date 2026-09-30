@@ -82,6 +82,7 @@ const docsSidebar = [
       { text: 'WebSocket', link: '/api-testing/websocket' },
       { text: 'gRPC', link: '/api-testing/grpc' },
       { text: 'Mock Servers', link: '/api-testing/mock-servers' },
+      { text: 'Record Traffic', link: '/api-testing/recording' },
       { text: 'Collections & Import', link: '/api-testing/collections' },
     ],
   },

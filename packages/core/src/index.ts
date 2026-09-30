@@ -90,6 +90,7 @@ export * from './scripts/compat.js';
 export * from './import/curl.js';
 export * from './import/snippet.js';
 export * from './import/save-request.js';
+export * from './record/recorder.js';
 export * from './import/postman-export.js';
 export * from './codegen/codegen.js';
 export * from './engine.js';
