@@ -29,6 +29,7 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  historyToHar,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
 
@@ -194,6 +195,28 @@ export function registerDataCommands(program: Command): void {
       }
     });
   const histCmd = program.command('history').description('response history of requests sent in the app, and comparing two responses');
+  histCmd
+    .command('export-har')
+    .description('write HTTP and GraphQL history as a HAR file (browser devtools and other tools open it; secrets masked)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-q, --query <text>', 'only entries matching this text (name, URL, method, status)')
+    .option('-n, --limit <n>', 'how many, newest first', '500')
+    .option('-o, --out <file>', 'write here (default: print it)')
+    .action((o) => {
+      const mgr = new WorkspaceManager();
+      const { store } = openWorkspace(o.workspace, undefined, mgr);
+      try {
+        const items = store.meta.listHistory({ query: o.query, limit: Math.min(Number(o.limit) || 500, 2000) }).items;
+        const har = historyToHar(store, items, new Redactor(mgr.loadSettings().redactFields));
+        const text = JSON.stringify(har, null, 2) + '\n';
+        if (o.out) {
+          writeFileSync(resolve(o.out), text);
+          console.log(green(`Wrote ${(har.log as { entries: unknown[] }).entries.length} entries to ${resolve(o.out)}`));
+        } else process.stdout.write(text);
+      } finally {
+        store.close();
+      }
+    });
   histCmd
     .command('list')
     .description('recent responses, newest first (optionally of one saved request)')

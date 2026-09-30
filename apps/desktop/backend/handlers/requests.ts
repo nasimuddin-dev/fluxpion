@@ -1,5 +1,5 @@
 /** RPC handlers: Sending requests: HTTP (with response history), GraphQL and WebSocket. */
-import { copyFileSync, readFileSync } from 'node:fs';
+import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   ApsError,
   WebSocketSession,
@@ -16,6 +16,7 @@ import {
   type GraphQLRequestSpec,
   type HttpRequestSpec,
   historyResponse,
+  historyToHar,
   SocketIoSession,
   diffResponses,
   type HttpResponseData,
@@ -64,6 +65,12 @@ export function requestsHandlers(be: Backend): Handlers {
     'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
     'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
     'history.clear': () => be.ws.meta.clearHistory(),
+    /** HTTP and GraphQL history (optionally filtered) as a HAR file, secrets redacted. */
+    'history.exportHar': async ({ query, kind, limit }: { query?: string; kind?: string; limit?: number }) => {
+      const items = be.ws.meta.listHistory({ query, kind: kind || undefined, limit: Math.min(limit ?? 500, 2000) }).items;
+      const text = JSON.stringify(historyToHar(be.ws, items, be.logger.redactor), null, 2);
+      return be.saveOrDownload('testpion-history.har', [{ name: 'HAR', extensions: ['har'] }], (dest) => writeFileSync(dest, text), () => Buffer.from(text));
+    },
     /** Earlier responses of a saved request, newest first (response history). */
     'history.forRequest': ({ requestId, limit }: { requestId: string; limit?: number }) =>
       be.ws.meta.listHistory({ requestId, kind: 'http', limit: Math.min(limit ?? 50, 200) }).items,

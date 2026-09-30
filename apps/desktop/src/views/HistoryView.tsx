@@ -1,10 +1,11 @@
-import { History, RotateCcw, Trash2 } from 'lucide-react';
+import { Download, History, RotateCcw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import { confirmAction, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { HttpRequestSpec } from '../types';
 import { formatBytes, formatMs, groupByDay } from '../lib/format';
+import { finishSave, type SaveResult } from '../lib/files';
 import { JsonTree } from '../components/JsonView';
 import { Badge, Button, cx, Empty, Input, Select, Split, statusTone, VirtualList } from '../components/ui';
 
@@ -67,6 +68,14 @@ export function HistoryView() {
               <option key={k}>{k}</option>
             ))}
           </Select>
+          <Button
+            variant="ghost"
+            icon={<Download size={13} />}
+            title="Export the HTTP and GraphQL entries shown here as a HAR file (secrets are masked)"
+            onClick={() => void call<SaveResult>('history.exportHar', { query: query || undefined, kind: kind || undefined }).then((r) => finishSave(r, 'HAR file'))}
+          >
+            HAR
+          </Button>
           <Button
             variant="ghost"
             icon={<Trash2 size={13} />}

@@ -25,7 +25,7 @@ testpion env list|order|diff -w  List environments; set their order; compare two
 testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)
 testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
 testpion trash list|restore|empty -w  Recently deleted collections and environments (30 days)
-testpion history list|stats|diff -w  Response history of saved requests; response times; compare two responses
+testpion history list|stats|diff|export-har -w  Response history of saved requests; response times; compare two responses; HAR export
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
