@@ -22,6 +22,8 @@ import { addRequestToCollection, externalizeSecrets } from '../import/save-reque
 import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
+import { runLoadTest, type LoadTarget } from '../load/load.js';
+import { collectionLoadTarget } from '../load/collection-load.js';
 import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
@@ -555,6 +557,59 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         try {
           const summary = await runCollection({ name: c.name, runId: shortId('mcp-'), collection: c, selection, services: ctx.services, traceMode: 'none', environment, onEvent: (e: RunEvent) => e.type === 'test-end' && results.push(e.result) });
           return { total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, skipped: summary.skipped, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
+        } finally {
+          await ctx.dispose();
+        }
+      },
+    },
+    {
+      name: 'load_test',
+      write: true,
+      description:
+        'Load-test a local API (localhost / private network only; remote hosts are never allowed from here): a URL, or a collection (every virtual user sends its requests in order, with per-user cookies). At most 50 virtual users and 60 seconds. `warmUp` runs the collection once with scripts first (e.g. to log in). Returns throughput, latency percentiles, error rate, status codes and, for collections, per-request numbers.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: str('URL to load-test (GET), or use collection'),
+          collection: str('Collection name or id'),
+          folder: str('With collection: only this folder or request (name or id)'),
+          environment: str('Environment name'),
+          virtualUsers: { type: 'number', description: 'Virtual users, 1–50 (default 5)' },
+          durationSec: { type: 'number', description: 'Seconds, 1–60 (default 10)' },
+          warmUp: { type: 'boolean', description: 'With collection: run it once with scripts first' },
+        },
+      },
+      run: async (a) => {
+        const environment = checkEnvironment(a.environment);
+        const vus = Math.min(50, Math.max(1, Number(a.virtualUsers) || 5));
+        const duration = Math.min(60, Math.max(1, Number(a.durationSec) || 10));
+        const c = a.collection ? findCollection(a.collection) : undefined;
+        if (!c && !a.url) throw new ApsError('ValidationError', 'Give a url or a collection');
+        const ctx = createEngineContext({ store, secrets, settings, environment, collectionId: c?.id });
+        try {
+          let target: LoadTarget;
+          let prep: { requests: string[]; unresolved: string[] } | undefined;
+          if (c) {
+            let selection: string[] | undefined;
+            if (a.folder) {
+              const r = String(a.folder).toLowerCase();
+              const all: CollectionNode[] = [];
+              const walk = (nodes: CollectionNode[]) => nodes.forEach((n) => (all.push(n), n.kind === 'folder' && walk(n.items)));
+              walk(c.items);
+              const n = all.find((x) => x.id.toLowerCase() === r) ?? all.find((x) => x.name.toLowerCase() === r);
+              if (!n) throw new ApsError('ConfigurationError', `No folder or request "${String(a.folder)}" in "${c.name}"`);
+              selection = [n.id];
+            }
+            const t = await collectionLoadTarget({ collection: c, selection, services: ctx.services, warmUp: a.warmUp === true });
+            target = t.target;
+            prep = { requests: t.target.requests.map((x) => x.name), unresolved: t.unresolved };
+          } else target = { kind: 'http', request: { method: 'GET', url: ctx.vars.resolve(String(a.url)) } };
+          const s = await runLoadTest(
+            { target, virtualUsers: vus, durationSec: duration, allowRemoteHosts: false, environmentIsProduction: !!ctx.environment?.isProduction, maxVirtualUsers: 50 },
+            { redactor: ctx.redactor },
+          );
+          const { series: _series, ...summary } = s;
+          return { ...prep, ...summary };
         } finally {
           await ctx.dispose();
         }
