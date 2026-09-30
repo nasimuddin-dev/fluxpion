@@ -41,6 +41,28 @@ assertions:
   - type: exists
     path: $.data.patient.id
 `,
+  grpc: `name: Say hello
+type: grpc
+target: "{{grpcHost}}"          # host:port, or grpcs://host:port for TLS
+method: hello.HelloService/SayHello
+message: { greeting: TestPion }
+protos: []                      # empty: ask the server (reflection)
+assertions:
+  - type: grpc-status
+    expected: OK
+`,
+  websocket: `name: Echo server replies
+type: websocket                  # socketio for Socket.IO
+url: "{{wsUrl}}"
+send:
+  - hello
+  - { type: ping }
+waitMs: 1500
+assertions:
+  - type: equals
+    path: $.received[0]
+    expected: hello
+`,
   mcp: `name: Search customer tool
 type: mcp
 server: customer-mcp
@@ -213,6 +235,8 @@ export function TestsView() {
                 <option value="">+</option>
                 <option value="http">New REST test</option>
                 <option value="graphql">New GraphQL test</option>
+                <option value="grpc">New gRPC test</option>
+                <option value="websocket">New WebSocket test</option>
                 <option value="mcp">New MCP test</option>
                 <option value="llm">New AI test</option>
                 <option value="suite">New suite</option>
@@ -223,7 +247,7 @@ export function TestsView() {
         >
           Tests
         </SectionTitle>
-        <div className="flex-1 overflow-auto">{tree.length ? renderTree(tree) : <Empty title="No test files">Use + to create a REST, GraphQL, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
+        <div className="flex-1 overflow-auto">{tree.length ? renderTree(tree) : <Empty title="No test files">Use + to create a REST, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
         <div className="border-t border-line p-2 flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <label className="flex flex-col gap-0.5">
