@@ -35,12 +35,12 @@ export function registerDataCommands(program: Command): void {
   program
     .command('export')
     .description('export a collection as a Postman v2.1 collection (default) or TestPion JSON\n<collection> is a collection name or id in the workspace, or a collection file to convert')
-    .argument('<collection>', 'collection name, id or file')
+    .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'testpion']).default('postman'))
     .option('-o, --out <file>', 'write to this file instead of stdout')
-    .action((ref: string, o: { workspace?: string; format: 'postman' | 'testpion'; out?: string }) => {
-      const c = loadCollectionRef(ref, o.workspace);
+    .action(async (ref: string, o: { workspace?: string; format: 'postman' | 'testpion'; out?: string }) => {
+      const c = await loadCollectionRef(ref, o.workspace);
       const { collection, notes } = o.format === 'postman' ? exportPostmanCollection(c) : { collection: c, notes: [] as string[] };
       const json = JSON.stringify(collection, null, 2) + '\n';
       for (const n of notes) console.error(yellow(`not exported: ${n}`));
@@ -72,14 +72,14 @@ export function registerDataCommands(program: Command): void {
     });
   program
     .command('docs')
-    .description('write Markdown or HTML (--html) documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file')
-    .argument('<collection>', 'collection name, id or file')
+    .description('write Markdown or HTML (--html) documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection or OpenAPI file or link')
+    .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-o, --out <file>', 'write to this file instead of stdout')
     .option('--no-examples', 'leave out saved examples')
     .option('--html', 'a self-contained HTML page (sidebar, search, copy buttons) to publish or share')
-    .action((ref: string, o: { workspace?: string; out?: string; examples?: boolean; html?: boolean }) => {
-      const c = loadCollectionRef(ref, o.workspace);
+    .action(async (ref: string, o: { workspace?: string; out?: string; examples?: boolean; html?: boolean }) => {
+      const c = await loadCollectionRef(ref, o.workspace);
       const md = o.html ? collectionHtml(c, { examples: o.examples }) : collectionMarkdown(c, { examples: o.examples });
       if (o.out) {
         writeFileSync(resolve(o.out), md);

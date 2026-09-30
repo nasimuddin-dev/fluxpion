@@ -121,12 +121,14 @@ export function importOpenApi(text: string): { collection: Collection; environme
         else if (ct === 'multipart/form-data') body = { type: 'multipart', fields: Object.keys(content[ct].schema?.properties ?? {}).map((k) => ({ key: k, value: '' })) };
         else if (ct) body = { type: 'text', content: '' };
       }
+      const examples = openApiExamples(op.responses, spec, isV2, op.produces ?? spec.produces);
       const req: SavedHttpRequest = {
         kind: 'http',
         id: shortId('req-'),
         name: op.summary ?? op.operationId ?? `${method.toUpperCase()} ${path}`,
         request: { method: method.toUpperCase(), url, params: query, headers, body, auth: authFor(op.security ?? spec.security) ?? { type: 'inherit' } },
         assertions: [{ type: 'status', expected: Number(Object.keys(op.responses ?? {}).find((c) => /^2/.test(c)) ?? 200) }],
+        ...(examples.length ? { examples } : {}),
       };
       const tag = op.tags?.[0];
       if (tag) {
@@ -142,6 +144,49 @@ export function importOpenApi(text: string): { collection: Collection; environme
   }
   const collection = newCollection(name, root, { description: spec.info?.description, variables: [{ key: 'baseUrl', value: baseUrl, enabled: true }] });
   return { collection };
+}
+
+/**
+ * Saved examples from an operation's documented responses (success first, at most 5): the response's
+ * own example, its first named example, or a sample built from the schema. They make the imported
+ * collection mockable right away (`testpion mock`, the app's mock server).
+ */
+function openApiExamples(responses: any, spec: any, isV2: boolean, produces?: string[]): SavedExample[] {
+  const codes = Object.keys(responses ?? {})
+    .filter((c) => /^\d{3}$/.test(c))
+    .sort((a, b) => Number(!/^2/.test(a)) - Number(!/^2/.test(b)) || Number(a) - Number(b))
+    .slice(0, 5);
+  const out: SavedExample[] = [];
+  for (const code of codes) {
+    const r0 = responses[code];
+    const r = r0?.$ref ? sampleRef(r0.$ref, spec) : r0;
+    if (!r) continue;
+    let ct: string | undefined;
+    let body: unknown;
+    if (isV2) {
+      ct = (produces ?? []).find((p) => /json/.test(p)) ?? (r.schema ? 'application/json' : undefined);
+      const ex = r.examples?.[ct ?? ''] ?? r.examples?.['application/json'];
+      body = ex !== undefined ? ex : r.schema ? sampleFromSchema(r.schema, spec) : undefined;
+    } else {
+      const content = r.content ?? {};
+      ct = Object.keys(content).find((k) => /json/.test(k)) ?? Object.keys(content)[0];
+      const media = ct ? content[ct] : undefined;
+      if (media) {
+        const named = media.examples ? Object.values<any>(media.examples)[0] : undefined;
+        const namedValue = named?.$ref ? sampleRef(named.$ref, spec)?.value : named?.value;
+        body = media.example !== undefined ? media.example : namedValue !== undefined ? namedValue : media.schema ? sampleFromSchema(media.schema, spec) : undefined;
+      }
+    }
+    const text = body === undefined ? '' : typeof body === 'string' && !/json/.test(ct ?? '') ? body : JSON.stringify(body, null, 2);
+    out.push({
+      id: shortId('ex-'),
+      name: `${code} ${String(r.description ?? '').split('\n')[0]!.slice(0, 60)}`.trim(),
+      status: Number(code),
+      headers: ct && text ? [{ key: 'Content-Type', value: ct, enabled: true }] : [],
+      body: text,
+    });
+  }
+  return out;
 }
 
 function sampleRef(ref: string, spec: any): any {

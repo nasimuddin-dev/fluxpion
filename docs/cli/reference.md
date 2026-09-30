@@ -52,7 +52,7 @@ testpion report <results.jsonl>              Re-generate reports
 
 ## `run-collection`
 
-Runs a collection one request at a time, in order, with its `pm.*` scripts, like Postman's Collection Runner or Newman. `<collection>` is a collection name or id in the workspace, or a collection file (TestPion or Postman v2.1 JSON). A collection file runs in a temporary workspace, so your own workspace isn't changed.
+Runs a collection one request at a time, in order, with its `pm.*` scripts, like Postman's Collection Runner or Newman. `<collection>` is a collection name or id in the workspace, a collection file (TestPion or Postman v2.1 JSON), or an http(s) link to one (e.g. a collection published in a repository). A collection file runs in a temporary workspace, so your own workspace isn't changed.
 
 ```bash
 # a collection in the workspace

@@ -7,6 +7,7 @@ import {
   WorkspaceStore,
   formatBytes,
   importAny,
+  fetchImportText,
   readResultsFile,
   type LoadSnapshot,
   type Collection,
@@ -82,8 +83,19 @@ export function readImport<K extends 'collection' | 'environment'>(file: string,
   return v;
 }
 
-/** A collection by name or id from a workspace, or from a TestPion / Postman collection file. */
-export function loadCollectionRef(ref: string, workspace: string | undefined): Collection {
+/** A collection by name or id from a workspace, or from a file or an http(s) link (TestPion / Postman collection, OpenAPI …). */
+export async function loadCollectionRef(ref: string, workspace: string | undefined): Promise<Collection> {
+  if (/^https?:\/\//i.test(ref)) {
+    const f = await fetchImportText(ref);
+    let r: ReturnType<typeof importAny>;
+    try {
+      r = importAny(f.text);
+    } catch (e) {
+      throw new CliError(`Could not read the collection at ${ref}: ${(e as Error).message}`, EXIT.CONFIG_ERROR);
+    }
+    if (!r.collection) throw new CliError(`${ref} is not a collection or API definition (detected: ${r.format})`, EXIT.CONFIG_ERROR);
+    return r.collection;
+  }
   if (existsSync(ref) && statSync(ref).isFile()) return readImport(resolve(ref), 'collection');
   const { store, ephemeral } = openWorkspace(workspace, undefined, new WorkspaceManager());
   try {

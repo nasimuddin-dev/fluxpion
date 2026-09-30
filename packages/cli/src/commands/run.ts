@@ -22,9 +22,9 @@ export function registerRunCommands(program: Command): void {
     .command('run-collection')
     .description(
       'run a collection like Postman\'s Collection Runner / Newman: requests in order, pm.* scripts, iterations and data files\n' +
-        '<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file',
+        '<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection or OpenAPI file or link',
     )
-    .argument('<collection>', 'collection name, id or file')
+    .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-e, --environment <nameOrFile>', 'environment name, or a Postman environment file')
     .option('-d, --iteration-data <file>', 'CSV or JSON data file: one row per iteration (pm.iterationData, {{column}})')

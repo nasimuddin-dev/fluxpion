@@ -35,7 +35,7 @@ Copied commands include the request's real header and token values, so they run 
 
 **Import** accepts:
 
-- OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, and security schemes map to auth. The document is kept in the workspace's `specs/` folder and every request gets a [**Matches OpenAPI contract**](../test-runner/assertions.md#openapi-contract-testing) check, so running the collection tests the API against its own contract (`testpion import --no-contract-checks` leaves the checks out).
+- OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, security schemes map to auth, and each documented response becomes a saved [example](#examples) (so the collection can be [mocked](/api-testing/mock-servers) right away). The document is kept in the workspace's `specs/` folder and every request gets a [**Matches OpenAPI contract**](../test-runner/assertions.md#openapi-contract-testing) check, so running the collection tests the API against its own contract (`testpion import --no-contract-checks` leaves the checks out).
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
 - Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment.
 - Bruno collection exports (JSON, from *Export collection*), with their environments. Secret variables arrive empty: set them again as secrets. `res.status: eq 200` assertions become status checks.

@@ -55,8 +55,8 @@ export function registerServeCommands(program: Command): void {
     });
   program
     .command('mock')
-    .description("serve a collection's saved examples on localhost (like a Postman mock server) until Ctrl+C\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file")
-    .argument('<collection>', 'collection name, id or file')
+    .description("serve a collection's saved examples on localhost (like a Postman mock server) until Ctrl+C\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection or OpenAPI file or link")
+    .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-p, --port <port>', 'port to listen on (default: any free port)')
     .option('--delay <ms>', 'delay every response by this many ms')

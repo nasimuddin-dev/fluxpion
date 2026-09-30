@@ -285,7 +285,8 @@ export function resolveSelection(collection: Collection, refs: string[] | undefi
 export async function executeCollectionRun(ref: string, o: CollectionCliOptions): Promise<number> {
   const mgr = new WorkspaceManager();
   const settings = mgr.loadSettings();
-  const fromFile = existsSync(ref) && statSync(ref).isFile();
+  const fromUrl = /^https?:\/\//i.test(ref);
+  const fromFile = fromUrl || (existsSync(ref) && statSync(ref).isFile());
   // a collection file never touches the user's workspace: it runs in an ephemeral one unless -w is given
   const { store, ephemeral } = openWorkspace(o.workspace, fromFile && !o.workspace ? tmpdir() : undefined, mgr);
   const logger = new Logger((o.logLevel?.toUpperCase() as 'INFO') ?? 'WARN');
@@ -293,7 +294,8 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
   const secrets = new ChainSecretStore([new EnvSecretStore()]);
 
   let collection: Collection;
-  if (fromFile) collection = readImport(resolve(ref), 'collection');
+  if (fromUrl) collection = await loadCollectionRef(ref, undefined);
+  else if (fromFile) collection = readImport(resolve(ref), 'collection');
   else {
     const cols = store.listCollections().filter((c) => !c.problem);
     const found = cols.find((c) => c.id === ref) ?? cols.find((c) => c.name.toLowerCase() === ref.toLowerCase());
@@ -420,7 +422,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
 
 /** `testpion mock`: serve saved examples until interrupted. */
 export async function executeMock(ref: string, o: { workspace?: string; port?: string; delay?: string; quiet?: boolean }): Promise<number> {
-  const collection = loadCollectionRef(ref, o.workspace);
+  const collection = await loadCollectionRef(ref, o.workspace);
   const port = o.port ? Number(o.port) : 0;
   if (!(port >= 0 && port < 65536)) throw new CliError('--port must be between 0 and 65535', EXIT.CONFIG_ERROR);
   let mock: MockServer;

@@ -28,6 +28,16 @@ testpion mock "Veterinary API" -p 4545
 
 A Postman collection file with saved responses works too: `testpion mock api.postman_collection.json`.
 
+### From an OpenAPI document
+
+Importing an OpenAPI or Swagger document gives every request an example for each documented response (up to five, success first), taken from the document's `example`, its first named example, or a sample built from the schema. So an imported API can be mocked straight away, and the CLI can mock a document from a file or a link without importing it:
+
+```bash
+testpion mock https://petstore3.swagger.io/api/v3/openapi.json -p 4545
+curl http://127.0.0.1:4545/pet/5                                     # 200, the documented pet example
+curl -H "x-mock-response-code: 404" http://127.0.0.1:4545/pet/5      # the documented 404
+```
+
 ## How a request finds its example
 
 Every example is a route: the method and path of the example's request (or of the saved request when the example has none). The host part is ignored, so `{{baseUrl}}/patients/1` and `https://api.example.com/patients/1` both become `/patients/1`.
