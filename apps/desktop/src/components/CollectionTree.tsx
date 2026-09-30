@@ -35,6 +35,11 @@ export function addToFolder(nodes: CollectionNode[], folderId: string | undefine
   return mapNodes(nodes, (n) => (n.kind === 'folder' && n.id === folderId ? { ...n, items: [...n.items, node] } : n));
 }
 
+/** Insert a node right before the node with this id, wherever it is in the tree. */
+export function insertBefore(nodes: CollectionNode[], beforeId: string, node: CollectionNode): CollectionNode[] {
+  return nodes.flatMap((n) => (n.id === beforeId ? [node, n] : n.kind === 'folder' ? [{ ...n, items: insertBefore(n.items, beforeId, node) }] : [n]));
+}
+
 /** Insert a copy right after the node with this id, wherever it is in the tree. */
 export function duplicateNode(nodes: CollectionNode[], id: string, copy: (n: CollectionNode) => CollectionNode): CollectionNode[] {
   return nodes.flatMap((n) => (n.id === id ? [n, copy(n)] : n.kind === 'folder' ? [{ ...n, items: duplicateNode(n.items, id, copy) }] : [n]));
@@ -67,6 +72,53 @@ export function CollectionTree({
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
+  // drag and drop: a request or folder onto a request (before it), a folder (into it) or a collection (top level)
+  const [drag, setDrag] = useState<{ c: Collection; n: CollectionNode }>();
+  const [dropAt, setDropAt] = useState<{ id: string; mode: 'before' | 'into' }>();
+  const canDrop = (place: { beforeId?: string; folderId?: string }) => {
+    if (!drag) return false;
+    const own = subtreeIds(drag.n);
+    return !(place.beforeId && own.includes(place.beforeId)) && !(place.folderId && own.includes(place.folderId));
+  };
+  const drop = (to: Collection, place: { beforeId?: string; folderId?: string }) => {
+    const d = drag;
+    setDrag(undefined);
+    setDropAt(undefined);
+    if (!d || !canDrop(place)) return;
+    const insert = (items: CollectionNode[]) => (place.beforeId ? insertBefore(items, place.beforeId, d.n) : addToFolder(items, place.folderId, d.n));
+    const without = mapNodes(d.c.items, (x) => (x.id === d.n.id ? null : x));
+    if (to.id === d.c.id) onChange({ ...d.c, items: insert(without) });
+    else {
+      onChange({ ...to, items: insert(to.items) });
+      onChange({ ...d.c, items: without });
+      onMoved?.(subtreeIds(d.n), d.c.id, to.id);
+    }
+  };
+  const dragProps = (c: Collection, n: CollectionNode) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', n.name);
+      setDrag({ c, n });
+    },
+    onDragEnd: () => (setDrag(undefined), setDropAt(undefined)),
+  });
+  const dropProps = (c: Collection, id: string, mode: 'before' | 'into', place: { beforeId?: string; folderId?: string }) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!canDrop(place)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (dropAt?.id !== id || dropAt.mode !== mode) setDropAt({ id, mode });
+    },
+    onDragLeave: () => dropAt?.id === id && setDropAt(undefined),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drop(c, place);
+    },
+  });
+  const dropClass = (id: string) => (dropAt?.id !== id ? undefined : dropAt.mode === 'into' ? 'ring-1 ring-accent bg-accent/10' : 'shadow-[inset_0_2px_0_var(--accent)]');
   const move = (from: Collection, n: CollectionNode, to: Collection, folderId: string | undefined) => {
     const without = { ...from, items: mapNodes(from.items, (x) => (x.id === n.id ? null : x)) };
     if (to.id === from.id) onChange({ ...without, items: addToFolder(without.items, folderId, n) });
@@ -145,7 +197,7 @@ export function CollectionTree({
         const isOpen = open[n.id] ?? !!f;
         return (
           <div key={n.id}>
-            <div className="group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors" style={pad}>
+            <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })}>
               <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
@@ -181,8 +233,10 @@ export function CollectionTree({
       return (
         <div key={n.id}>
         <div
-          className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuFor === n.id && 'bg-hover')}
+          className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuFor === n.id && 'bg-hover', dropClass(n.id))}
           style={pad}
+          {...dragProps(c, n)}
+          {...dropProps(c, n.id, 'before', { beforeId: n.id })}
           onContextMenu={(e) => {
             e.preventDefault();
             setMenuFor(n.id);
@@ -245,7 +299,8 @@ export function CollectionTree({
         return (
           <div key={c.id}>
             <div
-              className={cx('group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors', menuFor === c.id && 'bg-hover')}
+              className={cx('group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors', menuFor === c.id && 'bg-hover', dropClass(c.id))}
+              {...dropProps(c, c.id, 'into', {})}
               onContextMenu={(e) => {
                 if (c.problem) return;
                 e.preventDefault();

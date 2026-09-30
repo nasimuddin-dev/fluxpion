@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Move requests and folders.** **Move to…** in a request's or folder's menu moves it to any folder of any collection; open tabs follow it.
+- **Move requests and folders.** Drag them in the collection tree (onto a request to place before it, onto a folder to put inside, onto a collection name for its top level, across collections too), or use **Move to…** in their menu. Open tabs follow them.
 - Fixed: **Duplicate** did nothing for a request inside a folder.
 - **Home shows what's working.** When a workspace has monitors or test runs, Home adds a **Monitors** card (last result of each, paused ones marked) and a **Recent test runs** card (passed / failed, opens the run).
 - **Compare a request across environments.** A new button next to **Send** sends the request with two environments and shows what differs: status, time, headers and every changed JSON field. From the terminal, `testpion env diff <a> <b> --request <name>`; for AI agents, `compare_request_across_environments`.
