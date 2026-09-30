@@ -30,6 +30,9 @@ import {
   TerminalSquare,
   X,
   AlarmClock,
+  ArrowLeft,
+  ArrowRight,
+  ChevronDown as NavChevron,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
@@ -37,9 +40,9 @@ import wordmarkUrl from '../../build/wordmark-nav.png';
 import { ConsolePanel } from './ConsolePanel';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
-import { useApp, type ViewId, type DialogRequest, type DialogTone } from '../store';
+import { useApp, type ViewId, type DialogRequest, type DialogTone, type NavLocation } from '../store';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
-import { Badge, Button, cx, IconButton, Input, Kbd, Modal, Spinner, Tooltip } from './ui';
+import { Badge, Button, cx, IconButton, Input, Kbd, Menu, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
 
 /**
@@ -169,6 +172,9 @@ export function TopBar() {
       <span className="h-5 w-px bg-line hidden md:block" />
       <div style={noDrag}>
         <WorkspaceMenu />
+      </div>
+      <div style={noDrag}>
+        <NavButtons />
       </div>
       <button
         data-search-trigger
@@ -643,6 +649,45 @@ export function ProgressHost() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Where a place is, for tooltips and the recent-places list: "REST · request", "Environments · environment" … */
+function placeLabel(l: NavLocation): string {
+  const view = l.view === 'settings' ? 'Settings' : l.view === 'collections' ? 'Collection settings' : (NAV.find((n) => n.id === l.view)?.label ?? l.view);
+  const p = l.payload ?? {};
+  const what = p.requestId ? 'request' : p.savedId ? 'saved item' : p.monitorId ? 'monitor' : p.environmentId ? 'environment' : p.serverId ? 'server' : p.historyId ? 'history entry' : p.runId ? 'run' : p.path ? String(p.path) : p.collectionId ? 'collection' : '';
+  return what ? `${view} · ${what}` : view;
+}
+
+/** Back / Forward like a browser (Alt+← / Alt+→ and the mouse's back / forward buttons), plus recent places. */
+function NavButtons() {
+  const nav = useApp((s) => s.nav);
+  const prev = nav.back[nav.back.length - 1];
+  const next = nav.forward[nav.forward.length - 1];
+  const recent = [...nav.back].reverse().slice(0, 12);
+  const jump = (steps: number) => {
+    for (let i = 0; i < steps; i++) useApp.getState().goBack();
+  };
+  return (
+    <div className="flex items-center gap-0.5">
+      <IconButton label={prev ? `Back to ${placeLabel(prev)}  (Alt+←)` : 'Back'} disabled={!prev} onClick={() => useApp.getState().goBack()}>
+        <ArrowLeft size={16} />
+      </IconButton>
+      <IconButton label={next ? `Forward to ${placeLabel(next)}  (Alt+→)` : 'Forward'} disabled={!next} onClick={() => useApp.getState().goForward()}>
+        <ArrowRight size={16} />
+      </IconButton>
+      <Menu
+        width={260}
+        align="start"
+        trigger={
+          <IconButton label="Recent places" disabled={!recent.length} className="w-6">
+            <NavChevron size={13} />
+          </IconButton>
+        }
+        items={recent.map((l, i) => ({ label: placeLabel(l), icon: <History size={14} />, onSelect: () => jump(i + 1) }))}
+      />
     </div>
   );
 }

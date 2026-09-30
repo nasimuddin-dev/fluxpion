@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Back and Forward** next to the workspace switcher, like a browser. They go to the views you visited and reopen the request, saved item, environment or monitor you had open. The tooltips name where they lead, a drop-down lists recent places, and they work with Alt+← / Alt+→ and the mouse's back and forward buttons.
 - **Monitors**: clicking a monitor in the list (or in the Collections explorer) opens its settings, like the edit button.
 
 ## 0.10.0 — 2026-09-30

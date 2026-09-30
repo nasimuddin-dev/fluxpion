@@ -192,6 +192,7 @@ export function RestView() {
   const openRequest = (c: Collection, n: CollectionNode) => {
     if (n.kind === 'graphql') return useApp.getState().openIntent('graphql', { collectionId: c.id, requestId: n.id });
     if (n.kind !== 'http') return;
+    useApp.getState().markPlace('rest', { collectionId: c.id, requestId: n.id });
     const existing = tabs.find((t) => t.requestId === n.id);
     if (existing) return setActive(existing.id);
     const t: RestTab = { id: uid('tab-'), name: n.name, request: fromEngineRequest(structuredClone(n.request)), preRequestScript: n.preRequestScript, testScript: n.testScript, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, examples: n.examples, description: n.description };

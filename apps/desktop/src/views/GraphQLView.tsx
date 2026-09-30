@@ -259,8 +259,10 @@ export function GraphQLView() {
   const [side, setSide] = useSticky<'collections' | 'schema' | 'environments' | 'history'>('gql:side', 'collections');
   const [treeFilter, setTreeFilter] = useState('');
   const [saving, setSaving] = useState(false);
-  const openNode = (c: Collection, n: SavedGraphQLRequest) =>
+  const openNode = (c: Collection, n: SavedGraphQLRequest) => {
+    useApp.getState().markPlace('graphql', { collectionId: c.id, requestId: n.id });
     setD({ endpoint: n.request.endpoint, query: n.request.query, variables: variablesText(n.request.variables), headers: n.request.headers ?? [], auth: n.request.auth, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, name: n.name, operationName: n.request.operationName, preRequestScript: n.preRequestScript, testScript: n.testScript });
+  };
 
   useIntent('graphql', async (p) => {
     if (p?.reset) setD({ ...store.load(), query: DEFAULT_QUERY, collectionId: undefined, requestId: undefined, name: 'GraphQL query' });

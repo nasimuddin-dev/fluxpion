@@ -12,6 +12,8 @@ const GROUPS: Array<{ title: string; items: Array<{ keys: string[][]; text: stri
     items: [
       { keys: [[modKey, 'K']], text: 'Command palette' },
       { keys: [[modKey, shift, 'F']], text: 'Search the workspace' },
+      { keys: [[alt, '←'], [alt, '→']], text: 'Back / forward to where you were (also the mouse back and forward buttons)' },
+      { keys: [[modKey, 'B']], text: 'Show or hide the Collections explorer' },
       { keys: [[modKey, ',']], text: 'Settings' },
       { keys: [[modKey, alt, 'C']], text: 'Show or hide the console' },
       { keys: [[modKey, alt, '1…9']], text: 'Go to a view (REST, GraphQL, WebSocket …)' },

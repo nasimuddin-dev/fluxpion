@@ -115,6 +115,12 @@ interface AppState {
   toast(text: string, kind?: Toast['kind'], action?: { label: string; onClick(): void }): void;
   setActivity(key: string, label?: string): void;
   openIntent(view: ViewId, payload: any): void;
+  /** Back / forward through the places visited (views and the items opened in them), like a browser. */
+  nav: { back: NavLocation[]; forward: NavLocation[]; current: NavLocation };
+  goBack(): void;
+  /** Record the item a view just opened by itself (e.g. a click in its own list), so Back returns to it. */
+  markPlace(view: ViewId, payload: Record<string, unknown>): void;
+  goForward(): void;
   refreshWorkspace(): Promise<void>;
   saveSettings(s: AppSettings): Promise<void>;
   setEnvironment(name?: string): void;
@@ -122,13 +128,55 @@ interface AppState {
 
 let toastId = 0;
 
+/** A place in the app: a view, and the item opened in it when there is one. */
+export interface NavLocation {
+  view: ViewId;
+  /** Intent payload that reopens the item (only "open this" keys, never actions like newTab or import). */
+  payload?: Record<string, unknown>;
+}
+
+/** Intent keys that identify an item to open; everything else (newTab, reset, import, run …) is an action, not a place. */
+const PLACE_KEYS = ['collectionId', 'requestId', 'savedId', 'monitorId', 'environmentId', 'serverId', 'historyId', 'runId', 'path', 'tab'];
+const ACTION_KEYS = ['newTab', 'reset', 'import', 'export', 'run', 'create', 'addServer', 'request', 'runCurrent', 'runAll', 'exportLatest', 'mock'];
+function replayable(payload: unknown): Record<string, unknown> | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const p = payload as Record<string, unknown>;
+  if (ACTION_KEYS.some((k) => p[k] !== undefined && p[k] !== false)) return undefined;
+  const out = Object.fromEntries(PLACE_KEYS.filter((k) => p[k] !== undefined).map((k) => [k, p[k]]));
+  return Object.keys(out).length ? out : undefined;
+}
+const sameLocation = (a: NavLocation, b: NavLocation) => a.view === b.view && JSON.stringify(a.payload ?? null) === JSON.stringify(b.payload ?? null);
+const NAV_LIMIT = 50;
+type Get = () => AppState;
+type Set = (p: Partial<AppState>) => void;
+/** Remember where we were before going to `next` (a new place clears Forward, like a browser). */
+function record(get: Get, set: Set, next: NavLocation) {
+  const { back, current } = get().nav;
+  if (sameLocation(current, next)) return;
+  set({ nav: { back: [...back, current].slice(-NAV_LIMIT), forward: [], current: next } });
+}
+function travel(get: Get, set: Set, dir: 'back' | 'forward') {
+  const { back, forward, current } = get().nav;
+  const from = dir === 'back' ? back : forward;
+  const to = from[from.length - 1];
+  if (!to) return;
+  const nav = dir === 'back' ? { back: back.slice(0, -1), forward: [...forward, current].slice(-NAV_LIMIT), current: to } : { back: [...back, current].slice(-NAV_LIMIT), forward: forward.slice(0, -1), current: to };
+  localStorage.setItem('aps.view', to.view);
+  set({ nav, view: to.view, ...(to.payload ? { intent: { view: to.view, payload: to.payload, nonce: Date.now() } } : {}) });
+}
+
 export const useApp = create<AppState>((set, get) => ({
   // first launch opens the Home view
   view: (localStorage.getItem('aps.view') as ViewId) || 'home',
   setView: (view) => {
     localStorage.setItem('aps.view', view);
+    if (view !== get().view) record(get, set, { view });
     set({ view });
   },
+  nav: { back: [], forward: [], current: { view: (localStorage.getItem('aps.view') as ViewId) || 'rest' } },
+  goBack: () => travel(get, set, 'back'),
+  markPlace: (view, payload) => record(get, set, { view, payload: replayable(payload) }),
+  goForward: () => travel(get, set, 'forward'),
   paletteOpen: false,
   searchOpen: false,
   logsOpen: false,
@@ -168,8 +216,9 @@ export const useApp = create<AppState>((set, get) => ({
     set({ activity: a });
   },
   openIntent: (view, payload) => {
-    get().setView(view);
-    set({ intent: { view, payload, nonce: Date.now() } });
+    localStorage.setItem('aps.view', view);
+    record(get, set, { view, payload: replayable(payload) });
+    set({ view, intent: { view, payload, nonce: Date.now() } });
   },
   refreshWorkspace: async () => {
     const ws = await call<WorkspaceCurrent>('ws.current');

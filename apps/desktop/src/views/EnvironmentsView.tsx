@@ -153,7 +153,10 @@ export function EnvironmentsView() {
                   key={e.id}
                   draggable
                   title="Drag (or Alt+↑/↓) to reorder"
-                  onClick={() => setSel(e.id)}
+                  onClick={() => {
+                    setSel(e.id);
+                    useApp.getState().markPlace('environments', { environmentId: e.id });
+                  }}
                   onDragStart={(ev) => {
                     setDragId(e.id);
                     ev.dataTransfer.effectAllowed = 'move';

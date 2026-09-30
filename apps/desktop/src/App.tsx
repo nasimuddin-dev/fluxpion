@@ -173,7 +173,12 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       const { set } = useApp.getState();
-      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
+      // Back / Forward like a browser
+      if (e.altKey && !mod && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        if (e.key === 'ArrowLeft') useApp.getState().goBack();
+        else useApp.getState().goForward();
+      } else if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         useApp.getState().toggleExplorer();
       } else if (mod && e.key.toLowerCase() === 'k') {
@@ -199,7 +204,16 @@ export default function App() {
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // the mouse's back / forward (thumb) buttons
+    const onMouse = (e: MouseEvent) => {
+      if (e.button === 3) (e.preventDefault(), useApp.getState().goBack());
+      else if (e.button === 4) (e.preventDefault(), useApp.getState().goForward());
+    };
+    window.addEventListener('mouseup', onMouse);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mouseup', onMouse);
+    };
   }, []);
 
   const commands = useMemo<PaletteCommand[]>(() => {
