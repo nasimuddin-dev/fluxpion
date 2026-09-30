@@ -6,8 +6,13 @@ import { LatencyRecorder, round } from '../util/stats.js';
 import { sleep } from '../util/concurrency.js';
 import { estimateCost, type ProviderRegistry } from '../ai/index.js';
 import type { Redactor } from '../util/redact.js';
+import { CookieJar } from '../cookies/cookie-jar.js';
 
-export type LoadTarget = { kind: 'http'; request: HttpRequestSpec } | { kind: 'llm'; model: ModelRef; prompt: string; stream?: boolean };
+export type LoadTarget =
+  | { kind: 'http'; request: HttpRequestSpec }
+  | { kind: 'llm'; model: ModelRef; prompt: string; stream?: boolean }
+  /** Each virtual user runs these requests in order, again and again (a collection or folder; see collectionLoadTarget). */
+  | { kind: 'sequence'; name?: string; requests: Array<{ name: string; request: HttpRequestSpec }> };
 
 export interface LoadTestConfig {
   target: LoadTarget;
@@ -50,6 +55,10 @@ export interface LoadSnapshot {
     generation: LatencyStats;
   };
   series: Array<{ t: number; rps: number; p95: number; errors: number; vus: number }>;
+  /** Sequences: each request's numbers, in order. */
+  perRequest?: Array<{ name: string; requests: number; errors: number; latency: LatencyStats }>;
+  /** Sequences: complete passes through all the requests. */
+  iterations?: number;
 }
 
 class TokenBucket {
@@ -110,6 +119,11 @@ export async function runLoadTest(
 ): Promise<LoadSnapshot> {
   const url = cfg.target.kind === 'http' ? buildUrl(cfg.target.request.url, cfg.target.request.params, cfg.target.request.pathVariables).toString() : undefined;
   checkLoadSafeguards(cfg, url);
+  // a sequence: every host must pass the safeguards
+  if (cfg.target.kind === 'sequence') {
+    if (!cfg.target.requests.length) throw new ApsError('ConfigurationError', 'The collection has no HTTP or GraphQL requests to load-test');
+    for (const r of cfg.target.requests) checkLoadSafeguards(cfg, buildUrl(r.request.url, r.request.params, r.request.pathVariables).toString());
+  }
   if (cfg.virtualUsers < 1 || cfg.durationSec <= 0) throw new ApsError('ConfigurationError', 'virtualUsers and durationSec must be positive');
 
   const ctrl = new AbortController();
@@ -155,7 +169,54 @@ export async function runLoadTest(
   const llm = cfg.target.kind === 'llm' ? deps.providers?.resolveModel(cfg.target.model) : undefined;
   if (cfg.target.kind === 'llm' && !llm) throw new ApsError('ConfigurationError', 'No provider registry for LLM load test');
 
-  const once = async () => {
+  const per = cfg.target.kind === 'sequence' ? cfg.target.requests.map((r) => ({ name: r.name, requests: 0, errors: 0, latency: new LatencyRecorder() })) : [];
+  let iterations = 0;
+  /** One request of a sequence: counted like a single-request test, and in its own row. */
+  const step = async (i: number, request: HttpRequestSpec, cookieJar?: CookieJar) => {
+    const t0 = performance.now();
+    const row = per[i]!;
+    try {
+      const { response } = await executeHttp(request, { signal, discardBody: true, redactor: deps.redactor, cookieJar });
+      const ms = performance.now() - t0;
+      bytes += response.size;
+      status[response.status] = (status[response.status] ?? 0) + 1;
+      latency.record(ms);
+      secLat.record(ms);
+      row.latency.record(ms);
+      if (response.status >= 400) {
+        errors++;
+        secErr++;
+        row.errors++;
+      }
+    } catch (e) {
+      if (signal.aborted) return;
+      const err = normalizeError(e);
+      errors++;
+      secErr++;
+      row.errors++;
+      errKinds[err.kind] = (errKinds[err.kind] ?? 0) + 1;
+      if (err.kind === 'NetworkError' || err.kind === 'TimeoutError') connFail++;
+      status[err.kind] = (status[err.kind] ?? 0) + 1;
+    } finally {
+      if (!signal.aborted) {
+        requests++;
+        secReq++;
+        row.requests++;
+      }
+    }
+  };
+
+  const once = async (jar?: CookieJar) => {
+    if (cfg.target.kind === 'sequence') {
+      const reqs = cfg.target.requests;
+      for (let i = 0; i < reqs.length; i++) {
+        if (signal.aborted || performance.now() >= endAt) return;
+        if (i > 0 && bucket) await bucket.take(signal).catch(() => undefined);
+        await step(i, reqs[i]!.request, jar);
+      }
+      iterations++;
+      return;
+    }
     const t0 = performance.now();
     try {
       if (cfg.target.kind === 'http') {
@@ -170,7 +231,7 @@ export async function runLoadTest(
           secErr++;
         }
       } else {
-        const tgt = cfg.target;
+        const tgt = cfg.target as Extract<LoadTarget, { kind: 'llm' }>;
         const r = await llm!.provider.chat({ model: llm!.model, messages: [{ role: 'user', content: tgt.prompt }], stream: tgt.stream ?? true, temperature: tgt.model.temperature, maxTokens: tgt.model.maxTokens, signal });
         const ms = performance.now() - t0;
         latency.record(ms);
@@ -206,6 +267,8 @@ export async function runLoadTest(
   };
 
   const vu = async (i: number) => {
+    // a collection: every virtual user keeps its own cookies, like a real session (log in, then use it)
+    const jar = cfg.target.kind === 'sequence' ? new CookieJar() : undefined;
     while (!signal.aborted && performance.now() < endAt) {
       if (i >= targetVUs(performance.now())) {
         await sleep(100, signal).catch(() => undefined);
@@ -214,7 +277,7 @@ export async function runLoadTest(
       if (bucket) await bucket.take(signal).catch(() => undefined);
       if (signal.aborted || performance.now() >= endAt) break;
       active++;
-      await once();
+      await once(jar);
       active--;
       if (cfg.thinkTimeMs) await sleep(cfg.thinkTimeMs, signal).catch(() => undefined);
     }
@@ -237,6 +300,7 @@ export async function runLoadTest(
       statusCodes: { ...status },
       errorKinds: { ...errKinds },
       series: series.slice(-600),
+      ...(cfg.target.kind === 'sequence' ? { iterations, perRequest: per.map((p) => ({ name: p.name, requests: p.requests, errors: p.errors, latency: p.latency.stats() })) } : {}),
     };
     if (cfg.target.kind === 'llm')
       snap.ai = {

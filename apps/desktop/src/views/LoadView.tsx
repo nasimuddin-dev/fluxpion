@@ -2,11 +2,11 @@ import { AlertTriangle, Gauge, Play, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, persisted, useApp } from '../store';
-import type { KeyValue, LatencyStats, ProviderConfig } from '../types';
-import { formatBytes, formatCost, formatMs } from '../lib/format';
+import type { Collection, CollectionNode, KeyValue, LatencyStats, ProviderConfig } from '../types';
+import { formatBytes, formatCost, formatMs, plural } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { VarInput } from '../components/VarInput';
-import { Badge, Button, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
 import type { NormalizedError } from '../api';
 
@@ -26,10 +26,25 @@ interface Snapshot {
   errorKinds: Record<string, number>;
   ai?: { inputTokens: number; outputTokens: number; totalTokens: number; tokensPerSec: number; costUsd?: number; ttft: LatencyStats; interTokenMsAvg?: number; generation: LatencyStats };
   series: Array<{ t: number; rps: number; p95: number; errors: number; vus: number }>;
+  perRequest?: Array<{ name: string; requests: number; errors: number; latency: LatencyStats }>;
+  iterations?: number;
+}
+
+/** Folders of a collection (with their path), for picking part of it. */
+function foldersOf(c: Collection | undefined): Array<{ id: string; name: string }> {
+  const out: Array<{ id: string; name: string }> = [];
+  const walk = (nodes: CollectionNode[], path: string[]) => {
+    for (const n of nodes) if (n.kind === 'folder') (out.push({ id: n.id, name: [...path, n.name].join(' / ') }), walk(n.items, [...path, n.name]));
+  };
+  walk(c?.items ?? [], []);
+  return out;
 }
 
 const drafts = persisted('load', {
-  kind: 'http' as 'http' | 'llm',
+  kind: 'http' as 'http' | 'llm' | 'collection',
+  collectionId: '',
+  folderId: '',
+  warmUp: true,
   method: 'GET',
   url: '{{baseUrl}}/health',
   headers: [] as KeyValue[],
@@ -76,6 +91,9 @@ export function LoadView() {
   const [snap, setSnap] = useState<Snapshot>();
   const [error, setError] = useState<NormalizedError>();
   const [tab, setTab] = useState<'headers' | 'body'>('headers');
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const [prep, setPrep] = useState<{ requests: string[]; unresolved: string[]; warmUp?: { passed: number; failed: number } }>();
   const env = useApp((s) => s.environment);
   const ws = useApp((s) => s.workspace);
   const idRef = useRef<string | undefined>(undefined);
@@ -84,6 +102,7 @@ export function LoadView() {
   useEffect(() => drafts.save(d), [d]);
   useEffect(() => {
     void call<ProviderConfig[]>('ai.providers').then(setProviders);
+    void call<Collection[]>('col.list').then((cs) => setCollections(cs.filter((c) => !(c as { problem?: string }).problem)));
     const a = on<{ id: string; snapshot: Snapshot }>('load.snapshot', (p) => {
       if (p.id !== idRef.current) return;
       setSnap(p.snapshot);
@@ -108,13 +127,20 @@ export function LoadView() {
     setError(undefined);
     setSnap(undefined);
     if (d.allowRemote && !(await confirmAction({ title: 'Load test a remote host', message: 'You are about to generate load against a host that is not on this computer.', detail: 'Only continue if you own this system or are explicitly authorised to load test it.', confirmLabel: 'Start load test', tone: 'warning' }))) return;
+    setPrep(undefined);
+    const collectionId = d.collectionId || collections[0]?.id;
+    if (d.kind === 'collection' && !collectionId) return setError({ kind: 'ValidationError', message: 'There is no collection to load-test' } as NormalizedError);
+    setPreparing(d.kind === 'collection');
     try {
       const target =
         d.kind === 'http'
           ? { kind: 'http', request: { method: d.method, url: d.url, headers: d.headers, body: d.body ? { type: /^\s*[{[]/.test(d.body) ? 'json' : 'text', content: d.body } : undefined } }
-          : { kind: 'llm', model: { provider: d.provider || providers[0]?.id, name: d.model || undefined }, prompt: d.prompt, stream: true };
-      const r = await call<{ id: string }>('load.start', {
+          : d.kind === 'llm'
+            ? { kind: 'llm', model: { provider: d.provider || providers[0]?.id, name: d.model || undefined }, prompt: d.prompt, stream: true }
+            : { kind: 'sequence', requests: [] };
+      const r = await call<{ id: string; requests?: string[]; unresolved?: string[]; warmUp?: { passed: number; failed: number } }>('load.start', {
         environment: env,
+        collection: d.kind === 'collection' ? { collectionId, selection: d.folderId ? [d.folderId] : undefined, warmUp: d.warmUp } : undefined,
         config: {
           target,
           virtualUsers: d.vus,
@@ -128,11 +154,15 @@ export function LoadView() {
         },
       });
       setId(r.id);
+      if (r.requests) setPrep({ requests: r.requests, unresolved: r.unresolved ?? [], warmUp: r.warmUp });
       useApp.getState().setActivity(r.id, `Load test: ${d.vus} VUs`);
     } catch (e) {
       setError(asError(e));
+    } finally {
+      setPreparing(false);
     }
   };
+  const collection = collections.find((c) => c.id === (d.collectionId || collections[0]?.id));
   const s = snap;
   return (
     <Split id="load-main" initial={34}>
@@ -140,12 +170,39 @@ export function LoadView() {
         <div className="flex items-center gap-2">
           <Gauge size={16} />
           <span className="font-semibold">Load test</span>
-          <Select className="ml-auto" value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' })}>
+          <Select className="ml-auto" value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' | 'collection' })} aria-label="Target">
             <option value="http">HTTP endpoint</option>
+            <option value="collection">Collection</option>
             <option value="llm">LLM provider</option>
           </Select>
         </div>
-        {d.kind === 'http' ? (
+        {d.kind === 'collection' ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Collection">
+                <Select value={collection?.id ?? ''} onChange={(e) => set({ collectionId: e.target.value, folderId: '' })}>
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Requests">
+                <Select value={d.folderId} onChange={(e) => set({ folderId: e.target.value })}>
+                  <option value="">The whole collection</option>
+                  {foldersOf(collection).map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Toggle checked={d.warmUp} onChange={(warmUp) => set({ warmUp })} label="Run it once first with scripts (for example to log in), then use the variables they set" />
+            <p className="text-xs text-muted">Every virtual user sends the HTTP and GraphQL requests in order, again and again. Scripts don't run under load; variables are resolved once, before it starts.</p>
+          </>
+        ) : d.kind === 'http' ? (
           <>
             <div className="flex gap-2">
               <Select className="w-24 mono" value={d.method} onChange={(e) => set({ method: e.target.value })}>
@@ -229,8 +286,8 @@ export function LoadView() {
             Stop
           </Button>
         ) : (
-          <Button variant="primary" icon={<Play size={13} />} onClick={start}>
-            Start load test
+          <Button variant="primary" icon={<Play size={13} />} loading={preparing} onClick={start}>
+            {preparing ? (d.warmUp ? 'Warming up…' : 'Preparing…') : 'Start load test'}
           </Button>
         )}
       </div>
@@ -271,6 +328,41 @@ export function LoadView() {
               <Chart series={s.series} field="errors" color="var(--bad)" label="Errors / second" />
               <Chart series={s.series} field="vus" color="var(--ok)" label="Virtual users" />
             </div>
+            {prep && (prep.unresolved.length > 0 || prep.warmUp) && (
+              <div className="text-xs text-muted">
+                {prep.warmUp && `Warm-up: ${prep.warmUp.passed} passed${prep.warmUp.failed ? `, ${prep.warmUp.failed} failed` : ''}. `}
+                {prep.unresolved.length > 0 && <span className="text-warn">Unresolved variables: {prep.unresolved.join(', ')}.</span>}
+              </div>
+            )}
+            {s.perRequest && (
+              <div>
+                <div className="text-xs text-muted font-semibold mb-1">Per request · {plural(s.iterations ?? 0, 'pass', 'passes')} through the collection</div>
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-muted text-left">
+                    <tr>
+                      <th className="font-medium py-1">Request</th>
+                      <th className="font-medium text-right">Requests</th>
+                      <th className="font-medium text-right">Errors</th>
+                      <th className="font-medium text-right">p50</th>
+                      <th className="font-medium text-right">p95</th>
+                      <th className="font-medium text-right">p99</th>
+                    </tr>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    {s.perRequest.map((p) => (
+                      <tr key={p.name} className="border-t border-line">
+                        <td className="py-1 pr-2">{p.name}</td>
+                        <td className="text-right">{p.requests.toLocaleString()}</td>
+                        <td className={cx('text-right', p.errors ? 'text-bad' : '')}>{p.errors.toLocaleString()}</td>
+                        <td className="text-right">{formatMs(p.latency.p50)}</td>
+                        <td className="text-right">{formatMs(p.latency.p95)}</td>
+                        <td className="text-right">{formatMs(p.latency.p99)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div>
               <div className="text-xs text-muted font-semibold mb-1">Status code distribution</div>
               <div className="flex gap-2 flex-wrap">

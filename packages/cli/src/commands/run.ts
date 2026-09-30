@@ -3,12 +3,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { Command, Option } from 'commander';
 import {
+  ChainSecretStore,
+  EnvSecretStore,
   WorkspaceManager,
+  collectionLoadTarget,
+  createEngineContext,
   runLoadTest,
   writeReports,
+  type LoadTarget,
 } from '@testpion/core';
-import { EXIT, dim, CliError, collectVar, readResults, printLoad } from '../shared.js';
-import { type RunCliOptions, executeRun, type CollectionCliOptions, executeCollectionRun, runOptions } from '../run.js';
+import { EXIT, dim, yellow, CliError, collectVar, openWorkspace, readResults, printLoad } from '../shared.js';
+import { type RunCliOptions, executeRun, type CollectionCliOptions, executeCollectionRun, resolveSelection, runOptions } from '../run.js';
 
 export function registerRunCommands(program: Command): void {
 
@@ -60,8 +65,13 @@ export function registerRunCommands(program: Command): void {
     });
   program
     .command('load')
-    .description('run a load test against a URL (safeguarded: local hosts only unless --allow-remote)')
-    .argument('<url>', 'target URL')
+    .description('run a load test against a URL or a collection (safeguarded: local hosts only unless --allow-remote)')
+    .argument('[url]', 'target URL (or use --collection)')
+    .option('--collection <nameOrId>', 'load-test a collection: every virtual user sends its requests in order, again and again')
+    .option('-w, --workspace <nameOrPath>', 'with --collection: workspace name or directory')
+    .option('-e, --environment <name>', 'with --collection: environment')
+    .option('--folder <nameOrId...>', 'with --collection: only these folders or requests')
+    .option('--warm-up', 'with --collection: run it once first with scripts (e.g. to log in), then use the variables they set')
     .option('-X, --method <method>', 'HTTP method', 'GET')
     .option('-H, --header <header...>', 'headers "Name: value"')
     .option('-d, --data <body>', 'request body')
@@ -72,16 +82,39 @@ export function registerRunCommands(program: Command): void {
     .option('--ramp-down <sec>', 'ramp-down seconds', '0')
     .option('--allow-remote', 'allow non-local hosts (only systems you are authorised to test)')
     .option('--json <file>', 'write final metrics as JSON')
-    .action(async (url: string, o) => {
+    .action(async (url: string | undefined, o) => {
+      if (!url && !o.collection) throw new CliError('Give a URL or --collection', EXIT.CONFIG_ERROR);
       const headers = ((o.header as string[]) ?? []).map((h) => {
         const i = h.indexOf(':');
         return { key: h.slice(0, i).trim(), value: h.slice(i + 1).trim() };
       });
-      const settings = new WorkspaceManager().loadSettings();
+      const mgr = new WorkspaceManager();
+      const settings = mgr.loadSettings();
+      let target: LoadTarget = { kind: 'http', request: { method: o.method, url: url ?? '', headers, body: o.data ? { type: /^\s*[{[]/.test(o.data) ? 'json' : 'text', content: o.data } : undefined } };
+      let isProduction = false;
+      if (o.collection) {
+        const { store } = openWorkspace(o.workspace, undefined, mgr);
+        const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings, environment: o.environment });
+        try {
+          const cols = store.listCollections().filter((c) => !c.problem);
+          const col = cols.find((c) => c.id === o.collection) ?? cols.find((c) => c.name.toLowerCase() === String(o.collection).toLowerCase());
+          if (!col) throw new CliError(`Collection "${o.collection}" not found. Available: ${cols.map((c) => c.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+          const t = await collectionLoadTarget({ collection: col, selection: resolveSelection(col, o.folder), services: ctx.services, warmUp: !!o.warmUp });
+          if (t.warmUp) console.log(dim(`Warm-up: ${t.warmUp.passed} passed, ${t.warmUp.failed + t.warmUp.errors} failed`));
+          if (t.unresolved.length) console.log(yellow(`Unresolved variables: ${t.unresolved.join(', ')} (set them in the environment, or use --warm-up when scripts set them)`));
+          target = t.target;
+          isProduction = !!ctx.environment?.isProduction;
+          console.log(dim(`${t.target.requests.length} requests per pass: ${t.target.requests.map((r) => r.name).join(' → ')}`));
+        } finally {
+          await ctx.dispose();
+          store.close();
+        }
+      }
       let last = 0;
       const snap = await runLoadTest(
         {
-          target: { kind: 'http', request: { method: o.method, url, headers, body: o.data ? { type: /^\s*[{[]/.test(o.data) ? 'json' : 'text', content: o.data } : undefined } },
+          target,
+          environmentIsProduction: isProduction,
           virtualUsers: Number(o.vus),
           durationSec: Number(o.duration),
           rampUpSec: Number(o.rampUp),

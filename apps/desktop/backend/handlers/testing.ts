@@ -77,7 +77,7 @@ export function testingHandlers(be: Backend): Handlers {
     'traces.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listTraces(q),
     'traces.get': ({ id }: { id: string }) => be.ws.loadTrace(id),
 
-    'load.start': (p: { config: LoadTestConfig; environment?: string }) => be.startLoad(p),
+    'load.start': (p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean } }) => be.startLoad(p),
     'load.stop': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
   };
 }

@@ -37,6 +37,7 @@ import {
   readResultsFile,
   runChecks,
   runLoadTest,
+  collectionLoadTarget,
   runScript,
   scriptScopes,
   applyScriptOutput,
@@ -1128,14 +1129,30 @@ export class Backend {
     return this.startRun(p.name ?? String(p.template.name ?? 'Evaluation'), tests, { environment: p.environment, concurrency: p.concurrency, retries: p.retries, traceMode: 'all' });
   }
 
-  async startLoad(p: { config: LoadTestConfig; environment?: string }) {
+  async startLoad(p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean } }) {
     const id = shortId('load-');
     const ctrl = new AbortController();
     this.controllers.set(id, ctrl);
-    const ctx = this.context({ environment: p.environment });
+    const ctx = this.context({ environment: p.environment, collectionId: p.collection?.collectionId });
+    // a collection: its requests in order (after an optional warm-up run with scripts), variables resolved once
+    let target = p.config.target;
+    let info: { requests: string[]; unresolved: string[]; warmUp?: { passed: number; failed: number } } | undefined;
+    if (p.collection) {
+      const col = this.ws.getCollection(p.collection.collectionId);
+      if (!col) throw new ApsError('ConfigurationError', 'Collection not found');
+      try {
+        const t = await collectionLoadTarget({ collection: col, selection: p.collection.selection, services: ctx.services, warmUp: p.collection.warmUp, signal: ctrl.signal });
+        target = t.target;
+        info = { requests: t.target.requests.map((r) => r.name), unresolved: t.unresolved, warmUp: t.warmUp && { passed: t.warmUp.passed, failed: t.warmUp.failed + t.warmUp.errors } };
+      } catch (e) {
+        this.controllers.delete(id);
+        void ctx.dispose();
+        throw e;
+      }
+    }
     const cfg: LoadTestConfig = {
       ...p.config,
-      target: ctx.vars.resolveDeep(p.config.target),
+      target: p.collection ? target : ctx.vars.resolveDeep(target),
       environmentIsProduction: ctx.environment?.isProduction,
       allowRemoteHosts: p.config.allowRemoteHosts || this.settings.loadTesting.allowRemoteHosts,
       maxVirtualUsers: this.settings.loadTesting.maxVirtualUsers,
@@ -1150,7 +1167,7 @@ export class Backend {
         void ctx.dispose();
       });
     this.logger.info('Load test started', { id, vus: cfg.virtualUsers, duration: cfg.durationSec });
-    return { id };
+    return { id, ...info };
   }
 
   async dispose(): Promise<void> {
