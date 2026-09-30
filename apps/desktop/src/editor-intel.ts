@@ -90,6 +90,9 @@ const SNIPPETS: Array<{ label: string; detail: string; body: string }> = [
   { label: 'pm.sendRequest', detail: 'Send another request from a script', body: "pm.sendRequest('${1:https://example.com}', (err, res) => {\n\tif (err) return console.log(err);\n\t${2:console.log(res.json());}\n});" },
   { label: 'pm.execution.setNextRequest', detail: 'Choose the next request of a run', body: "pm.execution.setNextRequest('${1:Request name}');" },
   { label: 'pm.visualizer.set', detail: 'Show the response as HTML', body: "pm.visualizer.set(`\n\t<table>{{#each items}}<tr><td>{{name}}</td></tr>{{/each}}</table>\n`, { items: pm.response.json()${1:} });" },
+  { label: 'pm.variables.set date (moment)', detail: 'A date for the request, e.g. a week from now', body: "pm.variables.set('${1:dueDate}', moment().add(${2:7}, '${3:days}').format('${4:YYYY-MM-DD}'));" },
+  { label: 'pm.variables.set fake value', detail: 'A made-up value (dynamic variable)', body: "pm.variables.set('${1:name}', pm.variables.replaceIn('{{\\$${2:randomFullName}}}'));" },
+  { label: 'pm.test lodash', detail: 'Check a list with lodash', body: "pm.test('${1:Every item has an id}', () => {\n\tconst items = pm.response.json()${2:.items};\n\tpm.expect(_.every(items, '${3:id}')).to.be.true;\n});" },
   { label: 'pm.request.headers.upsert', detail: 'Set a request header (pre-request)', body: "pm.request.headers.upsert({ key: '${1:X-Request-Id}', value: ${2:pm.variables.replaceIn('{{\\$uuid}}')} });" },
 ];
 
