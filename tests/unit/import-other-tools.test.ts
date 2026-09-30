@@ -138,4 +138,10 @@ describe('importing into a workspace', () => {
     importIntoWorkspace(store, insomnia4);
     expect(store.listEnvironments().map((e) => e.name)).toContain('Staging (imported 2)');
   });
+
+  it('says where a broken JSON file is broken instead of "unknown format"', () => {
+    const text = ['{', '  "info": { "name": "x" },', '  "item": ["a\\.b"]', '}'].join('\n');
+    expect(() => importAny(text)).toThrow(/not valid JSON \(line 3, column \d+\)/);
+    expect(() => importAny('hello there')).toThrow(/Unrecognised import format/);
+  });
 });

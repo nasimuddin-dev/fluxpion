@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Importing (or running) a JSON file that has a syntax error now says so, with the line and column, instead of "Unrecognised import format".
 - **lodash and moment in scripts.** As in Postman, scripts can use `_` (for example `_.get(json, 'items[0].id')`) or `require('lodash')`, and `moment` (for example `moment().add(1, 'day').format('YYYY-MM-DD')`; times are UTC). Each is loaded only for scripts that use it.
 - Fixed: `pm.response.to.have.jsonSchema(schema)` in scripts always passed. It now validates the response (with Ajv, as the Schema check does) and the failure says what didn't match. `pm.expect(value).to.have.jsonSchema(schema)` and `tv4.validate(data, schema)` (older Postman scripts) work too.
 - **Postman's dynamic variables.** `{{$randomFirstName}}`, `{{$randomCity}}`, `{{$randomUUID}}`, `{{$randomLoremSentence}}`, `{{$randomDateFuture}}` and about 70 more now give fresh fake values, so imported Postman collections send what they sent there instead of the literal text. Type `{{$` in any field or editor to pick one. `pm.variables.replaceIn()` in scripts fills them too.

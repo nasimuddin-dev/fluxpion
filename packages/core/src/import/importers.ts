@@ -384,9 +384,24 @@ export function importAny(text: string, opts: { name?: string } = {}): { format:
       const c = JSON.parse(text) as Collection;
       return { format, collection: { ...c, id: c.id || shortId('col-') } };
     }
-    default:
+    default: {
+      // a file that is meant to be JSON but doesn't parse: say where, not just "unknown format"
+      const t = text.trimStart();
+      if (t.startsWith('{') || t.startsWith('[')) {
+        try {
+          JSON.parse(t);
+        } catch (e) {
+          const msg = (e as Error).message;
+          const pos = /position (\d+)/.exec(msg);
+          const at = pos ? (() => { const before = t.slice(0, Number(pos[1])).split('\n'); return ` (line ${before.length}, column ${before.at(-1)!.length + 1})`; })() : '';
+          throw new ApsError('ValidationError', `The file is not valid JSON${at}: ${msg.replace(/ in JSON at position \d+.*$/s, '')}`, {
+            suggestions: ['Fix the JSON (a stray backslash or a missing comma is common), then import it again.'],
+          });
+        }
+      }
       throw new ApsError('ValidationError', `Unrecognised import format (${format})`, {
         suggestions: ['Supported: OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections & environments, Insomnia (v4 export, v5 YAML), Bruno collection exports, Hoppscotch collections, .env files, HAR, TestPion collections and workspace exports.'],
       });
+    }
   }
 }
