@@ -94,7 +94,7 @@ For a saved request, the response panel has a **History** tab: every response yo
 
 Response bodies come from the payload files in the workspace (up to 2 MB each are compared). Responses sent before version 0.6.4 have no link to their saved request, so they don't appear here.
 
-**For AI agents and scripts:** `testpion history list --request "List patients" --json` and `testpion history diff <before> <after> --json` in the CLI, and `request_history` and `compare_responses` on the [MCP server](/ai-testing/mcp-server). In these, the values of sensitive fields such as tokens and passwords are masked.
+**For AI agents and scripts:** `testpion history list --request "List patients" --json`, `testpion history stats --request "List patients" --json` (the numbers of the Response time chart) and `testpion history diff <before> <after> --json` in the CLI, and `request_history`, `response_time_stats` and `compare_responses` on the [MCP server](/ai-testing/mcp-server). In these, the values of sensitive fields such as tokens and passwords are masked.
 
 ## Scripts
 

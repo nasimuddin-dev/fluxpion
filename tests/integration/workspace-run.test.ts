@@ -214,7 +214,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['collection_docs', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_requests', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'run_collection', 'save_request', 'send_request']);
+      expect(names).toEqual(['collection_docs', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_requests', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -316,6 +316,8 @@ describe('example workspace (end-to-end)', () => {
     const list = await run([cli, 'history', 'list', '-w', ws.root, '--request', 'List patients', '--json'], env);
     expect(list.stderr).toBe('');
     expect(JSON.parse(list.stdout).map((h: { id: string }) => h.id)).toEqual(['h-new', 'h-old']);
+    const stats = await run([cli, 'history', 'stats', '-w', ws.root, '--request', 'List patients', '--json'], env);
+    expect(JSON.parse(stats.stdout)).toMatchObject({ count: 2, p50Ms: 40, maxMs: 50, failed: 0 });
     const diff = await run([cli, 'history', 'diff', 'h-old', 'h-new', '-w', ws.root, '--json'], env);
     const d = JSON.parse(diff.stdout);
     expect(d.diff.body.changes.map((c: { path: string }) => c.path)).toEqual(['$.total', '$.items[0].token', '$.items[1]']);
@@ -326,6 +328,7 @@ describe('example workspace (end-to-end)', () => {
     try {
       const text = async (tool: string, args: Record<string, unknown>) => mcpResultBody(await s.callTool(tool, args)).text;
       expect(JSON.parse(await text('request_history', { collection: 'Veterinary API', request: 'List patients' })).map((h: { id: string }) => h.id)).toEqual(['h-new', 'h-old']);
+      expect(JSON.parse(await text('response_time_stats', { collection: 'Veterinary API', request: 'List patients' }))).toEqual({ count: 2, failed: 0, minMs: 40, meanMs: 45, p50Ms: 40, p95Ms: 50, maxMs: 50 });
       const cmp = await text('compare_responses', { before: 'h-old', after: 'h-new' });
       expect(JSON.parse(cmp).diff.summary).toBe('3 body changes');
       // token values in the bodies are masked for agents

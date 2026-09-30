@@ -48,6 +48,7 @@ export * from './runner/collection-run.js';
 
 export * from './report/reports.js';
 export * from './report/response-diff.js';
+export * from './report/response-stats.js';
 export * from './storage/history-compare.js';
 export * from './net/policy.js';
 export * from './report/regression.js';

@@ -21,7 +21,7 @@ testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 testpion load <url>           Safeguarded load test
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order -w    List environments; set their order
-testpion history list|diff -w   Response history of saved requests; compare two responses
+testpion history list|stats|diff -w  Response history of saved requests; response times; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
@@ -210,10 +210,11 @@ Rewrites collection, folder and request scripts from Postman's `pm.*` to TestPio
 
 ```bash
 testpion history list -w my-workspace --request "List patients" --json   # newest first
+testpion history stats -w my-workspace --request "List patients" --json  # median, p95, slowest, failed
 testpion history diff h-abc h-def -w my-workspace --json                  # older id first
 ```
 
-`history list` shows recent responses of requests sent in the app (`--collection`, `--request`, `-n/--limit`). `history diff` compares two of them: the status, timing, header changes (volatile ones such as `date` are flagged) and a field-by-field JSON body diff, or a line diff for text. Values of sensitive fields and headers are masked.
+`history list` shows recent responses of requests sent in the app (`--collection`, `--request`, `-n/--limit`). `history stats` summarises the response times of a request's recent responses (`-n/--limit`, default 50): count, failed (no status or 400+), fastest, mean, median, p95 and slowest. `history diff` compares two of them: the status, timing, header changes (volatile ones such as `date` are flagged) and a field-by-field JSON body diff, or a line diff for text. Values of sensitive fields and headers are masked.
 
 ## `env`
 

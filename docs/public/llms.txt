@@ -10,7 +10,7 @@ Key facts for agents:
 - A request copied as cURL (bash or cmd), fetch or PowerShell can be parsed (`parse_request_snippet`), sent (`send_request` with `snippet`) or saved (`save_request`, or CLI `testpion import <file|-> -w <ws> --json`). Secrets in it are replaced by `{{variables}}` listed in `placeholders`; they are never written to workspace files.
 - Scripts use the Postman API as `tp.*` (TestPion's name) or `pm.*` (Postman's): the same object, both always work. Exports to Postman convert `tp.*` to `pm.*`; `testpion scripts convert --to tp|pm --json` rewrites a workspace's scripts.
 - Test scripts can call `pm.visualizer.set(template, data)` (Handlebars); run results include the rendered `visualization.html` and `scriptLogs`.
-- Response history: `testpion history list --request <name> --json` / `testpion history diff <before> <after> --json`, or MCP `request_history` / `compare_responses`, show what changed between two runs of a request (field-by-field JSON diff; secrets masked).
+- Response history: `testpion history list --request <name> --json` / `testpion history diff <before> <after> --json`, or MCP `request_history` / `compare_responses`, show what changed between two runs of a request (field-by-field JSON diff; secrets masked). `testpion history stats --request <name> --json` or MCP `response_time_stats` give its median / p95 / slowest response time and failure count.
 - `testpion env list --json` and `testpion env order <names...>` read and set the environment order.
 - CLI exit codes: 0 success, 1 test failure, 2 configuration error, 3 execution error.
 

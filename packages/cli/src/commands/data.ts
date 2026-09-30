@@ -7,6 +7,8 @@ import {
   formatDuration,
   importRequestSnippet,
   compareHistory,
+  responseTimeStats,
+  type WorkspaceStore,
   convertCollectionScripts,
   redactDiff,
   isRequestSnippet,
@@ -151,19 +153,35 @@ export function registerDataCommands(program: Command): void {
     .action((o) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
-        let requestId: string | undefined;
-        if (o.request) {
-          const want = String(o.request).toLowerCase();
-          const cols = store.listCollections().filter((c) => !c.problem && (!o.collection || c.id === o.collection || c.name.toLowerCase() === String(o.collection).toLowerCase()));
-          const flat = (nodes: CollectionNode[]): CollectionNode[] => nodes.flatMap((n) => (n.kind === 'folder' ? flat(n.items) : [n]));
-          const hit = cols.flatMap((c) => flat(c.items)).find((n) => n.id.toLowerCase() === want || n.name.toLowerCase() === want);
-          if (!hit) throw new CliError(`No saved request "${o.request}"`, EXIT.CONFIG_ERROR);
-          requestId = hit.id;
-        }
+        const requestId = o.request ? savedRequestId(store, o.request, o.collection) : undefined;
         const items = store.meta.listHistory({ requestId, kind: requestId ? 'http' : undefined, limit: Math.min(Number(o.limit) || 20, 500) }).items;
         const rows = items.map((h) => ({ id: h.id, timestamp: h.timestamp, kind: h.kind, name: h.name, method: h.method, status: h.status, durationMs: h.durationMs, size: h.size }));
         if (o.json) console.log(JSON.stringify(rows, null, 2));
         else for (const r of rows) console.log(`${dim(r.id)}  ${r.timestamp}  ${String(r.status ?? '').padEnd(4)} ${r.method ?? r.kind} ${r.name}  ${dim(formatDuration(r.durationMs ?? 0))}`);
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('stats')
+    .description("response-time summary of a saved request's recent responses: median, p95, slowest, failed")
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .requiredOption('--request <nameOrId>', 'saved request')
+    .option('--collection <nameOrId>', 'collection of --request')
+    .option('-n, --limit <n>', 'how many recent responses', '50')
+    .option('--json', 'print as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const requestId = savedRequestId(store, o.request, o.collection);
+        const s = responseTimeStats(store.meta.listHistory({ requestId, kind: 'http', limit: Math.min(Number(o.limit) || 50, 500) }).items);
+        if (o.json) console.log(JSON.stringify(s, null, 2));
+        else if (!s.count) console.log('No responses yet. Send the request from the app first.');
+        else {
+          const f = (v?: number) => formatDuration(v ?? 0);
+          console.log(`${s.count} responses: median ${f(s.p50Ms)}, p95 ${f(s.p95Ms)}, fastest ${f(s.minMs)}, slowest ${f(s.maxMs)}, mean ${f(s.meanMs)}`);
+          console.log(s.failed ? red(`${s.failed} failed`) : green('none failed'));
+        }
       } finally {
         store.close();
       }
@@ -229,4 +247,14 @@ export function registerDataCommands(program: Command): void {
         store.close();
       }
     });
+}
+
+/** Id of a saved request by name or id (optionally within one collection). */
+function savedRequestId(store: WorkspaceStore, request: string, collection?: string): string {
+  const want = String(request).toLowerCase();
+  const cols = store.listCollections().filter((c) => !c.problem && (!collection || c.id === collection || c.name.toLowerCase() === String(collection).toLowerCase()));
+  const flat = (nodes: CollectionNode[]): CollectionNode[] => nodes.flatMap((n) => (n.kind === 'folder' ? flat(n.items) : [n]));
+  const hit = cols.flatMap((c) => flat(c.items)).find((n) => n.id.toLowerCase() === want || n.name.toLowerCase() === want);
+  if (!hit) throw new CliError(`No saved request "${request}"`, EXIT.CONFIG_ERROR);
+  return hit.id;
 }

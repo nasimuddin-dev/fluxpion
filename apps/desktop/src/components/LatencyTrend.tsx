@@ -31,7 +31,8 @@ export function LatencyTrend({ entries, onPick }: { entries: Point[]; onPick?(id
   const pts = useMemo(() => [...entries].filter((e) => typeof e.durationMs === 'number').reverse(), [entries]);
   const stats = useMemo(() => {
     const ms = pts.map((p) => p.durationMs!).sort((a, b) => a - b);
-    const q = (f: number) => ms[Math.min(ms.length - 1, Math.floor(f * ms.length))];
+    // nearest-rank, as responseTimeStats in core (CLI `testpion history stats`, MCP response_time_stats)
+    const q = (f: number) => ms[Math.min(ms.length - 1, Math.max(0, Math.ceil(f * ms.length) - 1))];
     return { p50: q(0.5), p95: q(0.95), max: ms[ms.length - 1], fails: pts.filter((p) => failed(p.status)).length };
   }, [pts]);
   if (pts.length < 2) return null;

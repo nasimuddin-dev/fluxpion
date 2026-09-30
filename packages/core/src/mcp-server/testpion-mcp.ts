@@ -21,6 +21,7 @@ import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js'
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
 import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
+import { responseTimeStats } from '../report/response-stats.js';
 
 /**
  * `testpion mcp-server`: the TestPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
@@ -307,6 +308,17 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         return store.meta
           .listHistory({ requestId: node.id, kind: 'http', limit })
           .items.map((h) => ({ id: h.id, timestamp: h.timestamp, status: h.status, durationMs: h.durationMs, size: h.size, url: h.url && redactor.redactUrl(h.url) }));
+      },
+    },
+    {
+      name: 'response_time_stats',
+      description:
+        "Response-time summary of a saved request's recent responses (from requests sent in the TestPion app): count, failed (no status or 400+), fastest, mean, median (p50), p95 and slowest in ms. Use it to spot a slow or flaky endpoint; request_history lists the individual responses.",
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request name or id'), limit: { type: 'number', description: 'How many recent responses (default 50, max 500)' } }, required: ['collection', 'request'] },
+      run: (a) => {
+        const { node } = findRequest(findCollection(a.collection), a.request);
+        const limit = Math.min(Math.max(Number(a.limit) || 50, 1), 500);
+        return responseTimeStats(store.meta.listHistory({ requestId: node.id, kind: 'http', limit }).items);
       },
     },
     {
