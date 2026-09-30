@@ -83,6 +83,8 @@ export interface HttpSettings {
   retries?: number;
   /** First wait between attempts in ms (doubles each time, max 10 s; Retry-After wins). Default 500. */
   retryDelayMs?: number;
+  /** Use HTTP/1.1 only. By default HTTP/2 is offered over https (ALPN) and used when the server supports it. */
+  http1Only?: boolean;
 }
 
 export interface HttpRequestSpec {
@@ -111,6 +113,8 @@ export interface HttpResponseData {
   statusText: string;
   /** How many attempts it took (when the request has retries). */
   attempts?: number;
+  /** The HTTP version the response came over: "1.1" or "2". */
+  httpVersion?: string;
   headers: Array<[string, string]>;
   cookies: Array<{ name: string; value: string; attributes: Record<string, string> }>;
   /** Body preview (UTF-8 decoded, possibly truncated). */

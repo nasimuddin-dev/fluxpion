@@ -49,6 +49,8 @@ export interface HttpSettings {
   timeoutMs?: number;
   followRedirects?: boolean;
   insecure?: boolean;
+  /** HTTP/1.1 only (HTTP/2 is used over https when the server supports it). */
+  http1Only?: boolean;
   proxy?: string;
   clientCert?: { certPath: string; keyPath: string; caPath?: string; passphrase?: string };
   retries?: number;
@@ -94,6 +96,8 @@ export interface HttpResponseData {
   statusText: string;
   /** How many attempts it took (requests with retries). */
   attempts?: number;
+  /** "1.1" or "2". */
+  httpVersion?: string;
   headers: Array<[string, string]>;
   cookies: Array<{ name: string; value: string; attributes: Record<string, string> }>;
   bodyPreview: string;

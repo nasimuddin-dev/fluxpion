@@ -2,6 +2,8 @@ import { assertUrlAllowed, getNetworkPolicy } from '../../net/policy.js';
 import { baseDispatcher, makeDispatcher, proxyGeneration } from '../../net/proxy.js';
 import { createWriteStream, openAsBlob, readFileSync, mkdirSync, type WriteStream } from 'node:fs';
 import { basename, join } from 'node:path';
+import { subscribe } from 'node:diagnostics_channel';
+import { STATUS_CODES } from 'node:http';
 import { endAndClose } from '../../storage/fsutil.js';
 import { fetch as undiciFetch, FormData as UndiciFormData, type Dispatcher } from 'undici';
 import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelinePhase } from '../../model/types.js';
@@ -45,11 +47,23 @@ export interface PreparedRequest {
 
 const dispatchers = new Map<string, Dispatcher>();
 
-/** Reuse connection pools per TLS / proxy configuration (the app-wide proxy settings apply; see net/proxy.ts). */
+// the protocol each connection negotiated (ALPN), by origin: how an HTTP/2 response is recognised
+const alpnByOrigin = new Map<string, string>();
+subscribe('undici:client:connected', (message) => {
+  const m = message as { connectParams?: { protocol?: string; host?: string }; socket?: { alpnProtocol?: string | false } };
+  if (!m.connectParams?.host || m.connectParams.protocol !== 'https:') return;
+  if (alpnByOrigin.size > 500) alpnByOrigin.clear();
+  const origin = `https://${m.connectParams.host}`;
+  // an HTTP/1.1-only request's connection doesn't mean the server lost HTTP/2
+  if (alpnByOrigin.get(origin) === 'h2' && m.socket?.alpnProtocol !== 'h2') return;
+  alpnByOrigin.set(origin, m.socket?.alpnProtocol || 'http/1.1');
+});
+
+/** Reuse connection pools per TLS / proxy / HTTP version configuration (the app-wide proxy settings apply; see net/proxy.ts). */
 function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
   const s = spec.settings ?? {};
-  if (!s.insecure && !s.proxy && !s.clientCert) return baseDispatcher();
-  const key = JSON.stringify([proxyGeneration(), s.insecure, s.proxy, s.clientCert]);
+  if (!s.insecure && !s.proxy && !s.clientCert && !s.http1Only) return baseDispatcher();
+  const key = JSON.stringify([proxyGeneration(), s.insecure, s.proxy, s.clientCert, !!s.http1Only]);
   let d = dispatchers.get(key);
   if (!d) {
     const connect: Record<string, unknown> = {};
@@ -60,7 +74,7 @@ function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
       if (s.clientCert.caPath) connect.ca = readFileSync(s.clientCert.caPath);
       if (s.clientCert.passphrase) connect.passphrase = s.clientCert.passphrase;
     }
-    d = makeDispatcher(connect, s.proxy);
+    d = makeDispatcher(connect, s.proxy, s.http1Only ? { allowH2: false } : {});
     dispatchers.set(key, d);
   }
   return d;
@@ -396,7 +410,8 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
 
   const response: HttpResponseData = {
     status: res.status,
-    statusText: res.statusText,
+    // HTTP/2 has no reason phrase: use the standard one
+    statusText: res.statusText || STATUS_CODES[res.status] || '',
     headers: [...res.headers.entries()].map(([k, v]) => [k, v] as [string, string]),
     cookies: res.headers.getSetCookie().map(parseSetCookie),
     bodyPreview: bodyPreviewText,
@@ -408,6 +423,7 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
     timeline,
     url: redact(hops ? current.toString() : res.url || url.toString()),
     redirected: hops > 0 || res.redirected,
+    httpVersion: !s.http1Only && alpnByOrigin.get(new URL(res.url || current.toString()).origin) === 'h2' ? '2' : '1.1',
     json,
   };
   if (sse) {

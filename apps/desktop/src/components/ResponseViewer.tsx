@@ -84,6 +84,9 @@ export function ResponseViewer({
         <span className="text-muted">
           Size <span className="text-fg tabular-nums">{formatBytes(response.size)}</span>
         </span>
+        {response.httpVersion === '2' && (
+          <Badge title="The response came over HTTP/2 (request Settings ▸ HTTP/1.1 only to turn it off)">HTTP/2</Badge>
+        )}
         {!!response.attempts && response.attempts > 1 && (
           <Badge tone="warn" title="Earlier attempts failed and were retried (request Settings ▸ Retries)">
             {response.attempts} attempts

@@ -106,6 +106,7 @@ export function RequestEditor({
             </Field>
             <Toggle checked={r.settings?.followRedirects !== false} onChange={(v) => setReq({ settings: { ...r.settings, followRedirects: v } })} label="Follow redirects" />
             <Toggle checked={!!r.settings?.insecure} onChange={(v) => setReq({ settings: { ...r.settings, insecure: v } })} label="Disable TLS verification (development only)" />
+            <Toggle checked={!!r.settings?.http1Only} onChange={(v) => setReq({ settings: { ...r.settings, http1Only: v || undefined } })} label="HTTP/1.1 only (HTTP/2 is used over https when the server supports it)" />
             <div className="col-span-2 font-medium pt-2">Client certificate (mTLS)</div>
             <Field label="Certificate path (PEM)">
               <Input className="mono" value={r.settings?.clientCert?.certPath ?? ''} onChange={(e) => setReq({ settings: { ...r.settings, clientCert: e.target.value ? { certPath: e.target.value, keyPath: r.settings?.clientCert?.keyPath ?? '' } : undefined } })} />
