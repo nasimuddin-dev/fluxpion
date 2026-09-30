@@ -1,4 +1,5 @@
-import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Radio, Send, ShieldCheck, Trash2, Upload, FolderOpen } from 'lucide-react';
+import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Package, Play, Radio, Send, ShieldCheck, Trash2, Upload, FolderOpen } from 'lucide-react';
+import { downloadContent } from '../lib/files';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -79,6 +80,38 @@ export function CollectionsView() {
               <Button size="sm" variant="ghost" icon={<Upload size={12} />} onClick={() => setImporting(true)}>
                 Import
               </Button>
+              <Menu
+                width={260}
+                trigger={
+                  <Button size="sm" variant="ghost" icon={<Download size={12} />} disabled={!cols.length} title={cols.length ? 'Export a collection or the whole workspace' : 'Nothing to export yet'}>
+                    Export
+                  </Button>
+                }
+                items={(() => {
+                  const target = cols.find((c) => c.id === sel) ?? cols[0];
+                  if (!target) return [];
+                  return [
+                    { label: `"${target.name}" as TestPion (.json)`, icon: <FileJson size={14} />, onSelect: () => void exportAs(target.id, 'testpion') },
+                    { label: 'as Postman collection v2.1', icon: <Send size={14} />, onSelect: () => void exportAs(target.id, 'postman') },
+                    { label: 'as OpenAPI 3.1 (.yaml)', icon: <FileCode size={14} />, onSelect: () => void exportAs(target.id, 'openapi') },
+                    { label: 'as Bruno collection folder…', icon: <FolderOpen size={14} />, onSelect: () => void exportAs(target.id, 'bruno') },
+                    {
+                      label: 'Whole workspace (.json)…',
+                      icon: <Package size={14} />,
+                      separator: true,
+                      onSelect: () =>
+                        void call<{ path?: string; bundle?: unknown }>('ws.export', {}).then(
+                          (r) => {
+                            // no native save dialog (browser / cloud): download the export instead
+                            if (r.bundle) downloadContent(`${useApp.getState().workspace?.name ?? 'workspace'}.apsworkspace.json`, JSON.stringify(r.bundle, null, 2), { type: 'application/json' });
+                            if (r.path || r.bundle) useApp.getState().toast('Workspace exported (secret values are never exported)', 'success');
+                          },
+                          (e) => useApp.getState().toast(asError(e).message, 'error'),
+                        ),
+                    },
+                  ];
+                })()}
+              />
               <Button
                 size="sm"
                 variant="ghost"

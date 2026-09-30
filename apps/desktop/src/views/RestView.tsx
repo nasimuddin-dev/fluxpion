@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X, FileCheck2 } from 'lucide-react';
+import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, Download, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X, FileCheck2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
@@ -543,6 +543,18 @@ export function RestView() {
                     <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" onClick={() => setImporting(true)}>
                       <Upload size={14} />
                     </IconButton>
+                    <Menu
+                      width={260}
+                      trigger={
+                        <IconButton label="Export a collection" disabled={!collections.length}>
+                          <Download size={14} />
+                        </IconButton>
+                      }
+                      items={[
+                        ...collections.slice(0, 12).map((c) => ({ label: `${c.name} (Postman v2.1)`, icon: <Download size={14} />, onSelect: () => useApp.getState().openIntent('collections', { collectionId: c.id, export: 'postman' }) })),
+                        { label: 'More formats (TestPion, OpenAPI, Bruno, workspace)…', icon: <FolderTree size={14} />, separator: true, onSelect: () => useApp.getState().setView('collections') },
+                      ]}
+                    />
                     <IconButton
                       label="New collection"
                       onClick={async () => {
