@@ -3,6 +3,9 @@ import { writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import {
   ApsError,
+  listTrash,
+  restoreFromTrash,
+  purgeTrash,
   compareEnvironments,
   WorkspaceStore,
   WORKSPACE_FORMATS,
@@ -163,6 +166,10 @@ export function workspaceHandlers(be: Backend): Handlers {
       return be.ws.saveEnvironment(env);
     },
     'env.delete': ({ id }: { id: string }) => be.ws.deleteEnvironment(id),
+    /** Recently deleted collections and environments (30 days). */
+    'trash.list': () => listTrash(be.ws),
+    'trash.restore': ({ id }: { id: string }) => restoreFromTrash(be.ws, id),
+    'trash.purge': ({ id }: { id?: string }) => purgeTrash(be.ws, id),
     'env.reorder': ({ ids }: { ids: string[] }) => be.ws.reorderEnvironments(ids),
     'currentValues.summary': () => be.currentValues?.summary(),
     'currentValues.get': ({ scope, owner }: { scope: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => {

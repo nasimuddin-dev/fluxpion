@@ -4,8 +4,11 @@ import { resolve } from 'node:path';
 import { Command } from 'commander';
 import {
   WorkspaceManager,
+  listTrash,
+  purgeTrash,
+  restoreFromTrash,
 } from '@testpion/core';
-import { EXIT, green, dim, CliError, openWorkspace } from '../shared.js';
+import { EXIT, green, dim, bold, CliError, openWorkspace } from '../shared.js';
 
 export function registerWorkspaceCommands(program: Command): void {
   const ws = program.command('workspace').description('manage workspaces');
@@ -57,5 +60,52 @@ export function registerWorkspaceCommands(program: Command): void {
       writeFileSync(o.output, JSON.stringify(store.exportBundle(), null, 2));
       console.log(green(`Exported to ${o.output} (secret values are never exported)`));
       store.close();
+    });
+
+  const trash = program.command('trash').description('recently deleted collections and environments (kept 30 days): list, restore, empty');
+  trash
+    .command('list')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const items = listTrash(store);
+        if (o.json) return console.log(JSON.stringify(items, null, 2));
+        if (!items.length) return console.log(dim('Nothing deleted in the last 30 days.'));
+        for (const i of items) console.log(`${bold(i.name)}  ${dim(`${i.kind} · deleted ${i.deletedAt} · ${i.id}`)}`);
+      } finally {
+        store.close();
+      }
+    });
+  trash
+    .command('restore')
+    .description('restore a deleted item (id from `trash list`); a name that is taken again gets "(restored)"')
+    .argument('<id>')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print the restored item as JSON')
+    .action((id: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const r = restoreFromTrash(store, id);
+        console.log(o.json ? JSON.stringify(r, null, 2) : green(`Restored ${r.kind} "${r.name}"`));
+      } finally {
+        store.close();
+      }
+    });
+  trash
+    .command('empty')
+    .description('delete everything in the trash for good (or one item with --id)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--id <id>', 'only this item')
+    .option('--yes', 'confirm; required, because this cannot be undone')
+    .action((o) => {
+      if (!o.yes) throw new CliError('Refusing to delete for good without --yes', EXIT.CONFIG_ERROR);
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        console.log(green(`Deleted ${purgeTrash(store, o.id)} item(s) for good`));
+      } finally {
+        store.close();
+      }
     });
 }

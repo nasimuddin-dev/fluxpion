@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Copy, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -7,13 +7,15 @@ import type { Environment, KeyValue } from '../types';
 import { download, uid } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { EnvCompare } from '../components/EnvCompare';
-import { Badge, Button, cx, Empty, Field, Input, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
+import { TrashDialog } from '../components/TrashDialog';
+import { Badge, Button, cx, Empty, Field, IconButton, Input, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
   const settings = useApp((s) => s.settings);
   const [envs, setEnvs] = useState<Environment[]>([]);
   const [comparing, setComparing] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Environment>();
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
@@ -126,7 +128,12 @@ export function EnvironmentsView() {
                   </Button>
                 }
               >
-                Environments
+                <span className="flex items-center gap-1">
+                  Environments
+                  <IconButton label="Recently deleted" className="h-6 w-6" onClick={() => setTrashOpen(true)}>
+                    <ArchiveRestore size={12} />
+                  </IconButton>
+                </span>
               </SectionTitle>
               {envs.map((e, i) => (
                 <button
@@ -216,7 +223,7 @@ export function EnvironmentsView() {
                       className="text-bad"
                       icon={<Trash2 size={13} />}
                       onClick={async () => {
-                        if (!(await confirmAction({ title: 'Delete environment', message: `Delete the environment "${draft.name}"?`, detail: 'Its variables and saved secret values are removed.', confirmLabel: 'Delete environment', danger: true }))) return;
+                        if (!(await confirmAction({ title: 'Delete environment', message: `Delete the environment "${draft.name}"?`, detail: 'You can restore it, with its secret values, from Recently deleted for 30 days.', confirmLabel: 'Delete environment', danger: true }))) return;
                         await call('env.delete', { id: draft.id });
                         setSel(undefined);
                         await load();
@@ -283,6 +290,7 @@ export function EnvironmentsView() {
           </div>
         )}
       </div>
+      {trashOpen && <TrashDialog kind="environment" onClose={() => setTrashOpen(false)} onRestored={(r) => void load().then(() => setSel(r.id))} />}
       {comparing && sel && <EnvCompare environments={envs} initialLeft={sel} onClose={() => setComparing(false)} />}
     </div>
   );

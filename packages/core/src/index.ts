@@ -71,6 +71,7 @@ export * from './storage/workspace.js';
 export * from './storage/search.js';
 export * from './storage/current-values.js';
 export * from './storage/env-compare.js';
+export * from './storage/trash.js';
 export * from './storage/examples.js';
 
 export * from './import/importers.js';

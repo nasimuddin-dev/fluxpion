@@ -1,4 +1,4 @@
-import { Download, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Send, Trash2, Upload } from 'lucide-react';
+import { ArchiveRestore, Download, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Send, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -11,11 +11,13 @@ import { CollectionRunner } from '../components/CollectionRunner';
 import { MockPanel } from '../components/MockPanel';
 import { CollectionDocs } from '../components/CollectionDocs';
 import { addToFolder, CollectionTree } from '../components/CollectionTree';
+import { TrashDialog } from '../components/TrashDialog';
 import { KeyValueEditor } from '../components/KeyValueEditor';
-import { Badge, Button, cx, Empty, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, IconButton, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
 import { ImportModal } from './rest/dialogs';
 
 export function CollectionsView() {
+  const [trashOpen, setTrashOpen] = useState(false);
   const [cols, setCols] = useState<Collection[]>([]);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Collection>();
@@ -89,6 +91,9 @@ export function CollectionsView() {
               >
                 New
               </Button>
+              <IconButton label="Recently deleted" onClick={() => setTrashOpen(true)}>
+                <ArchiveRestore size={13} />
+              </IconButton>
             </div>
           }
         >
@@ -103,6 +108,7 @@ export function CollectionsView() {
               </div>
             </button>
           ))}
+          {trashOpen && <TrashDialog kind="collection" onClose={() => setTrashOpen(false)} onRestored={(r) => void load().then(() => setSel(r.id))} />}
           {!cols.length && <Empty icon={<FolderTree size={24} />} title="No collections">Create one or import OpenAPI, Postman, Insomnia, Bruno, Hoppscotch or HAR.</Empty>}
         </div>
       </div>
@@ -147,7 +153,7 @@ export function CollectionsView() {
                   className="text-bad"
                   icon={<Trash2 size={12} />}
                   onClick={async () => {
-                    if (!(await confirmAction({ title: 'Delete collection', message: `Delete the collection "${draft.name}" and all its requests?`, detail: 'This cannot be undone. Export it first if you may need it.', confirmLabel: 'Delete collection', danger: true }))) return;
+                    if (!(await confirmAction({ title: 'Delete collection', message: `Delete the collection "${draft.name}" and all its requests?`, detail: 'You can restore it from Recently deleted for 30 days.', confirmLabel: 'Delete collection', danger: true }))) return;
                     await call('col.delete', { id: draft.id });
                     setSel(undefined);
                     await load();

@@ -65,3 +65,9 @@ testpion workspace delete "Checkout API v2" --yes --json       # --yes is requir
 ```
 
 `workspace delete` refuses to run without `--yes` and says what would be deleted. The [MCP server](/ai-testing/mcp-server) gives agents one workspace's collections, requests and environments; creating and deleting workspaces stays with you and the CLI.
+
+## Recently deleted
+
+Deleted collections and environments aren't gone straight away. They stay in the workspace's `trash/` folder for 30 days; that folder ignores itself in git, so it is never committed. Click the **Recently deleted** icon at the top of the Collections or Envs list to **Restore** an item or delete it for good. A restored environment keeps its secret values. If you've created another item with the same name meanwhile, the restored one is called *Name (restored)*.
+
+From the terminal: `testpion trash list -w <workspace> [--json]`, `testpion trash restore <id> -w <workspace>`, `testpion trash empty -w <workspace> --yes`.

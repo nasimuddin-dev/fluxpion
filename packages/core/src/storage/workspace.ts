@@ -8,6 +8,7 @@ import { shortId, slugify } from '../util/ids.js';
 import { atomicWrite, readJson, writeJson } from './fsutil.js';
 import { openMetaStore, type MetaStore } from './metastore.js';
 import type { Baseline } from '../report/regression.js';
+import { moveToTrash } from './trash.js';
 
 /* ------------------------------------------------------------------ migrations */
 
@@ -168,8 +169,9 @@ export class WorkspaceStore {
     return next;
   }
 
+  /** Moves the collection to the trash (restorable for 30 days; see trash.ts). */
   deleteCollection(id: string): void {
-    rmSync(this.path('collections', `${slugify(id)}.json`), { force: true });
+    moveToTrash(this, 'collection', this.path('collections', `${slugify(id)}.json`));
   }
 
   /* environments */
@@ -226,8 +228,9 @@ export class WorkspaceStore {
     return clean;
   }
 
+  /** Moves the environment to the trash (restorable for 30 days; its secret values stay in the secret store). */
   deleteEnvironment(id: string): void {
-    rmSync(this.path('environments', `${slugify(id)}.json`), { force: true });
+    moveToTrash(this, 'environment', this.path('environments', `${slugify(id)}.json`));
   }
 
   /* providers & MCP servers */
@@ -525,7 +528,7 @@ export class WorkspaceManager {
       // copy definitions, not execution artefacts
       filter: (s) => {
         const top = relative(src, s).split(/[\\/]/)[0] ?? '';
-        return !['runs', 'traces', 'payloads', 'reports'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
+        return !['runs', 'traces', 'payloads', 'reports', 'trash'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
       },
     });
     const w = readJson<Workspace>(join(dest, 'workspace.json'));
@@ -550,7 +553,7 @@ export class WorkspaceManager {
       recursive: true,
       filter: (s) => {
         const top = relative(templateDir, s).split(/[\\/]/)[0] ?? '';
-        return !['runs', 'traces', 'payloads', 'reports', 'baselines'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
+        return !['runs', 'traces', 'payloads', 'reports', 'baselines', 'trash'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
       },
     });
     return { id: w.id, name: w.name, path: dest, updatedAt: w.updatedAt };
