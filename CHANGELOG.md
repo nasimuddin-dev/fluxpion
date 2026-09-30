@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Mock servers fill dynamic variables.** `{{$guid}}`, `{{$randomFullName}}`, `{{$isoTimestamp}}` … in a saved example's body or headers get a new value on every response, as in Postman's mocks.
+- **Mock servers fill dynamic variables.** `{{$guid}}`, `{{$randomFullName}}`, `{{$isoTimestamp}}` … in a saved example's body or headers get a new value on every response, as in Postman's mocks. MCP mocks take them too, next to `{{args.x}}`.
 - **Catch breaking API changes.** `testpion openapi-diff old.yaml new.yaml` compares two OpenAPI / Swagger versions and lists what can break clients (removed operations or success responses, new required parameters or body fields, type changes, removed or now-optional response fields, narrowed enums) and the other changes. `--fail-on-breaking` makes it a CI check, and **Run in CI** (`testpion ci --openapi api/openapi.yaml`) adds that check on pull requests to the generated GitHub, GitLab, Azure or Jenkins pipeline; `--json` and the MCP tool `openapi_diff` give the same to scripts and AI agents, and the app has **Compare OpenAPI versions** in the command palette.
 - Fixed: `pm.environment.name` in scripts returned `"environment"`; it is now the active environment's name (also `pm.info.environmentName`).
 - Scripts: `pm.request.url` is now a Postman-style URL object (`getPath()`, `getQueryString()`, `getRemote()`, `query.get/add/upsert/remove` …, keeping `{{variables}}` as written), and assigning a string to it replaces the URL.

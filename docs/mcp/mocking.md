@@ -50,7 +50,7 @@ prompts:
         text: "Summarize {{topic}} in one line."
 ```
 
-A tool's first response whose `when` matches the arguments is used, otherwise the one without `when`. A response is `text` (with `{{args.name}}` placeholders), `json` (also sent as structured content) or raw MCP `content` items, and `isError: true` makes it a tool error.
+A tool's first response whose `when` matches the arguments is used, otherwise the one without `when`. A response is `text` (with `{{args.name}}` placeholders), `json` (also sent as structured content) or raw MCP `content` items, and `isError: true` makes it a tool error. [Dynamic variables](/api-testing/environments#built-in-variables) such as `{{$guid}}`, `{{$randomFullName}}` or `{{$randomInt(1,100)}}` give a fresh value on every call; a string that is only a placeholder keeps the value's type (`qty: "{{$randomInt(1,5)}}"` is a number).
 
 ## Use it
 

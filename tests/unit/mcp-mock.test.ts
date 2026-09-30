@@ -40,6 +40,12 @@ describe('MCP mock server', () => {
     expect(mockToolResult(def, 'search_customer', { customer_id: '999' })).toEqual({ content: [{ type: 'text', text: 'No customer 999' }], isError: true });
     expect(mockToolResult(def, 'search_customer', { customer_id: '1' }).structuredContent).toEqual({ id: '123', name: 'Ada Lovelace', tier: 'gold' });
     expect(mockToolResult(def, 'echo', { message: 'hi' }).content).toEqual([{ type: 'text', text: 'you said hi' }]);
+    // dynamic variables: a fresh value per call; a whole-string placeholder keeps its type
+    const dyn = { name: 'dyn', tools: [{ name: 'new_order', responses: [{ json: { id: '{{$guid}}', qty: '{{$randomInt(3,3)}}', note: 'by {{$randomFirstName}} for {{args.who}}' } }] }] };
+    const o = mockToolResult(dyn as never, 'new_order', { who: 'Ada' }).structuredContent as { id: string; qty: number; note: string };
+    expect(o.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(o.qty).toBe(3);
+    expect(o.note).toMatch(/^by [A-Z]\w+ for Ada$/);
     expect(mockToolResult(def, 'nope').isError).toBe(true);
     // placeholders in JSON responses: a whole-string placeholder keeps the argument's type
     const templ = { name: 't', tools: [{ name: 'forecast', responses: [{ json: { city: '{{args.city}}', days: '{{args.days}}', note: 'for {{args.city}}', list: ['{{args.city}}'] } }] }] };

@@ -15,6 +15,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { ApsError } from '../errors.js';
+import { dynamicValue } from '../vars/dynamic.js';
 import type { McpDiscovery } from '../protocols/mcp/client.js';
 
 /**
@@ -59,18 +60,22 @@ export function dumpMcpMock(d: McpMockDefinition): string {
 
 const deepEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 const subset = (args: Record<string, unknown>, when: Record<string, unknown>) => Object.entries(when).every(([k, v]) => deepEqual(args[k], v));
+/** `{{args.x}}` from the call, or a dynamic variable (`{{$guid}}`, `{{$randomInt(1,9)}}` …) with a fresh value. */
+const lookup = (path: string, vars: Record<string, unknown>): unknown =>
+  path.startsWith('$') ? dynamicValue(path) : path.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), vars);
+const PLACEHOLDER = /\{\{\s*([\w.]+|\$[\w.]+(?:\([^)]*\))?)\s*\}\}/g;
 const fill = (s: string, vars: Record<string, unknown>) =>
-  s.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (m, path: string) => {
-    const v = path.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), vars);
+  s.replace(PLACEHOLDER, (m, path: string) => {
+    const v = lookup(path, vars);
     return v === undefined ? m : typeof v === 'string' ? v : JSON.stringify(v);
   });
 
-/** `{{args.x}}` in every string of a JSON value; a string that is only a placeholder keeps the argument's type. */
+/** Placeholders in every string of a JSON value; a string that is only a placeholder keeps the value's type. */
 const fillDeep = (v: unknown, vars: Record<string, unknown>): unknown => {
   if (typeof v === 'string') {
-    const whole = /^\{\{\s*([\w.]+)\s*\}\}$/.exec(v);
+    const whole = /^\{\{\s*([\w.]+|\$[\w.]+(?:\([^)]*\))?)\s*\}\}$/.exec(v);
     if (whole) {
-      const got = whole[1]!.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), vars);
+      const got = lookup(whole[1]!, vars);
       if (got !== undefined) return got;
     }
     return fill(v, vars);
