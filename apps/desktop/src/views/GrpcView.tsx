@@ -1,8 +1,10 @@
-import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2 } from 'lucide-react';
+import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2, Bookmark, History, KeyRound, Plug } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useIntent } from '../hooks';
 import type { KeyValue } from '../types';
@@ -212,25 +214,37 @@ export function GrpcView() {
 
   return (
     <Split id="grpc-saved" sidebar initial={18} min={12}>
-    <div className="h-full bg-panel/50">
-      <FolderList
-        id="grpc-saved"
-        title="Saved requests"
-        itemNoun="request"
-        addLabel="Save current request"
-        folders={saved.lib.folders}
-        selected={savedId}
-        onSelect={openSaved}
-        onAdd={(folder) => void saveRequest(true, folder)}
-        ops={saved.ops}
-        items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: i.data.method || i.data.target, icon: <Waypoints size={12} className="text-muted" /> }))}
-        empty={
-          <Empty title="No saved requests">
-            Save a request (address, method, message, metadata and its .proto files or reflection) to call it again later, and group requests in folders.
-          </Empty>
-        }
-      />
-    </div>
+    <SidebarShell
+      id="grpc"
+      panes={[
+        {
+          id: 'saved',
+          label: 'Saved',
+          icon: <Bookmark size={13} />,
+          render: () => (
+            <FolderList
+              id="grpc-saved"
+              title="Saved requests"
+              itemNoun="request"
+              addLabel="Save current request"
+              folders={saved.lib.folders}
+              selected={savedId}
+              onSelect={openSaved}
+              onAdd={(folder) => void saveRequest(true, folder)}
+              ops={saved.ops}
+              items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: i.data.method || i.data.target, icon: <Waypoints size={12} className="text-muted" /> }))}
+              empty={
+                <Empty title="No saved requests">
+                  Save a request (address, method, message, metadata and its .proto files or reflection) to call it again later, and group requests in folders.
+                </Empty>
+              }
+            />
+          ),
+        },
+        { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+        { id: 'history', label: 'History', icon: <History size={13} />, render: () => <HistoryPane kind="grpc" noun="gRPC calls you make" /> },
+      ]}
+    />
     <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <VarInput

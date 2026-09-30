@@ -4,6 +4,7 @@ import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
+import { ViewBoundary } from './components/ViewBoundary';
 import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
@@ -268,9 +269,11 @@ export default function App() {
               const V = VIEWS[id];
               return (
                 <div key={`${workspace?.id}-${id}`} className="absolute inset-0 flex flex-col" style={{ display: id === view ? 'flex' : 'none' }}>
-                  <Suspense fallback={<div className="h-full grid place-items-center"><Spinner size={20} /></div>}>
-                    <V />
-                  </Suspense>
+                  <ViewBoundary view={id}>
+                    <Suspense fallback={<div className="h-full grid place-items-center"><Spinner size={20} /></div>}>
+                      <V />
+                    </Suspense>
+                  </ViewBoundary>
                 </div>
               );
             })}

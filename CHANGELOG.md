@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+- **Fix: blank window on start** after opening a GraphQL request whose variables are saved as a JSON object (e.g. in the TestPion Examples workspace). The app remembers the last view, so it failed on every start. The variables now open as JSON text, editors accept any saved value, and a problem in one view no longer blanks the window: it shows the error with **Try again** and **Reset this view**.
+- **Fix: the test suite no longer writes to your real settings** (it added temporary workspaces to the list). Leftover entries from the temp folder are forgotten automatically.
 - **API coverage**: which operations of an OpenAPI document, and which of their documented response codes, the tests and requests exercised. It also shows operations that were never called, codes the document doesn't describe, and requests to paths it doesn't have. Open **API coverage** from a finished run or the command palette. **Suggest tests with AI** drafts tests for the gaps, and the report exports as Markdown. In CI, `testpion coverage specs/api.yaml --min 80` fails the build below a threshold (`--json`, `--markdown`, `--history`). AI agents use the `api_coverage` MCP tool. HTTP test results now record their status code.
+- **One sidebar layout everywhere**: every view now has the REST sidebar: its saved items (collections, saved requests, connections, servers, prompts, test files …), **Environments**, and **History** (that view's requests) or **Runs**. Tabs show labels when the sidebar is wide enough and icons with tooltips otherwise.
+- **Saved evaluations and load tests**: save an evaluation or a load test, group them in folders, and run one again from its menu whenever you need (`library/evaluations.json`, `library/load-tests.json`). The Evaluations sidebar lists their runs.
+- **Monitors** sidebar matches the other saved lists (filter, New monitor button, empty state with a start button).
 - **Example OpenAPI document** for the veterinary demo API (`specs/veterinary-api.yaml`).
 - **Open folder** in the workspace menu explains what it's for (a workspace kept elsewhere, e.g. in a git repository) and says clearly when the chosen folder isn't a workspace.
 

@@ -1,8 +1,10 @@
-import { FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Sparkles, Square, Trash2, WifiOff } from 'lucide-react';
+import { FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Sparkles, Square, Trash2, WifiOff, Bookmark, History, Plug } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSticky } from '../lib/sticky';
 import { useLibrary } from '../lib/library';
 import { FolderList } from '../components/FolderList';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { stringifyYaml } from '../lib/yaml';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
@@ -347,25 +349,37 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
   const r = result && !('error' in result) ? result : undefined;
   return (
     <Split id="ai-saved" sidebar initial={18} min={12}>
-    <div className="h-full bg-panel/50">
-      <FolderList
-        id="ai-saved"
-        title="Saved prompts"
-        itemNoun="prompt"
-        addLabel="Save current prompt"
-        folders={saved.lib.folders}
-        selected={savedId}
-        onSelect={openSaved}
-        onAdd={(folder) => void savePrompt(true, folder)}
-        ops={saved.ops}
-        items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: `${i.data.model || i.data.provider}`, icon: <Sparkles size={12} className="text-muted" /> }))}
-        empty={
-          <Empty title="No saved prompts">
-            Save a prompt with its model, variables, structured output and evaluators to run it again later, and group prompts in folders.
-          </Empty>
-        }
-      />
-    </div>
+    <SidebarShell
+      id="ai"
+      panes={[
+        {
+          id: 'saved',
+          label: 'Saved',
+          icon: <Bookmark size={13} />,
+          render: () => (
+            <FolderList
+              id="ai-saved"
+              title="Saved prompts"
+              itemNoun="prompt"
+              addLabel="Save current prompt"
+              folders={saved.lib.folders}
+              selected={savedId}
+              onSelect={openSaved}
+              onAdd={(folder) => void savePrompt(true, folder)}
+              ops={saved.ops}
+              items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: `${i.data.model || i.data.provider}`, icon: <Sparkles size={12} className="text-muted" /> }))}
+              empty={
+                <Empty title="No saved prompts">
+                  Save a prompt with its model, variables, structured output and evaluators to run it again later, and group prompts in folders.
+                </Empty>
+              }
+            />
+          ),
+        },
+        { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+        { id: 'history', label: 'History', icon: <History size={13} />, render: () => <HistoryPane kind="llm" noun="Prompts you run" /> },
+      ]}
+    />
     <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line flex-wrap">
         <ModelPicker providers={providers} provider={d.provider} model={d.model} onChange={onModel} />

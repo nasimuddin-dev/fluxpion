@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, Layers, Play, Save, Trash2, Workflow } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -6,6 +6,8 @@ import { useIntent } from '../hooks';
 import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunPanel } from '../components/RunPanel';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane } from '../components/SidebarPanes';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, IconButton, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
 
@@ -244,64 +246,94 @@ export function TestsView() {
 
   return (
     <Split id="tests-main" initial={22} min={14}>
-      <div className="h-full flex flex-col bg-panel/50">
-        <SectionTitle
-          right={
-            <div className="flex items-center">
-              <Menu
-                width={220}
-                items={(
-                  [
-                    ['http', 'New REST test'],
-                    ['graphql', 'New GraphQL test'],
-                    ['grpc', 'New gRPC test'],
-                    ['websocket', 'New WebSocket test'],
-                    ['mqtt', 'New MQTT test'],
-                    ['mcp', 'New MCP test'],
-                    ['llm', 'New AI test'],
-                    ['suite', 'New suite'],
-                  ] as const
-                ).map(([kind, label], i) => ({ label, icon: kind === 'suite' ? <Layers size={13} /> : <FilePlus2 size={13} />, separator: i === 7, onSelect: () => void newFile(kind) }))}
-                trigger={
-                  <button aria-label="New test file" title="New test file (REST, GraphQL, gRPC, WebSocket, MQTT, MCP, AI or a suite)" className="flex items-center gap-1 h-6 px-1.5 rounded-md text-xs text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover">
-                    <FilePlus2 size={13} />
-                    New
-                    <ChevronDown size={11} />
-                  </button>
-                }
-              />
-              <IconButton label="Run in CI (GitHub Actions, GitLab, Azure, Jenkins)" className="ml-1" onClick={() => useApp.getState().set({ ci: {} })}>
-                <Workflow size={13} />
-              </IconButton>
-            </div>
-          }
-        >
-          Tests
-        </SectionTitle>
-        {tree.length > 0 && (
-          <div className="px-2 pb-2">
-            <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter test files" aria-label="Filter test files" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
-          </div>
-        )}
-        <div className="flex-1 overflow-auto">{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use New to create a REST, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
-        <div className="border-t border-line p-2 flex flex-col gap-2">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <label className="flex flex-col gap-0.5">
-              <span className="text-muted">Workers</span>
-              <Input type="number" min={1} value={opts.concurrency} onChange={(e) => setOpts({ ...opts, concurrency: Math.max(1, Number(e.target.value)) })} />
-            </label>
-            <label className="flex flex-col gap-0.5">
-              <span className="text-muted">Retries</span>
-              <Input type="number" min={0} value={opts.retries} onChange={(e) => setOpts({ ...opts, retries: Math.max(0, Number(e.target.value)) })} />
-            </label>
-            <Input className="text-xs" placeholder="grep name" value={opts.grep} onChange={(e) => setOpts({ ...opts, grep: e.target.value })} />
-            <Input className="text-xs" placeholder="tags" value={opts.tags} onChange={(e) => setOpts({ ...opts, tags: e.target.value })} />
-          </div>
-          <Button variant="primary" icon={<Play size={13} />} onClick={() => run([], 'All tests')}>
-            Run all tests
-          </Button>
-        </div>
-      </div>
+      <SidebarShell
+        id="tests"
+        panes={[
+          {
+            id: 'tests',
+            label: 'Tests',
+            icon: <ShieldCheck size={13} />,
+            render: () => (
+              <>
+                <SectionTitle
+                  right={
+                    <div className="flex items-center">
+                      <Menu
+                        width={220}
+                        items={(
+                          [
+                            ['http', 'New REST test'],
+                            ['graphql', 'New GraphQL test'],
+                            ['grpc', 'New gRPC test'],
+                            ['websocket', 'New WebSocket test'],
+                            ['mqtt', 'New MQTT test'],
+                            ['mcp', 'New MCP test'],
+                            ['llm', 'New AI test'],
+                            ['suite', 'New suite'],
+                          ] as const
+                        ).map(([kind, label], i) => ({ label, icon: kind === 'suite' ? <Layers size={13} /> : <FilePlus2 size={13} />, separator: i === 7, onSelect: () => void newFile(kind) }))}
+                        trigger={
+                          <button aria-label="New test file" title="New test file (REST, GraphQL, gRPC, WebSocket, MQTT, MCP, AI or a suite)" className="flex items-center gap-1 h-6 px-1.5 rounded-md text-xs text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover">
+                            <FilePlus2 size={13} />
+                            New
+                            <ChevronDown size={11} />
+                          </button>
+                        }
+                      />
+                      <IconButton label="Run in CI (GitHub Actions, GitLab, Azure, Jenkins)" className="ml-1" onClick={() => useApp.getState().set({ ci: {} })}>
+                        <Workflow size={13} />
+                      </IconButton>
+                    </div>
+                  }
+                >
+                  Tests
+                </SectionTitle>
+                {tree.length > 0 && (
+                  <div className="px-2 pb-2">
+                    <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter test files" aria-label="Filter test files" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
+                  </div>
+                )}
+                <div className="flex-1 overflow-auto">{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use New to create a REST, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
+                <div className="border-t border-line p-2 flex flex-col gap-2">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-muted">Workers</span>
+                      <Input type="number" min={1} value={opts.concurrency} onChange={(e) => setOpts({ ...opts, concurrency: Math.max(1, Number(e.target.value)) })} />
+                    </label>
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-muted">Retries</span>
+                      <Input type="number" min={0} value={opts.retries} onChange={(e) => setOpts({ ...opts, retries: Math.max(0, Number(e.target.value)) })} />
+                    </label>
+                    <Input className="text-xs" placeholder="grep name" value={opts.grep} onChange={(e) => setOpts({ ...opts, grep: e.target.value })} />
+                    <Input className="text-xs" placeholder="tags" value={opts.tags} onChange={(e) => setOpts({ ...opts, tags: e.target.value })} />
+                  </div>
+                  <Button variant="primary" icon={<Play size={13} />} onClick={() => run([], 'All tests')}>
+                    Run all tests
+                  </Button>
+                </div>
+              </>
+            ),
+          },
+          { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+          {
+            id: 'runs',
+            label: 'Runs',
+            icon: <History size={13} />,
+            render: () => (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <RunList
+                  runs={runs}
+                  active={runId}
+                  onSelect={(id) => {
+                    setRunId(id);
+                    setTab('run');
+                  }}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
       <div className="h-full flex flex-col min-w-0">
         <Tabs
           value={tab}

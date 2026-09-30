@@ -8,6 +8,7 @@ import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, u
 import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
+import { SidebarShell } from '../components/SidebarShell';
 import { uid } from '../lib/format';
 
 /** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
@@ -516,101 +517,95 @@ export function RestView() {
   return (
     <>
     <Split id="rest-sidebar" sidebar initial={20} min={12}>
-      <div className="h-full flex flex-col bg-panel/50 border-r border-line">
-        <div role="tablist" aria-label="Sidebar" className="flex items-center gap-0.5 px-2 pt-2 pb-2">
-          {(
-            [
-              ['collections', 'Collections', <FolderTree key="c" size={13} />],
-              ['environments', 'Environments', <KeyRound key="e" size={13} />],
-              ['history', 'History', <History key="h" size={13} />],
-            ] as const
-          ).map(([id, label, icon]) => (
-            <Tooltip key={id} content={label}>
-              <button
-                role="tab"
-                aria-selected={side === id}
-                aria-label={label}
-                onClick={() => setSide(id)}
-                className={cx('flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-xs font-medium transition-colors', side === id ? 'bg-bg shadow-sm border border-line text-fg' : 'text-muted hover:text-fg hover:bg-hover')}
-              >
-                {icon}
-                <span className="truncate hidden xl:inline">{label}</span>
-              </button>
-            </Tooltip>
-          ))}
-        </div>
-        {side === 'collections' && (
-          <>
-            <div className="flex items-center gap-1 px-2 pb-2">
-              <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter requests" value={filter} onChange={(e) => setFilter(e.target.value)} />
-              <IconButton
-                label={favoritesOnly ? 'Show all requests' : 'Show favorites only'}
-                active={favoritesOnly}
-                onClick={() => setFavoritesOnly((current) => {
-                  localStorage.setItem('aps.rest.favoritesOnly', String(!current));
-                  return !current;
-                })}
-              >
-                <Star size={14} fill={favoritesOnly ? 'currentColor' : 'none'} />
-              </IconButton>
-              <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" onClick={() => setImporting(true)}>
-                <Upload size={14} />
-              </IconButton>
-              <IconButton
-                label="New collection"
-                onClick={async () => {
-                  const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
-                  if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
+      <SidebarShell
+        id="rest"
+        value={side}
+        onChange={(v) => setSide(v as typeof side)}
+        panes={[
+          {
+            id: 'collections',
+            label: 'Collections',
+            icon: <FolderTree size={13} />,
+            render: () => (
+              <>
+                  <div className="flex items-center gap-1 px-2 pb-2">
+                    <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter requests" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                    <IconButton
+                      label={favoritesOnly ? 'Show all requests' : 'Show favorites only'}
+                      active={favoritesOnly}
+                      onClick={() => setFavoritesOnly((current) => {
+                        localStorage.setItem('aps.rest.favoritesOnly', String(!current));
+                        return !current;
+                      })}
+                    >
+                      <Star size={14} fill={favoritesOnly ? 'currentColor' : 'none'} />
+                    </IconButton>
+                    <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" onClick={() => setImporting(true)}>
+                      <Upload size={14} />
+                    </IconButton>
+                    <IconButton
+                      label="New collection"
+                      onClick={async () => {
+                        const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
+                        if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
+                      }}
+                    >
+                      <FolderPlus size={14} />
+                    </IconButton>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    {collections.length ? (
+                      <CollectionTree
+                        collections={collections}
+                        filter={filter}
+                        favoritesOnly={favoritesOnly}
+                        activeRequestId={tab.requestId}
+                        onOpen={openRequest}
+                        onChange={saveCollection}
+                        onMoved={(ids, from, to) => setTabs((ts) => ts.map((t) => (t.requestId && ids.includes(t.requestId) && t.collectionId === from ? { ...t, collectionId: to } : t)))}
+                        onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
+                        onNewRequest={async (c, folderId) => {
+                          const t = blankRequest();
+                          const node: SavedHttpRequest = { kind: 'http', id: uid('req-'), name: 'New request', request: t.request, assertions: t.assertions };
+                          await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
+                          openRequest(c, node);
+                        }}
+                      />
+                    ) : (
+                      <Empty
+                        icon={<FolderTree size={22} />}
+                        title="No collections yet"
+                        action={
+                          <Button size="sm" icon={<Upload size={12} />} onClick={() => setImporting(true)}>
+                            Import
+                          </Button>
+                        }
+                      >
+                        Save a request with Ctrl+S, create a collection, or import OpenAPI, Postman, Insomnia, Bruno or HAR.
+                      </Empty>
+                    )}
+                  </div>
+              </>
+            ),
+          },
+          { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+          {
+            id: 'history',
+            label: 'History',
+            icon: <History size={13} />,
+            render: () => (
+              <HistoryPane
+                onOpen={(item) => {
+                  if (!item.request) return;
+                  const t: RestTab = { ...blankRequest(), name: item.name, request: fromEngineRequest(item.request as HttpRequestSpec) };
+                  setTabs((ts) => [...ts, t]);
+                  setActive(t.id);
                 }}
-              >
-                <FolderPlus size={14} />
-              </IconButton>
-            </div>
-            <div className="flex-1 overflow-auto">
-              {collections.length ? (
-                <CollectionTree
-                  collections={collections}
-                  filter={filter}
-                  favoritesOnly={favoritesOnly}
-                  activeRequestId={tab.requestId}
-                  onOpen={openRequest}
-                  onChange={saveCollection}
-                  onMoved={(ids, from, to) => setTabs((ts) => ts.map((t) => (t.requestId && ids.includes(t.requestId) && t.collectionId === from ? { ...t, collectionId: to } : t)))}
-                  onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
-                  onNewRequest={async (c, folderId) => {
-                    const t = blankRequest();
-                    const node: SavedHttpRequest = { kind: 'http', id: uid('req-'), name: 'New request', request: t.request, assertions: t.assertions };
-                    await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
-                    openRequest(c, node);
-                  }}
-                />
-              ) : (
-                <Empty
-                  icon={<FolderTree size={22} />}
-                  title="No collections yet"
-                  action={
-                    <Button size="sm" icon={<Upload size={12} />} onClick={() => setImporting(true)}>
-                      Import
-                    </Button>
-                  }
-                >
-                  Save a request with Ctrl+S, create a collection, or import OpenAPI, Postman, Insomnia, Bruno or HAR.
-                </Empty>
-              )}
-            </div>
-          </>
-        )}
-        {side === 'environments' && <EnvironmentsPane />}
-        {side === 'history' && (
-          <HistoryPane
-            onOpen={(request, name) => {
-              const t: RestTab = { ...blankRequest(), name, request: fromEngineRequest(request) };
-              setTabs((ts) => [...ts, t]);
-              setActive(t.id);
-            }}
-          />
-        )}
-      </div>
+              />
+            ),
+          },
+        ]}
+      />
       <div className="h-full flex flex-col min-w-0">
         <div ref={stripRef} className="flex items-end h-9 border-b border-line bg-panel/40 overflow-hidden shrink-0" role="tablist">
           {shown.map((t) => (

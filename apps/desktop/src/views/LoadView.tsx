@@ -1,11 +1,16 @@
-import { AlertTriangle, Gauge, Play, Sparkles, Square } from 'lucide-react';
+import { AlertTriangle, Bookmark, Gauge, KeyRound, Play, Save, Sparkles, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
-import { confirmAction, persisted, useApp } from '../store';
+import { confirmAction, persisted, promptText, useApp } from '../store';
 import type { Collection, CollectionNode, KeyValue, LatencyStats, ProviderConfig } from '../types';
 import { formatBytes, formatCost, formatMs, plural } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { VarInput } from '../components/VarInput';
+import { FolderList } from '../components/FolderList';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane } from '../components/SidebarPanes';
+import { useLibrary } from '../lib/library';
+import { useSticky } from '../lib/sticky';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
 import type { NormalizedError } from '../api';
@@ -108,6 +113,31 @@ export function LoadView() {
   idRef.current = id;
   const set = (p: Partial<typeof d>) => setD((x) => ({ ...x, ...p }));
   useEffect(() => drafts.save(d), [d]);
+  // saved load tests (library/load-tests.json): run them again whenever needed
+  type Draft = typeof d;
+  const saved = useLibrary<Draft>('load-tests');
+  const [savedId, setSavedId] = useSticky<string | undefined>('load:saved', undefined);
+  const current = saved.lib.items.find((i) => i.id === savedId);
+  const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(d);
+  const [startWhenReady, setStartWhenReady] = useState(false);
+  const openSaved = async (savedItem: string, thenRun = false) => {
+    const it = await saved.find(savedItem);
+    if (!it) return;
+    setSavedId(savedItem);
+    setD({ ...drafts.load(), ...it.data });
+    if (thenRun) setStartWhenReady(true);
+  };
+  const saveLoad = async (asNew = false, folder?: string) => {
+    if (current && !asNew) {
+      await saved.put({ ...current, data: d });
+      useApp.getState().toast(`Saved "${current.name}"`, 'success');
+      return;
+    }
+    const target = d.kind === 'http' ? `${d.method} ${d.url}` : d.kind === 'grpc' ? d.grpcMethod : d.kind === 'llm' ? d.model || 'LLM' : 'Collection';
+    const name = await promptText('Save load test', { message: 'Name', value: `${target} · ${d.vus} users`.slice(0, 60), okLabel: 'Save' });
+    if (!name) return;
+    setSavedId(await saved.put({ name, folder, data: d }));
+  };
   useEffect(() => {
     void call<ProviderConfig[]>('ai.providers').then(setProviders);
     void call<Collection[]>('col.list').then((cs) => setCollections(cs.filter((c) => !(c as { problem?: string }).problem)));
@@ -183,14 +213,61 @@ export function LoadView() {
       setPreparing(false);
     }
   };
+  useEffect(() => {
+    if (!startWhenReady) return;
+    setStartWhenReady(false);
+    if (!id) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startWhenReady, d]);
   const collection = collections.find((c) => c.id === (d.collectionId || collections[0]?.id));
   const s = snap;
   return (
+    <Split id="load-sidebar" sidebar initial={18} min={12}>
+      <SidebarShell
+        id="load"
+        panes={[
+          {
+            id: 'saved',
+            label: 'Saved',
+            icon: <Bookmark size={13} />,
+            render: () => (
+              <FolderList
+                id="load-saved"
+                title="Saved load tests"
+                itemNoun="load test"
+                addLabel="Save current load test"
+                folders={saved.lib.folders}
+                selected={savedId}
+                onSelect={(savedItem) => void openSaved(savedItem)}
+                onAdd={(folder) => void saveLoad(true, folder)}
+                ops={saved.ops}
+                itemMenu={(savedItem) => [{ label: 'Run', icon: <Play size={13} />, disabled: !!id, onSelect: () => void openSaved(savedItem, true) }]}
+                items={saved.lib.items.map((i) => ({
+                  id: i.id,
+                  name: i.name,
+                  folder: i.folder,
+                  subtitle: `${i.data.kind === 'http' ? `${i.data.method} ${i.data.url}` : i.data.kind} · ${i.data.vus} users · ${i.data.duration}s`,
+                  icon: <Gauge size={12} className="text-muted" />,
+                }))}
+                empty={
+                  <Empty title="No saved load tests">
+                    Save a load test (target, users, duration, thresholds) to run it again whenever you need, and group them in folders.
+                  </Empty>
+                }
+              />
+            ),
+          },
+          { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+        ]}
+      />
     <Split id="load-main" initial={34}>
       <div className="h-full overflow-auto p-3 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Gauge size={16} />
-          <span className="font-semibold">Load test</span>
+          <span className="font-semibold truncate">{current ? current.name : 'Load test'}</span>
+          <Button size="sm" icon={<Save size={12} />} title={current ? `Save changes to "${current.name}"` : 'Save this load test to run it again later'} onClick={() => void saveLoad()}>
+            {current && dirty ? 'Save*' : 'Save'}
+          </Button>
           <Select className="ml-auto" value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' | 'collection' | 'grpc' })} aria-label="Target">
             <option value="http">HTTP endpoint</option>
             <option value="collection">Collection</option>
@@ -440,6 +517,7 @@ export function LoadView() {
           )
         )}
       </div>
+    </Split>
     </Split>
   );
 }

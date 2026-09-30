@@ -2,7 +2,6 @@ import { Check, History, KeyRound, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import { promptText, useApp } from '../store';
-import type { HttpRequestSpec } from '../types';
 import { groupByDay, uid } from '../lib/format';
 import { Badge, cx, Empty, IconButton, Input, statusTone } from './ui';
 
@@ -57,7 +56,7 @@ export function EnvironmentsPane() {
   );
 }
 
-interface HistoryItem {
+export interface HistoryItem {
   id: string;
   timestamp: string;
   kind: string;
@@ -68,16 +67,19 @@ interface HistoryItem {
   request?: unknown;
 }
 
-/** Sidebar pane: recent HTTP requests grouped by day; click to open one in a new tab. */
-export function HistoryPane({ onOpen }: { onOpen(request: HttpRequestSpec, name: string): void }) {
+/**
+ * Sidebar pane: recent requests of one kind (http, graphql, grpc, websocket, mcp, llm) grouped by day.
+ * Clicking one hands it to the view (REST opens it in a new tab); without `onOpen` it opens in History.
+ */
+export function HistoryPane({ kind = 'http', onOpen, noun = 'Requests you send' }: { kind?: string; onOpen?(item: HistoryItem): void; noun?: string }) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [filter, setFilter] = useState('');
   useEffect(() => {
-    const load = () => void call<{ items: HistoryItem[] }>('history.list', { kind: 'http', query: filter || undefined, limit: 100 }).then((r) => setItems(r.items));
+    const load = () => void call<{ items: HistoryItem[] }>('history.list', { kind, query: filter || undefined, limit: 100 }).then((r) => setItems(r.items));
     const t = setTimeout(load, 150);
     const off = useApp.subscribe((s, p) => s.activity !== p.activity && Object.keys(s.activity).length < Object.keys(p.activity).length && load());
     return () => (clearTimeout(t), off());
-  }, [filter]);
+  }, [filter, kind]);
   const rows = useMemo(() => groupByDay(items, (h) => h.timestamp), [items]);
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -95,17 +97,17 @@ export function HistoryPane({ onOpen }: { onOpen(request: HttpRequestSpec, name:
               key={r.item.id}
               className="w-full flex items-center gap-2 px-3 py-1 text-sm text-left hover:bg-hover"
               title={r.item.url}
-              onClick={() => r.item.request && onOpen(r.item.request as HttpRequestSpec, r.item.name)}
+              onClick={() => (onOpen ? onOpen(r.item) : useApp.getState().openIntent('history', { historyId: r.item.id }))}
             >
-              <span className={cx('mono method-badge text-[0.64rem] font-bold w-12 shrink-0', r.item.method && `method-${r.item.method}`)}>{r.item.method}</span>
-              <span className="truncate flex-1">{r.item.url ?? r.item.name}</span>
+              {r.item.method && <span className={cx('mono method-badge text-[0.64rem] font-bold w-12 shrink-0', `method-${r.item.method}`)}>{r.item.method}</span>}
+              <span className="truncate flex-1">{kind === 'http' ? (r.item.url ?? r.item.name) : r.item.name}</span>
               {r.item.status !== undefined && <Badge tone={statusTone(r.item.status)}>{r.item.status}</Badge>}
             </button>
           ),
         )}
         {!items.length && (
           <Empty icon={<History size={22} />} title={filter ? 'No matches' : 'No history yet'}>
-            {filter ? 'Try another filter.' : 'Requests you send appear here, grouped by day.'}
+            {filter ? 'Try another filter.' : `${noun} appear here, grouped by day.`}
           </Empty>
         )}
       </div>

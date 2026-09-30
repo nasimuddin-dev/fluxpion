@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, Pencil, Play, Plug, Plus, Save, Sparkles, Trash2, Unplug, Wrench, Bookmark, History, KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -15,6 +15,8 @@ import { downloadContent } from '../lib/files';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { FolderList, type FolderListOps } from '../components/FolderList';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
 
 interface Tool {
@@ -166,38 +168,50 @@ export function McpView() {
   return (
     <>
     <Split id="mcp-servers" sidebar initial={20} min={14}>
-      <div className="h-full flex flex-col bg-panel/50">
-        <FolderList
-          id="mcp-servers"
-          title="MCP servers"
-          itemNoun="server"
-          addLabel="Add MCP server"
-          folders={folders}
-          selected={selected}
-          onSelect={setSelected}
-          onAdd={(folder) => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) })}
-          items={servers.map((s) => ({
-            id: s.id,
-            name: s.name,
-            folder: s.folder,
-            icon: <CircleDot size={10} className={s.connected ? 'text-ok' : 'text-muted'} />,
-            subtitle: serverSummary(s),
-          }))}
-          itemMenu={(id) => {
-            const s = servers.find((x) => x.id === id)!;
-            return [
-              { label: 'Edit…', icon: <Pencil size={14} />, onSelect: () => setEditing(s) },
-              s.connected ? { label: 'Disconnect', icon: <Unplug size={14} />, onSelect: () => void disconnect(id) } : { label: 'Connect', icon: <Plug size={14} />, onSelect: () => (setSelected(id), void connect(id)) },
-            ];
-          }}
-          ops={serverOps}
-          empty={
-            <Empty title="No MCP servers">
-              Add a server using stdio (a local command), Streamable HTTP, legacy SSE or a mock definition.
-            </Empty>
-          }
-        />
-      </div>
+      <SidebarShell
+        id="mcp"
+        panes={[
+          {
+            id: 'saved',
+            label: 'Servers',
+            icon: <Plug size={13} />,
+            render: () => (
+              <FolderList
+                id="mcp-servers"
+                title="MCP servers"
+                itemNoun="server"
+                addLabel="Add MCP server"
+                folders={folders}
+                selected={selected}
+                onSelect={setSelected}
+                onAdd={(folder) => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) })}
+                items={servers.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  folder: s.folder,
+                  icon: <CircleDot size={10} className={s.connected ? 'text-ok' : 'text-muted'} />,
+                  subtitle: serverSummary(s),
+                }))}
+                itemMenu={(id) => {
+                  const s = servers.find((x) => x.id === id)!;
+                  return [
+                    { label: 'Edit…', icon: <Pencil size={14} />, onSelect: () => setEditing(s) },
+                    s.connected ? { label: 'Disconnect', icon: <Unplug size={14} />, onSelect: () => void disconnect(id) } : { label: 'Connect', icon: <Plug size={14} />, onSelect: () => (setSelected(id), void connect(id)) },
+                  ];
+                }}
+                ops={serverOps}
+                empty={
+                  <Empty title="No MCP servers">
+                    Add a server using stdio (a local command), Streamable HTTP, legacy SSE or a mock definition.
+                  </Empty>
+                }
+              />
+            ),
+          },
+          { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+          { id: 'history', label: 'History', icon: <History size={13} />, render: () => <HistoryPane kind="mcp" noun="MCP tool calls you make" /> },
+        ]}
+      />
       <div className="h-full flex flex-col min-w-0">
         {server ? (
           <>

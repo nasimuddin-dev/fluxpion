@@ -1,4 +1,4 @@
-import { BookOpen, ChevronLeft, Code2, FlaskConical, FolderPlus, FolderTree, Play, Radio, RefreshCw, Save, Sparkles, Square, Upload, Wand2, FileCheck2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, Code2, FlaskConical, FolderPlus, FolderTree, History, KeyRound, Network, Play, Radio, RefreshCw, Save, Sparkles, Square, Upload, Wand2, FileCheck2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, on, type NormalizedError } from '../api';
@@ -14,6 +14,8 @@ import { CodeEditor } from '../components/CodeEditor';
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
 import { SaveModal } from './rest/dialogs';
 import { useSticky } from '../lib/sticky';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { saveResponseVariable } from '../lib/save-variable';
@@ -72,10 +74,21 @@ query GetPatient($id: ID!) {
   }
 }
 `;
+/** GraphQL variables as editor text: saved requests may keep them as a JSON object. */
+function variablesText(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (v == null) return '';
+  return JSON.stringify(v, null, 2);
+}
+
 const store = persisted<Draft>('graphql', { endpoint: '{{graphqlEndpoint}}', query: DEFAULT_QUERY, variables: '{\n  "id": "123"\n}', headers: [], auth: { type: 'inherit' }, assertions: [{ type: 'graphql-no-errors' }], name: 'GraphQL query' });
 
 export function GraphQLView() {
-  const [d, setD] = useState<Draft>(store.load);
+  // drafts saved by older versions may hold the variables as an object: the editors need text
+  const [d, setD] = useState<Draft>(() => {
+    const x = store.load();
+    return { ...x, variables: variablesText(x.variables) };
+  });
   const [schema, setSchema] = useState<SchemaSummary>();
   const [sdl, setSdl] = useState<string>();
   const [introspecting, setIntrospecting] = useState(false);
@@ -243,11 +256,11 @@ export function GraphQLView() {
     await call('col.save', c);
     await loadCollections();
   };
-  const [side, setSide] = useSticky<'collections' | 'schema'>('gql:side', 'collections');
+  const [side, setSide] = useSticky<'collections' | 'schema' | 'environments' | 'history'>('gql:side', 'collections');
   const [treeFilter, setTreeFilter] = useState('');
   const [saving, setSaving] = useState(false);
   const openNode = (c: Collection, n: SavedGraphQLRequest) =>
-    setD({ endpoint: n.request.endpoint, query: n.request.query, variables: n.request.variables ?? '', headers: n.request.headers ?? [], auth: n.request.auth, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, name: n.name, operationName: n.request.operationName, preRequestScript: n.preRequestScript, testScript: n.testScript });
+    setD({ endpoint: n.request.endpoint, query: n.request.query, variables: variablesText(n.request.variables), headers: n.request.headers ?? [], auth: n.request.auth, assertions: n.assertions ?? [], collectionId: c.id, requestId: n.id, name: n.name, operationName: n.request.operationName, preRequestScript: n.preRequestScript, testScript: n.testScript });
 
   useIntent('graphql', async (p) => {
     if (p?.reset) setD({ ...store.load(), query: DEFAULT_QUERY, collectionId: undefined, requestId: undefined, name: 'GraphQL query' });
@@ -373,66 +386,87 @@ export function GraphQLView() {
       {showCode && <CodeModal request={asHttpRequest()} collectionId={d.collectionId} requestId={d.requestId} onClose={() => setShowCode(false)} />}
       <div className="flex-1 min-h-0">
         <Split id="gql-explorer" sidebar initial={22} min={12}>
-          <div className="h-full flex flex-col min-h-0">
-            <div className="flex gap-1 p-1.5 border-b border-line shrink-0" role="tablist" aria-label="Sidebar">
-              {(
-                [
-                  ['collections', 'Collections'],
-                  ['schema', 'Schema'],
-                ] as const
-              ).map(([id, label]) => (
-                <button key={id} role="tab" aria-selected={side === id} className={cx('flex-1 h-7 rounded-md text-xs font-medium', side === id ? 'bg-accent-soft text-fg' : 'text-muted hover:text-fg hover:bg-hover')} onClick={() => setSide(id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {side === 'schema' ? (
-              <div className="flex-1 min-h-0">
-                <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onBuild={(f) => void buildOperation(f)} onIntrospect={introspectNow} loading={introspecting} />
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-1 p-2 shrink-0">
-                  <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter requests" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
-                  <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" onClick={() => useApp.getState().openIntent('collections', { import: true })}>
-                    <Upload size={14} />
-                  </IconButton>
-                  <IconButton
-                    label="New collection"
-                    onClick={async () => {
-                      const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
-                      if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
+          <SidebarShell
+            id="graphql"
+            value={side}
+            onChange={(v) => setSide(v as typeof side)}
+            panes={[
+              {
+                id: 'collections',
+                label: 'Collections',
+                icon: <FolderTree size={13} />,
+                render: () => (
+                  <>
+                    <div className="flex items-center gap-1 p-2 shrink-0">
+                      <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter requests" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
+                      <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" onClick={() => useApp.getState().openIntent('collections', { import: true })}>
+                        <Upload size={14} />
+                      </IconButton>
+                      <IconButton
+                        label="New collection"
+                        onClick={async () => {
+                          const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
+                          if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
+                        }}
+                      >
+                        <FolderPlus size={14} />
+                      </IconButton>
+                    </div>
+                    <div className="flex-1 overflow-auto">
+                      {collections.length ? (
+                        <CollectionTree
+                          collections={collections}
+                          filter={treeFilter}
+                          activeRequestId={d.requestId}
+                          newRequestLabel="New GraphQL request"
+                          onOpen={(c, n) => (n.kind === 'graphql' ? openNode(c, n) : useApp.getState().openIntent('rest', { collectionId: c.id, requestId: n.id }))}
+                          onChange={(c) => void saveCollection(c)}
+                          onMoved={(ids, from, to) => d.collectionId === from && d.requestId && ids.includes(d.requestId) && set({ collectionId: to })}
+                          onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
+                          onNewRequest={async (c, folderId) => {
+                            const node: SavedGraphQLRequest = { kind: 'graphql', id: uid('gql-'), name: 'New GraphQL request', request: { endpoint: d.endpoint, query: DEFAULT_QUERY, variables: '', headers: [] }, assertions: [] };
+                            await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
+                            openNode(c, node);
+                          }}
+                        />
+                      ) : (
+                        <Empty icon={<FolderTree size={22} />} title="No collections yet">
+                          Create a collection with the folder button, or Save this operation (Ctrl+S) to put it in one.
+                        </Empty>
+                      )}
+                    </div>
+                  </>
+                ),
+              },
+              {
+                id: 'schema',
+                label: 'Schema',
+                icon: <Network size={13} />,
+                render: () => (
+                  <div className="flex-1 min-h-0">
+                    <SchemaExplorer schema={schema} error={schemaError} sdl={sdl} onInsert={(f) => set({ query: d.query.replace(/\}\s*$/, `  ${f}\n}\n`) })} onBuild={(f) => void buildOperation(f)} onIntrospect={introspectNow} loading={introspecting} />
+                  </div>
+                ),
+              },
+              { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+              {
+                id: 'history',
+                label: 'History',
+                icon: <History size={13} />,
+                render: () => (
+                  <HistoryPane
+                    kind="graphql"
+                    noun="GraphQL requests you send"
+                    onOpen={(item) => {
+                      const r = item.request as { endpoint?: string; query?: string; variables?: string; headers?: typeof d.headers; operationName?: string } | undefined;
+                      if (!r?.query) return useApp.getState().openIntent('history', { historyId: item.id });
+                      set({ name: item.name, endpoint: r.endpoint ?? d.endpoint, query: r.query, variables: variablesText(r.variables), headers: r.headers ?? [], operationName: r.operationName, collectionId: undefined, requestId: undefined });
                     }}
-                  >
-                    <FolderPlus size={14} />
-                  </IconButton>
-                </div>
-                <div className="flex-1 overflow-auto">
-                  {collections.length ? (
-                    <CollectionTree
-                      collections={collections}
-                      filter={treeFilter}
-                      activeRequestId={d.requestId}
-                      newRequestLabel="New GraphQL request"
-                      onOpen={(c, n) => (n.kind === 'graphql' ? openNode(c, n) : useApp.getState().openIntent('rest', { collectionId: c.id, requestId: n.id }))}
-                      onChange={(c) => void saveCollection(c)}
-                      onMoved={(ids, from, to) => d.collectionId === from && d.requestId && ids.includes(d.requestId) && set({ collectionId: to })}
-                      onRun={(c, folderId) => useApp.getState().openIntent('collections', { collectionId: c.id, run: true, folderId })}
-                      onNewRequest={async (c, folderId) => {
-                        const node: SavedGraphQLRequest = { kind: 'graphql', id: uid('gql-'), name: 'New GraphQL request', request: { endpoint: d.endpoint, query: DEFAULT_QUERY, variables: '', headers: [] }, assertions: [] };
-                        await saveCollection({ ...c, items: addToFolder(c.items, folderId, node) });
-                        openNode(c, node);
-                      }}
-                    />
-                  ) : (
-                    <Empty icon={<FolderTree size={22} />} title="No collections yet">
-                      Create a collection with the folder button, or Save this operation (Ctrl+S) to put it in one.
-                    </Empty>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+                  />
+                ),
+              },
+            ]}
+          />
           <Split id="gql-main" initial={50}>
             <div className="h-full flex flex-col">
               <div className="flex items-center h-8 px-2 border-b border-line gap-1 text-xs text-muted shrink-0">

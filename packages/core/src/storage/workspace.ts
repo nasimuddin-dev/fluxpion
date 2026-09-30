@@ -1,6 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import type { AppSettings, Collection, Environment, Library, McpServerConfig, ProviderConfig, Trace, Workspace } from '../model/types.js';
 import { SCHEMA_VERSION, defaultSettings } from '../model/types.js';
 import { ApsError } from '../errors.js';
@@ -521,6 +521,12 @@ export class WorkspaceManager {
     }
     // revision 2 (redesigned UI): the default font size went from 13 to 14px — move people still on the old default
     if ((s.settingsRevision ?? 1) < 2 && s.fontSize === 13) s.fontSize = 14;
+    // forget workspaces that lived in the system temp folder and are gone (test runs used to add them);
+    // other missing paths stay listed, e.g. a workspace on a drive that isn't connected right now
+    if (Array.isArray(s.workspacePaths)) {
+      const tmp = tmpdir().toLowerCase();
+      s.workspacePaths = s.workspacePaths.filter((p) => !(typeof p === 'string' && p.toLowerCase().startsWith(tmp) && !existsSync(p)));
+    }
     return { ...defaultSettings(), ...s, settingsRevision: 2 };
   }
 

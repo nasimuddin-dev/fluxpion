@@ -1,8 +1,10 @@
-import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X, FileCheck2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X, FileCheck2, Bookmark, History, KeyRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
 import { useIntent } from '../hooks';
@@ -195,25 +197,37 @@ export function WebSocketView() {
   }
   return (
     <Split id="ws-saved" sidebar initial={18} min={12}>
-    <div className="h-full bg-panel/50">
-      <FolderList
-        id="ws-saved"
-        title="Saved connections"
-        itemNoun="connection"
-        addLabel="Save current connection"
-        folders={saved.lib.folders}
-        selected={savedId}
-        onSelect={open}
-        onAdd={(folder) => void save(true, folder)}
-        ops={saved.ops}
-        items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: i.data.url, icon: <Radio size={12} className="text-muted" /> }))}
-        empty={
-          <Empty title="No saved connections">
-            Save a connection (URL, subprotocols, headers and message) to open it again later, and group them in folders.
-          </Empty>
-        }
-      />
-    </div>
+    <SidebarShell
+      id="websocket"
+      panes={[
+        {
+          id: 'saved',
+          label: 'Saved',
+          icon: <Bookmark size={13} />,
+          render: () => (
+            <FolderList
+              id="ws-saved"
+              title="Saved connections"
+              itemNoun="connection"
+              addLabel="Save current connection"
+              folders={saved.lib.folders}
+              selected={savedId}
+              onSelect={open}
+              onAdd={(folder) => void save(true, folder)}
+              ops={saved.ops}
+              items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: i.data.url, icon: <Radio size={12} className="text-muted" /> }))}
+              empty={
+                <Empty title="No saved connections">
+                  Save a connection (URL, subprotocols, headers and message) to open it again later, and group them in folders.
+                </Empty>
+              }
+            />
+          ),
+        },
+        { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+        { id: 'history', label: 'History', icon: <History size={13} />, render: () => <HistoryPane kind="websocket" noun="Connections you open" /> },
+      ]}
+    />
     <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <Badge tone={status === 'open' ? 'ok' : status === 'connecting' ? 'warn' : 'default'}>{status}</Badge>

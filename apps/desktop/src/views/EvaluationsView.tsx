@@ -1,13 +1,17 @@
-import { FlaskConical, History, Play } from 'lucide-react';
+import { Bookmark, FlaskConical, History, KeyRound, Play, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSticky } from '../lib/sticky';
 import { asError, call } from '../api';
-import { persisted, useApp } from '../store';
+import { persisted, promptText, useApp } from '../store';
 import type { CheckConfig, ProviderConfig } from '../types';
 import { templateVars, timeAgo } from '../lib/format';
 import { AssertionEditor } from '../components/AssertionEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunPanel } from '../components/RunPanel';
+import { FolderList } from '../components/FolderList';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane } from '../components/SidebarPanes';
+import { useLibrary } from '../lib/library';
 import { Badge, Button, cx, Empty, Field, Input, Select, Split, Tabs } from '../components/ui';
 
 interface Draft {
@@ -96,11 +100,35 @@ export function EvaluationsView() {
     void call('runs.list', { limit: 30 }).then((r) => setRuns(r.items));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const saved = useLibrary<Draft>('evaluations');
+  const [savedId, setSavedId] = useSticky<string | undefined>('eval:saved', undefined);
+  const current = saved.lib.items.find((i) => i.id === savedId);
+  const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(d);
+  const openSaved = async (id: string) => {
+    const it = await saved.find(id);
+    if (!it) return undefined;
+    setSavedId(id);
+    setD({ ...drafts.load(), ...it.data, name: it.name });
+    return it;
+  };
+  const saveEval = async (asNew = false, folder?: string) => {
+    if (current && !asNew) {
+      await saved.put({ ...current, name: d.name || current.name, data: d });
+      useApp.getState().toast(`Saved "${d.name || current.name}"`, 'success');
+      return;
+    }
+    const name = await promptText('Save evaluation', { message: 'Name', value: d.name || 'Evaluation', okLabel: 'Save' });
+    if (!name) return;
+    set({ name });
+    setSavedId(await saved.put({ name, folder, data: { ...d, name } }));
+  };
+  const evalRuns = runs.filter((r) => saved.lib.items.some((i) => i.name === r.name) || r.name === d.name);
   const count = useMemo(() => countRecords(d.dataset, d.datasetFormat), [d.dataset, d.datasetFormat]);
   const preview = useMemo(() => previewRecords(d.dataset, d.datasetFormat), [d.dataset, d.datasetFormat]);
   const vars = templateVars(d.prompt);
 
-  const run = async () => {
+  const run = () => runDraft(d);
+  const runDraft = async (d: Draft) => {
     try {
       const template: Record<string, unknown> =
         d.type === 'llm'
@@ -123,6 +151,72 @@ export function EvaluationsView() {
   };
 
   return (
+    <Split id="eval-sidebar" sidebar initial={18} min={12}>
+      <SidebarShell
+        id="evaluations"
+        panes={[
+          {
+            id: 'saved',
+            label: 'Saved',
+            icon: <Bookmark size={13} />,
+            render: () => (
+              <FolderList
+                id="eval-saved"
+                title="Saved evaluations"
+                itemNoun="evaluation"
+                addLabel="Save current evaluation"
+                folders={saved.lib.folders}
+                selected={savedId}
+                onSelect={(id) => void openSaved(id)}
+                onAdd={(folder) => void saveEval(true, folder)}
+                ops={saved.ops}
+                itemMenu={(id) => [
+                  {
+                    label: 'Run',
+                    icon: <Play size={13} />,
+                    onSelect: () =>
+                      void openSaved(id).then((it) => {
+                        if (it) void runDraft({ ...drafts.load(), ...it.data, name: it.name });
+                      }),
+                  },
+                ]}
+                items={saved.lib.items.map((i) => ({
+                  id: i.id,
+                  name: i.name,
+                  folder: i.folder,
+                  subtitle: `${i.data.model || i.data.provider || 'model'} · ${countRecords(i.data.dataset ?? '', i.data.datasetFormat ?? 'jsonl')} cases`,
+                  icon: <FlaskConical size={12} className="text-muted" />,
+                }))}
+                empty={
+                  <Empty title="No saved evaluations">
+                    Save an evaluation (dataset, prompt, model and evaluators) to run it again whenever you need, and group evaluations in folders.
+                  </Empty>
+                }
+              />
+            ),
+          },
+          { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+          {
+            id: 'runs',
+            label: 'Runs',
+            icon: <History size={13} />,
+            render: () => (
+              <div className="flex-1 overflow-auto">
+                {evalRuns.map((r) => (
+                  <button key={r.id} className={cx('w-full text-left px-3 py-2 border-b border-line/60 text-sm', runId === r.id ? 'bg-accent/10' : 'hover:bg-hover')} onClick={() => setRunId(r.id)}>
+                    <div className="truncate">{r.name}</div>
+                    <div className="text-xs text-muted flex gap-2">
+                      {r.total ? <span>{r.passed}/{r.total} passed</span> : null}
+                      <span className="ml-auto">{timeAgo(r.startedAt)}</span>
+                    </div>
+                  </button>
+                ))}
+                {!evalRuns.length && <Empty icon={<History size={22} />} title="No runs yet">Runs of your evaluations appear here.</Empty>}
+              </div>
+            ),
+          },
+        ]}
+      />
     <Split id="eval-main" initial={42}>
       <div className="h-full flex flex-col">
         <div className="p-2 border-b border-line flex flex-col gap-2">
@@ -132,6 +226,9 @@ export function EvaluationsView() {
               <option value="llm">Prompt / LLM</option>
               <option value="rag">RAG</option>
             </Select>
+            <Button className="shrink-0" icon={<Save size={13} />} title={current ? `Save changes to "${current.name}"` : 'Save this evaluation to run it again later'} onClick={() => void saveEval()}>
+              {current && dirty ? 'Save*' : 'Save'}
+            </Button>
             <Button variant="primary" className="shrink-0" icon={<Play size={13} />} onClick={run} disabled={!count || !d.provider}>
               Run {count ? `${d.limit ? Math.min(d.limit, count) : count} cases` : ''}
             </Button>
@@ -280,25 +377,10 @@ export function EvaluationsView() {
             <Empty icon={<FlaskConical size={28} />} title="Run an evaluation">
               Datasets are streamed record-by-record with bounded concurrency, retries and rate limiting. Results are written to disk and can be compared against a baseline.
             </Empty>
-            {runs.length > 0 && (
-              <div className="border-t border-line max-h-72 overflow-auto">
-                <div className="px-3 py-2 text-xs text-muted font-semibold flex items-center gap-1">
-                  <History size={12} /> Recent runs
-                </div>
-                {runs.map((r) => (
-                  <button key={r.id} className="w-full text-left px-3 py-1.5 hover:bg-hover text-sm flex gap-2" onClick={() => setRunId(r.id)}>
-                    <span className="truncate">{r.name}</span>
-                    <span className="ml-auto text-xs text-muted">
-                      {r.total ? `${r.passed}/${r.total} · ` : ''}
-                      {timeAgo(r.startedAt)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
+    </Split>
     </Split>
   );
 }

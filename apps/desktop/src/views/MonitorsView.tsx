@@ -1,4 +1,6 @@
-import { AlarmClock, Folder, Pause, Pencil, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlarmClock, Folder, KeyRound, Pause, Pencil, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { SidebarShell } from '../components/SidebarShell';
+import { EnvironmentsPane } from '../components/SidebarPanes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { asError, call, on } from '../api';
 import type { MonitorResult } from '../lib/monitor-alerts';
@@ -41,6 +43,7 @@ const statusLabel = (r?: MonitorResult) => (!r ? 'Never ran' : r.status === 'pas
 
 export function MonitorsView() {
   const [rows, setRows] = useState<MonitorRow[]>([]);
+  const [filter, setFilter] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [sel, setSel] = useState<string>();
   const [results, setResults] = useState<MonitorResult[]>([]);
@@ -120,42 +123,68 @@ export function MonitorsView() {
     await load();
   };
 
+  const shown = filter ? rows.filter((m) => `${m.name} ${colName(m.collectionId)}`.toLowerCase().includes(filter.toLowerCase())) : rows;
   return (
-    <Split id="monitors" initial={30}>
-      <div className="h-full flex flex-col min-h-0">
-        <div className="flex items-center gap-2 p-2 border-b border-line">
-          <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setEditing({ name: '', collectionId: collections[0]?.id ?? '', everyMinutes: 15, enabled: true, environment: useApp.getState().environment })} disabled={!collections.length}>
-            New monitor
-          </Button>
-          <IconButton label="Refresh" className="ml-auto" onClick={() => void load()}>
-            <RefreshCw size={14} />
-          </IconButton>
-        </div>
-        <div className="flex-1 overflow-auto">
-          {rows.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setSel(m.id)}
-              className={cx('w-full text-left px-3 py-2 border-b border-line/60 flex flex-col gap-0.5', sel === m.id ? 'bg-accent/10' : 'hover:bg-hover')}
-            >
-              <div className="flex items-center gap-2 text-sm min-w-0">
-                <span className={cx('w-2 h-2 rounded-full shrink-0', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
-                <span className="truncate font-medium">{m.name}</span>
-                {!m.enabled && <Badge>paused</Badge>}
-              </div>
-              <div className="text-xs text-muted pl-4 truncate">
-                {colName(m.collectionId)} · {m.schedule}
-                {m.lastResult && ` · ${timeAgo(m.lastResult.startedAt)}`}
-              </div>
-            </button>
-          ))}
-          {loaded && !rows.length && (
-            <Empty icon={<AlarmClock size={24} />} title="No monitors yet" action={collections.length ? undefined : <span className="text-xs text-muted">Create a collection first.</span>}>
-              A monitor runs a collection (or some of its folders) on a schedule and tells you when it starts failing.
-            </Empty>
-          )}
-        </div>
-      </div>
+    <Split id="monitors" sidebar initial={20} min={12}>
+      <SidebarShell
+        id="monitors"
+        panes={[
+          {
+            id: 'monitors',
+            label: 'Monitors',
+            icon: <AlarmClock size={13} />,
+            render: () => (
+              <>
+                <div className="flex items-center gap-1 px-3 h-8 shrink-0">
+                  <span className="text-[11px] font-semibold tracking-wider uppercase text-muted flex-1 truncate">Monitors</span>
+                  <IconButton label="Refresh" className="h-6 w-6" onClick={() => void load()}>
+                    <RefreshCw size={13} />
+                  </IconButton>
+                  <IconButton
+                    label={collections.length ? 'New monitor' : 'Create a collection first'}
+                    className="h-6 w-6"
+                    disabled={!collections.length}
+                    onClick={() => setEditing({ name: '', collectionId: collections[0]?.id ?? '', everyMinutes: 15, enabled: true, environment: useApp.getState().environment })}
+                  >
+                    <Plus size={14} />
+                  </IconButton>
+                </div>
+                {rows.length > 0 && (
+                  <div className="px-2 pb-2">
+                    <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter monitors" aria-label="Filter monitors" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                  </div>
+                )}
+                <div className="flex-1 min-h-0 overflow-auto px-1 flex flex-col">
+                  {shown.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setSel(m.id)}
+                      className={cx('w-full text-left px-2 py-1.5 rounded-md flex flex-col gap-0.5 transition-colors', sel === m.id ? 'bg-accent-soft' : 'hover:bg-hover')}
+                    >
+                      <div className="flex items-center gap-2 text-sm min-w-0">
+                        <span className={cx('w-2 h-2 rounded-full shrink-0', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
+                        <span className="truncate font-medium">{m.name}</span>
+                        {!m.enabled && <Badge>paused</Badge>}
+                      </div>
+                      <div className="text-xs text-muted pl-4 truncate">
+                        {colName(m.collectionId)} · {m.schedule}
+                        {m.lastResult && ` · ${timeAgo(m.lastResult.startedAt)}`}
+                      </div>
+                    </button>
+                  ))}
+                  {rows.length > 0 && !shown.length && <p className="px-3 py-4 text-sm text-muted text-center">No monitors match this filter.</p>}
+                  {loaded && !rows.length && (
+                    <Empty icon={<AlarmClock size={24} />} title="No monitors yet" action={collections.length ? undefined : <span className="text-xs text-muted">Create a collection first.</span>}>
+                      A monitor runs a collection (or some of its folders) on a schedule and tells you when it starts failing.
+                    </Empty>
+                  )}
+                </div>
+              </>
+            ),
+          },
+          { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
+        ]}
+      />
       <div className="h-full min-h-0 overflow-auto">
         {current ? (
           <MonitorDetail
@@ -170,7 +199,22 @@ export function MonitorsView() {
             onDelete={() => void remove(current)}
           />
         ) : (
-          loaded && rows.length > 0 && <Empty title="Select a monitor" />
+          loaded &&
+          (rows.length > 0 ? (
+            <Empty title="Select a monitor" />
+          ) : (
+            <Empty
+              icon={<AlarmClock size={24} />}
+              title="Run collections on a schedule"
+              action={
+                <Button variant="primary" icon={<Plus size={13} />} disabled={!collections.length} onClick={() => setEditing({ name: '', collectionId: collections[0]?.id ?? '', everyMinutes: 15, enabled: true, environment: useApp.getState().environment })}>
+                  New monitor
+                </Button>
+              }
+            >
+              {collections.length ? 'A monitor runs a collection, or some of its folders, every few minutes while TestPion is open, and tells you when it starts failing. From the terminal: testpion monitor.' : 'Create a collection first: a monitor runs a collection on a schedule.'}
+            </Empty>
+          ))
         )}
         {editing && <MonitorEditor draft={editing} collections={collections} onCancel={() => setEditing(undefined)} onSave={save} />}
       </div>

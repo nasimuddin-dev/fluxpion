@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
@@ -9,5 +12,8 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     pool: 'forks',
+    // never touch the developer's real ~/.testpion (settings, workspaces, secrets): tests and the CLI
+    // processes they spawn get a throwaway data folder unless a test sets its own
+    env: { TESTPION_HOME: mkdtempSync(join(tmpdir(), 'testpion-test-home-')) },
   },
 });

@@ -69,13 +69,16 @@ export function CodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, localKey]);
   if (!ready) return <div className="h-full w-full grid place-items-center"><Spinner /></div>;
+  // Monaco only accepts text: a value that arrives as an object (e.g. GraphQL variables saved as JSON) would
+  // throw inside createModel and take the whole window down, so show it as formatted JSON instead
+  const text = typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value, null, 2);
   return (
     <div className="h-full w-full min-h-0 relative">
-      {!value && placeholder && <div className="absolute left-14 top-1 text-muted text-sm pointer-events-none z-10 mono">{placeholder}</div>}
+      {!text && placeholder && <div className="absolute left-14 top-1 text-muted text-sm pointer-events-none z-10 mono">{placeholder}</div>}
       <Editor
         height={height}
         language={language}
-        value={value}
+        value={text}
         path={path}
         theme={theme}
         loading={<Spinner />}
