@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Download, FileCode2, FolderPlus, FolderTree, GitCompare, Layers, PanelLeftClose, Plug, Plus, Radio, RefreshCw, ScanSearch, Upload, Waypoints } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileCode2, FolderPlus, FolderTree, GitCompare, Layers, MoreHorizontal, PanelLeftClose, Plug, Plus, Radio, RefreshCw, ScanSearch, Upload, Waypoints } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { promptText, useApp, type ViewId } from '../store';
@@ -193,15 +193,19 @@ export function Explorer() {
           }
           items={[{ label: 'Collection', icon: <FolderPlus size={14} />, onSelect: () => void newCollection() }, ...newRequestItems().map((it, i) => (i === 0 ? { ...it, separator: true } : it))]}
         />
-        <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)" className="h-7 w-7" onClick={importDefinition}>
-          <Upload size={14} />
-        </IconButton>
-        <IconButton label="Export (collections, workspace)" className="h-7 w-7" onClick={() => intent('collections', {})}>
-          <Download size={14} />
-        </IconButton>
-        <IconButton label="Refresh" className="h-7 w-7" onClick={() => void load()}>
-          <RefreshCw size={13} />
-        </IconButton>
+        <Menu
+          width={250}
+          trigger={
+            <IconButton label="More: import, export, refresh" className="h-7 w-7">
+              <MoreHorizontal size={15} />
+            </IconButton>
+          }
+          items={[
+            { label: 'Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)', icon: <Upload size={14} />, onSelect: importDefinition },
+            { label: 'Export collections or the workspace', icon: <Download size={14} />, onSelect: () => intent('collections', {}) },
+            { label: 'Refresh', icon: <RefreshCw size={14} />, separator: true, onSelect: () => void load() },
+          ]}
+        />
         <IconButton label="Hide the sidebar (Ctrl+B)" className="h-7 w-7" onClick={() => useApp.getState().toggleExplorer(false)}>
           <PanelLeftClose size={14} />
         </IconButton>

@@ -80,7 +80,7 @@ export function Sidebar() {
         aria-label={label}
         className={cx(
           // short windows: icons only (the tooltip names them), so the whole rail fits without scrolling
-          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:820px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
+          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:680px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
           view === id ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
@@ -93,7 +93,7 @@ export function Sidebar() {
         >
           {icon}
         </span>
-        <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:820px)]:hidden">{label}</span>
+        <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:680px)]:hidden">{label}</span>
       </button>
     </Tooltip>
   );
@@ -113,7 +113,7 @@ export function Sidebar() {
         aria-current={inRequests ? 'page' : undefined}
         aria-label="Collections"
         className={cx(
-          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:820px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
+          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:680px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
           inRequests ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
@@ -121,15 +121,15 @@ export function Sidebar() {
         <span className={cx('grid place-items-center h-7 w-11 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90', inRequests ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover')}>
           <FolderTree size={18} />
         </span>
-        <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:820px)]:hidden">Collections</span>
+        <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:680px)]:hidden">Collections</span>
       </button>
     </Tooltip>
   );
   return (
-    <nav aria-label="Main navigation" className="w-[84px] [@media(max-height:820px)]:w-[64px] shrink-0 border-r border-line bg-chrome flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none]">
+    <nav aria-label="Main navigation" className="w-[84px] [@media(max-height:680px)]:w-[64px] shrink-0 border-r border-line bg-chrome flex flex-col items-stretch gap-0.5 px-1.5 py-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none]">
       {RAIL.map((n, i) => (
         <div key={n.id}>
-          {i > 0 && RAIL[i - 1]!.group !== n.group && <div className="mx-3 my-1 [@media(max-height:820px)]:my-0.5 border-t border-line/70" />}
+          {i > 0 && RAIL[i - 1]!.group !== n.group && <div className="mx-3 my-1 [@media(max-height:680px)]:my-0.5 border-t border-line/70" />}
           {item(n.id, n.label, n.icon, NAV.indexOf(n) < 9 ? `${modKey}+Alt+${NAV.indexOf(n) + 1}` : undefined, n.hint)}
           {n.id === 'home' && <div className="mt-0.5">{explorerToggle}</div>}
         </div>

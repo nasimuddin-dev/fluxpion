@@ -404,7 +404,9 @@ export function TestsView() {
                 </div>
               </Split>
             ) : (
-              <Empty icon={<FileCode2 size={28} />} title="Select a test file" />
+              <Empty icon={<FileCode2 size={28} />} title="Select a test file">
+                Pick a file on the left to edit it and preview its tests, or use <b>New</b> to create one.
+              </Empty>
             )
           ) : runId ? (
             <Split id="tests-runs" initial={22} min={12}>

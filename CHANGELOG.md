@@ -5,6 +5,10 @@
 - **Several GraphQL, gRPC and WebSocket tabs**: each tab is its own document, with its own draft, response and connection. **New ▸ GraphQL / gRPC / WebSocket** opens a new tab instead of showing the existing one, opening a saved item gives it its own tab (or selects the tab that already shows it), and closing a tab discards that document's draft. **New ▸ MCP server** opens *Add server*.
 - **Right-click menu on every tab**: GraphQL, gRPC, WebSocket and MCP tabs now have Close tab, Close other tabs, Close tabs to the right and Close all tabs. On REST tabs these now close tabs of every kind, not only REST ones.
 - **Payload tab in traces**: the first tab of a span shows the request and response bodies on their own: JSON as a tree or raw text, with content type, size and copy. Requests sent from the editor now keep the response body in their trace (redacted, up to 48 KB).
+- **Monitors open on double-click**: a single click selects a monitor and shows its runs; double-click (or the pencil) opens its settings.
+- **Explorer header**: Import, Export (collections or the whole workspace) and Refresh now sit in a **⋯** menu beside **+**.
+- **UI polish**: tab rows no longer show a scrollbar under the tabs; the REST editor lost a duplicate request-name field (rename from the tab); the rail keeps its labels on windows down to 680 px tall; the Tests view explains what to do when no file is open; saved load tests no longer repeat their target under the name; the Evaluations dataset toolbar wraps instead of clipping **Load file…**.
+- **Evaluations**: a dataset saved as "JSON" but written one record per line is read as JSONL, so its case count and runs are right (it showed "0 cases").
 
 ## 0.12.0 — 2026-09-30
 

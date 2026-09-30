@@ -53,7 +53,24 @@ const drafts = persisted<Draft>('eval', {
   retries: 1,
 });
 
-function countRecords(text: string, fmt: Draft['datasetFormat']): number {
+/** "json" whose text is one object per line is really JSONL (as datasetFormatOf in core). */
+function formatOf(text: string, fmt: Draft['datasetFormat']): Draft['datasetFormat'] {
+  if (fmt !== 'json') return fmt;
+  try {
+    JSON.parse(text);
+    return 'json';
+  } catch {
+    const lines = text.split('\n').filter((l) => l.trim());
+    try {
+      return lines.length && lines.every((l) => typeof JSON.parse(l) === 'object') ? 'jsonl' : 'json';
+    } catch {
+      return 'json';
+    }
+  }
+}
+
+function countRecords(text: string, format: Draft['datasetFormat']): number {
+  const fmt = formatOf(text, format);
   if (fmt === 'jsonl') return text.split('\n').filter((l) => l.trim()).length;
   if (fmt === 'csv') return Math.max(0, text.split('\n').filter((l) => l.trim()).length - 1);
   if (fmt === 'md') return Math.max(0, text.split('\n').filter((l) => l.trim().startsWith('|')).length - 2);
@@ -65,7 +82,8 @@ function countRecords(text: string, fmt: Draft['datasetFormat']): number {
   }
 }
 
-function previewRecords(text: string, fmt: Draft['datasetFormat']): Array<Record<string, unknown>> {
+function previewRecords(text: string, format: Draft['datasetFormat']): Array<Record<string, unknown>> {
+  const fmt = formatOf(text, format);
   try {
     if (fmt === 'jsonl') return text.split('\n').filter((l) => l.trim()).slice(0, 5).map((l) => JSON.parse(l));
     if (fmt === 'json') {
@@ -267,13 +285,13 @@ export function EvaluationsView() {
         <div className="flex-1 min-h-0">
           {sub === 'dataset' && (
             <div className="h-full flex flex-col">
-              <div className="flex items-center gap-3 px-3 py-1.5 text-sm border-b border-line">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-sm border-b border-line">
                 {(['jsonl', 'json', 'csv', 'md'] as const).map((f) => (
                   <label key={f} className="flex items-center gap-1">
                     <input type="radio" checked={d.datasetFormat === f} onChange={() => set({ datasetFormat: f })} /> {f.toUpperCase()}
                   </label>
                 ))}
-                <label className="ml-auto flex items-center gap-1 text-xs text-muted">
+                <label className="ml-auto flex items-center gap-1 text-xs text-muted whitespace-nowrap">
                   expected field
                   <Input className="h-6 min-h-6 w-24 text-xs" value={d.expectedField} onChange={(e) => set({ expectedField: e.target.value })} />
                 </label>

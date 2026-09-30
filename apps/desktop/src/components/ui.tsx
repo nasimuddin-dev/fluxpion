@@ -120,7 +120,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 
 export function Tabs<T extends string>({ tabs, value, onChange, className, right }: { tabs: Array<{ id: NoInfer<T>; label: ReactNode; badge?: ReactNode }>; value: T; onChange(v: NoInfer<T>): void; className?: string; right?: ReactNode }) {
   return (
-    <div role="tablist" className={cx('flex items-center gap-1 border-b border-line px-2 min-h-10 shrink-0 overflow-x-auto', className)}>
+    <div role="tablist" className={cx('flex items-center gap-1 border-b border-line px-2 min-h-10 shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}>
       {tabs.map((t) => (
         <button
           key={t.id}

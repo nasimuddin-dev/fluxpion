@@ -47,14 +47,6 @@ export function RequestEditor({
           { id: 'docs', label: 'Docs', badge: tab.description?.trim() ? '•' : undefined },
           { id: 'settings', label: 'Settings' },
         ]}
-        right={
-          <input
-            aria-label="Request name"
-            className="bg-transparent text-sm text-muted text-right outline-none focus:text-fg w-48"
-            value={tab.name}
-            onChange={(e) => update({ name: e.target.value })}
-          />
-        }
       />
       <div className="flex-1 min-h-0 overflow-auto">
         {sub === 'params' && (

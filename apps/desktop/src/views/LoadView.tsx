@@ -245,13 +245,17 @@ export function LoadView() {
                 onAdd={(folder) => void saveLoad(true, folder)}
                 ops={saved.ops}
                 itemMenu={(savedItem) => [{ label: 'Run', icon: <Play size={13} />, disabled: !!id, onSelect: () => void openSaved(savedItem, true) }]}
-                items={saved.lib.items.map((i) => ({
-                  id: i.id,
-                  name: i.name,
-                  folder: i.folder,
-                  subtitle: `${i.data.kind === 'http' ? `${i.data.method} ${i.data.url}` : i.data.kind} · ${i.data.vus} users · ${i.data.duration}s`,
-                  icon: <Gauge size={12} className="text-muted" />,
-                }))}
+                items={saved.lib.items.map((i) => {
+                  const target = i.data.kind === 'http' ? `${i.data.method} ${i.data.url}` : i.data.kind;
+                  return {
+                    id: i.id,
+                    name: i.name,
+                    folder: i.folder,
+                    // the default name is the target itself; don't repeat it underneath
+                    subtitle: `${i.name.startsWith(target) ? '' : `${target} · `}${i.data.vus} users · ${i.data.duration}s`,
+                    icon: <Gauge size={12} className="text-muted" />,
+                  };
+                })}
                 empty={
                   <Empty title="No saved load tests">
                     Save a load test (target, users, duration, thresholds) to run it again whenever you need, and group them in folders.

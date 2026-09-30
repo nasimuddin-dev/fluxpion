@@ -45,8 +45,28 @@ export function evaluationTemplate(d: SavedEvaluation): Record<string, unknown> 
   };
 }
 
+/**
+ * The format a dataset text really has: "json" whose text is one JSON object per line is JSONL
+ * (a common slip when the format was switched after pasting records).
+ */
+export function datasetFormatOf(text: string, fmt: SavedEvaluation['datasetFormat']): SavedEvaluation['datasetFormat'] {
+  if (fmt !== 'json') return fmt;
+  try {
+    JSON.parse(text);
+    return 'json';
+  } catch {
+    const lines = text.split('\n').filter((l) => l.trim());
+    try {
+      return lines.length && lines.every((l) => typeof JSON.parse(l) === 'object') ? 'jsonl' : 'json';
+    } catch {
+      return 'json';
+    }
+  }
+}
+
 /** Number of records in a dataset text (for listings). */
-export function countDatasetRecords(text: string, fmt: SavedEvaluation['datasetFormat']): number {
+export function countDatasetRecords(text: string, format: SavedEvaluation['datasetFormat']): number {
+  const fmt = datasetFormatOf(text, format);
   const lines = text.split('\n').filter((l) => l.trim());
   if (fmt === 'jsonl') return lines.length;
   if (fmt === 'csv') return Math.max(0, lines.length - 1);
@@ -99,12 +119,12 @@ export function findSavedEvaluation(store: WorkspaceStore, ref: string): SavedEv
 export async function* evaluationTests(d: SavedEvaluation): AsyncGenerator<TestCase> {
   const dir = mkdtempSync(join(tmpdir(), 'testpion-eval-'));
   try {
-    const ext = d.datasetFormat === 'md' ? 'md' : d.datasetFormat;
-    const file = join(dir, `dataset.${ext}`);
+    const format = datasetFormatOf(d.dataset ?? '', d.datasetFormat);
+    const file = join(dir, `dataset.${format}`);
     writeFileSync(file, d.dataset ?? '');
     const template = {
       ...evaluationTemplate(d),
-      dataset: { path: file, format: d.datasetFormat === 'md' ? 'markdown' : d.datasetFormat, limit: d.limit, expectedField: d.expectedField || 'expected' },
+      dataset: { path: file, format: format === 'md' ? 'markdown' : format, limit: d.limit, expectedField: d.expectedField || 'expected' },
     };
     yield* expandDataset(template, join(dir, 'evaluation'));
   } finally {
