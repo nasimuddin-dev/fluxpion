@@ -15,6 +15,18 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Body types:** JSON, XML, text, HTML, form URL-encoded, multipart (text and file fields), and binary file. Files are streamed from disk.
 - **Settings:** timeout, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS).
 
+## Proxy
+
+**Settings ▸ Proxy** chooses how TestPion reaches the network:
+
+- **Use the environment variables** (the default): `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`, like curl.
+- **Use this proxy**: a proxy URL, an optional user name and password, and a list of hosts that bypass it. The bypass list uses `NO_PROXY` rules: host names (subdomains included), `.domain` suffixes, `host:port`, IP addresses, or `*`. The password is kept in the OS secret store, never in the settings file.
+- **Don't use a proxy.**
+
+The proxy applies to requests, `pm.sendRequest`, OAuth token calls, AI providers, MCP over HTTP and remote datasets. A request's own proxy (its **Settings** tab) wins. WebSocket connections don't use the proxy yet; gRPC reads the environment variables itself.
+
+The CLI always uses the environment variables. Set `TESTPION_NO_PROXY=1` to connect directly instead.
+
 ## Paste a request from the browser
 
 In the browser's devtools, right-click a request on the **Network** tab, choose **Copy**, and pick any of:

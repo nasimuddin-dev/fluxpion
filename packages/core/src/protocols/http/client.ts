@@ -1,8 +1,9 @@
-import { assertUrlAllowed, getNetworkPolicy, policyLookup } from '../../net/policy.js';
+import { assertUrlAllowed, getNetworkPolicy } from '../../net/policy.js';
+import { baseDispatcher, makeDispatcher, proxyGeneration } from '../../net/proxy.js';
 import { createWriteStream, openAsBlob, readFileSync, mkdirSync, type WriteStream } from 'node:fs';
 import { basename, join } from 'node:path';
 import { endAndClose } from '../../storage/fsutil.js';
-import { Agent, ProxyAgent, fetch as undiciFetch, FormData as UndiciFormData, type Dispatcher } from 'undici';
+import { fetch as undiciFetch, FormData as UndiciFormData, type Dispatcher } from 'undici';
 import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelinePhase } from '../../model/types.js';
 import { ApsError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
@@ -44,14 +45,14 @@ export interface PreparedRequest {
 
 const dispatchers = new Map<string, Dispatcher>();
 
-/** Reuse connection pools per TLS/proxy configuration. */
+/** Reuse connection pools per TLS / proxy configuration (the app-wide proxy settings apply; see net/proxy.ts). */
 function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
   const s = spec.settings ?? {};
-  if (!s.insecure && !s.proxy && !s.clientCert) return defaultAgent();
-  const key = JSON.stringify([s.insecure, s.proxy, s.clientCert]);
+  if (!s.insecure && !s.proxy && !s.clientCert) return baseDispatcher();
+  const key = JSON.stringify([proxyGeneration(), s.insecure, s.proxy, s.clientCert]);
   let d = dispatchers.get(key);
   if (!d) {
-    const connect: Record<string, unknown> = { lookup: policyLookup };
+    const connect: Record<string, unknown> = {};
     if (s.insecure) connect.rejectUnauthorized = false;
     if (s.clientCert) {
       connect.cert = readFileSync(s.clientCert.certPath);
@@ -59,16 +60,10 @@ function dispatcherFor(spec: HttpRequestSpec): Dispatcher | undefined {
       if (s.clientCert.caPath) connect.ca = readFileSync(s.clientCert.caPath);
       if (s.clientCert.passphrase) connect.passphrase = s.clientCert.passphrase;
     }
-    d = s.proxy ? new ProxyAgent({ uri: s.proxy, connect, requestTls: connect }) : new Agent({ connect });
+    d = makeDispatcher(connect, s.proxy);
     dispatchers.set(key, d);
   }
   return d;
-}
-
-let _default: Agent | undefined;
-function defaultAgent(): Agent {
-  // policyLookup refuses private addresses at connect time when the network policy blocks them
-  return (_default ??= new Agent({ connections: 256, pipelining: 1, keepAliveTimeout: 10_000, connect: { lookup: policyLookup } as never }));
 }
 
 /** Names of `:name` path segments in a URL, e.g. `/users/:id/posts/:postId` → ["id", "postId"]. */

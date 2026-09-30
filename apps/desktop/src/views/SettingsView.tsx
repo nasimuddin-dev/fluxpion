@@ -6,7 +6,7 @@ import type { AppSettings, PriceEntry, ProviderConfig } from '../types';
 import { checkForUpdates } from '../updates';
 import { Badge, Button, Field, IconButton, Input, Select, Tabs, Toggle } from '../components/ui';
 
-type Tab = 'appearance' | 'requests' | 'privacy' | 'pricing' | 'load' | 'assistant' | 'about';
+type Tab = 'appearance' | 'requests' | 'proxy' | 'privacy' | 'pricing' | 'load' | 'assistant' | 'about';
 
 export function SettingsView() {
   const settings = useApp((s) => s.settings);
@@ -31,6 +31,7 @@ export function SettingsView() {
         tabs={[
           { id: 'appearance', label: 'Appearance' },
           { id: 'requests', label: 'Requests' },
+          { id: 'proxy', label: 'Proxy' },
           { id: 'privacy', label: 'Privacy & security' },
           { id: 'pricing', label: 'Model pricing' },
           { id: 'load', label: 'Load testing' },
@@ -80,6 +81,7 @@ export function SettingsView() {
               </Field>
             </>
           )}
+          {tab === 'proxy' && <ProxySettings value={s.proxy ?? { mode: 'env' }} onChange={(proxy) => set({ proxy })} />}
           {tab === 'privacy' && (
             <>
               <Field label="Always-redacted field names" hint="Matched case-insensitively (and as suffixes, e.g. accessToken) in logs, traces, history, reports and exports.">
@@ -212,3 +214,72 @@ export function SettingsView() {
     </div>
   );
 }
+
+interface ProxyInfo {
+  passwordSet: boolean;
+  env: { HTTP_PROXY?: string; HTTPS_PROXY?: string; NO_PROXY?: string };
+}
+
+/** Outbound proxy: the environment variables (default), a custom proxy, or none. The password goes to the secret store. */
+function ProxySettings({ value, onChange }: { value: NonNullable<AppSettings['proxy']>; onChange(v: NonNullable<AppSettings['proxy']>): void }) {
+  const [info, setInfo] = useState<ProxyInfo>();
+  const [password, setPassword] = useState('');
+  const load = () => void call<ProxyInfo>('settings.proxyInfo').then(setInfo);
+  useEffect(load, []);
+  const savePassword = async (pw: string) => {
+    await call('settings.setProxyPassword', { password: pw });
+    setPassword('');
+    load();
+    useApp.getState().toast(pw ? 'Proxy password saved in the secret store' : 'Proxy password removed', 'success');
+  };
+  const env = info?.env ?? {};
+  const envSet = !!(env.HTTP_PROXY || env.HTTPS_PROXY);
+  const option = (mode: typeof value.mode, title: string, text: string) => (
+    <label className="flex items-start gap-2 cursor-pointer">
+      <input type="radio" className="mt-1" checked={value.mode === mode} onChange={() => onChange({ ...value, mode })} />
+      <span>
+        <span className="font-medium">{title}</span>
+        <span className="block text-sm text-muted">{text}</span>
+      </span>
+    </label>
+  );
+  return (
+    <>
+      <div className="flex flex-col gap-3">
+        {option('env', 'Use the environment variables', envSet ? `HTTP_PROXY / HTTPS_PROXY are set on this computer: ${env.HTTPS_PROXY ?? env.HTTP_PROXY}${env.NO_PROXY ? `, except ${env.NO_PROXY}` : ''}.` : 'HTTP_PROXY, HTTPS_PROXY and NO_PROXY, like curl. None are set on this computer, so requests go direct.')}
+        {option('custom', 'Use this proxy', 'For requests, OAuth token calls, AI providers, MCP over HTTP and datasets.')}
+        {option('off', "Don't use a proxy", 'Connect directly, even when the environment variables are set.')}
+      </div>
+      {value.mode === 'custom' && (
+        <div className="flex flex-col gap-3 pl-6">
+          <Field label="Proxy URL">
+            <Input className="mono" placeholder="http://proxy.example.com:8080" value={value.url ?? ''} onChange={(e) => onChange({ ...value, url: e.target.value })} />
+          </Field>
+          <Field label="Bypass the proxy for" hint="Comma separated, like NO_PROXY: host names (subdomains included), .domain suffixes, host:port, IP addresses, or * for everything.">
+            <Input className="mono" placeholder="localhost, 127.0.0.1, .internal.example.com" value={value.bypass ?? ''} onChange={(e) => onChange({ ...value, bypass: e.target.value })} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="User name (optional)">
+              <Input value={value.username ?? ''} autoComplete="off" onChange={(e) => onChange({ ...value, username: e.target.value || undefined })} />
+            </Field>
+            <Field label="Password" hint={info?.passwordSet ? 'A password is saved in the secret store.' : 'Saved in the OS secret store, never in settings.'}>
+              <div className="flex gap-2">
+                <Input type="password" autoComplete="new-password" value={password} placeholder={info?.passwordSet ? '••••••••' : ''} onChange={(e) => setPassword(e.target.value)} />
+                <Button disabled={!password} onClick={() => void savePassword(password)}>
+                  Save
+                </Button>
+                {info?.passwordSet && (
+                  <Button variant="ghost" onClick={() => void savePassword('')}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </Field>
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-muted">A request's own proxy (request Settings) wins over this. WebSocket connections don't use the proxy yet; gRPC reads the environment variables itself. The CLI always uses the environment variables (set TESTPION_NO_PROXY=1 to turn that off).</p>
+    </>
+  );
+}
+

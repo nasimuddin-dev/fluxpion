@@ -3,6 +3,7 @@ import {
   ApsError,
   normalizeError,
   ENGINE_VERSION,
+  setProxySettings,
 } from '@testpion/core';
 import { EXIT, red, dim, CliError } from './shared.js';
 import { registerRunCommands } from './commands/run.js';
@@ -29,6 +30,8 @@ export function buildProgram(): Command {
 }
 
 export async function main(argv = process.argv): Promise<number> {
+  // HTTP_PROXY / HTTPS_PROXY / NO_PROXY apply to everything the CLI sends (curl-style)
+  setProxySettings({ mode: process.env.TESTPION_NO_PROXY ? 'off' : 'env' });
   const program = buildProgram();
   program.exitOverride();
   try {

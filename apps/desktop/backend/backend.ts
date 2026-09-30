@@ -89,6 +89,7 @@ import {
   listMonitors,
   lastMonitorResult,
   type WorkspaceInfo,
+  setProxySettings,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -198,6 +199,7 @@ export class Backend {
       this.host.emit('log', rec);
     });
     this.handlers = this.buildHandlers();
+    this.applyProxy();
     if (this.manager.settingsProblem) this.logger.warn(`Settings were reset to defaults: ${this.manager.settingsProblem}`);
     this.bootstrapWorkspace();
     this.monitorScheduler = new MonitorScheduler({
@@ -209,6 +211,19 @@ export class Backend {
       onError: (m, e) => this.logger.error(`Monitor ${m.name} could not run: ${(e as Error).message}`),
     });
     if (!host.noMonitors) this.monitorScheduler.start();
+  }
+
+  /** Apply the proxy settings (the password comes from the secret store and is redacted from logs). */
+  applyProxy(): void {
+    const p = this.settings.proxy ?? { mode: 'env' as const };
+    const password = p.mode === 'custom' && p.username ? this.secrets.get('proxy.password') : undefined;
+    if (password) this.logger.redactor.addSecret(password);
+    try {
+      setProxySettings({ ...p, password });
+    } catch (e) {
+      this.logger.warn(`Proxy settings ignored: ${(e as Error).message}`);
+      setProxySettings({ mode: 'env' });
+    }
   }
 
   /** Copy the bundled examples workspace into the data folder (once); undefined when this host has none. */

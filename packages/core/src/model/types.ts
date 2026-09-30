@@ -639,6 +639,8 @@ export interface AppSettings {
   globalVariables: KeyValue[];
   /** Check GitHub for a newer version when the desktop app starts. */
   checkForUpdates: boolean;
+  /** Outbound proxy: environment variables (default), a custom proxy, or none. The password is in the secret store. */
+  proxy?: { mode: 'env' | 'custom' | 'off'; url?: string; bypass?: string; username?: string };
   /** Settings layout revision, used for one-time migrations of defaults. */
   settingsRevision?: number;
 }

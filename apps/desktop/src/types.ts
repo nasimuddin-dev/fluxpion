@@ -307,6 +307,7 @@ export interface AppSettings {
   workspacePaths: string[];
   globalVariables: KeyValue[];
   checkForUpdates: boolean;
+  proxy?: { mode: 'env' | 'custom' | 'off'; url?: string; bypass?: string; username?: string };
 }
 
 export interface WorkspaceCurrent {
