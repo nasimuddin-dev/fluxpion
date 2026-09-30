@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -301,6 +301,11 @@ describe('example workspace (end-to-end)', () => {
       expect(onDisk).toContain('{{accessToken}}');
       expect((await text('list_requests', { collection: 'Imported' })).text).toContain('Search pets');
       expect((await text('save_request', { collection: 'Nope', url: 'https://x.test' })).isError).toBe(true);
+      // import from text (the url form is covered by the import-url unit test)
+      const spec = ['openapi: 3.0.0', 'info: { title: Agent Pets, version: "1" }', 'paths:', '  /pets:', '    get: { responses: { "200": { description: ok } } }', ''].join('\n');
+      const imp = JSON.parse((await text('import_definition', { text: spec })).text);
+      expect(imp).toMatchObject({ format: 'openapi', collection: { name: 'Agent Pets' } });
+      expect((await text('import_definition', {})).isError).toBe(true);
       // environment order
       expect(JSON.parse((await text('reorder_environments', { order: ['Production', 'Development'] })).text).slice(0, 2)).toEqual(['Production', 'Development']);
       expect((await text('reorder_environments', { order: ['Nope'] })).isError).toBe(true);
@@ -317,6 +322,7 @@ describe('example workspace (end-to-end)', () => {
     await ro.connect(20_000);
     try {
       expect((await ro.listTools()).map((t) => t.name)).not.toContain('send_request');
+      expect((await ro.listTools()).map((t) => t.name)).not.toContain('import_definition');
     } finally {
       await ro.close();
     }

@@ -19,6 +19,8 @@ import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
+import { importIntoWorkspace } from '../import/workspace-import.js';
+import { fetchImportText } from '../import/fetch-url.js';
 import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
@@ -384,6 +386,36 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           next: placeholders.length
             ? `Ask the user to add ${placeholders.map((p) => p.variable).join(', ')} as secret variables of an environment (Environments view, or they stay unresolved).`
             : undefined,
+        };
+      },
+    },
+    {
+      name: 'import_definition',
+      write: true,
+      description:
+        'Import an API definition or collection into the workspace from a public http(s) link (`url`: OpenAPI/Swagger URL, a GitHub/GitLab/Bitbucket file page, a Postman collection API link) or from `text` (OpenAPI, Postman collection or environment, Insomnia, Bruno, Hoppscotch, HAR, .env). OpenAPI imports keep the document in specs/ and add contract checks to each request. Returns what was created; secret values from a .env are never written to files (listed in `secretsToSet`).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: str('http(s) link to download and import'),
+          text: str('Document text to import (when no url)'),
+          name: str('Name for an imported .env environment'),
+          contractChecks: { type: 'boolean', description: 'For OpenAPI: add a contract check to each request (default true)' },
+        },
+      },
+      run: async (a) => {
+        const f = typeof a.url === 'string' && a.url ? await fetchImportText(a.url) : undefined;
+        const text = f?.text ?? (typeof a.text === 'string' ? a.text : '');
+        if (!text.trim()) throw new ApsError('ValidationError', 'Give a url or text to import');
+        const r = importIntoWorkspace(store, text, { contractChecks: a.contractChecks !== false, name: typeof a.name === 'string' ? a.name : undefined });
+        return {
+          format: r.format,
+          source: f?.url,
+          collection: r.collection ? { name: r.collection.name, id: r.collection.id } : undefined,
+          environments: r.environments?.map((e) => e.name),
+          specPath: r.specPath,
+          contractChecks: r.contractChecks,
+          secretsToSet: r.secretsToSet?.length ? r.secretsToSet : undefined,
         };
       },
     },

@@ -58,8 +58,9 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `run_monitor` | Run a monitor now; returns the result and the failed requests. |
 | `compare_responses` | Compare two responses by history id: status, timing, header changes and a field-by-field JSON body diff (`$.path` added / removed / changed). Sensitive values are masked. |
 | `reorder_environments` | Set the order of environments in the environment picker (names or ids, first to last). |
+| `import_definition` | Import an OpenAPI document, Postman / Insomnia / Bruno / Hoppscotch collection, HAR or .env, from a public link (`url`) or `text`. OpenAPI imports get contract checks. |
 
-`save_request` and `reorder_environments` change workspace files, and `--read-only` hides them together with the tools that send requests.
+`save_request`, `import_definition` and `reorder_environments` change workspace files, and `--read-only` hides them together with the tools that send requests.
 
 ## What agents can and can't see
 
