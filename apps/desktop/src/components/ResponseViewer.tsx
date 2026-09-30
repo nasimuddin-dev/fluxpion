@@ -8,7 +8,7 @@ import { formatBytes, formatMs } from '../lib/format';
 import { useApp } from '../store';
 import { CheckList } from './Results';
 import { ResponseHistory } from './ResponseHistory';
-import { JsonTree, RawView, type TreeAssertion } from './JsonView';
+import { JsonTree, RawView, type TreeAssertion, type TreeVariable } from './JsonView';
 import { TraceView } from './TraceView';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
@@ -27,6 +27,7 @@ export function ResponseViewer({
   historyId,
   onSuggestAssertions,
   onAddAssertion,
+  onSaveVariable,
   onSaveExample,
   onGenerateTests,
   onExplain,
@@ -46,6 +47,7 @@ export function ResponseViewer({
   onSuggestAssertions?(): void;
   /** Clicking a field in the JSON tree can add a check on it to the request's Tests. */
   onAddAssertion?(a: TreeAssertion): void;
+  onSaveVariable?(v: TreeVariable): void;
   /** Save this response as an example of the request. */
   onSaveExample?(): void;
   /** Ask the AI assistant for pm tests for this response. */
@@ -148,7 +150,7 @@ export function ResponseViewer({
           (!response.bodyPreview ? (
             <Empty title="Empty body" />
           ) : mode === 'pretty' && isJson ? (
-            <JsonTree data={response.json} onAssert={onAddAssertion} />
+            <JsonTree data={response.json} onAssert={onAddAssertion} onSaveVariable={onSaveVariable} />
           ) : mode === 'visualize' && visualizer ? (
             <div className="h-full flex flex-col">
               {visualizer.error && <div className="px-3 py-2 text-sm text-bad border-b border-line">{visualizer.error}</div>}

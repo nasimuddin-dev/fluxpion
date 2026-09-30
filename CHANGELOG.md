@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Save a response field to a variable.** Click a key in a JSON response and choose **Save to variable…**: the request's test script gets a `pm.environment.set(...)` line for it (so it's refreshed after every send) and the variable is set right away, ready for `{{name}}` in the next request.
 - **OAuth 2.0: refresh tokens, Basic client auth, your own callback URL.** An expired authorization-code token is renewed with its refresh token instead of opening the browser again. **Client authentication** can send the client id and secret as a Basic header (Postman's option, imported and exported too), **Callback URL** takes the exact redirect registered with the provider (e.g. `http://localhost:8080/callback`), and **Forget tokens** clears the cache. Also fixed: running the browser flow twice could hang, because the browser reused a connection to the previous callback listener.
 - **Imports flag scripts that won't run.** Importing a Postman collection whose scripts use `cheerio`, `pm.vault`, `pm.require` or an unavailable `require()` module now lists those requests with a suggestion (in the app, `testpion import` and the MCP tool), instead of failing later at run time.
 - **More Postman scripts run as they are.** `xml2Json()` for XML and SOAP responses, `setTimeout` / `setInterval` (callbacks run after the script in delay order), `pm.response.size()`, `pm.expect.fail()`, and the legacy `postman.getResponseHeader`, `getResponseCookie`, `clearEnvironmentVariable` and `clearGlobalVariable`.

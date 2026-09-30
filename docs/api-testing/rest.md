@@ -113,6 +113,7 @@ To find something in a big response, type a JSONPath in **Filter with JSONPath**
 In the **Pretty** view of a JSON response, click a key to open its menu:
 
 - **Copy JSONPath** copies the key's path (like `$.items[0].id`).
+- **Save to variable…** keeps the field in a variable for later requests (a token from a login, an id from a create). It adds a line such as `pm.environment.set('accessToken', pm.response.json().access_token);` to the request's test script, so the value is updated after every send, and sets it right away in the active environment (the globals when no environment is selected). Use it as `{{accessToken}}`.
 - **Equals** checks the field has its current value.
 - **Exists** checks the field is there.
 - **Is a …** checks the field's type (string, number, array …).

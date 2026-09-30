@@ -179,6 +179,12 @@ export function workspaceHandlers(be: Backend): Handlers {
       // never send secret values to the UI: mask sensitive keys
       return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, be.logger.redactor.isSensitiveKey(k) ? '••••••' : v]));
     },
+    /** Set a current value now (e.g. a response field saved to a variable); sensitive keys and secret variables are kept encrypted. */
+    'currentValues.set': async ({ scope, owner, key, value }: { scope: 'environment' | 'globals' | 'collectionVariables'; owner?: string; key: string; value: unknown }) => {
+      if (!be.currentValues) throw new ApsError('ConfigurationError', 'Current values are not available here');
+      const secret = scope === 'environment' && !!be.ws.getEnvironment(owner ?? '')?.variables.some((v) => v.key === key && v.secret);
+      await be.currentValues.set(scope, owner ?? '', key, value, secret || be.logger.redactor.isSensitiveKey(key));
+    },
     'currentValues.reset': ({ scope, owner }: { scope?: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => be.currentValues?.reset(scope, owner),
     /** Postman's environment "quick look": initial and current values of the active environment and globals, secrets masked. */
     'env.quickLook': ({ environment }: { environment?: string }) => {

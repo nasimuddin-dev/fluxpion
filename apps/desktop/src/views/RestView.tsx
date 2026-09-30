@@ -31,7 +31,7 @@ import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/C
 import { ResponseViewer } from '../components/ResponseViewer';
 import { EnvCompareDialog } from './rest/EnvCompareDialog';
 import { toastAiError } from '../lib/ai-errors';
-import type { TreeAssertion } from '../components/JsonView';
+import type { TreeAssertion, TreeVariable } from '../components/JsonView';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
@@ -463,6 +463,24 @@ export function RestView() {
     useApp.getState().toast(`Added a check on ${a.path} (Tests tab). Save the request to keep it.`, 'success');
   };
 
+  // a response field kept in a variable: the test script sets it after every send, and it is set now too
+  const saveVariable = async (v: TreeVariable) => {
+    const scope = env ? 'environment' : 'globals';
+    const name = (
+      await promptText('Save to variable', {
+        message: `After every send, this request's test script stores the field in ${env ? `the ${env} environment` : 'the globals'}, so later requests can use {{name}}.`,
+        value: v.name,
+        okLabel: 'Save',
+      })
+    )?.trim();
+    if (!name) return;
+    if (!/^[\w.-]+$/.test(name)) return useApp.getState().toast('Use letters, digits, _ . or - in a variable name', 'error');
+    const line = `pm.${scope}.set('${name}', pm.response.json()${v.access});`;
+    update({ testScript: tab.testScript?.trim() ? `${tab.testScript.trimEnd()}\n${line}` : line });
+    await call('currentValues.set', { scope, owner: env ?? '', key: name, value: v.value }).catch(() => undefined);
+    useApp.getState().toast(`{{${name}}} is set, and the Scripts tab keeps it up to date after each send. Save the request to keep the script.`, 'success');
+  };
+
   const suggest = result?.response
     ? () =>
         useApp.getState().set({
@@ -719,7 +737,7 @@ export function RestView() {
                 <ErrorPanel error={result.error} context={{ request: { method: tab.request.method, url: tab.request.url } }} />
               </div>
             ) : result?.response ? (
-              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} visualizer={result.visualizer} requestId={tab.requestId} historyId={result.historyId} onSuggestAssertions={suggest} onAddAssertion={addAssertion} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
+              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} visualizer={result.visualizer} requestId={tab.requestId} historyId={result.historyId} onSuggestAssertions={suggest} onAddAssertion={addAssertion} onSaveVariable={(v) => void saveVariable(v)} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
             ) : (
               <Empty icon={<Send size={28} />} title="Send a request to see the response">
                 Press <b>Ctrl+Enter</b> to send. Variables like <span className="var-token mono">{'{{baseUrl}}'}</span> resolve from the active environment.

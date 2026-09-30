@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Copy, Equal, ListChecks, ListOrdered, Search, Shapes, WrapText } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Copy, Equal, ListChecks, ListOrdered, Search, Shapes, Variable, WrapText } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { JSONPath } from 'jsonpath-plus';
 import { cx, IconButton, Input, Menu, VirtualList, type MenuItem } from './ui';
@@ -9,10 +9,19 @@ interface TreeRow {
   depth: number;
   key?: string;
   path: string;
+  /** JavaScript accessor from the document root, e.g. `.items[0]["content-type"]` (for scripts). */
+  access?: string;
   value: unknown;
   expandable: boolean;
   count?: number;
   closing?: string;
+}
+
+/** A response field to keep in a variable: the test script sets it after every send. */
+export interface TreeVariable {
+  name: string;
+  access: string;
+  value: unknown;
 }
 
 function summary(v: unknown): string {
@@ -33,6 +42,9 @@ export interface TreeAssertion {
   min?: number;
 }
 
+/** A variable name for a key: `access_token` stays, `user-id` → `userId`, an index → `item0`. */
+const variableName = (key: string) => (/^\d+$/.test(key) ? `item${key}` : key.replace(/[^A-Za-z0-9_]+(.)?/g, (_, c: string | undefined) => (c ? c.toUpperCase() : '')) || 'value');
+
 const typeName = (v: unknown) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
 const short = (v: unknown) => {
   const s = JSON.stringify(v);
@@ -52,7 +64,7 @@ function assertionItems(r: { path: string; value: unknown; expandable: boolean }
   return items;
 }
 
-export function JsonTree({ data: full, query, onAssert: assertOnFull }: { data: unknown; query?: string; onAssert?(a: TreeAssertion): void }) {
+export function JsonTree({ data: full, query, onAssert: assertOnFull, onSaveVariable }: { data: unknown; query?: string; onAssert?(a: TreeAssertion): void; onSaveVariable?(v: TreeVariable): void }) {
   // "Filter with JSONPath": show only what the expression selects
   const [filter, setFilter] = useState('');
   const filtered = useMemo(() => {
@@ -78,13 +90,13 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull }: { data: 
 
   const rows = useMemo(() => {
     const out: TreeRow[] = [];
-    const walk = (v: unknown, key: string | undefined, path: string, depth: number) => {
+    const walk = (v: unknown, key: string | undefined, path: string, depth: number, access = '') => {
       const expandable = !!v && typeof v === 'object';
-      out.push({ depth, key, path, value: v, expandable, count: expandable ? Object.keys(v as object).length : undefined });
+      out.push({ depth, key, path, access, value: v, expandable, count: expandable ? Object.keys(v as object).length : undefined });
       if (expandable && expanded.has(path)) {
         const entries = Array.isArray(v) ? v.map((x, i) => [String(i), x] as const) : Object.entries(v as object);
         const limit = 5000;
-        entries.slice(0, limit).forEach(([k, x]) => walk(x, k, Array.isArray(v) ? `${path}[${k}]` : `${path}.${k}`, depth + 1));
+        entries.slice(0, limit).forEach(([k, x]) => walk(x, k, Array.isArray(v) ? `${path}[${k}]` : `${path}.${k}`, depth + 1, `${access}${Array.isArray(v) ? `[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `.${k}` : `[${JSON.stringify(k)}]`}`));
         if (entries.length > limit) out.push({ depth: depth + 1, path: `${path}#more`, value: `… ${entries.length - limit} more items (use Raw view / Save response)`, expandable: false });
         out.push({ depth, path: `${path}#close`, value: undefined, expandable: false, closing: Array.isArray(v) ? ']' : '}' });
       }
@@ -131,7 +143,7 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull }: { data: 
           spellCheck={false}
         />
         {filtered && <span className={filtered.error ? 'text-bad' : ''}>{filtered.error ? 'Not a valid JSONPath' : `${(filtered.data ?? []).length} match${(filtered.data ?? []).length === 1 ? '' : 'es'}`}</span>}
-        <span className="ml-auto">{filtered ? 'Showing the matches as a list' : onAssert ? 'Click a key to copy its JSONPath or turn it into an assertion' : 'Click a key to copy its JSONPath'}</span>
+        <span className="ml-auto">{filtered ? 'Showing the matches as a list' : onAssert ? onSaveVariable ? 'Click a key to copy its JSONPath, save it to a variable or check it' : 'Click a key to copy its JSONPath or turn it into an assertion' : 'Click a key to copy its JSONPath'}</span>
       </div>
       <VirtualList
         className="flex-1 mono text-[0.9em]"
@@ -161,6 +173,9 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull }: { data: 
                     }
                     items={[
                       { label: 'Copy JSONPath', icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(r.path) },
+                      ...(onSaveVariable
+                        ? [{ label: 'Save to variable…', icon: <Variable size={14} />, onSelect: () => onSaveVariable({ name: variableName(r.key!), access: r.access ?? '', value: r.value }) }]
+                        : []),
                       ...assertionItems(r, onAssert).map((it, i) => (i === 0 ? { ...it, separator: true } : it)),
                     ]}
                   />
