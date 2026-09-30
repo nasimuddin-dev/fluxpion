@@ -529,6 +529,7 @@ export function RestView() {
       pinned: t.pinned,
       onSelect: () => setActive(t.id),
       onClose: () => void closeTab(t.id),
+      closeMany: (keys: string[]) => void closeTabs(keys.map((k) => k.replace(/^rest:/, ''))),
       onRename: () => void renameTab(t),
       menu: () => tabMenu(t),
     })),

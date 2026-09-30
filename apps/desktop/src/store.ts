@@ -1,4 +1,5 @@
 import { toast as sonner } from 'sonner';
+import { docKey, isDocView, routeDoc, useDocs } from './lib/docs';
 import { create } from 'zustand';
 import type { AppSettings, WorkspaceCurrent } from './types';
 import { call } from './api';
@@ -74,6 +75,8 @@ export interface Intent {
   view: ViewId;
   payload: any;
   nonce: number;
+  /** For multi-document editors: the document (tab) that handles it. */
+  docId?: string;
 }
 
 interface AppState {
@@ -177,7 +180,8 @@ function travel(get: Get, set: Set, dir: 'back' | 'forward') {
   if (!to) return;
   const nav = dir === 'back' ? { back: back.slice(0, -1), forward: [...forward, current].slice(-NAV_LIMIT), current: to } : { back: [...back, current].slice(-NAV_LIMIT), forward: forward.slice(0, -1), current: to };
   localStorage.setItem('aps.view', to.view);
-  set({ nav, view: to.view, ...lastRequest(to.view), ...(to.payload ? { intent: { view: to.view, payload: to.payload, nonce: Date.now() } } : {}) });
+  if (isDocView(to.view) && !to.payload) useDocs.getState().ensure(to.view);
+  set({ nav, view: to.view, ...lastRequest(to.view), ...(to.payload ? { intent: { view: to.view, payload: to.payload, nonce: Date.now(), docId: routeDoc(to.view, to.payload) } } : {}) });
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -186,6 +190,7 @@ export const useApp = create<AppState>((set, get) => ({
   setView: (view) => {
     localStorage.setItem('aps.view', view);
     if (view !== get().view) record(get, set, { view });
+    if (isDocView(view)) useDocs.getState().ensure(view);
     set({ view, ...lastRequest(view) });
   },
   lastRequestView: ((): ViewId => {
@@ -241,7 +246,7 @@ export const useApp = create<AppState>((set, get) => ({
   openIntent: (view, payload) => {
     localStorage.setItem('aps.view', view);
     record(get, set, { view, payload: replayable(payload) });
-    set({ view, ...lastRequest(view), intent: { view, payload, nonce: Date.now() } });
+    set({ view, ...lastRequest(view), intent: { view, payload, nonce: Date.now(), docId: routeDoc(view, payload) } });
   },
   refreshWorkspace: async () => {
     const ws = await call<WorkspaceCurrent>('ws.current');
@@ -261,8 +266,10 @@ export const useApp = create<AppState>((set, get) => ({
 }));
 
 /** Persist per-view drafts in localStorage (UI state only — never secrets or responses). */
-export function persisted<T>(key: string, fallback: T): { load(): T; save(v: T): void } {
+export function persisted<T>(key: string, fallback: T): { load(): T; save(v: T): void; forDoc(docId?: string): { load(): T; save(v: T): void } } {
   return {
+    /** The draft of one document of a multi-document editor (`main` is the plain key). */
+    forDoc: (docId?: string) => persisted<T>(`${key}${docKey(docId)}`, fallback),
     load() {
       try {
         const s = localStorage.getItem(`aps.draft.${key}`);

@@ -14,6 +14,7 @@ import { CodeEditor } from '../components/CodeEditor';
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
 import { SaveModal } from './rest/dialogs';
 import { useSticky } from '../lib/sticky';
+import { useDoc } from '../lib/docs';
 import { SidebarShell } from '../components/SidebarShell';
 import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
@@ -85,9 +86,12 @@ function variablesText(v: unknown): string {
 const store = persisted<Draft>('graphql', { endpoint: '{{graphqlEndpoint}}', query: DEFAULT_QUERY, variables: '{\n  "id": "123"\n}', headers: [], auth: { type: 'inherit' }, assertions: [{ type: 'graphql-no-errors' }], name: 'GraphQL query' });
 
 export function GraphQLView() {
+  // this document's draft (each tab of this editor is its own document)
+  const { docId } = useDoc();
+  const docDrafts = useMemo(() => store.forDoc(docId), [docId]);
   // drafts saved by older versions may hold the variables as an object: the editors need text
   const [d, setD] = useState<Draft>(() => {
-    const x = store.load();
+    const x = docDrafts.load();
     return { ...x, variables: variablesText(x.variables) };
   });
   const [schema, setSchema] = useState<SchemaSummary>();
@@ -124,7 +128,7 @@ export function GraphQLView() {
   const [resTab, setResTab] = useState<'response' | 'raw' | 'tests'>('response');
   const env = useApp((s) => s.environment);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
-  useEffect(() => store.save(d), [d]);
+  useEffect(() => docDrafts.save(d), [d, docDrafts]);
 
   const operations = useMemo(() => {
     try {
@@ -267,7 +271,7 @@ export function GraphQLView() {
   };
 
   useIntent('graphql', async (p) => {
-    if (p?.reset) setD({ ...store.load(), query: DEFAULT_QUERY, collectionId: undefined, requestId: undefined, name: 'GraphQL query' });
+    if (p?.reset) setD({ ...docDrafts.load(), query: DEFAULT_QUERY, collectionId: undefined, requestId: undefined, name: 'GraphQL query' });
     if (p?.collectionId) {
       const cols = await call<Collection[]>('col.list');
       const c = cols.find((x) => x.id === p.collectionId);
@@ -322,7 +326,7 @@ export function GraphQLView() {
   };
 
   // this editor's tab in the shared tab strip
-  useSingleEditorTab('graphql', { title: d.name || 'GraphQL query', badge: 'GQL', badgeClass: 'text-[#e535ab]' });
+  useSingleEditorTab('graphql', { title: d.name || 'GraphQL query', badge: 'GQL', badgeClass: 'text-[#e535ab]', item: d.requestId });
   return (
     <div className="h-full flex flex-col">
       {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}

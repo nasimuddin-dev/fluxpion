@@ -1,7 +1,8 @@
-import { ChevronDown, Pin, Plug, Plus, Radio, Waypoints, X } from 'lucide-react';
+import { ArrowRightToLine, ChevronDown, ListX, Pin, Plug, Plus, Radio, SquareX, Waypoints, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { useApp, type ViewId } from '../store';
+import { isDocView, useDoc, useDocs } from '../lib/docs';
 import { cx, Menu, type MenuItem } from './ui';
 
 /**
@@ -21,15 +22,18 @@ export interface EditorTab {
   pinned?: boolean;
   onSelect?(): void;
   onClose(): void;
+  /** Close several of this editor's tabs at once (one question about unsaved changes); by keys. */
+  closeMany?(keys: string[]): void;
   onRename?(): void;
   menu?(): MenuItem[];
 }
 
 interface EditorTabsState {
-  byView: Partial<Record<ViewId, EditorTab[]>>;
-  /** The tab that's active inside each editor (REST has several). */
-  activeByView: Partial<Record<ViewId, string>>;
-  publish(view: ViewId, tabs: EditorTab[], active?: string): void;
+  /** Tabs by publisher: an editor (`rest`, `mcp`) or one document of a multi-document editor (`graphql:<docId>`). */
+  byView: Record<string, EditorTab[]>;
+  /** The tab that's active inside each publisher (REST has several). */
+  activeByView: Record<string, string | undefined>;
+  publish(group: string, tabs: EditorTab[], active?: string): void;
   /** Editors that have a tab open: they stay mounted (and come back after a restart). REST always does. */
   openViews: ViewId[];
   setOpen(view: ViewId, open: boolean): void;
@@ -76,20 +80,25 @@ export const useEditorTabsStore = create<EditorTabsState>((set, get) => ({
 const sameTab = (a: EditorTab, b: EditorTab) => a.key === b.key && a.title === b.title && a.badge === b.badge && a.dirty === b.dirty && a.pinned === b.pinned;
 
 /** Publish an editor's tabs (call it on every render; unchanged tabs don't re-render the strip). */
-export function useEditorTabs(view: ViewId, tabs: EditorTab[], active?: string) {
+export function useEditorTabs(group: string, tabs: EditorTab[], active?: string) {
   const ref = useRef({ tabs, active });
   ref.current = { tabs, active };
   useEffect(() => {
-    useEditorTabsStore.getState().publish(view, ref.current.tabs, ref.current.active);
+    useEditorTabsStore.getState().publish(group, ref.current.tabs, ref.current.active);
   });
-  useEffect(() => () => useEditorTabsStore.getState().publish(view, []), [view]);
+  useEffect(() => () => useEditorTabsStore.getState().publish(group, []), [group]);
 }
 
 /**
  * A single-document editor's tab (GraphQL, gRPC, WebSocket, MCP): shown while it holds something, hidden by
  * its close button until the editor is opened again. The draft itself is kept.
  */
-export function useSingleEditorTab(view: ViewId, tab: Omit<EditorTab, 'key' | 'view' | 'onClose'> | undefined) {
+export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | 'view' | 'onClose'> & { item?: string }) | undefined) {
+  const { docId } = useDoc();
+  const item = tab?.item;
+  useEffect(() => {
+    if (docId) useDocs.getState().setItem(view, docId, item);
+  }, [view, docId, item]);
   const current = useApp((s) => s.view);
   const [hidden, setHidden] = useState(false);
   const shown = !!tab && !hidden;
@@ -98,13 +107,34 @@ export function useSingleEditorTab(view: ViewId, tab: Omit<EditorTab, 'key' | 'v
   useEffect(() => {
     if (current === view) setHidden(false);
   }, [current, view]);
+  const key = `${view}:${docId ?? 'main'}`;
   useEditorTabs(
-    view,
-    tab && !hidden
+    key,
+    docId && tab
       ? [
           {
             ...tab,
-            key: `${view}:main`,
+            key,
+            view,
+            onSelect: () => useDocs.getState().select(view, docId),
+            onClose: () => {
+              const docs = useDocs.getState();
+              docs.close(view, docId);
+              // the last document of this editor: go to another open tab (or REST)
+              if (!(docs.docs[view] ?? []).length && useApp.getState().view === view) {
+                const others = Object.values(useEditorTabsStore.getState().byView).flat().filter((t) => t && t.view !== view);
+                const next = others[others.length - 1];
+                useApp.getState().setView(next?.view ?? 'rest');
+                next?.onSelect?.();
+              }
+            },
+          },
+        ]
+      : tab && !hidden
+      ? [
+          {
+            ...tab,
+            key,
             view,
             onClose: () => {
               setHidden(true);
@@ -119,7 +149,7 @@ export function useSingleEditorTab(view: ViewId, tab: Omit<EditorTab, 'key' | 'v
           },
         ]
       : [],
-    tab && !hidden ? `${view}:main` : undefined,
+    tab ? key : undefined,
   );
 }
 
@@ -128,11 +158,44 @@ export function newRequestItems(): MenuItem[] {
   const s = useApp.getState();
   return [
     { label: 'HTTP request', icon: <Plus size={14} />, shortcut: 'Ctrl+T', onSelect: () => s.openIntent('rest', { newTab: true }) },
-    { label: 'GraphQL request', icon: <Plus size={14} />, onSelect: () => s.openIntent('graphql', { reset: true }) },
-    { label: 'gRPC request', icon: <Waypoints size={14} />, onSelect: () => s.setView('grpc') },
-    { label: 'WebSocket, Socket.IO or MQTT', icon: <Radio size={14} />, onSelect: () => s.setView('websocket') },
-    { label: 'MCP server', icon: <Plug size={14} />, onSelect: () => s.setView('mcp') },
+    { label: 'GraphQL request', icon: <Plus size={14} />, onSelect: () => s.openIntent('graphql', { newDoc: true, reset: true }) },
+    { label: 'gRPC request', icon: <Waypoints size={14} />, onSelect: () => s.openIntent('grpc', { newDoc: true }) },
+    { label: 'WebSocket, Socket.IO or MQTT', icon: <Radio size={14} />, onSelect: () => s.openIntent('websocket', { newDoc: true }) },
+    { label: 'MCP server', icon: <Plug size={14} />, onSelect: () => s.openIntent('mcp', { addServer: true }) },
   ];
+}
+
+/** Right-click menu of a tab without its own (GraphQL, gRPC, WebSocket, MCP): closing, across every tab in the strip. */
+function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
+  const i = all.indexOf(t);
+  // per editor: one batch close where the editor offers it (REST), else tab by tab
+  const close = (list: EditorTab[]) => {
+    const open = list.filter((x) => !x.pinned);
+    for (const view of new Set(open.map((x) => x.view))) {
+      const mine = open.filter((x) => x.view === view);
+      if (mine[0]?.closeMany) mine[0].closeMany(mine.map((x) => x.key));
+      else mine.forEach((x) => x.onClose());
+    }
+  };
+  const others = all.filter((x) => x !== t && !x.pinned);
+  const right = all.slice(i + 1).filter((x) => !x.pinned);
+  return [
+    { label: 'Close tab', icon: <X size={14} />, shortcut: 'Middle-click', onSelect: () => t.onClose() },
+    { label: 'Close other tabs', icon: <SquareX size={14} />, disabled: !others.length, onSelect: () => close(others) },
+    { label: 'Close tabs to the right', icon: <ArrowRightToLine size={14} />, disabled: !right.length, onSelect: () => close(right) },
+    { label: 'Close all tabs', icon: <ListX size={14} />, onSelect: () => close(all) },
+  ];
+}
+
+/** A tab's menu: its own items, with closing (other / to the right / all) working across every tab in the strip. */
+function tabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
+  const shared = defaultTabMenu(t, all);
+  if (!t.menu) return shared;
+  const byLabel = new Map(shared.map((i) => [i.label, i]));
+  return t.menu().map((i) => {
+    const s = byLabel.get(i.label);
+    return s && i.label !== 'Close tab' ? { ...i, onSelect: s.onSelect, disabled: s.disabled } : i;
+  });
 }
 
 const ORDER: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp'];
@@ -142,8 +205,10 @@ export function EditorTabStrip() {
   const view = useApp((s) => s.view);
   const byView = useEditorTabsStore((s) => s.byView);
   const activeByView = useEditorTabsStore((s) => s.activeByView);
-  const tabs = ORDER.flatMap((v) => byView[v] ?? []);
-  const activeKey = activeByView[view];
+  const docs = useDocs((s) => s.docs);
+  const activeDocs = useDocs((s) => s.active);
+  const tabs = ORDER.flatMap((v) => (isDocView(v) ? (docs[v] ?? []).flatMap((d) => byView[`${v}:${d}`] ?? []) : (byView[v] ?? byView[`${v}:main`] ?? [])));
+  const activeKey = isDocView(view) ? `${view}:${activeDocs[view]}` : activeByView[view];
   const [menuFor, setMenuFor] = useState<string>();
   const stripRef = useRef<HTMLDivElement>(null);
   // keep the active tab in view (scrolling only the strip: scrollIntoView could shift the whole window)
@@ -173,7 +238,6 @@ export function EditorTabStrip() {
               onDoubleClick={t.onRename}
               onAuxClick={(e) => e.button === 1 && !t.pinned && t.onClose()}
               onContextMenu={(e) => {
-                if (!t.menu) return;
                 e.preventDefault();
                 setMenuFor(t.key);
               }}
@@ -192,8 +256,8 @@ export function EditorTabStrip() {
                   <X size={12} />
                 </button>
               )}
-              {t.menu && menuFor === t.key && (
-                <Menu open onOpenChange={(o) => !o && setMenuFor(undefined)} align="start" width={210} items={t.menu()} trigger={<span aria-hidden className="absolute left-2 bottom-0 w-0 h-0" />} />
+              {menuFor === t.key && (
+                <Menu open onOpenChange={(o) => !o && setMenuFor(undefined)} align="start" width={210} items={tabMenu(t, tabs)} trigger={<span aria-hidden className="absolute left-2 bottom-0 w-0 h-0" />} />
               )}
             </div>
           );

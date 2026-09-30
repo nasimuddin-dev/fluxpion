@@ -16,6 +16,7 @@ import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Split, Tabs, VirtualList } from '../components/ui';
 import { pickTextFile } from '../lib/files';
 import { useSticky } from '../lib/sticky';
+import { useDoc } from '../lib/docs';
 import { plural } from '../lib/format';
 import { saveAsTestFile } from '../lib/save-test';
 
@@ -71,10 +72,13 @@ const kind = (m: MethodInfo) => (m.clientStreaming && m.serverStreaming ? 'bidi 
 
 /** gRPC client: pick a method from .proto files, send a message (or a list, for client streams), see the response live. */
 export function GrpcView() {
-  const [d, setD] = useState(drafts.load);
+  // this document's draft (each tab of this editor is its own document)
+  const { docId } = useDoc();
+  const docDrafts = useMemo(() => drafts.forDoc(docId), [docId]);
+  const [d, setD] = useState(docDrafts.load);
   const [methods, setMethods] = useState<MethodInfo[]>([]);
   const [protoError, setProtoError] = useState<string>();
-  const [tab, setTab] = useState<'message' | 'metadata' | 'protos' | 'settings'>(() => (drafts.load().protoFiles.length ? 'message' : 'protos'));
+  const [tab, setTab] = useState<'message' | 'metadata' | 'protos' | 'settings'>(() => (docDrafts.load().protoFiles.length ? 'message' : 'protos'));
   const [resTab, setResTab] = useState<'response' | 'metadata' | 'trailers'>('response');
   const [sending, setSending] = useState<string>();
   const [live, setLive] = useState<Array<{ data: unknown; atMs: number }>>([]);
@@ -87,7 +91,7 @@ export function GrpcView() {
   // the client private key is never part of them
   type Saved = Omit<typeof d, 'keyRef'> & { keyRef?: string };
   const saved = useLibrary<Saved>('grpc');
-  const [savedId, setSavedId] = useSticky<string | undefined>('grpc:saved', undefined);
+  const [savedId, setSavedId] = useSticky<string | undefined>(`grpc:saved:${docId ?? 'main'}`, undefined);
   const currentSaved = saved.lib.items.find((i) => i.id === savedId);
   // descriptors fetched by reflection aren't an edit (a saved request without protos reflects when opened)
   const comparable = (x: Partial<typeof d>) => JSON.stringify({ ...x, descriptorSet: undefined, reflectedFrom: undefined });
@@ -97,7 +101,7 @@ export function GrpcView() {
     if (!it) return;
     setSavedId(id);
     // the previous request's protos / reflected descriptors must not carry over to this one
-    const clean = { ...drafts.load(), protoFiles: [] as ProtoFile[], descriptorSet: undefined, reflectedFrom: undefined };
+    const clean = { ...docDrafts.load(), protoFiles: [] as ProtoFile[], descriptorSet: undefined, reflectedFrom: undefined };
     const next = { ...clean, ...it.data };
     setD(next);
     setResult(undefined);
@@ -124,13 +128,13 @@ export function GrpcView() {
     setD((cur) => ({ ...cur, target: r.target ?? cur.target, method: r.method ?? cur.method, message: r.message || cur.message, metadata: r.metadata ?? cur.metadata }));
   });
   // a pasted private key stays in memory; a {{variable}} reference may be kept with the draft
-  const [keyText, setKeyText] = useSticky('grpc:key', drafts.load().keyRef ?? '');
+  const [keyText, setKeyText] = useSticky(`grpc:key:${docId ?? 'main'}`, docDrafts.load().keyRef ?? '');
   useEffect(() => set({ keyRef: /^\s*\{\{[^}]+\}\}\s*$/.test(keyText) ? keyText.trim() : undefined }), [keyText]); // eslint-disable-line react-hooks/exhaustive-deps
   const tlsOptions = d.ca?.trim() || d.cert?.trim() || keyText.trim() ? { ca: d.ca, cert: d.cert, key: keyText } : undefined;
   const env = useApp((s) => s.environment);
   const sendingRef = useRef<string | undefined>(undefined);
   sendingRef.current = sending;
-  useEffect(() => drafts.save(d), [d]);
+  useEffect(() => docDrafts.save(d), [d, docDrafts]);
 
   // methods follow the proto files (or the reflected descriptors)
   useEffect(() => {
@@ -214,7 +218,7 @@ export function GrpcView() {
   const example = useMemo(() => (current ? JSON.stringify(current.example) : ''), [current]);
 
   // this editor's tab in the shared tab strip
-  useSingleEditorTab('grpc', { title: currentSaved?.name ?? (d.method ? d.method.split('/').pop()! : 'gRPC request'), badge: 'gRPC', badgeClass: 'text-[#2ea99e]' });
+  useSingleEditorTab('grpc', { title: currentSaved?.name ?? (d.method ? d.method.split('/').pop()! : 'gRPC request'), badge: 'gRPC', badgeClass: 'text-[#2ea99e]', item: savedId });
   return (
     <Split id="grpc-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell

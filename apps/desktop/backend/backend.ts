@@ -651,7 +651,9 @@ export class Backend {
       const { response, prepared } = result;
       root.setAttributes({ status: response.status, url: prepared.url, size: response.size });
       root.span.input = { method: prepared.method, headers: prepared.headers, body: prepared.bodyPreview };
-      root.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers } });
+      // the body is kept (redacted, up to 48 KB) for the trace's Payload tab; the full body is in the payload file
+      const tracedBody = response.bodyPreview.length > 48_000 ? `${response.bodyPreview.slice(0, 48_000)}…` : response.bodyPreview;
+      root.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers, body: tracedBody } });
 
       const cctx: CheckContext = {
         testType: 'http',

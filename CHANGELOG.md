@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Several GraphQL, gRPC and WebSocket tabs**: each tab is its own document, with its own draft, response and connection. **New ▸ GraphQL / gRPC / WebSocket** opens a new tab instead of showing the existing one, opening a saved item gives it its own tab (or selects the tab that already shows it), and closing a tab discards that document's draft. **New ▸ MCP server** opens *Add server*.
+- **Right-click menu on every tab**: GraphQL, gRPC, WebSocket and MCP tabs now have Close tab, Close other tabs, Close tabs to the right and Close all tabs. On REST tabs these now close tabs of every kind, not only REST ones.
+- **Payload tab in traces**: the first tab of a span shows the request and response bodies on their own: JSON as a tree or raw text, with content type, size and copy. Requests sent from the editor now keep the response body in their trace (redacted, up to 48 KB).
+
 ## 0.12.0 — 2026-09-30
 
 Highlights: a clearer **Collections sidebar**, organised by what you work with (collections, gRPC, WebSocket & MQTT, MCP servers, API definitions), with a create button in every section.

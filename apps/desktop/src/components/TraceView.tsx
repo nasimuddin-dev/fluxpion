@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import type { Span, Trace } from '../types';
 import { formatMs } from '../lib/format';
 import { Badge, cx, Split, Tabs } from './ui';
@@ -38,7 +39,7 @@ export function spanRows(trace: Trace): Array<{ span: Span; depth: number }> {
 export function TraceView({ trace }: { trace: Trace }) {
   const rows = useMemo(() => spanRows(trace), [trace]);
   const [sel, setSel] = useState<string | undefined>(rows[0]?.span.spanId);
-  const [tab, setTab] = useState<'attributes' | 'input' | 'output' | 'events'>('attributes');
+  const [tab, setTab] = useState<'payload' | 'attributes' | 'input' | 'output' | 'events'>('payload');
   const start = trace.startTime;
   const end = Math.max(trace.endTime ?? 0, ...trace.spans.map((s) => s.endTime ?? s.startTime));
   const total = Math.max(1, end - start);
@@ -88,6 +89,7 @@ export function TraceView({ trace }: { trace: Trace }) {
                 value={tab}
                 onChange={setTab}
                 tabs={[
+                  { id: 'payload', label: 'Payload' },
                   { id: 'attributes', label: 'Attributes' },
                   { id: 'input', label: 'Input' },
                   { id: 'output', label: 'Output' },
@@ -100,6 +102,9 @@ export function TraceView({ trace }: { trace: Trace }) {
                 }
               />
               <div className="flex-1 min-h-0">
+                {tab === 'payload' ? (
+                  <PayloadPanel key={span.spanId} span={span} />
+                ) : (
                 <JsonTree
                   data={
                     tab === 'attributes'
@@ -111,6 +116,7 @@ export function TraceView({ trace }: { trace: Trace }) {
                           : span.events ?? []
                   }
                 />
+                )}
               </div>
             </>
           ) : (
@@ -119,5 +125,108 @@ export function TraceView({ trace }: { trace: Trace }) {
         </div>
       </Split>
     </div>
+  );
+}
+
+type Headers = Array<[string, string]> | Record<string, string> | undefined;
+function headerValue(h: Headers, name: string): string | undefined {
+  if (!h) return undefined;
+  const n = name.toLowerCase();
+  if (Array.isArray(h)) return h.find(([k]) => k?.toLowerCase() === n)?.[1];
+  return Object.entries(h).find(([k]) => k.toLowerCase() === n)?.[1];
+}
+
+/** The body of a span's input or output: HTTP spans keep it under `body`; AI, MCP and tool spans are the payload themselves. */
+function payloadOf(v: unknown): { body: unknown; contentType?: string; status?: unknown } | undefined {
+  if (v === undefined || v === null || v === '') return undefined;
+  if (typeof v === 'object' && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>;
+    // too big to record whole: the tracer kept the start of it as text
+    if (o.truncated === true && typeof o.preview === 'string') return { body: `${o.preview}…` };
+    if ('body' in o || 'headers' in o) {
+      const body = o.body;
+      return body === undefined || body === null || body === '' ? { body: undefined, contentType: headerValue(o.headers as Headers, 'content-type'), status: o.status } : { body, contentType: headerValue(o.headers as Headers, 'content-type'), status: o.status };
+    }
+  }
+  return { body: v };
+}
+
+/** JSON text becomes a value to show as a tree; anything else stays text. */
+function parsed(body: unknown): { json?: unknown; text: string } {
+  if (typeof body !== 'string') return { json: body, text: JSON.stringify(body, null, 2) };
+  const t = body.trim();
+  if (/^[[{]/.test(t)) {
+    try {
+      return { json: JSON.parse(t), text: body };
+    } catch {
+      /* not JSON (or cut off) */
+    }
+  }
+  return { text: body };
+}
+
+const sizeOf = (text: string) => {
+  const n = new TextEncoder().encode(text).length;
+  return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+};
+
+function PayloadBox({ title, payload, emptyText }: { title: string; payload?: { body: unknown; contentType?: string; status?: unknown }; emptyText: string }) {
+  const [raw, setRaw] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const body = payload?.body;
+  const p = body === undefined ? undefined : parsed(body);
+  const copy = () => {
+    if (!p) return;
+    void navigator.clipboard.writeText(p.text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
+  };
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex items-center gap-2 h-8 px-3 border-b border-line bg-panel/40 shrink-0 text-xs">
+        <span className="font-semibold text-fg">{title}</span>
+        {payload?.status !== undefined && <Badge>{String(payload.status)}</Badge>}
+        {payload?.contentType && <span className="mono text-muted truncate">{payload.contentType.split(';')[0]}</span>}
+        {p && <span className="text-muted">{sizeOf(p.text)}{typeof body === 'string' && body.endsWith('…') ? ' · preview' : ''}</span>}
+        {p && (
+          <div className="ml-auto flex items-center gap-1">
+            {p.json !== undefined && (
+              <div className="flex rounded-md border border-line overflow-hidden">
+                {(['Pretty', 'Raw'] as const).map((m) => (
+                  <button key={m} className={cx('px-2 h-6', (m === 'Raw') === raw ? 'bg-accent-soft text-accent' : 'text-muted hover:text-fg')} onClick={() => setRaw(m === 'Raw')}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button aria-label={`Copy the ${title.toLowerCase()}`} title="Copy" className="p-1 rounded text-muted hover:text-fg hover:bg-hover" onClick={copy}>
+              {copied ? <Check size={13} className="text-ok" /> : <Copy size={13} />}
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {!p ? (
+          <p className="p-3 text-sm text-muted">{emptyText}</p>
+        ) : p.json !== undefined && !raw ? (
+          <JsonTree data={p.json} />
+        ) : (
+          <pre className="p-3 text-xs mono whitespace-pre-wrap break-words">{p.text}</pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The span's request and response bodies on their own (secrets are already redacted in traces). */
+function PayloadPanel({ span }: { span: Span }) {
+  const req = payloadOf(span.input);
+  const res = payloadOf(span.output);
+  return (
+    <Split id="trace-payload" direction="vertical" initial={45} min={15}>
+      <PayloadBox title="Request" payload={req} emptyText="No request payload (e.g. a GET without a body)." />
+      <PayloadBox title="Response" payload={res} emptyText={span.error ? `No response: ${span.error}` : 'No response payload.'} />
+    </Split>
   );
 }

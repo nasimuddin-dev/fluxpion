@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X, FileCheck2, Bookmark, History, KeyRound } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
@@ -8,6 +8,7 @@ import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
+import { useDoc } from '../lib/docs';
 import { useIntent } from '../hooks';
 import type { KeyValue } from '../types';
 import { CodeEditor } from '../components/CodeEditor';
@@ -72,7 +73,10 @@ const MODES = [
 const drafts = persisted<Draft>('websocket', { url: '{{wsUrl}}', protocols: '', headers: [] as KeyValue[], message: '{\n  "type": "ping"\n}' });
 
 export function WebSocketView() {
-  const [d, setD] = useState(drafts.load);
+  // this document's draft (each tab of this editor is its own document)
+  const { docId } = useDoc();
+  const docDrafts = useMemo(() => drafts.forDoc(docId), [docId]);
+  const [d, setD] = useState(docDrafts.load);
   const [session, setSession] = useState<string>();
   const [status, setStatus] = useState<'closed' | 'connecting' | 'open'>('closed');
   const [messages, setMessages] = useState<WsMessage[]>([]);
@@ -85,14 +89,14 @@ export function WebSocketView() {
   const env = useApp((s) => s.environment);
   // saved connections (URL, subprotocols, handshake headers, message) with folders
   const saved = useLibrary<Draft>('websocket');
-  const [savedId, setSavedId] = useSticky<string | undefined>('ws:saved', undefined);
+  const [savedId, setSavedId] = useSticky<string | undefined>(`ws:saved:${docId ?? 'main'}`, undefined);
   const current = saved.lib.items.find((i) => i.id === savedId);
   const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(persistable(d));
   const open = async (id: string) => {
     const it = await saved.find(id);
     if (!it) return;
     setSavedId(id);
-    setD({ ...drafts.load(), ...it.data });
+    setD({ ...docDrafts.load(), ...it.data });
   };
   // global search → open a saved connection
   useIntent('websocket', (p) => p?.savedId && open(p.savedId));
@@ -108,7 +112,7 @@ export function WebSocketView() {
   };
   const sessionRef = useRef<string | undefined>(undefined);
   sessionRef.current = session;
-  useEffect(() => drafts.save(persistable(d)), [d]);
+  useEffect(() => docDrafts.save(persistable(d)), [d, docDrafts]);
   useEffect(() => {
     const a = on<Array<{ id: string; message: WsMessage }>>('wsock.messages', (items) => {
       const mine = items.filter((i) => i.id === sessionRef.current).map((i) => i.message);
@@ -197,7 +201,7 @@ export function WebSocketView() {
     parsed = undefined;
   }
   // this editor's tab in the shared tab strip
-  useSingleEditorTab('websocket', { title: current?.name ?? (d.url || 'WebSocket'), badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]' });
+  useSingleEditorTab('websocket', { title: current?.name ?? (d.url || 'WebSocket'), badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]', item: savedId });
   return (
     <Split id="ws-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell
