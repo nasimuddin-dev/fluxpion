@@ -5,6 +5,7 @@ import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
+import { useIntent } from '../hooks';
 import type { KeyValue } from '../types';
 import { CodeEditor } from '../components/CodeEditor';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -56,12 +57,14 @@ export function WebSocketView() {
   const [savedId, setSavedId] = useSticky<string | undefined>('ws:saved', undefined);
   const current = saved.lib.items.find((i) => i.id === savedId);
   const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(d);
-  const open = (id: string) => {
-    const it = saved.lib.items.find((i) => i.id === id);
+  const open = async (id: string) => {
+    const it = await saved.find(id);
     if (!it) return;
     setSavedId(id);
     setD({ ...drafts.load(), ...it.data });
   };
+  // global search → open a saved connection
+  useIntent('websocket', (p) => p?.savedId && open(p.savedId));
   const save = async (asNew = false, folder?: string) => {
     if (current && !asNew) {
       await saved.put({ ...current, data: d });

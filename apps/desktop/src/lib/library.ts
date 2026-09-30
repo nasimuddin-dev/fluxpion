@@ -43,5 +43,10 @@ export function useLibrary<T>(kind: string) {
     },
     [lib, save],
   );
-  return { lib, save, ops, put, reload };
+  /** An item by id, loading the library first if it isn't known yet (e.g. opened from search). */
+  const find = useCallback(
+    async (id: string) => lib.items.find((i) => i.id === id) ?? (await call<Library<T>>('lib.get', { kind }).then((l) => (setLib(l), l.items.find((i) => i.id === id)), () => undefined)),
+    [lib, kind],
+  );
+  return { lib, save, ops, put, reload, find };
 }

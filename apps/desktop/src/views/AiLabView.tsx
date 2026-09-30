@@ -78,6 +78,7 @@ export function AiLabView() {
     void load();
   }, [load]);
   useIntent('ai', (p) => {
+    if (p?.savedId) setTab('playground');
     if (p?.tab) setTab(p.tab);
     if (p?.providerId) setTab('providers');
     if (p?.reset) setTab('playground');
@@ -260,14 +261,16 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
   const current = saved.lib.items.find((i) => i.id === savedId);
   const snapshot = (): SavedPrompt => ({ provider: d.provider, model: d.model, system: d.system, prompt: d.prompt, input: d.input, temperature: d.temperature, topP: d.topP, maxTokens: d.maxTokens, seed: d.seed, format: d.format, schema: d.schema, expected: d.expected, evaluators: d.evaluators });
   const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(snapshot());
-  const openSaved = (id: string) => {
-    const it = saved.lib.items.find((i) => i.id === id);
+  const openSaved = async (id: string) => {
+    const it = await saved.find(id);
     if (!it) return;
     setSavedId(id);
     // parameters the saved prompt doesn't set go back to their defaults (not the previous prompt's values)
     set({ temperature: undefined, topP: undefined, maxTokens: undefined, seed: undefined, ...it.data });
     setResult(undefined);
   };
+  // global search → open a saved prompt (keyed: the Playground unmounts when another tab is shown)
+  useIntent('ai', (p) => p?.savedId && openSaved(p.savedId), 'ai-playground-saved');
   const savePrompt = async (asNew = false, folder?: string) => {
     if (current && !asNew) {
       await saved.put({ ...current, data: snapshot() });

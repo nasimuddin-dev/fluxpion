@@ -20,6 +20,7 @@ import {
   Plug,
   Plus,
   Radio,
+  Bookmark,
   Waypoints,
   ScrollText,
   Search,
@@ -384,6 +385,7 @@ export function SearchDialog() {
     else if (h.kind === 'history') openIntent('history', { historyId: h.ref.historyId });
     else if (h.kind === 'trace') openIntent('traces', { traceId: h.ref.traceId });
     else if (h.kind === 'run') openIntent('tests', { runId: h.ref.runId });
+    else if (h.kind === 'saved') openIntent(h.ref.library === 'grpc' ? 'grpc' : h.ref.library === 'ai-prompts' ? 'ai' : 'websocket', { savedId: h.ref.itemId });
   };
   const icons: Record<string, ReactNode> = {
     request: <Network size={14} />,
@@ -393,6 +395,7 @@ export function SearchDialog() {
     'environment-variable': <KeyRound size={14} />,
     'mcp-server': <Plug size={14} />,
     provider: <Sparkles size={14} />,
+    saved: <Bookmark size={14} />,
     history: <History size={14} />,
     trace: <Activity size={14} />,
     run: <Boxes size={14} />,

@@ -85,8 +85,8 @@ export function GrpcView() {
   const [savedId, setSavedId] = useSticky<string | undefined>('grpc:saved', undefined);
   const currentSaved = saved.lib.items.find((i) => i.id === savedId);
   const savedDirty = !!currentSaved && JSON.stringify(currentSaved.data) !== JSON.stringify(d);
-  const openSaved = (id: string) => {
-    const it = saved.lib.items.find((i) => i.id === id);
+  const openSaved = async (id: string) => {
+    const it = await saved.find(id);
     if (!it) return;
     setSavedId(id);
     setD({ ...drafts.load(), ...it.data });
@@ -105,6 +105,7 @@ export function GrpcView() {
   };
   // History → open: fill in the address, method, message and metadata
   useIntent('grpc', (p) => {
+    if (p?.savedId) return openSaved(p.savedId);
     const r = p?.request as { target?: string; method?: string; message?: string; metadata?: KeyValue[] } | undefined;
     if (!r) return;
     setSavedId(undefined);

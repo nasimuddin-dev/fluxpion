@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorkspaceManager, WorkspaceStore } from '../../packages/core/src/index.js';
+import { WorkspaceManager, WorkspaceSearch, WorkspaceStore } from '../../packages/core/src/index.js';
 
 describe('workspace library (saved items with folders)', () => {
   it('saves items and folders per kind, keeps empty folders, and adds folders items refer to', () => {
@@ -23,6 +23,10 @@ describe('workspace library (saved items with folders)', () => {
       expect(store.getLibrary('websocket').items.map((i) => i.name)).toEqual(['Echo', 'Untitled']);
       expect(store.getLibrary('ai-prompts').items).toEqual([]);
       expect(() => store.getLibrary('../secrets')).toThrow(/Invalid library kind/);
+
+      // global search finds saved items by name and URL
+      const hits = new WorkspaceSearch(store).search('4013');
+      expect(hits.find((h) => h.kind === 'saved')).toMatchObject({ title: 'Echo', ref: { library: 'websocket', itemId: 'a' } });
 
       // workspace export / import carries the saved items and folders
       const bundle = store.exportBundle();
