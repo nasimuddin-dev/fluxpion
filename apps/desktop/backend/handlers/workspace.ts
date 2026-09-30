@@ -1,6 +1,6 @@
 /** RPC handlers: Workspaces, environments, current values, cookies and variables. */
-import { writeFileSync } from 'node:fs';
-import { resolve as resolvePath } from 'node:path';
+import { existsSync, writeFileSync } from 'node:fs';
+import { join, resolve as resolvePath } from 'node:path';
 import {
   ApsError,
   listTrash,
@@ -64,6 +64,10 @@ export function workspaceHandlers(be: Backend): Handlers {
         const dir = await be.host.openDialog({ directory: true });
         if (!dir) return null;
         path = dir;
+        if (!existsSync(join(dir, 'workspace.json')))
+          throw new ApsError('ConfigurationError', `${dir} is not a TestPion workspace (it has no workspace.json)`, {
+            suggestions: ['Choose the folder that contains workspace.json, e.g. a workspace kept in a git repository.', 'To start a new workspace use New; to bring in a Postman collection or OpenAPI file use Import.'],
+          });
         const s = be.manager.loadSettings();
         if (!s.workspacePaths.includes(dir)) be.settings = be.manager.saveSettings({ ...s, workspacePaths: [...s.workspacePaths, dir] });
       }

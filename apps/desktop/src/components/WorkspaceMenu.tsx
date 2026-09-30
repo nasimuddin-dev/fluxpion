@@ -182,7 +182,7 @@ export function WorkspaceMenu() {
               <Button size="sm" variant="ghost" icon={<FolderPlus size={13} />} onClick={() => setNameDialog({ mode: 'create', value: '' })}>
                 New
               </Button>
-              <Button size="sm" variant="ghost" icon={<FolderOpen size={13} />} onClick={async () => {
+              <Button size="sm" variant="ghost" icon={<FolderOpen size={13} />} title="Open a workspace that lives elsewhere on disk, e.g. one kept in a git repository with your code. Choose the folder that contains workspace.json; it's added to this list and used in place (nothing is copied)." onClick={async () => {
                   setOpen(false);
                   if (hasNativeDialogs()) return void act(() => call('ws.open', {}));
                   // no folder picker in the browser: ask for the workspace folder's path

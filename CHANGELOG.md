@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **API coverage**: which operations of an OpenAPI document, and which of their documented response codes, the tests and requests exercised. It also shows operations that were never called, codes the document doesn't describe, and requests to paths it doesn't have. Open **API coverage** from a finished run or the command palette. **Suggest tests with AI** drafts tests for the gaps, and the report exports as Markdown. In CI, `testpion coverage specs/api.yaml --min 80` fails the build below a threshold (`--json`, `--markdown`, `--history`). AI agents use the `api_coverage` MCP tool. HTTP test results now record their status code.
+- **Example OpenAPI document** for the veterinary demo API (`specs/veterinary-api.yaml`).
+- **Open folder** in the workspace menu explains what it's for (a workspace kept elsewhere, e.g. in a git repository) and says clearly when the chosen folder isn't a workspace.
+
 ## 0.9.0 — 2026-09-30
 
 Highlights: **MQTT** alongside WebSocket and Socket.IO; **HTTP/2**; **WSDL/SOAP**, **Bruno** folder import and export, HTTPie and grpcurl paste; **async scripts** (`await pm.sendRequest`, async `pm.test`), **script packages** (`pm.require`) and more Postman modules (ajv, chai, cheerio, xml2js, csv-parse); **MCP client features** (elicitation, sampling, roots, completions, resource subscriptions); **load-test thresholds** and **gRPC load tests**; **watch mode**, **re-run failed tests** and **OpenTelemetry export** in the CLI; tests run from AI agents over MCP (`list_tests`, `run_tests`, `save_test`), **Explain with AI** for failed tests; and a tidier UI: grouped navigation, collections in the GraphQL view, filterable saved lists and a clearer Tests sidebar.

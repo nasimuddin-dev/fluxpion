@@ -17,14 +17,14 @@ interface OpenApiDiff {
   operations: { old: number; new: number; added: number; removed: number };
 }
 /** One side of the comparison: a document kept in the workspace, a link, or a file's text. */
-interface Side {
+export interface Side {
   path?: string;
   url?: string;
   text?: string;
   fileName?: string;
 }
 
-function SidePicker({ label, specs, value, onChange }: { label: string; specs: string[]; value: Side; onChange(s: Side): void }) {
+export function SidePicker({ label, specs, value, onChange }: { label: string; specs: string[]; value: Side; onChange(s: Side): void }) {
   const mode = value.text !== undefined ? 'file' : value.url !== undefined ? 'link' : 'spec';
   return (
     <Field label={label}>

@@ -8,6 +8,8 @@ import {
   collectionToBru,
   importIntoWorkspace,
   diffOpenApi,
+  workspaceApiCoverage,
+  apiCoverageMarkdown,
   securityLint,
   variableFlow,
   startRecorder,
@@ -157,6 +159,19 @@ export function collectionsHandlers(be: Backend): Handlers {
       const read = async (s: { path?: string; url?: string; text?: string }) =>
         s.text ?? (s.url ? (await fetchImportText(s.url)).text : s.path ? readFileSync(be.ws.safePath(s.path), 'utf8') : '');
       return diffOpenApi(await read(old), await read(next));
+    },
+    /** API coverage of an OpenAPI document by test runs (default: the latest) and optionally the request history. */
+    'openapi.coverage': async (p: { spec: { path?: string; url?: string; text?: string }; runs?: string[]; history?: number; baseUrl?: string; excludeDeprecated?: boolean }) => {
+      const s = p.spec ?? {};
+      const text = s.text ?? (s.url ? (await fetchImportText(s.url)).text : s.path ? readFileSync(be.ws.safePath(s.path), 'utf8') : '');
+      if (!text.trim()) throw new ApsError('ValidationError', 'Choose an OpenAPI document');
+      const { report, sources } = await workspaceApiCoverage(be.ws, text, {
+        runs: p.runs?.length ? p.runs : undefined,
+        history: p.history && p.history > 0 ? Math.min(p.history, 10_000) : undefined,
+        baseUrl: p.baseUrl?.trim() || undefined,
+        excludeDeprecated: p.excludeDeprecated,
+      });
+      return { report, sources, markdown: apiCoverageMarkdown(report) };
     },
     /** Import from a link: an OpenAPI URL, a raw GitHub file, a Postman API link … (downloaded, then imported as text). */
     'col.importUrl': async ({ url }: { url: string }) => {

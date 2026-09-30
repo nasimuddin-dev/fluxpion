@@ -1,0 +1,163 @@
+openapi: 3.0.3
+info:
+  title: Veterinary API (demo)
+  version: 1.0.0
+  description: |
+    The REST API of the local demo server (`node examples/servers/demo-servers.mjs`, port 4010).
+    Try `testpion coverage specs/veterinary-api.yaml` after a run to see which operations the tests exercise,
+    or add an `openapi` check to validate responses against it.
+servers:
+  - url: http://localhost:4010
+security:
+  - bearer: []
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: The server is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  time: { type: string, format: date-time }
+  /auth/token:
+    post:
+      operationId: getToken
+      summary: Get an access token (client credentials or password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string }
+                client_id: { type: string }
+                client_secret: { type: string }
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, token_type]
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string }
+                  expires_in: { type: integer }
+        '401':
+          $ref: '#/components/responses/Error'
+  /patients:
+    get:
+      operationId: listPatients
+      summary: List patients
+      tags: [patients]
+      responses:
+        '200':
+          description: All patients
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Patient' } }
+                  total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createPatient
+      summary: Create a patient
+      tags: [patients]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, species]
+              properties:
+                name: { type: string }
+                species: { type: string }
+                ownerId: { type: string }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          description: Missing fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  fields: { type: object, additionalProperties: { type: string } }
+  /patients/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getPatient
+      summary: Get a patient
+      tags: [patients]
+      responses:
+        '200':
+          description: The patient
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deletePatient
+      summary: Delete a patient
+      tags: [patients]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+  schemas:
+    Patient:
+      type: object
+      required: [id, name, species]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        species: { type: string }
+        ownerId: { type: string, nullable: true }
+  responses:
+    Error:
+      description: An error
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string }
+              message: { type: string }

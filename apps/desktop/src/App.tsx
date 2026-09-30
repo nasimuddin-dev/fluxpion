@@ -20,6 +20,7 @@ const CiDialog = lazy(async () => ({ default: (await import('./components/CiDial
 const RecordDialog = lazy(async () => ({ default: (await import('./components/RecordDialog')).RecordDialog }));
 const VariableUsagesDialog = lazy(async () => ({ default: (await import('./components/VariableUsagesDialog')).VariableUsagesDialog }));
 const OpenApiDiffDialog = lazy(async () => ({ default: (await import('./components/OpenApiDiffDialog')).OpenApiDiffDialog }));
+const ApiCoverageDialog = lazy(async () => ({ default: (await import('./components/ApiCoverageDialog')).ApiCoverageDialog }));
 const view = (load: () => Promise<any>, name: string) => lazy(async () => ({ default: (await load())[name] as ComponentType }));
 const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
   home: view(() => import('./views/HomeView'), 'HomeView'),
@@ -113,6 +114,7 @@ export default function App() {
   const assistant = useApp((s) => s.assistant);
   const ci = useApp((s) => s.ci);
   const openapiDiff = useApp((s) => s.openapiDiff);
+  const apiCoverage = useApp((s) => s.apiCoverage);
   const variableUsages = useApp((s) => s.variableUsages);
   const recordOpen = useApp((s) => s.recordOpen);
   const shortcutsOpen = useApp((s) => s.shortcutsOpen);
@@ -230,6 +232,7 @@ export default function App() {
       { id: 'm-record', label: 'Record traffic (reverse proxy) into a collection…', hint: 'Collections', run: () => useApp.getState().set({ recordOpen: true }) },
       { id: 'm-var-usages', label: 'Find variable usages / rename a variable everywhere…', hint: 'Environments', run: () => useApp.getState().set({ variableUsages: true }) },
       { id: 'm-openapi-diff', label: 'Compare OpenAPI versions (breaking changes)…', hint: 'Tests', run: () => useApp.getState().set({ openapiDiff: true }) },
+      { id: 'm-api-coverage', label: 'API coverage (OpenAPI operations tested)…', hint: 'Tests', run: () => useApp.getState().set({ apiCoverage: {} }) },
       { id: 'm-new-monitor', label: 'New Monitor', hint: 'File', run: () => void runMenuCommand('new-monitor') },
       { id: 'm-new-workspace', label: 'New Workspace', hint: 'File', run: () => void runMenuCommand('new-workspace') },
       { id: 'm-open-ws', label: 'Open Workspace Folder', hint: 'File', run: () => void runMenuCommand('open-workspace') },
@@ -307,6 +310,11 @@ export default function App() {
       {openapiDiff && (
         <Suspense fallback={null}>
           <OpenApiDiffDialog onClose={() => useApp.getState().set({ openapiDiff: false })} />
+        </Suspense>
+      )}
+      {apiCoverage && (
+        <Suspense fallback={null}>
+          <ApiCoverageDialog runId={apiCoverage.runId} onClose={() => useApp.getState().set({ apiCoverage: undefined })} />
         </Suspense>
       )}
       <Toaster />

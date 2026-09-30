@@ -94,6 +94,8 @@ interface AppState {
   ci?: CiRequest;
   /** The "Compare OpenAPI versions" dialog. */
   openapiDiff?: boolean;
+  /** The API coverage dialog; `runId` preselects a run. */
+  apiCoverage?: { runId?: string };
   /** The "Variable usages" dialog, with the variable to show (true: none chosen yet). */
   variableUsages?: string | true;
   /** The "Record traffic" dialog. */

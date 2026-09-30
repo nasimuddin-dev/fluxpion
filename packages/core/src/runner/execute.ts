@@ -305,7 +305,7 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
         readFile: svc.readFile,
       },
       partial: { input: `${prepared.method} ${prepared.url}`, output: summarize(svc.redactor.redact(response.json ?? response.bodyPreview)) },
-      metadata: { url: prepared.url, method: prepared.method, size: response.size, truncated: response.truncated },
+      metadata: { url: prepared.url, method: prepared.method, status: response.status, size: response.size, truncated: response.truncated },
     };
   } catch (e) {
     s.fail(e);

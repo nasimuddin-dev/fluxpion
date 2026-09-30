@@ -80,6 +80,27 @@ The CLI isn't published to npm yet, so a pipeline installs it from the repositor
 
 To run a collection instead, use `run-collection "My API" -w . -e Staging -r console junit -o test-results`. For GitLab, Azure DevOps and Jenkins, publish `test-results/junit.xml` with `reports: junit`, *PublishTestResults* or the `junit` step.
 
+## API coverage
+
+`testpion coverage` compares a run with the API's OpenAPI document. It shows which operations were called and which documented responses were seen: a `404` for an unknown id, a `401` without a token and so on. It also lists operations nobody tested. With `--min` it becomes a gate that fails the build when coverage drops:
+
+```yaml
+# GitHub Actions, after the tests ran in the workspace
+- run: node "$RUNNER_TEMP/testpion/packages/cli/bin/testpion.js" coverage specs/api.yaml --min 80 --markdown coverage.md
+- run: cat coverage.md >> "$GITHUB_STEP_SUMMARY"
+  if: always()
+```
+
+```text
+  ✓ GET    /health  seen 200
+  ◐ GET    /patients  seen 200 · not seen 401, 403
+  ✗ DELETE /patients/{id}  not seen 204, 404
+
+83.3% of operations covered (5/6) · 35.7% of documented responses seen (5/14) · minimum 80%
+```
+
+In the app, open **API coverage** from a finished run (or the command palette). **Suggest tests with AI** drafts tests for the gaps for you to review. AI agents get the same report from the `api_coverage` MCP tool.
+
 ## Catch breaking API changes
 
 `testpion openapi-diff` compares two versions of an OpenAPI / Swagger document and lists what can break existing clients: removed operations or success responses, new required parameters or body fields, changed types, response fields that were removed or became optional, and request enums that lost a value. Additions (new operations, optional parameters, response fields) are listed as other changes. With `--fail-on-breaking` it exits `1` when something breaks, so a pull request that changes the spec can be checked against the main branch:

@@ -27,6 +27,7 @@ import { addRequestToCollection, externalizeSecrets } from '../import/save-reque
 import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
+import { workspaceApiCoverage } from '../openapi/coverage.js';
 import { securityLint, variableFlow } from '../eval/security.js';
 import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { introspect } from '../protocols/graphql/graphql.js';
@@ -82,6 +83,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
     const c = collections().find((x) => x.id.toLowerCase() === r) ?? collections().find((x) => x.name.toLowerCase() === r);
     if (!c) throw new ApsError('ConfigurationError', `No collection "${String(ref)}". Available: ${collections().map((x) => x.name).join(', ') || 'none'}`);
     return c;
+  };
+  /** An OpenAPI document given as an http(s) link, a path inside the workspace (never outside it) or the text itself. */
+  const readSpecRef = async (ref: string): Promise<string> => {
+    if (/^https?:\/\//i.test(ref)) return (await fetchImportText(ref)).text;
+    if (!/[\n{]/.test(ref) && /\.(json|ya?ml)$/i.test(ref)) return readFileSync(store.safePath(ref), 'utf8');
+    return ref;
   };
   type Flat = { node: Exclude<CollectionNode, { kind: 'folder' }>; folder: string };
   const flatten = (nodes: CollectionNode[], path: string[] = []): Flat[] => nodes.flatMap((n) => (n.kind === 'folder' ? flatten(n.items, [...path, n.name]) : [{ node: n, folder: path.join(' / ') }]));
@@ -587,14 +594,31 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       description:
         'Compare two versions of an OpenAPI / Swagger document and list breaking changes (removed operations or success responses, new required parameters or body fields, type changes, removed or now-optional response fields, narrowed enums) and non-breaking ones. `old` and `new` are each an http(s) link, a path inside the workspace (e.g. specs/pets.openapi.json) or the document text.',
       inputSchema: { type: 'object', properties: { old: str('Previous version: link, workspace path or text'), new: str('New version: link, workspace path or text') }, required: ['old', 'new'] },
+      run: async (a) => diffOpenApi(await readSpecRef(String(a.old ?? '')), await readSpecRef(String(a.new ?? ''))),
+    },
+    {
+      name: 'api_coverage',
+      description:
+        "API coverage of an OpenAPI / Swagger document: which operations and documented response codes the workspace's test runs (default: the latest run) and optionally its request history exercised, which were never called, observed codes the document doesn't describe, and requests to paths it doesn't have. Use it to find untested endpoints and error cases, then write tests for them (save_test / save_request). `spec` is an http(s) link, a path inside the workspace (e.g. specs/pets.yaml) or the document text.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          spec: str('OpenAPI document: link, workspace path or text'),
+          runs: { type: 'array', items: { type: 'string' }, description: 'Run ids to use (default: the latest run)' },
+          history: { type: 'number', description: 'Also use the last n request history entries' },
+          baseUrl: str('Only count requests under this URL'),
+          excludeDeprecated: { type: 'boolean', description: 'Leave deprecated operations out of the totals' },
+        },
+        required: ['spec'],
+      },
       run: async (a) => {
-        const read = async (ref: string) => {
-          if (/^https?:\/\//i.test(ref)) return (await fetchImportText(ref)).text;
-          // a workspace path (never outside the workspace), otherwise the text itself
-          if (!/[\n{]/.test(ref) && /\.(json|ya?ml)$/i.test(ref)) return readFileSync(store.safePath(ref), 'utf8');
-          return ref;
-        };
-        return diffOpenApi(await read(String(a.old ?? '')), await read(String(a.new ?? '')));
+        const { report, sources } = await workspaceApiCoverage(store, await readSpecRef(String(a.spec ?? '')), {
+          runs: Array.isArray(a.runs) && a.runs.length ? a.runs.map(String) : undefined,
+          history: typeof a.history === 'number' && a.history > 0 ? Math.min(a.history, 10_000) : undefined,
+          baseUrl: a.baseUrl ? String(a.baseUrl) : undefined,
+          excludeDeprecated: a.excludeDeprecated === true,
+        });
+        return { ...report, sources };
       },
     },
     {

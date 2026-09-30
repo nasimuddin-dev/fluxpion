@@ -22,6 +22,7 @@ testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents
 testpion env set|unset|get <env> -w   Set or remove plain variables of an environment (secrets stay in the app)
 testpion vars usages|rename -w   Where a variable is used; rename it everywhere
 testpion openapi-diff <old> <new>   List breaking changes between two OpenAPI versions (--fail-on-breaking for CI)
+testpion coverage <spec> -w   API coverage: which OpenAPI operations and responses the runs exercised (--min for CI)
 testpion docs <collection>    Write Markdown (or --html) documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)
 testpion export-environment <name>   Export an environment in Postman's format
@@ -125,6 +126,26 @@ testpion run-collection api.json -e staging.json -g globals.json --env-var token
 Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./testpion-results/<runId>` unless you pass `-o`.
 
 Exit codes: `0` success, `1` test failure, `2` configuration error, `3` execution error.
+
+## `coverage`
+
+Shows which operations of an OpenAPI 3 / Swagger 2 document, and which of their documented response codes, your tests and requests exercised. It reads the workspace's latest run by default. It also lists operations that were never called, observed codes the document doesn't describe, and requests to paths it doesn't have. See [API coverage](/test-runner/ci-cd#api-coverage).
+
+```bash
+testpion coverage specs/pets.yaml                        # the latest run
+testpion coverage specs/pets.yaml --run run-abc --history 500 --markdown coverage.md
+testpion coverage https://api.example.com/openapi.json --min 80   # exit 1 below 80%
+```
+
+| Option | Description |
+|---|---|
+| `--run <id...>` | Use these runs instead of the latest one. |
+| `--history [n]` | Also use the last `n` request history entries (default 1000). |
+| `--base-url <url>` | Only count requests under this URL. |
+| `--exclude-deprecated` | Leave deprecated operations out of the totals. |
+| `--min <percent>` | Exit `1` when fewer operations are covered. |
+| `--markdown <file>` | Also write a Markdown report, e.g. for a pull request comment. |
+| `--json` | The full report as JSON, for scripts and AI agents. |
 
 ## `openapi-diff`
 

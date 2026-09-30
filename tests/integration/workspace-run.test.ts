@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'list_tests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
+      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'list_tests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -528,4 +528,36 @@ describe('example workspace (end-to-end)', () => {
       p.kill();
     }
   });
+  it('API coverage: CLI `testpion coverage` and the api_coverage MCP tool', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    const runOut = await run([cli, 'run-collection', 'Veterinary API', '-w', ws.root, '-e', 'Development', '--folder', 'Authentication', 'Patients', '-q'], env);
+    expect(runOut.status).toBe(0);
+
+    const spec = join(ws.root, 'specs', 'veterinary-api.yaml');
+    const r = await run([cli, 'coverage', spec, '-w', ws.root, '--json'], env);
+    expect(r.status).toBe(0);
+    const report = JSON.parse(r.stdout);
+    const op = (k: string) => report.operations.find((o: { method: string; path: string }) => `${o.method} ${o.path}` === k);
+    expect(op('GET /patients').covered).toBe(true);
+    expect(op('POST /patients').testedStatuses).toContain('201');
+    expect(op('DELETE /patients/{id}').covered).toBe(false);
+    expect(report.sources.runs).toHaveLength(1);
+    expect(report.summary.operations).toBe(6);
+
+    // a coverage gate for CI
+    const gate = await run([cli, 'coverage', spec, '-w', ws.root, '--min', '100'], env);
+    expect(gate.status).toBe(1);
+
+    const s = new McpSession({ id: 'cov', name: 'testpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env });
+    await s.connect(20_000);
+    try {
+      const out = JSON.parse(mcpResultBody(await s.callTool('api_coverage', { spec: 'specs/veterinary-api.yaml' })).text);
+      expect(out.summary.covered).toBe(report.summary.covered);
+      // paths outside the workspace are refused
+      expect((await s.callTool('api_coverage', { spec: '../../outside.yaml' })).isError).toBe(true);
+    } finally {
+      await s.close();
+    }
+  }, 90_000);
 });

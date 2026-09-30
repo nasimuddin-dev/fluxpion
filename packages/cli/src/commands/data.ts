@@ -34,6 +34,8 @@ import {
   isWsdl,
   importIntoWorkspace,
   diffOpenApi,
+  workspaceApiCoverage,
+  apiCoverageMarkdown,
   securityLint,
   findEnvironment,
   setEnvironmentVariables,
@@ -147,6 +149,71 @@ export function registerDataCommands(program: Command): void {
         }
       }
       if (o.failOnBreaking && d.breaking.length) process.exitCode = EXIT.TEST_FAILURE;
+    });
+  program
+    .command('coverage')
+    .description(
+      'API coverage: which operations and documented responses of an OpenAPI document your test runs and request history exercised\n' +
+        'Uses the latest run unless --run or --history is given. For CI: --min <percent> exits 1 below the threshold',
+    )
+    .argument('<spec>', 'OpenAPI / Swagger document: a file or an http(s) link')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--run <runId...>', 'use these runs (repeatable; default: the latest run)')
+    .option('--history [n]', 'also use the request history (the last n entries, default 1000)')
+    .option('--base-url <url>', 'only count requests under this URL (e.g. your staging server)')
+    .option('--exclude-deprecated', 'leave deprecated operations out of the totals')
+    .option('--min <percent>', 'exit 1 when fewer than this percent of the operations are covered')
+    .option('--markdown <file>', 'also write a Markdown report (for pull requests)')
+    .option('--json', 'print the full report as JSON (for scripts and AI agents)')
+    .action(async (specRef: string, o: { workspace?: string; run?: string[]; history?: string | boolean; baseUrl?: string; excludeDeprecated?: boolean; min?: string; markdown?: string; json?: boolean }) => {
+      let specText: string;
+      try {
+        specText = /^https?:\/\//i.test(specRef) ? (await fetchImportText(specRef)).text : readFileSync(specRef, 'utf8');
+      } catch (e) {
+        throw new CliError(`Could not read ${specRef}: ${(e as Error).message}`, EXIT.CONFIG_ERROR);
+      }
+      const min = o.min === undefined ? undefined : Number(o.min);
+      if (min !== undefined && !(min >= 0 && min <= 100)) throw new CliError('--min must be a percentage between 0 and 100', EXIT.CONFIG_ERROR);
+      const { store, ephemeral } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      if (ephemeral) throw new CliError('No workspace found: run inside a workspace or pass -w <nameOrPath>', EXIT.CONFIG_ERROR);
+      let result: Awaited<ReturnType<typeof workspaceApiCoverage>>;
+      try {
+        result = await workspaceApiCoverage(store, specText, {
+          runs: o.run,
+          history: o.history === undefined ? undefined : o.history === true ? 1000 : Number(o.history),
+          baseUrl: o.baseUrl,
+          excludeDeprecated: o.excludeDeprecated,
+        });
+      } catch (e) {
+        throw new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+      } finally {
+        store.close();
+      }
+      const { report, sources } = result;
+      if (o.markdown) writeFileSync(o.markdown, apiCoverageMarkdown(report));
+      if (o.json) console.log(JSON.stringify({ ...report, sources }, null, 2));
+      else {
+        const s = report.summary;
+        const from = [sources.runs.map((r) => `run ${r.name} (${r.id})`).join(', '), sources.historyEntries ? `${sources.historyEntries} history entries` : ''].filter(Boolean).join(' + ');
+        console.log(bold(`API coverage${report.title ? ` — ${report.title}` : ''}`));
+        console.log(dim(`from ${from || 'no requests'} · ${s.observations} requests analysed`));
+        for (const op of report.operations) {
+          const icon = !op.covered ? red('✗') : op.untestedStatuses.length ? yellow('◐') : green('✓');
+          const seen = Object.keys(op.statuses).join(', ');
+          const extra = [seen && `seen ${seen}`, op.untestedStatuses.length ? `not seen ${op.untestedStatuses.join(', ')}` : '', op.undocumentedStatuses.length ? `undocumented ${op.undocumentedStatuses.join(', ')}` : '', op.deprecated ? 'deprecated' : '']
+            .filter(Boolean)
+            .join(' · ');
+          console.log(`  ${icon} ${op.method.padEnd(6)} ${op.path}${extra ? dim(`  ${extra}`) : ''}`);
+        }
+        if (report.unmatched.length) {
+          console.log(dim(`\n${s.unmatched} request(s) not in the document:`));
+          for (const u of report.unmatched.slice(0, 10)) console.log(dim(`  · ${u.method} ${u.path} ×${u.count}`));
+        }
+        const ok = min === undefined || s.operationPct >= min;
+        console.log(`\n${(ok ? green : red)(bold(`${s.operationPct}%`))} of operations covered (${s.covered}/${s.operations}) · ${s.statusPct}% of documented responses seen (${s.testedStatuses}/${s.documentedStatuses})${min !== undefined ? dim(` · minimum ${min}%`) : ''}`);
+        if (o.markdown) console.log(dim(`Markdown report: ${o.markdown}`));
+      }
+      if (min !== undefined && report.summary.operationPct < min) process.exitCode = EXIT.TEST_FAILURE;
     });
   program
     .command('export')

@@ -1,4 +1,4 @@
-import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target, RotateCcw, Sparkles } from 'lucide-react';
+import { Activity, Braces, Download, FileBarChart, FileCode2, FileText, GitCompare, Square, Target, RotateCcw, ScanSearch, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
@@ -134,6 +134,9 @@ export function RunPanel({ runId, expectedTotal, onRerunFailed }: { runId: strin
               HTML report
             </Button>
             <ExportMenu runId={runId} />
+            <Button size="sm" icon={<ScanSearch size={12} />} title="Which OpenAPI operations and responses this run exercised" onClick={() => useApp.getState().set({ apiCoverage: { runId } })}>
+              API coverage
+            </Button>
             <Button size="sm" icon={<GitCompare size={12} />} onClick={() => setBaselineOpen(true)}>
               Baselines
             </Button>
