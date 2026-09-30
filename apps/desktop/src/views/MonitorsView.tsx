@@ -436,7 +436,20 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
           <Toggle checked={!!d.bail} onChange={(v) => setD({ ...d, bail: v || undefined })} label="Stop at the first failure" />
         </div>
         <Field label="Alert webhook (optional)" hint="Posted when the monitor starts failing or passes again: a Slack, Teams or Discord incoming webhook, or any URL. {{variables}} of the environment work, so the URL can be a secret.">
-          <Input className="mono" placeholder="https://hooks.slack.com/services/…  or  {{alertWebhook}}" value={d.webhook ?? ''} onChange={(e) => setD({ ...d, webhook: e.target.value || undefined })} aria-label="Alert webhook" />
+          <div className="flex gap-2">
+            <Input className="mono flex-1" placeholder="https://hooks.slack.com/services/…  or  {{alertWebhook}}" value={d.webhook ?? ''} onChange={(e) => setD({ ...d, webhook: e.target.value || undefined })} aria-label="Alert webhook" />
+            <Button
+              disabled={!d.webhook?.trim()}
+              onClick={() =>
+                void call('monitor.testWebhook', { webhook: d.webhook, environment: d.environment, name: (d as { name?: string }).name }).then(
+                  () => useApp.getState().toast('Test alert sent', 'success'),
+                  (e) => useApp.getState().toast(asError(e).message, 'error'),
+                )
+              }
+            >
+              Send test alert
+            </Button>
+          </div>
         </Field>
       </div>
     </Modal>

@@ -7,6 +7,7 @@ import {
   listMonitors,
   monitorResults,
   monitorStatus,
+  notifyMonitorWebhook,
   saveMonitor,
   shortId,
   type Monitor,
@@ -34,6 +35,19 @@ export function monitorHandlers(be: Backend): Handlers {
     'monitor.list': () => listMonitors(be.ws).map(status),
     'monitor.save': ({ monitor }: { monitor: Omit<Monitor, 'id'> & { id?: string } }) => status(saveMonitor(be.ws, { ...monitor, id: monitor.id || shortId('mon-') })),
     'monitor.delete': ({ id }: { id: string }) => deleteMonitor(be.ws, id),
+    /** Post a sample "failed" alert to a webhook, to check it before relying on it. */
+    'monitor.testWebhook': async ({ webhook, environment, name }: { webhook: string; environment?: string; name?: string }) => {
+      const ctx = be.context({ environment });
+      try {
+        const url = ctx.vars.resolve(webhook);
+        const sample: MonitorResult = { monitorId: 'test', runId: 'test', startedAt: new Date().toISOString(), durationMs: 0, status: 'failed', total: 1, passed: 0, failed: 1, errors: 0, trigger: 'manual' };
+        const r = await notifyMonitorWebhook(url, { id: 'test', name: `${name || 'Monitor'} (test alert)` }, sample);
+        if (!r.ok) throw new ApsError('NetworkError', r.error ? `Couldn't reach the webhook: ${r.error}` : `The webhook answered HTTP ${r.status}`, { suggestions: ['Check the URL (and the variable it uses, if any).'] });
+        return { status: r.status };
+      } finally {
+        void ctx.dispose();
+      }
+    },
     'monitor.results': ({ id, limit }: { id: string; limit?: number }) => monitorResults(be.ws, id, Math.min(limit ?? 50, 500)),
     'monitor.run': async ({ id }: { id: string }) => {
       if (be.runningMonitors.has(id)) throw new ApsError('ValidationError', 'This monitor is already running', { suggestions: [] });

@@ -35,7 +35,7 @@ When a monitor starts failing, or passes again, TestPion shows a notification.
 
 ### Alerts to Slack, Teams, Discord or any URL
 
-Give a monitor an **Alert webhook** (or `testpion monitor add … --webhook <url>`) and TestPion posts to it when the monitor starts failing and when it passes again, not on every run. The JSON has a `text` field (Slack and Microsoft Teams incoming webhooks show it), `content` (Discord), and the details for any other receiver: `monitor`, `status`, `total`, `passed`, `failed`, `errors`, `p50Ms`, `startedAt`, `runId` and `error`.
+Give a monitor an **Alert webhook** (or `testpion monitor add … --webhook <url>`; **Send test alert** checks it) and TestPion posts to it when the monitor starts failing and when it passes again, not on every run. The JSON has a `text` field (Slack and Microsoft Teams incoming webhooks show it), `content` (Discord), and the details for any other receiver: `monitor`, `status`, `total`, `passed`, `failed`, `errors`, `p50Ms`, `startedAt`, `runId` and `error`.
 
 ```json
 { "text": "🔴 Monitor \"Checkout\" failed: 3 of 4 requests", "status": "failed", "total": 4, "passed": 1, "failed": 3 }
