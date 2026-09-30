@@ -151,7 +151,7 @@ interface PmMoment {
 declare const moment: { (input?: any, format?: string): PmMoment; utc(input?: any, format?: string): PmMoment; unix(seconds: number): PmMoment; duration(n: number | object, unit?: string): any };
 /** tv4-compatible JSON Schema validation (older Postman scripts). */
 declare const tv4: { validate(data: any, schema: object): boolean; error: { message: string } | null; validateResult(data: any, schema: object): { valid: boolean; error: { message: string } | null }; validateMultiple(data: any, schema: object): { valid: boolean; errors: Array<{ message: string }> } };
-declare function require(name: 'cheerio' | 'crypto-js' | 'uuid' | 'tv4' | 'lodash' | 'moment'): any;
+declare function require(name: 'ajv' | 'atob' | 'btoa' | 'chai' | 'cheerio' | 'crypto-js' | 'csv-parse/lib/sync' | 'lodash' | 'moment' | 'tv4' | 'uuid' | 'xml2js'): any;
 /** HTML with CSS selectors, as in Postman: const $ = cheerio.load(pm.response.text()); $('title').text() */
 declare const cheerio: { load(html: string): any };
 declare const CryptoJS: any;
