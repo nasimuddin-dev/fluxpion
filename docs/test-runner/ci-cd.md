@@ -77,4 +77,24 @@ The CLI isn't published to npm yet, so a pipeline installs it from the repositor
 
 To run a collection instead, use `run-collection "My API" -w . -e Staging -r console junit -o test-results`. For GitLab, Azure DevOps and Jenkins, publish `test-results/junit.xml` with `reports: junit`, *PublishTestResults* or the `junit` step.
 
+## Catch breaking API changes
+
+`testpion openapi-diff` compares two versions of an OpenAPI / Swagger document and lists what can break existing clients: removed operations or success responses, new required parameters or body fields, changed types, response fields that were removed or became optional, and request enums that lost a value. Additions (new operations, optional parameters, response fields) are listed as other changes. With `--fail-on-breaking` it exits `1` when something breaks, so a pull request that changes the spec can be checked against the main branch:
+
+```yaml
+# GitHub Actions, after the install step above
+- run: git show origin/main:openapi.yaml > "$RUNNER_TEMP/openapi.main.yaml"
+- run: node "$RUNNER_TEMP/testpion/packages/cli/bin/testpion.js" openapi-diff "$RUNNER_TEMP/openapi.main.yaml" openapi.yaml --fail-on-breaking
+```
+
+```text
+4 → 5 operations (1 added, 0 removed)
+
+2 breaking changes:
+  ✗ GET /pets: query parameter "limit" is now required
+  ✗ GET /pets/{id} response 200 owner: was always returned, now optional
+```
+
+Either side can be a file or an http(s) link. `--json` prints the result for scripts, and AI agents get the same through the MCP tool `openapi_diff`.
+
 :::

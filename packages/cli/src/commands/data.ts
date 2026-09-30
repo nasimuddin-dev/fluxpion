@@ -28,10 +28,43 @@ import {
   type CollectionNode,
   fetchImportText,
   importIntoWorkspace,
+  diffOpenApi,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
 
 export function registerDataCommands(program: Command): void {
+  program
+    .command('openapi-diff')
+    .description('compare two versions of an OpenAPI / Swagger document and list breaking changes (for CI: --fail-on-breaking)')
+    .argument('<old>', 'the previous document: a file or an http(s) link')
+    .argument('<new>', 'the new document: a file or an http(s) link')
+    .option('--fail-on-breaking', 'exit 1 when there are breaking changes')
+    .option('--breaking-only', 'leave out the non-breaking changes')
+    .option('--json', 'print the result as JSON (for scripts and AI agents)')
+    .action(async (oldRef: string, newRef: string, o: { failOnBreaking?: boolean; breakingOnly?: boolean; json?: boolean }) => {
+      const read = async (ref: string) => (/^https?:\/\//i.test(ref) ? (await fetchImportText(ref)).text : readFileSync(ref, 'utf8'));
+      let d: ReturnType<typeof diffOpenApi>;
+      try {
+        d = diffOpenApi(await read(oldRef), await read(newRef));
+      } catch (e) {
+        throw new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+      }
+      if (o.breakingOnly) d = { ...d, nonBreaking: [] };
+      if (o.json) console.log(JSON.stringify(d, null, 2));
+      else {
+        const ops = d.operations;
+        console.log(bold(`${ops.old} → ${ops.new} operations (${ops.added} added, ${ops.removed} removed)`));
+        if (d.breaking.length) {
+          console.log(red(bold(`\n${d.breaking.length} breaking change${d.breaking.length > 1 ? 's' : ''}:`)));
+          for (const c of d.breaking) console.log(red(`  ✗ ${c.where}: ${c.message}`));
+        } else console.log(green('\nNo breaking changes.'));
+        if (d.nonBreaking.length) {
+          console.log(dim(`\n${d.nonBreaking.length} other change${d.nonBreaking.length > 1 ? 's' : ''}:`));
+          for (const c of d.nonBreaking) console.log(dim(`  · ${c.where}: ${c.message}`));
+        }
+      }
+      if (o.failOnBreaking && d.breaking.length) process.exitCode = EXIT.TEST_FAILURE;
+    });
   program
     .command('export')
     .description('export a collection as a Postman v2.1 collection (default) or TestPion JSON\n<collection> is a collection name or id in the workspace, or a collection file to convert')

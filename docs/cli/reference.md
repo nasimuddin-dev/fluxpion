@@ -14,6 +14,7 @@ testpion run-collection <collection>   Run a collection like Postman's Collectio
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
 testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
+testpion openapi-diff <old> <new>   List breaking changes between two OpenAPI versions (--fail-on-breaking for CI)
 testpion docs <collection>    Write Markdown (or --html) documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)
 testpion export-environment <name>   Export an environment in Postman's format
@@ -90,6 +91,16 @@ testpion run-collection api.json -e staging.json -g globals.json --env-var token
 Variables set by scripts carry over to later requests and iterations, and so do cookies (see [Cookies](/api-testing/cookies)). `pm.execution.setNextRequest()` changes the order. Outside a workspace, reports go to `./testpion-results/<runId>` unless you pass `-o`.
 
 Exit codes: `0` success, `1` test failure, `2` configuration error, `3` execution error.
+
+## `openapi-diff`
+
+Compares two versions of an OpenAPI 3 / Swagger 2 document (files or http(s) links) and lists breaking and other changes. See [Catch breaking API changes](/test-runner/ci-cd#catch-breaking-api-changes).
+
+| Option | Description |
+|---|---|
+| `--fail-on-breaking` | Exit `1` when there are breaking changes. |
+| `--breaking-only` | Leave out the non-breaking changes. |
+| `--json` | Print `{ breaking, nonBreaking, operations }` as JSON. |
 
 ## `mock`
 

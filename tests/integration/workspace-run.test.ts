@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -306,6 +306,11 @@ describe('example workspace (end-to-end)', () => {
       const imp = JSON.parse((await text('import_definition', { text: spec })).text);
       expect(imp).toMatchObject({ format: 'openapi', collection: { name: 'Agent Pets' } });
       expect((await text('import_definition', {})).isError).toBe(true);
+      // compare the imported spec (kept in specs/) with a changed copy given as text
+      const diff = JSON.parse((await text('openapi_diff', { old: imp.specPath, new: spec.replace('/pets:', '/animals:') })).text);
+      expect(diff.breaking.map((c: { kind: string }) => c.kind)).toEqual(['operation-removed']);
+      expect(diff.nonBreaking.map((c: { kind: string }) => c.kind)).toEqual(['operation-added']);
+      expect((await text('openapi_diff', { old: '../../outside.json', new: spec })).isError).toBe(true);
       // environment order
       expect(JSON.parse((await text('reorder_environments', { order: ['Production', 'Development'] })).text).slice(0, 2)).toEqual(['Production', 'Development']);
       expect((await text('reorder_environments', { order: ['Nope'] })).isError).toBe(true);

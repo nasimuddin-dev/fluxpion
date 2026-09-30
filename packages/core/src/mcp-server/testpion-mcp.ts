@@ -21,6 +21,7 @@ import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js'
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
 import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
+import { diffOpenApi } from '../openapi/diff.js';
 import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
@@ -387,6 +388,21 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             ? `Ask the user to add ${placeholders.map((p) => p.variable).join(', ')} as secret variables of an environment (Environments view, or they stay unresolved).`
             : undefined,
         };
+      },
+    },
+    {
+      name: 'openapi_diff',
+      description:
+        'Compare two versions of an OpenAPI / Swagger document and list breaking changes (removed operations or success responses, new required parameters or body fields, type changes, removed or now-optional response fields, narrowed enums) and non-breaking ones. `old` and `new` are each an http(s) link, a path inside the workspace (e.g. specs/pets.openapi.json) or the document text.',
+      inputSchema: { type: 'object', properties: { old: str('Previous version: link, workspace path or text'), new: str('New version: link, workspace path or text') }, required: ['old', 'new'] },
+      run: async (a) => {
+        const read = async (ref: string) => {
+          if (/^https?:\/\//i.test(ref)) return (await fetchImportText(ref)).text;
+          // a workspace path (never outside the workspace), otherwise the text itself
+          if (!/[\n{]/.test(ref) && /\.(json|ya?ml)$/i.test(ref)) return readFileSync(store.safePath(ref), 'utf8');
+          return ref;
+        };
+        return diffOpenApi(await read(String(a.old ?? '')), await read(String(a.new ?? '')));
       },
     },
     {
