@@ -31,6 +31,8 @@ The first run starts as soon as the monitor is saved; after that it runs wheneve
 
 When a monitor starts failing, or passes again, TestPion shows a notification.
 
+::: v-pre
+
 ### Alerts to Slack, Teams, Discord or any URL
 
 Give a monitor an **Alert webhook** (or `testpion monitor add … --webhook <url>`) and TestPion posts to it when the monitor starts failing and when it passes again, not on every run. The JSON has a `text` field (Slack and Microsoft Teams incoming webhooks show it), `content` (Discord), and the details for any other receiver: `monitor`, `status`, `total`, `passed`, `failed`, `errors`, `p50Ms`, `startedAt`, `runId` and `error`.
@@ -40,6 +42,8 @@ Give a monitor an **Alert webhook** (or `testpion monitor add … --webhook <url
 ```
 
 A webhook URL is a credential: write it as a `{{variable}}` (for example `{{alertWebhook}}`) and keep the value in a secret variable of the monitor's environment. Alerts are sent by whichever host runs the monitor: the app while it's open, `testpion monitor start`, or `testpion monitor run --due` from cron.
+
+:::
 
 ::: tip While the app is open
 The app runs monitors only while it is open. To run them all the time, use the CLI on a server, or schedule them in CI (see below).
