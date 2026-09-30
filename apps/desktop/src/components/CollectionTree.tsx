@@ -436,7 +436,8 @@ export function CollectionTree({
       {moving && <MoveDialog node={moving.n} from={moving.c} collections={collections} onClose={() => setMoving(undefined)} onMove={(to, folderId) => move(moving.c, moving.n, to, folderId)} />}
       {collections.map((c) => {
         // grouped by category, collections start folded: the workspace lists them, expanding shows the categories
-        const isOpen = categorize && f ? true : open[c.id] ?? !categorize;
+        const holdsActive = !!activeRequestId && (!!findNode(c.items, activeRequestId) || (extraGroups?.(c) ?? []).some((g) => g.items.some((i) => i.id === activeRequestId)));
+        const isOpen = categorize && f ? true : open[c.id] ?? (!categorize || holdsActive);
         if (categorize && f && !c.items.some(matches) && !extraMatches(c)) return null;
         return (
           <div key={c.id}>
