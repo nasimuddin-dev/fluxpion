@@ -22,6 +22,7 @@ import { addRequestToCollection, externalizeSecrets } from '../import/save-reque
 import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
+import { collectionToOpenApiText } from '../openapi/from-collection.js';
 import { renameVariable, variableUsages } from '../storage/variable-refactor.js';
 import { runLoadTest, type LoadTarget } from '../load/load.js';
 import { collectionLoadTarget } from '../load/collection-load.js';
@@ -392,6 +393,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             : undefined,
         };
       },
+    },
+    {
+      name: 'collection_openapi',
+      description: 'An OpenAPI 3.1 document (YAML) describing a collection\'s HTTP requests: paths, parameters, request bodies with inferred schemas, saved examples as responses, folders as tags, auth as security schemes. Useful to document an API that only exists as a collection, or to compare it with a spec (openapi_diff).',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id') }, required: ['collection'] },
+      run: (a) => collectionToOpenApiText(findCollection(a.collection)),
     },
     {
       name: 'variable_usages',

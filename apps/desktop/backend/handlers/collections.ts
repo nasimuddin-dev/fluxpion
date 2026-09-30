@@ -6,6 +6,7 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  collectionToOpenApiText,
   exampleFromResponse,
   startMockServer,
   collectionMarkdown,
@@ -153,8 +154,16 @@ export function collectionsHandlers(be: Backend): Handlers {
       return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
     },
     /** Export a collection as TestPion JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
-    'col.export': async ({ id, format = 'testpion' }: { id: string; format?: 'testpion' | 'postman' }) => {
+    'col.export': async ({ id, format = 'testpion' }: { id: string; format?: 'testpion' | 'postman' | 'openapi' }) => {
       const c = be.ws.getCollection(id);
+      if (format === 'openapi') {
+        // an OpenAPI 3.1 description of the collection's HTTP requests (YAML)
+        const text = collectionToOpenApiText(c);
+        const name = `${c.name}.openapi.yaml`;
+        const dest = await be.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'OpenAPI', extensions: ['yaml', 'yml'] }] });
+        if (dest) writeFileSync(dest, text);
+        return { path: dest, text: dest ? undefined : text, name, notes: [] as string[] };
+      }
       const { collection, notes } = format === 'postman' ? exportPostmanCollection(c) : { collection: c as unknown as Record<string, unknown>, notes: [] as string[] };
       const name = format === 'postman' ? `${c.name}.postman_collection.json` : `${c.name}.collection.json`;
       const dest = await be.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Collection', extensions: ['json'] }] });

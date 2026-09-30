@@ -1,4 +1,4 @@
-import { ArchiveRestore, Download, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Send, Trash2, Upload } from 'lucide-react';
+import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Play, Send, Trash2, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -53,10 +53,11 @@ export function CollectionsView() {
     await load();
     useApp.getState().toast('Collection saved', 'success');
   };
-  const exportAs = async (id: string, format: 'testpion' | 'postman') => {
+  const exportAs = async (id: string, format: 'testpion' | 'postman' | 'openapi') => {
     try {
-      const r = await call<{ path?: string; collection?: unknown; name: string; notes: string[] }>('col.export', { id, format });
+      const r = await call<{ path?: string; collection?: unknown; text?: string; name: string; notes: string[] }>('col.export', { id, format });
       if (r.collection) download(r.name, JSON.stringify(r.collection, null, 2));
+      else if (r.text !== undefined) download(r.name, r.text);
       else if (!r.path) return;
       const extra = r.notes.length ? ` Not exported (no Postman equivalent): ${r.notes.join('; ')}.` : '';
       useApp.getState().toast(`${r.path ? `Exported to ${r.path}.` : 'Exported.'}${extra}`, r.notes.length ? 'info' : 'success');
@@ -142,6 +143,7 @@ export function CollectionsView() {
                   items={[
                     { label: 'TestPion collection (.json)', icon: <FileJson size={14} />, onSelect: () => void exportAs(draft.id, 'testpion') },
                     { label: 'Postman collection v2.1', icon: <Send size={14} />, onSelect: () => void exportAs(draft.id, 'postman') },
+                    { label: 'OpenAPI 3.1 (.yaml)', icon: <FileCode size={14} />, onSelect: () => void exportAs(draft.id, 'openapi') },
                   ]}
                 />
                 <Button size="sm" variant="primary" onClick={() => save(draft)}>

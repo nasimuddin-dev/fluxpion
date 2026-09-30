@@ -58,9 +58,10 @@ The CLI can import too, from a file or a link: `testpion import openapi.yaml -w 
 
 ## Export
 
-**Export** in a collection's toolbar offers two formats:
+**Export** in a collection's toolbar offers three formats:
 
 - **TestPion collection (.json)**: the collection file as it is stored in the workspace.
+- **OpenAPI 3.1 (.yaml)**: a description of the collection's HTTP requests for API documentation tools, code generators or a spec review: paths and methods (`{{id}}` and `:id` segments become path parameters), query and header parameters, request bodies with an example and an inferred schema, saved examples as documented responses, folders as tags and the auth in use as security schemes. Parameter values that hold `{{variables}}` are left out. GraphQL requests are not included. From the terminal: `testpion export "My API" --format openapi -o openapi.yaml`.
 - **Postman collection v2.1**: for Postman, Newman or any tool that reads Postman collections. It includes folders, requests, params and path variables, headers, bodies (raw, form, multipart, file, GraphQL), auth (bearer, basic, API key, OAuth 1.0, OAuth 2.0, AWS Signature, Digest), collection and request scripts, collection variables, descriptions, saved examples and the *follow redirects* / *TLS verification* settings.
 
 Postman has no place for some TestPion features. When they are left out, a message lists them:

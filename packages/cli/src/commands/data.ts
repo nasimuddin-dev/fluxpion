@@ -29,6 +29,7 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  collectionToOpenApiText,
   variableUsages,
   renameVariable,
   historyToHar,
@@ -107,13 +108,22 @@ export function registerDataCommands(program: Command): void {
     });
   program
     .command('export')
-    .description('export a collection as a Postman v2.1 collection (default) or TestPion JSON\n<collection> is a collection name or id in the workspace, or a collection file to convert')
+    .description('export a collection as a Postman v2.1 collection (default), TestPion JSON, or an OpenAPI 3.1 document (--format openapi)\n<collection> is a collection name or id in the workspace, or a collection file to convert')
     .argument('<collection>', 'collection name or id, a file, or an http(s) link')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
-    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'testpion']).default('postman'))
+    .addOption(new Option('-f, --format <format>', 'output format').choices(['postman', 'testpion', 'openapi']).default('postman'))
+    .option('--json', 'with --format openapi: JSON instead of YAML')
     .option('-o, --out <file>', 'write to this file instead of stdout')
-    .action(async (ref: string, o: { workspace?: string; format: 'postman' | 'testpion'; out?: string }) => {
+    .action(async (ref: string, o: { workspace?: string; format: 'postman' | 'testpion' | 'openapi'; json?: boolean; out?: string }) => {
       const c = await loadCollectionRef(ref, o.workspace);
+      if (o.format === 'openapi') {
+        const text = collectionToOpenApiText(c, { format: o.json ? 'json' : 'yaml' });
+        if (o.out) {
+          writeFileSync(resolve(o.out), text);
+          console.error(dim(`OpenAPI document written to ${resolve(o.out)}`));
+        } else process.stdout.write(text);
+        return;
+      }
       const { collection, notes } = o.format === 'postman' ? exportPostmanCollection(c) : { collection: c, notes: [] as string[] };
       const json = JSON.stringify(collection, null, 2) + '\n';
       for (const n of notes) console.error(yellow(`not exported: ${n}`));
