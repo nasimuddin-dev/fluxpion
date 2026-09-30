@@ -4,6 +4,7 @@ import {
   ApsError,
   applyAuth,
   grpcurlCommand,
+  parseGrpcurl,
   startGraphQLSubscription,
   WebSocketSession,
   introspect,
@@ -57,6 +58,8 @@ export function requestsHandlers(be: Backend): Handlers {
         void ctx.dispose();
       }
     },
+    /** Paste a grpcurl command into the gRPC view. */
+    'grpc.parseGrpcurl': ({ text }: { text: string }) => parseGrpcurl(text),
     'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => be.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
     'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => be.codeSnippet(p),
     'http.codeLanguages': () => CODE_LANGUAGES,

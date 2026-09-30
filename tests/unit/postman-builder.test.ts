@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCurl, shellSplit, isCurlCommand, generateCode, grpcurlCommand, CODE_LANGUAGES, buildUrl, pathVariableNames, applyPathVariables } from '../../packages/core/src/index.js';
+import { parseCurl, shellSplit, isCurlCommand, generateCode, grpcurlCommand, parseGrpcurl, CODE_LANGUAGES, buildUrl, pathVariableNames, applyPathVariables } from '../../packages/core/src/index.js';
 
 describe('cURL import', () => {
   it('splits shell arguments with quotes, escapes and continuations', () => {
@@ -68,6 +68,11 @@ describe('code generation', () => {
       `grpcurl -plaintext -proto 'vet.proto' -H 'authorization: Bearer it'\\''s' -max-time 5 -d '{"id":"7"}' 'localhost:50051' 'vet.v1.Patients/GetPatient'`,
     );
     expect(grpcurlCommand({ target: 'grpcs://api.test:443', method: '/svc.S/M', message: '{}' })).toBe(`grpcurl 'api.test:443' 'svc.S/M'`);
+    // and back: paste a grpcurl command into the gRPC view
+    const cmd = grpcurlCommand({ target: 'localhost:50051', method: 'vet.v1.Patients/GetPatient', message: '{"id":"7"}', metadata: [{ key: 'authorization', value: "Bearer it's" }], protoFiles: ['vet.proto'], timeoutMs: 5000 });
+    expect(parseGrpcurl(cmd)).toEqual({ target: 'localhost:50051', method: 'vet.v1.Patients/GetPatient', message: '{\n  "id": "7"\n}', metadata: [{ key: 'authorization', value: "Bearer it's" }], tls: false, protoFiles: ['vet.proto'], timeoutMs: 5000 });
+    expect(parseGrpcurl('grpcurl -d \'{"a":1}\' api.test:443 svc.S.M')).toMatchObject({ target: 'grpcs://api.test:443', method: 'svc.S/M', tls: true });
+    expect(() => parseGrpcurl('curl x')).toThrow(/Not a grpcurl/);
     expect(generateCode(req, 'fetch')).toContain('body: JSON.stringify({');
     expect(generateCode(req, 'raw').split('\n')[0]).toBe('POST /pets?x=1 HTTP/1.1');
     expect(generateCode({ method: 'POST', url: 'https://a.test/u', headers: [], form: [{ key: 'f', value: '/a.png', file: true }] }, 'curl')).toContain(`--form 'f=@/a.png'`);

@@ -1,3 +1,5 @@
+import { shellSplit } from '../import/curl.js';
+import { ApsError } from '../errors.js';
 /**
  * Code snippets for a prepared request (Postman's "Code" panel). The input is the request after
  * variable resolution and auth, so snippets run as-is. Secrets can be masked by the caller.
@@ -351,6 +353,44 @@ export function grpcurlCommand(o: { target: string; method: string; message?: st
   if (msg && msg !== '{}') parts.push('-d', sq(msg));
   parts.push(sq(address), sq(method));
   return parts.join(' ');
+}
+
+/**
+ * A grpcurl command back into a gRPC call (paste into the gRPC view): address, method, message (-d),
+ * metadata (-H / -rpc-header), TLS (-plaintext means none), proto files (-proto) and -max-time.
+ */
+export function parseGrpcurl(command: string): { target: string; method?: string; message?: string; metadata: Array<{ key: string; value: string }>; tls: boolean; insecure?: boolean; protoFiles: string[]; timeoutMs?: number } {
+  const args = shellSplit(command.replace(/\\\r?\n/g, ' ').trim());
+  if (args[0]?.replace(/\.exe$/i, '') !== 'grpcurl') throw new ApsError('ValidationError', 'Not a grpcurl command');
+  const out = { target: '', metadata: [] as Array<{ key: string; value: string }>, tls: true, protoFiles: [] as string[] } as ReturnType<typeof parseGrpcurl>;
+  const rest: string[] = [];
+  for (let i = 1; i < args.length; i++) {
+    const a = args[i]!.replace(/^--/, '-');
+    const next = () => args[++i] ?? '';
+    if (a === '-plaintext') out.tls = false;
+    else if (a === '-insecure') out.insecure = true;
+    else if (a === '-proto') out.protoFiles.push(next());
+    else if (a === '-H' || a === '-rpc-header' || a === '-reflect-header') {
+      const h = next();
+      const c = h.indexOf(':');
+      if (c > 0) out.metadata.push({ key: h.slice(0, c).trim(), value: h.slice(c + 1).trim() });
+    } else if (a === '-d') {
+      const d = next();
+      try {
+        out.message = JSON.stringify(JSON.parse(d), null, 2);
+      } catch {
+        out.message = d;
+      }
+    } else if (a === '-max-time' || a === '-connect-timeout') {
+      const n = Number(next());
+      if (a === '-max-time' && n) out.timeoutMs = n * 1000;
+    } else if (['-import-path', '-protoset', '-authority', '-servername', '-cert', '-key', '-cacert', '-user-agent', '-format'].includes(a)) next();
+    else if (!a.startsWith('-')) rest.push(args[i]!);
+  }
+  if (!rest[0]) throw new ApsError('ValidationError', 'The grpcurl command has no server address');
+  out.target = out.tls ? `grpcs://${rest[0]}` : rest[0];
+  if (rest[1] && rest[1] !== 'list' && rest[1] !== 'describe') out.method = rest[1].replace(/\./g, (m, i: number, s: string) => (i === s.lastIndexOf('.') && !s.includes('/') ? '/' : m));
+  return out;
 }
 
 export function generateCode(r: SnippetRequest, language: string): string {

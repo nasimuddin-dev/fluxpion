@@ -233,7 +233,24 @@ export function GrpcView() {
     </div>
     <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line">
-        <VarInput ariaLabel="gRPC server" className="w-72 h-8" value={d.target} onChange={(target) => set({ target })} placeholder="localhost:50051 or grpcs://api.example.com" />
+        <VarInput
+          ariaLabel="gRPC server"
+          className="w-72 h-8"
+          value={d.target}
+          onChange={(target) => set({ target })}
+          placeholder="localhost:50051, grpcs://…, or paste a grpcurl command"
+          onPasteText={(text) => {
+            if (!/^\s*grpcurl(\.exe)?\s/.test(text)) return false;
+            void call<{ target: string; method?: string; message?: string; metadata: Array<{ key: string; value: string }>; tls: boolean; protoFiles: string[]; timeoutMs?: number }>('grpc.parseGrpcurl', { text }).then(
+              (g) => {
+                set({ target: g.target, tls: g.tls, ...(g.method ? { method: g.method } : {}), ...(g.message ? { message: g.message } : {}), metadata: g.metadata.map((m) => ({ ...m, enabled: true })), ...(g.timeoutMs ? { timeoutMs: g.timeoutMs } : {}) });
+                useApp.getState().toast(g.protoFiles.length ? `Filled in from grpcurl. Load the proto files it uses: ${g.protoFiles.join(', ')}` : 'Filled in from grpcurl (the methods come from server reflection)', 'success');
+              },
+              (e) => useApp.getState().toast(asError(e).message, 'error'),
+            );
+            return true;
+          }}
+        />
         <select className="field h-8 flex-1 min-w-0 mono text-xs" aria-label="Method" value={d.method} onChange={(e) => set({ method: e.target.value })} disabled={!methods.length}>
           {!methods.length && <option value="">Add a .proto file or use server reflection to choose a method</option>}
           {methods.map((m) => (
