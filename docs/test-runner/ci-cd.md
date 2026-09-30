@@ -98,6 +98,6 @@ To run a collection instead, use `run-collection "My API" -w . -e Staging -r con
   ✗ GET /pets/{id} response 200 owner: was always returned, now optional
 ```
 
-Either side can be a file or an http(s) link. `--json` prints the result for scripts, and AI agents get the same through the MCP tool `openapi_diff`.
+Either side can be a file or an http(s) link. `--json` prints the result for scripts, and AI agents get the same through the MCP tool `openapi_diff`. In the app, open the command palette (**Ctrl+K**) and choose **Compare OpenAPI versions**: each side can be a document kept in the workspace (`specs/`, where imports put them), a link or a file.
 
 :::

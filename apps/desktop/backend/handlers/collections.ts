@@ -1,10 +1,11 @@
 /** RPC handlers: Collections (requests, folders, examples, import/export) and their mock servers. */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
   ApsError,
   fetchImportText,
   importIntoWorkspace,
+  diffOpenApi,
   exampleFromResponse,
   startMockServer,
   collectionMarkdown,
@@ -104,6 +105,17 @@ export function collectionsHandlers(be: Backend): Handlers {
       // .env imports: secret-looking values go to the OS secret store, never into workspace files
       const r = importIntoWorkspace(be.ws, text, { name: envName, secrets: be.secrets });
       return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks, scriptWarnings: r.scriptWarnings };
+    },
+    /** OpenAPI documents kept in the workspace (specs/), for comparing versions. */
+    'openapi.specs': () => {
+      const dir = be.ws.path('specs');
+      return existsSync(dir) ? readdirSync(dir).filter((f) => /\.(json|ya?ml)$/i.test(f)).map((f) => `specs/${f}`) : [];
+    },
+    /** Breaking and other changes between two OpenAPI versions; each side is a workspace path, a link or the text. */
+    'openapi.diff': async ({ old, new: next }: { old: { path?: string; url?: string; text?: string }; new: { path?: string; url?: string; text?: string } }) => {
+      const read = async (s: { path?: string; url?: string; text?: string }) =>
+        s.text ?? (s.url ? (await fetchImportText(s.url)).text : s.path ? readFileSync(be.ws.safePath(s.path), 'utf8') : '');
+      return diffOpenApi(await read(old), await read(next));
     },
     /** Import from a link: an OpenAPI URL, a raw GitHub file, a Postman API link … (downloaded, then imported as text). */
     'col.importUrl': async ({ url }: { url: string }) => {

@@ -92,6 +92,8 @@ interface AppState {
   shortcutsOpen?: boolean;
   /** The "Run in CI" dialog, with what to run preselected. */
   ci?: CiRequest;
+  /** The "Compare OpenAPI versions" dialog. */
+  openapiDiff?: boolean;
   toasts: Toast[];
   activity: Record<string, string>;
   intent?: Intent;
