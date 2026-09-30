@@ -45,6 +45,8 @@ In the browser's devtools, right-click a request on the **Network** tab, choose 
 - **Copy as fetch** or **Copy as fetch (Node.js)**
 - **Copy as PowerShell** (`Invoke-WebRequest`, also `Invoke-RestMethod`)
 
+An [HTTPie](https://httpie.io) or xh command works too, e.g. `http POST api.test/pets name=Rex age:=3 Authorization:'Bearer tok'`: `name=value` is a JSON field (a form field with `--form`), `name:=json` raw JSON, `name==value` a query parameter, `Name:value` a header, `field@file` a file; `-a` / `-A bearer`, `--verify=no` and `--timeout` are read, and `:3000/path` means localhost.
+
 Then paste it into TestPion:
 
 - **Into the URL bar:** the current tab is replaced with the pasted request.

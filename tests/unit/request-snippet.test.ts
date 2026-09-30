@@ -109,3 +109,21 @@ describe('paste a devtools "Copy as …" snippet', () => {
     expect(() => parseRequestSnippet('hello')).toThrow();
   });
 });
+
+describe('paste an HTTPie (or xh) command', () => {
+  it('reads method, URL, JSON fields, raw JSON, query, headers and auth', () => {
+    const cmd = `http POST api.test/pets name=Rex age:=3 tags:='["dog"]' q==search 'Authorization:Bearer tok' -A bearer -a tok123`;
+    expect(detectRequestSnippet(cmd)).toBe('httpie');
+    const r = parseRequestSnippet(cmd);
+    expect(r).toMatchObject({ method: 'POST', url: 'http://api.test/pets', params: [{ key: 'q', value: 'search' }], headers: [{ key: 'Authorization', value: 'Bearer tok' }], auth: { type: 'bearer', token: 'tok123' } });
+    expect(JSON.parse((r.body as { content: string }).content)).toEqual({ name: 'Rex', age: 3, tags: ['dog'] });
+  });
+
+  it('forms, files, localhost shorthand, https and flags', () => {
+    expect(parseRequestSnippet('http --form :3000/login user=vet password=paws')).toMatchObject({ method: 'POST', url: 'http://localhost:3000/login', body: { type: 'form-urlencoded', fields: [{ key: 'user', value: 'vet' }, { key: 'password', value: 'paws' }] } });
+    expect(parseRequestSnippet('https -f PUT example.com/upload photo@./rex.png name=Rex')).toMatchObject({ method: 'PUT', url: 'https://example.com/upload', body: { type: 'multipart', fields: [{ key: 'photo', value: './rex.png', kind: 'file' }, { key: 'name', value: 'Rex', kind: 'text' }] } });
+    expect(parseRequestSnippet('xh --verify=no --timeout 5 -a vet:paws localhost:8443/me')).toMatchObject({ method: 'GET', url: 'http://localhost:8443/me', auth: { type: 'basic', username: 'vet', password: 'paws' }, settings: { insecure: true, timeoutMs: 5000 } });
+    expect(isRequestSnippet('http is a protocol')).toBe(false);
+    expect(isRequestSnippet('https://api.test')).toBe(false);
+  });
+});

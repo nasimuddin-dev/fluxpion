@@ -1,6 +1,6 @@
 import type { HttpRequestSpec } from '../model/types.js';
 import { ApsError } from '../errors.js';
-import { isCurlCommand, parseCurl, parseCurlArgs } from './curl.js';
+import { isCurlCommand, parseCurl, parseCurlArgs, shellSplit } from './curl.js';
 
 /**
  * Paste-to-request: turn what browser devtools "Copy as …" puts on the clipboard into a request.
@@ -8,7 +8,7 @@ import { isCurlCommand, parseCurl, parseCurlArgs } from './curl.js';
  * Invoke-RestMethod). fetch and PowerShell snippets are converted to curl arguments so they share
  * the cURL importer's URL, body, cookie and auth handling.
  */
-export type RequestSnippetFormat = 'curl' | 'fetch' | 'powershell';
+export type RequestSnippetFormat = 'curl' | 'fetch' | 'powershell' | 'httpie';
 
 const FETCH_RE = /(?:^|[\s;=(])(?:await\s+)?fetch\s*\(/;
 const PWSH_RE = /\b(Invoke-WebRequest|Invoke-RestMethod|iwr|irm)\b/i;
@@ -19,6 +19,8 @@ export function detectRequestSnippet(text: string): RequestSnippetFormat | undef
   if (isCurlCommand(t)) return 'curl';
   if (/^(?:(?:const|let|var)\s+\w+\s*=\s*)?(?:await\s+)?fetch\s*\(/.test(t)) return 'fetch';
   if (/^(\$\w+\s*=|Invoke-WebRequest|Invoke-RestMethod|iwr\s|irm\s)/i.test(t) && PWSH_RE.test(t) && /-Uri\b|https?:\/\//i.test(t)) return 'powershell';
+  // HTTPie (and xh): http [flags] [METHOD] URL [items]
+  if (isHttpieCommand(t)) return 'httpie';
   return undefined;
 }
 
@@ -32,7 +34,118 @@ export function parseRequestSnippet(text: string): HttpRequestSpec {
   if (format === 'curl') return parseCurl(text);
   if (format === 'fetch') return parseFetch(text);
   if (format === 'powershell') return parsePowerShell(text);
-  throw new ApsError('ValidationError', 'Not a cURL, fetch or PowerShell request');
+  if (format === 'httpie') return parseHttpie(text);
+  throw new ApsError('ValidationError', 'Not a cURL, fetch, PowerShell or HTTPie request');
+}
+
+// ---------------------------------------------------------------------------------------------
+// HTTPie
+
+/** HTTPie (and xh): http [flags] [METHOD] URL [items], with a URL-like first argument. */
+function isHttpieCommand(t: string): boolean {
+  if (!/^(https?|xhs?)\s/i.test(t)) return false;
+  let args: string[];
+  try {
+    args = shellSplit(t).slice(1);
+  } catch {
+    return false;
+  }
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a.startsWith('-')) {
+      if (HTTPIE_VALUE_FLAGS.has(a)) i++;
+      continue;
+    }
+    const url = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(a) ? args[i + 1] ?? '' : a;
+    return /^(https?:\/\/|:\d|localhost([:/]|$)|[\w.-]+\.[a-z]{2,}([:/]|$)|[\w.-]+:\d+)/i.test(url);
+  }
+  return false;
+}
+
+const HTTPIE_VALUE_FLAGS = new Set(['-a', '--auth', '-A', '--auth-type', '--timeout', '--session', '--session-read-only', '-o', '--output', '--pretty', '-s', '--style', '-p', '--print', '--cert', '--cert-key', '--verify', '--proxy', '--max-redirects', '--format-options', '--boundary', '--raw', '--path-as-is']);
+
+/**
+ * `http POST api.test/pets name=Rex age:=3 Authorization:'Bearer x' q==search` (HTTPie or xh):
+ * name=value is a JSON string field (a form field with --form), name:=json raw JSON, name==value a
+ * query parameter, Name:value a header, field@file a file (multipart).
+ */
+export function parseHttpie(text: string): HttpRequestSpec {
+  const args = shellSplit(text.trim());
+  const prog = (args.shift() ?? '').toLowerCase();
+  let form = false;
+  let multipart = false;
+  let auth: string | undefined;
+  let authType = 'basic';
+  let insecure = false;
+  let timeoutMs: number | undefined;
+  let rawBody: string | undefined;
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (!a.startsWith('-') || a === '-') {
+      rest.push(a);
+      continue;
+    }
+    const [flag, inline] = a.includes('=') && a.startsWith('--') ? [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] : [a, undefined];
+    const value = () => inline ?? args[++i] ?? '';
+    if (flag === '-f' || flag === '--form') form = true;
+    else if (flag === '--multipart') multipart = form = true;
+    else if (flag === '-j' || flag === '--json') form = false;
+    else if (flag === '-a' || flag === '--auth') auth = value();
+    else if (flag === '-A' || flag === '--auth-type') authType = value().toLowerCase();
+    else if (flag === '--verify') insecure = /^(no|false)$/i.test(value());
+    else if (flag === '--timeout') timeoutMs = Number(value()) * 1000 || undefined;
+    else if (flag === '--raw') rawBody = value();
+    else if (HTTPIE_VALUE_FLAGS.has(flag)) value();
+  }
+  let method: string | undefined;
+  if (rest[0] && /^[A-Z]+$/.test(rest[0]) && rest.length > 1) method = rest.shift();
+  let url = rest.shift() ?? '';
+  if (!url) throw new ApsError('ValidationError', 'The HTTPie command has no URL');
+  // :3000/path is localhost; no scheme means http (https for https / xhs)
+  if (url.startsWith(':')) url = `localhost${url}`;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = `${prog === 'https' || prog === 'xhs' ? 'https' : 'http'}://${url}`;
+  const headers: Array<{ key: string; value: string }> = [];
+  const params: Array<{ key: string; value: string }> = [];
+  const data: Record<string, unknown> = {};
+  const fields: Array<{ key: string; value: string; kind?: 'text' | 'file' }> = [];
+  for (const item of rest) {
+    // the earliest separator wins; at the same place the longer one (== before =, := before :)
+    const m = /^((?:\\.|[^:=@\\])+?)(==|:=@|:=|=@|@|=|:)(.*)$/s.exec(item);
+    if (!m) continue;
+    const key = m[1]!.replace(/\\(.)/g, '$1');
+    const sep = m[2]!;
+    const val = m[3]!;
+    if (sep === '==') params.push({ key, value: val });
+    else if (sep === ':') {
+      if (!isPseudoHeader(key)) headers.push({ key, value: val.trim() });
+    } else if (sep === ':=') {
+      try {
+        data[key] = JSON.parse(val);
+      } catch {
+        data[key] = val;
+      }
+    } else if (sep === '@' || sep === '=@') {
+      fields.push({ key, value: val, kind: 'file' });
+      multipart = form = true;
+    } else {
+      data[key] = val;
+      fields.push({ key, value: val, kind: 'text' });
+    }
+  }
+  const hasData = Object.keys(data).length > 0 || fields.length > 0 || rawBody !== undefined;
+  const req: HttpRequestSpec = { method: (method ?? (hasData ? 'POST' : 'GET')).toUpperCase(), url, headers };
+  if (params.length) req.params = params;
+  if (rawBody !== undefined) req.body = { type: /^\s*[[{]/.test(rawBody) ? 'json' : 'text', content: rawBody };
+  else if (multipart) req.body = { type: 'multipart', fields: fields.map((f) => ({ key: f.key, value: f.value, kind: f.kind ?? 'text' })) };
+  else if (form && fields.length) req.body = { type: 'form-urlencoded', fields: fields.filter((f) => f.kind !== 'file').map((f) => ({ key: f.key, value: f.value })) };
+  else if (Object.keys(data).length) req.body = { type: 'json', content: JSON.stringify(data, null, 2) };
+  if (auth !== undefined) {
+    const i = auth.indexOf(':');
+    req.auth = authType === 'bearer' ? { type: 'bearer', token: auth } : authType === 'digest' ? { type: 'digest', username: i >= 0 ? auth.slice(0, i) : auth, password: i >= 0 ? auth.slice(i + 1) : '' } : { type: 'basic', username: i >= 0 ? auth.slice(0, i) : auth, password: i >= 0 ? auth.slice(i + 1) : '' };
+  }
+  if (insecure || timeoutMs) req.settings = { ...(insecure ? { insecure: true } : {}), ...(timeoutMs ? { timeoutMs } : {}) };
+  return req;
 }
 
 /** HTTP/2 pseudo headers that devtools sometimes include; they are not real request headers. */
