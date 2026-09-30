@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { pickTextFile } from '../lib/files';
 import { useApp } from '../store';
+import { useIntent } from '../hooks';
 import type { AppSettings, PriceEntry, ProviderConfig } from '../types';
 import { checkForUpdates } from '../updates';
 import { Badge, Button, Field, IconButton, Input, Select, Tabs, Toggle } from '../components/ui';
@@ -15,6 +16,8 @@ export function SettingsView() {
   const ws = useApp((s) => s.workspace);
   const [s, setS] = useState<AppSettings | undefined>(settings);
   const [tab, setTab] = useState<Tab>('appearance');
+  // other views open a tab directly, e.g. the assistant's "Set up" button
+  useIntent('settings', (p?: { tab?: Tab }) => p?.tab && setTab(p.tab), 'settings-tab');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   useEffect(() => setS(settings), [settings]);
   useEffect(() => {

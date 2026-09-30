@@ -30,6 +30,7 @@ const isEditable = (el: EventTarget | null) =>
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
 import { ResponseViewer } from '../components/ResponseViewer';
 import { EnvCompareDialog } from './rest/EnvCompareDialog';
+import { toastAiError } from '../lib/ai-errors';
 import type { TreeAssertion } from '../components/JsonView';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
@@ -424,7 +425,7 @@ export function RestView() {
       setActive(t.id);
       useApp.getState().toast(`Request drafted by ${r.model}: review it before sending`, 'info');
     } catch (e) {
-      useApp.getState().toast(asError(e).message, 'error');
+      toastAiError(e);
     } finally {
       useApp.getState().setActivity(actId);
     }
@@ -443,7 +444,7 @@ export function RestView() {
           update({ testScript: tab.testScript?.trim() ? `${tab.testScript.trimEnd()}\n\n${r.script}` : r.script });
           useApp.getState().toast(`Added tests by ${r.model} to the Post-response script (Scripts tab). Send again to run them.`, 'success');
         } catch (e) {
-          useApp.getState().toast(asError(e).message, 'error');
+          toastAiError(e);
         } finally {
           useApp.getState().setActivity(actId);
         }

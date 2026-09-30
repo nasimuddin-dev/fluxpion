@@ -489,7 +489,19 @@ export function AssistantPanel() {
             <Spinner /> Thinking…
           </div>
         )}
-        {error && <ErrorPanel error={error} />}
+        {error && /AI assistant is off|No Claude API key|No AI provider/.test(error.message) ? (
+          <div className="rounded-xl border border-line bg-panel p-4 flex flex-col gap-2">
+            <div className="font-medium">Set up the AI assistant</div>
+            <p className="text-sm text-muted">Save your Claude (Anthropic) API key in Settings, or choose a provider of this workspace such as a local model. The key is kept in the OS secret store.</p>
+            <div>
+              <Button variant="primary" size="sm" onClick={() => (useApp.getState().set({ assistant: undefined }), useApp.getState().openIntent('settings', { tab: 'assistant' }))}>
+                Open Settings ▸ AI assistant
+              </Button>
+            </div>
+          </div>
+        ) : (
+          error && <ErrorPanel error={error} />
+        )}
         {answer && (
           <>
             <pre className="whitespace-pre-wrap font-sans leading-relaxed">{answer.text}</pre>
