@@ -263,12 +263,18 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'list_tests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
       };
       expect((await text('list_collections')).text).toContain('Veterinary API');
+      // test files: list them, run one, then re-run only what failed
+      expect((await text('list_tests')).text).toContain('rest/auth.yaml');
+      const ran = JSON.parse((await text('run_tests', { paths: ['rest/auth.yaml'] })).text) as { runId: string; total: number };
+      expect(ran.total).toBeGreaterThan(0);
+      const again = JSON.parse((await text('run_tests', { rerunFailed: ran.runId })).text) as { total: number; message?: string };
+      expect(again.total === 0 ? again.message : 'ran').toBeTruthy();
       expect((await text('list_requests', { collection: 'Veterinary API' })).text).toContain('Get patient');
       const envs = await text('list_environments');
       expect(envs.text).toContain('clientSecret');

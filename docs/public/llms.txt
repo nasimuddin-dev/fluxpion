@@ -34,6 +34,7 @@ Key facts for agents:
 - Scripts have cheerio (`const $ = cheerio.load(pm.response.text()); $('title').text()`), lodash, moment, tv4, crypto-js, xml2Json.
 - Script packages: `pm.require('@team/utils')` loads workspace file packages/@team/utils.js (CommonJS, module.exports), like Postman's package library.
 - Save as test: REST tab menu / GraphQL, gRPC, WebSocket toolbar **Test** writes tests/<kind>/<name>.yaml; MCP `save_test` (collection + request).
+- MCP `list_tests` / `run_tests` (paths, grep, tags, rerunFailed) run the YAML tests under tests/.
 - Re-run only failures: `testpion test --rerun-failed [runId]` (default last run).
 - Watch mode for local development: `testpion test --watch`, `testpion run-collection <c> --watch` re-run on file changes.
 - Imports (app, `testpion import <file> -w <ws> --json`): OpenAPI 3 / Swagger 2, Postman v2.1, Insomnia v4/v5, Bruno (collection folder of .bru files, a .bru file, or JSON export; Bruno scripts run with the bru/req/res API and assertions become tests), Hoppscotch (export: `testpion export <c> --format bruno --out <dir>` writes a Bruno folder), WSDL 1.1 (SOAP 1.1/1.2 requests with SOAPAction and sample envelopes from the XSD; file or ?wsdl link), HAR, cURL/fetch/PowerShell snippets.

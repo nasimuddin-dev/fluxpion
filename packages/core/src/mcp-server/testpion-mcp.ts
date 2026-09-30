@@ -1,3 +1,6 @@
+import { runTests } from '../runner/runner.js';
+import { streamTests } from '../runner/loader.js';
+import { join, relative } from 'node:path';
 import { testFromRequest } from '../runner/test-from.js';
 import { evaluateThresholds, parseThreshold } from '../load/thresholds.js';
 import { ENGINE_VERSION } from '../version.js';
@@ -16,7 +19,7 @@ import { executeHttp } from '../protocols/http/client.js';
 import { describeRoot, executeGrpc, grpcRoot, parseGrpcTarget } from '../protocols/grpc/grpc.js';
 import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -755,6 +758,68 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         try {
           const summary = await runCollection({ name: c.name, runId: shortId('mcp-'), collection: c, selection, services: ctx.services, traceMode: 'none', environment, onEvent: (e: RunEvent) => e.type === 'test-end' && results.push(e.result) });
           return { total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, skipped: summary.skipped, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
+        } finally {
+          await ctx.dispose();
+        }
+      },
+    },
+    {
+      name: 'list_tests',
+      description: 'The test files under tests/ (YAML / JSON) with the tests in each: id, name, type and tags. Run them with run_tests.',
+      inputSchema: { type: 'object', properties: { path: str('Only this file or folder inside tests/') } },
+      run: async (a) => {
+        const out: Array<{ file: string; tests: Array<{ id?: string; name: string; type: string; tags?: string[] }> }> = [];
+        const base = store.path('tests');
+        for await (const t of streamTests([a.path ? String(a.path) : '.'], base)) {
+          const file = relative(base, t.file ?? '').replace(/\\/g, '/');
+          let f = out.find((x) => x.file === file);
+          if (!f) out.push((f = { file, tests: [] }));
+          if (f.tests.length < 200) f.tests.push({ id: t.id, name: t.name, type: t.type, ...(t.tags?.length ? { tags: t.tags } : {}) });
+          if (out.length > 300) break;
+        }
+        return out;
+      },
+    },
+    {
+      name: 'run_tests',
+      write: true,
+      description:
+        'Run test files under tests/ (all, or given files / folders), filtered by name (grep) or tags, like `testpion test`. `rerunFailed: true` runs only the tests that failed in the last run (or give a run id). Returns totals and per-test results with failed checks; the run is recorded in the workspace history.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          paths: { type: 'array', items: { type: 'string' }, description: 'Files or folders inside tests/ (default: all)' },
+          grep: str('Only tests whose name or id matches this regular expression'),
+          tags: { type: 'array', items: { type: 'string' }, description: 'Only tests with one of these tags' },
+          environment: str('Environment name'),
+          rerunFailed: { anyOf: [{ type: 'boolean' }, { type: 'string' }], description: 'true: the failed tests of the last run; or a run id' },
+        },
+      },
+      run: async (a) => {
+        const environment = checkEnvironment(a.environment);
+        const rerun = a.rerunFailed ? store.failedTestIds(typeof a.rerunFailed === 'string' ? a.rerunFailed : 'last') : undefined;
+        if (rerun && !rerun.ids.length) return { total: 0, message: `Nothing failed in ${rerun.runId}` };
+        const ctx = createEngineContext({ store, secrets, settings, environment });
+        const runId = shortId('run-');
+        const outDir = store.runDir(runId);
+        mkdirSync(outDir, { recursive: true });
+        const results: TestResult[] = [];
+        try {
+          const paths = Array.isArray(a.paths) && a.paths.length ? (a.paths as unknown[]).map(String) : ['.'];
+          const summary = await runTests({
+            name: rerun ? `Failed tests of ${rerun.runId}` : paths.join(', '),
+            runId,
+            tests: streamTests(paths, store.path('tests'), { grep: a.grep ? String(a.grep) : undefined, tags: Array.isArray(a.tags) ? (a.tags as unknown[]).map(String) : undefined, ...(rerun ? { ids: rerun.ids } : {}) }),
+            services: ctx.services,
+            concurrency: 4,
+            resultsFile: join(outDir, 'results.jsonl'),
+            traceMode: 'none',
+            environment,
+            onEvent: (e: RunEvent) => void (e.type === 'test-end' && results.push(e.result)),
+          });
+          writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
+          store.meta.addRun(summary, outDir);
+          return { runId, total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, skipped: summary.skipped, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
         } finally {
           await ctx.dispose();
         }
