@@ -5,6 +5,7 @@ import type { WorkspaceStore } from '../storage/workspace.js';
 import { shortId, slugify } from '../util/ids.js';
 import { secretKeys, type SecretStore } from '../storage/secrets.js';
 import { importAny } from './importers.js';
+import { scriptCompatibility, type ScriptWarning } from '../scripts/compat.js';
 
 export interface WorkspaceImportResult {
   format: string;
@@ -18,6 +19,8 @@ export interface WorkspaceImportResult {
   specPath?: string;
   /** Requests that got an `openapi` contract check. */
   contractChecks?: number;
+  /** Script APIs the sandbox doesn't provide (cheerio, pm.vault …): these requests need a change to run. */
+  scriptWarnings?: ScriptWarning[];
 }
 
 /**
@@ -49,7 +52,11 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
       out.contractChecks = added;
     }
   }
-  if (collection) out.collection = store.saveCollection(collection);
+  if (collection) {
+    out.collection = store.saveCollection(collection);
+    const warnings = scriptCompatibility(collection);
+    if (warnings.length) out.scriptWarnings = warnings;
+  }
   // an import never replaces an environment the workspace already has: a clash gets a new id and name
   const envs = (r.environments ?? (r.environment ? [r.environment] : [])).map((e) => {
     const taken = store.listEnvironments();

@@ -99,7 +99,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
   const [link, setLink] = useState('');
   const linkOk = /^https?:\/\/\S+$/i.test(link.trim());
   const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }>; specPath?: string; contractChecks?: number } | null>) => {
+  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }>; specPath?: string; contractChecks?: number; scriptWarnings?: Array<{ where: string; script: string; api: string; hint: string }> } | null>) => {
     setBusy(true);
     try {
       const r = await fn();
@@ -114,6 +114,12 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
             `Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (${r.environment.includes(', ') ? 'environments' : 'environment'} ${r.environment})` : ''}${r.contractChecks ? `. Each request checks the OpenAPI contract (${r.specPath})` : ''}`,
             'success',
           );
+        const w = r.scriptWarnings ?? [];
+        if (w.length) {
+          const apis = [...new Set(w.map((x) => x.api))].join(', ');
+          const where = [...new Set(w.map((x) => x.where))];
+          useApp.getState().toast(`${where.length} request${where.length > 1 ? 's' : ''} use${where.length > 1 ? '' : 's'} script APIs TestPion doesn't have (${apis}): ${where.slice(0, 3).join('; ')}${where.length > 3 ? ' …' : ''}. Tip: ${w[0]!.hint}.`, 'warning');
+        }
         onDone();
         await useApp.getState().refreshWorkspace();
         onClose();

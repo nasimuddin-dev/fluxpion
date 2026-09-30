@@ -416,6 +416,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           specPath: r.specPath,
           contractChecks: r.contractChecks,
           secretsToSet: r.secretsToSet?.length ? r.secretsToSet : undefined,
+          scriptWarnings: r.scriptWarnings,
         };
       },
     },

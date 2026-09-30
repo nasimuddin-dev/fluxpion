@@ -23,7 +23,7 @@ export type ViewId =
 
 export interface Toast {
   id: number;
-  kind: 'info' | 'success' | 'error';
+  kind: 'info' | 'success' | 'warning' | 'error';
   text: string;
 }
 
@@ -127,10 +127,10 @@ export const useApp = create<AppState>((set, get) => ({
   toast: (text, kind = 'info', action) => {
     const id = ++toastId;
     // a toast with an action (Undo) stays longer, so there is time to use it
-    const duration = action ? 8000 : kind === 'error' ? 7000 : 3500;
+    const duration = action ? 8000 : kind === 'error' || kind === 'warning' ? 7000 : 3500;
     set({ toasts: [...get().toasts, { id, kind, text }] });
     setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), duration);
-    (kind === 'error' ? sonner.error : kind === 'success' ? sonner.success : sonner)(text, { duration, ...(action ? { action: { label: action.label, onClick: action.onClick } } : {}) });
+    (kind === 'error' ? sonner.error : kind === 'success' ? sonner.success : kind === 'warning' ? sonner.warning : sonner)(text, { duration, ...(action ? { action: { label: action.label, onClick: action.onClick } } : {}) });
   },
   setActivity: (key, label) => {
     const a = { ...get().activity };

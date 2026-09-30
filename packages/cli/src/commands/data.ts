@@ -116,10 +116,14 @@ export function registerDataCommands(program: Command): void {
           return;
         }
         const r = importIntoWorkspace(store, text, { contractChecks: o.contractChecks !== false, name: dotenvName(source) });
-        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name, environments: r.environments?.map((e) => e.name), secretsToSet: r.secretsToSet, specPath: r.specPath, contractChecks: r.contractChecks }, null, 2));
+        if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name, environments: r.environments?.map((e) => e.name), secretsToSet: r.secretsToSet, specPath: r.specPath, contractChecks: r.contractChecks, scriptWarnings: r.scriptWarnings }, null, 2));
         else {
           console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environments?.length ? ` ${r.environments.length > 1 ? 'environments' : 'environment'} ${r.environments.map((e) => `"${e.name}"`).join(', ')}` : ''}`));
           if (r.specPath) console.log(dim(`Kept the document as ${r.specPath}${r.contractChecks ? `; ${r.contractChecks} requests check the OpenAPI contract` : ''}`));
+          if (r.scriptWarnings?.length) {
+            console.log(yellow(`${r.scriptWarnings.length} script${r.scriptWarnings.length > 1 ? 's use' : ' uses'} something TestPion's sandbox doesn't have:`));
+            for (const w of r.scriptWarnings) console.log(yellow(`  ${w.where} (${w.script} script): ${w.api}; ${w.hint}`));
+          }
           if (r.secretsToSet?.length) console.log(yellow(`Secret values were not saved (set them in the app, or as TESTPION_SECRET_* variables): ${r.secretsToSet.join(', ')}`));
         }
       } finally {

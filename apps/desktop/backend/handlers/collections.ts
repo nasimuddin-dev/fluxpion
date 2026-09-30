@@ -103,7 +103,7 @@ export function collectionsHandlers(be: Backend): Handlers {
       // an OpenAPI document is kept in specs/ and its requests get an openapi contract check
       // .env imports: secret-looking values go to the OS secret store, never into workspace files
       const r = importIntoWorkspace(be.ws, text, { name: envName, secrets: be.secrets });
-      return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks };
+      return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks, scriptWarnings: r.scriptWarnings };
     },
     /** Import from a link: an OpenAPI URL, a raw GitHub file, a Postman API link … (downloaded, then imported as text). */
     'col.importUrl': async ({ url }: { url: string }) => {
