@@ -2,6 +2,8 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { Backend } from '../../apps/desktop/backend/backend.js';
 
 // The desktop backend is the app's whole RPC surface (and a future server's); its handlers live in one
@@ -23,7 +25,7 @@ afterAll(async () => {
 describe('desktop backend', () => {
   it('exposes every domain through one RPC table', () => {
     const domains = new Set(Object.keys(be.handlers).map((m) => m.split('.')[0]));
-    for (const d of ['app', 'settings', 'ws', 'env', 'col', 'http', 'gql', 'mcp', 'ai', 'tests', 'runs', 'load', 'wsock', 'grpc']) expect(domains).toContain(d);
+    for (const d of ['app', 'settings', 'ws', 'env', 'col', 'http', 'gql', 'mcp', 'ai', 'tests', 'runs', 'load', 'wsock', 'grpc', 'monitor']) expect(domains).toContain(d);
     expect(Object.keys(be.handlers).length).toBeGreaterThan(100);
   });
 
@@ -42,5 +44,28 @@ describe('desktop backend', () => {
 
   it('reports errors as structured values, not crashes', async () => {
     await expect(Promise.resolve().then(() => call('mcp.ping', { serverId: 'nope' }))).rejects.toThrow(/not connected|nope/i);
+  });
+
+  it('monitors: save, list, run now, and the scheduler runs due ones (events for the UI)', async () => {
+    const server = createServer((_req, res) => res.end('ok'));
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+    try {
+      await call('col.save', { schemaVersion: '1.0', id: 'c-mon', name: 'Mon', version: 0, variables: [], updatedAt: '', items: [{ kind: 'request', id: 'r1', name: 'Ping', request: { method: 'GET', url, headers: [], params: [] }, assertions: [{ type: 'status', expected: 200 }] }] });
+      await expect(Promise.resolve().then(() => call('monitor.save', { monitor: { name: 'Ping', collectionId: 'c-mon', everyMinutes: 0, enabled: true } }))).rejects.toThrow(/1 minute/);
+      const saved = (await call('monitor.save', { monitor: { name: 'Ping', collectionId: 'c-mon', everyMinutes: 5, enabled: true } })) as { id: string; schedule: string; due: boolean };
+      expect(saved).toMatchObject({ schedule: 'every 5 minutes', due: true });
+      const r = (await call('monitor.run', { id: saved.id })) as { status: string; trigger: string };
+      expect(r).toMatchObject({ status: 'passed', trigger: 'manual' });
+      expect(events).toContain('monitor.result');
+      expect(((await call('monitor.list')) as Array<{ due: boolean; running: boolean }>)[0]).toMatchObject({ due: false, running: false });
+      // due again 5 minutes later: the scheduler runs it
+      expect(await be.monitorScheduler.tick(Date.now() + 6 * 60_000)).toBe(1);
+      expect(((await call('monitor.results', { id: saved.id })) as Array<{ trigger: string }>).map((x) => x.trigger)).toEqual(['schedule', 'manual']);
+      await call('monitor.delete', { id: saved.id });
+      expect(await call('monitor.list')).toEqual([]);
+    } finally {
+      server.close();
+    }
   });
 });

@@ -85,6 +85,9 @@ import {
   type SecretStore,
   type TestCase,
   type TestResult,
+  MonitorScheduler,
+  listMonitors,
+  lastMonitorResult,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -93,6 +96,7 @@ import { requestsHandlers } from './handlers/requests.js';
 import { mcpHandlers } from './handlers/mcp.js';
 import { aiHandlers } from './handlers/ai.js';
 import { testingHandlers } from './handlers/testing.js';
+import { monitorHandlers, runMonitorNow } from './handlers/monitors.js';
 import { grpcHandlers } from './handlers/grpc.js';
 
 export interface BackendHost {
@@ -103,6 +107,8 @@ export interface BackendHost {
   saveDialog?(opts: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | undefined>;
   openDialog?(opts: { directory?: boolean; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | undefined>;
   openPath?(path: string): void | Promise<unknown>;
+  /** Don't run monitors on their schedule (tests, one-off tools). */
+  noMonitors?: boolean;
 }
 
 export type Handler = (params: any) => Promise<unknown> | unknown;
@@ -166,6 +172,10 @@ export class Backend {
   private vizPages = new Map<string, string>();
   /** The GraphQL mock started from the GraphQL view (one at a time). */
   gqlMock?: GraphQLMockServer;
+  /** Monitors running right now (by id), from the schedule or "Run now". */
+  runningMonitors = new Set<string>();
+  /** Runs monitors of the open workspace when they are due, while this backend runs. */
+  monitorScheduler: MonitorScheduler;
   readonly handlers: Handlers;
 
   constructor(host: BackendHost) {
@@ -187,6 +197,15 @@ export class Backend {
     this.handlers = this.buildHandlers();
     if (this.manager.settingsProblem) this.logger.warn(`Settings were reset to defaults: ${this.manager.settingsProblem}`);
     this.bootstrapWorkspace();
+    this.monitorScheduler = new MonitorScheduler({
+      // read on every tick, so a workspace switch or an edited monitor applies right away
+      list: () => (this.store ? listMonitors(this.store).filter((m) => !this.runningMonitors.has(m.id)) : []),
+      last: (id) => lastMonitorResult(this.ws, id),
+      run: (m) => runMonitorNow(this, m, 'schedule'),
+      onResult: (monitor, result, previous) => this.host.emit('monitor.result', { monitor, result, previous }),
+      onError: (m, e) => this.logger.error(`Monitor ${m.name} could not run: ${(e as Error).message}`),
+    });
+    if (!host.noMonitors) this.monitorScheduler.start();
   }
 
   /** Open the last workspace, or create a starter workspace on first launch. */
@@ -457,7 +476,7 @@ export class Backend {
    */
   private buildHandlers(): Handlers {
     const all: Handlers = {};
-    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers]) {
+    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers, monitorHandlers]) {
       for (const [name, fn] of Object.entries(group(this))) {
         if (name in all) throw new Error(`RPC method ${name} is defined twice`);
         all[name] = fn;
@@ -1032,6 +1051,7 @@ export class Backend {
   }
 
   async dispose(): Promise<void> {
+    this.monitorScheduler.stop();
     for (const c of this.controllers.values()) c.abort();
     for (const r of this.runs.values()) r.ctrl.abort();
     for (const s of this.mcpSessions.values()) await s.close();

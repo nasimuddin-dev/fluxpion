@@ -15,6 +15,7 @@ export type MenuCommand =
   | 'new-websocket'
   | 'new-mcp-server'
   | 'new-collection'
+  | 'new-monitor'
   | 'new-environment'
   | 'new-workspace'
   | 'open-workspace'
@@ -48,6 +49,8 @@ export async function runMenuCommand(cmd: MenuCommand): Promise<void> {
         await call('col.save', { schemaVersion: '1.0', id, name, version: 0, variables: [], items: [], updatedAt: '' });
         return s.openIntent('collections', { collectionId: id });
       }
+      case 'new-monitor':
+        return s.openIntent('monitors', { create: { collectionId: '' } });
       case 'new-environment': {
         const name = await promptText('New environment', { message: 'Environment name', value: 'Staging', okLabel: 'Create' });
         if (!name) return;

@@ -50,6 +50,9 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `save_request` | Save a request into a collection and folder path (`"Auth / Tokens"`, created as needed; `create: true` makes a new collection). Give a `snippet` or `method` + `url` (+ `headers`, `body`). Secret values are **not** written to the workspace: they become `{{variables}}`, and the result's `placeholders` lists them so the user can add them as secret environment variables. |
 | `request_history` | Earlier responses of a saved request (sent in the app), newest first: id, time, status, duration, size. |
 | `response_time_stats` | Response-time summary of a saved request's recent responses: count, failed, fastest, mean, median (p50), p95 and slowest (ms). |
+| `list_monitors` | Monitors (collections on a schedule) with their schedule, last result and next run. |
+| `monitor_results` | A monitor's recent results, newest first. |
+| `run_monitor` | Run a monitor now; returns the result and the failed requests. |
 | `compare_responses` | Compare two responses by history id: status, timing, header changes and a field-by-field JSON body diff (`$.path` added / removed / changed). Sensitive values are masked. |
 | `reorder_environments` | Set the order of environments in the environment picker (names or ids, first to last). |
 

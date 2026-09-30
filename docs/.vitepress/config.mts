@@ -123,6 +123,7 @@ const docsSidebar = [
       { text: 'Assertions', link: '/test-runner/assertions' },
       { text: 'Datasets', link: '/test-runner/datasets' },
       { text: 'CI/CD', link: '/test-runner/ci-cd' },
+      { text: 'Monitors', link: '/test-runner/monitors' },
     ],
   },
   {

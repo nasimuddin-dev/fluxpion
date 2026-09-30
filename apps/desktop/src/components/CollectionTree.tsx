@@ -1,4 +1,4 @@
-import { Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
+import { AlarmClock, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
@@ -140,6 +140,7 @@ export function CollectionTree({
                 onNewRequest={() => onNewRequest(c, n.id)}
                 onRun={onRun && (() => onRun(c, n.id))}
                 runLabel="Run folder"
+                onMonitor={() => useApp.getState().openIntent('monitors', { create: { collectionId: c.id, selection: [n.id] } })}
                 onNewFolder={async () => {
                   const name = await promptText('New folder', { message: 'Folder name', okLabel: 'Create' });
                   if (name) onChange({ ...c, items: addToFolder(c.items, n.id, { kind: 'folder', id: uid('fld-'), name, items: [] } as CollectionFolder) });
@@ -243,6 +244,7 @@ export function CollectionTree({
                   onNewRequest={() => onNewRequest(c)}
                   onRun={onRun && (() => onRun(c))}
                   runLabel="Run collection"
+                  onMonitor={() => useApp.getState().openIntent('monitors', { create: { collectionId: c.id } })}
                   onNewFolder={async () => {
                     const name = await promptText('New folder', { message: 'Folder name', okLabel: 'Create' });
                     if (name) onChange({ ...c, items: [...c.items, { kind: 'folder', id: uid('fld-'), name, items: [] }] });
@@ -275,6 +277,7 @@ function NodeMenu({
   favorite,
   onRun,
   runLabel = 'Run',
+  onMonitor,
   onOpen,
   copyItems,
   extraItems,
@@ -291,6 +294,8 @@ function NodeMenu({
   favorite?: boolean;
   onRun?(): void;
   runLabel?: string;
+  /** Run it on a schedule (opens Monitors with a new monitor). */
+  onMonitor?(): void;
   /** Open the request (in a tab). */
   onOpen?(): void;
   /** Copy URL / Copy as cURL … (requests only). */
@@ -305,6 +310,7 @@ function NodeMenu({
   const add = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}) => fn && items.push({ label, icon, onSelect: fn, ...extra });
   add('Open in tab', <ExternalLink size={14} />, onOpen);
   add(runLabel, <Play size={14} />, onRun);
+  add('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor);
   add('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit, { separator: !!onRun });
   add('New request', <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
   add('New folder', <FolderPlus size={14} />, onNewFolder);

@@ -29,6 +29,7 @@ import {
   Sparkles,
   TerminalSquare,
   X,
+  AlarmClock,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
@@ -52,6 +53,7 @@ export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: str
   { id: 'evaluations', label: 'Evaluations', icon: <FlaskConical size={18} />, group: 'AI' },
   { id: 'tests', label: 'Tests', icon: <ShieldCheck size={18} />, group: 'Automation' },
   { id: 'load', label: 'Load', icon: <Gauge size={18} />, group: 'Automation' },
+  { id: 'monitors', label: 'Monitors', icon: <AlarmClock size={18} />, group: 'Automation' },
   { id: 'traces', label: 'Traces', icon: <Activity size={18} />, group: 'Observe' },
   { id: 'collections', label: 'Collections', icon: <FolderTree size={18} />, group: 'Workspace' },
   { id: 'history', label: 'History', icon: <History size={18} />, group: 'Workspace' },

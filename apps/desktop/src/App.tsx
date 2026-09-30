@@ -3,6 +3,7 @@ import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
+import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
 import { Spinner, TooltipProvider } from './components/ui';
@@ -25,6 +26,7 @@ const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
   tests: view(() => import('./views/TestsView'), 'TestsView'),
   load: view(() => import('./views/LoadView'), 'LoadView'),
   traces: view(() => import('./views/TracesView'), 'TracesView'),
+  monitors: view(() => import('./views/MonitorsView'), 'MonitorsView'),
   collections: view(() => import('./views/CollectionsView'), 'CollectionsView'),
   history: view(() => import('./views/HistoryView'), 'HistoryView'),
   environments: view(() => import('./views/EnvironmentsView'), 'EnvironmentsView'),
@@ -82,6 +84,7 @@ export default function App() {
       }
     })();
     const off = on('run.error', (p: { error: { message: string } }) => useApp.getState().toast(`Run failed: ${p.error.message}`, 'error'));
+    const offMonitors = watchMonitorAlerts();
     const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
     // application menu (File ▸ New, Import, Export, Save …)
     const offMenu = on<{ command: MenuCommand }>('menu.command', ({ command }) => void runMenuCommand(command));
@@ -92,6 +95,7 @@ export default function App() {
       offUpdate();
       offTabs();
       offMenu();
+      offMonitors();
     };
   }, []);
 
@@ -162,6 +166,7 @@ export default function App() {
       { id: 'm-new-mcp', label: 'Add MCP Server', hint: 'File', run: () => void runMenuCommand('new-mcp-server') },
       { id: 'm-new-col', label: 'New Collection', hint: 'File', run: () => void runMenuCommand('new-collection') },
       { id: 'm-new-env', label: 'New Environment', hint: 'File', run: () => void runMenuCommand('new-environment') },
+      { id: 'm-new-monitor', label: 'New Monitor', hint: 'File', run: () => void runMenuCommand('new-monitor') },
       { id: 'm-new-workspace', label: 'New Workspace', hint: 'File', run: () => void runMenuCommand('new-workspace') },
       { id: 'm-open-ws', label: 'Open Workspace Folder', hint: 'File', run: () => void runMenuCommand('open-workspace') },
       { id: 'm-import', label: 'Import (Postman, OpenAPI, HAR, cURL …)', hint: 'File', run: () => void runMenuCommand('import') },

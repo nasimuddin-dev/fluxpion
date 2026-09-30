@@ -184,6 +184,7 @@ function start(): void {
               { type: 'separator' },
               { label: 'Collection…', click: () => menu('new-collection') },
               { label: 'Environment…', click: () => menu('new-environment') },
+              { label: 'Monitor…', click: () => menu('new-monitor') },
               { label: 'Workspace…', click: () => menu('new-workspace') },
             ],
           },

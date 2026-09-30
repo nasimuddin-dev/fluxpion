@@ -15,6 +15,7 @@ export type ViewId =
   | 'tests'
   | 'load'
   | 'traces'
+  | 'monitors'
   | 'collections'
   | 'history'
   | 'environments'

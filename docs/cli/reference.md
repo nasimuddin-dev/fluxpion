@@ -21,6 +21,7 @@ testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 testpion load <url>           Safeguarded load test
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order -w    List environments; set their order
+testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)
 testpion history list|stats|diff -w  Response history of saved requests; response times; compare two responses
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server

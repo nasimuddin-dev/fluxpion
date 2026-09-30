@@ -214,7 +214,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['collection_docs', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_requests', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'save_request', 'send_request']);
+      expect(names).toEqual(['collection_docs', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -337,6 +337,38 @@ describe('example workspace (end-to-end)', () => {
       await s.close();
     }
   });
+
+  it('monitors: CLI add/run/list/results and MCP list_monitors/monitor_results/run_monitor', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    const add = await run([cli, 'monitor', 'add', 'Diagnostics check', '--collection', 'Veterinary API', '--folder', 'Diagnostics', '--every', '10m', '-e', 'Development', '-w', ws.root, '--json'], env);
+    expect(add.stderr).toBe('');
+    expect(JSON.parse(add.stdout)).toMatchObject({ name: 'Diagnostics check', everyMinutes: 10, enabled: true });
+    expect((await run([cli, 'monitor', 'add', 'Bad', '--collection', 'Veterinary API', '--every', '9d', '-w', ws.root], env)).status).toBe(2);
+    const due = await run([cli, 'monitor', 'run', '--due', '-w', ws.root, '--json'], env);
+    expect(due.status).toBe(0);
+    expect(JSON.parse(due.stdout)).toEqual([expect.objectContaining({ name: 'Diagnostics check', status: 'passed', trigger: 'schedule' })]);
+    // it just ran, so nothing is due
+    expect(JSON.parse((await run([cli, 'monitor', 'run', '--due', '-w', ws.root, '--json'], env)).stdout)).toEqual([]);
+    const list = JSON.parse((await run([cli, 'monitor', 'list', '-w', ws.root, '--json'], env)).stdout);
+    expect(list[0]).toMatchObject({ schedule: 'every 10 minutes', due: false, lastResult: { status: 'passed' } });
+
+    const s = new McpSession({ id: 'mon', name: 'testpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env: { TESTPION_HOME: join(dir, 'home') } });
+    await s.connect(20_000);
+    try {
+      const text = async (tool: string, args: Record<string, unknown> = {}) => mcpResultBody(await s.callTool(tool, args)).text;
+      expect(JSON.parse(await text('list_monitors'))[0].name).toBe('Diagnostics check');
+      const ran = JSON.parse(await text('run_monitor', { monitor: 'diagnostics check' }));
+      expect(ran).toMatchObject({ status: 'passed', trigger: 'manual', failures: [] });
+      expect(JSON.parse(await text('monitor_results', { monitor: 'Diagnostics check' })).map((r: { trigger: string }) => r.trigger)).toEqual(['manual', 'schedule']);
+    } finally {
+      await s.close();
+    }
+    const results = await run([cli, 'monitor', 'results', 'Diagnostics check', '-w', ws.root], env);
+    expect(results.stdout).toContain('2/2 passed');
+    expect((await run([cli, 'monitor', 'remove', 'Diagnostics check', '-w', ws.root], env)).status).toBe(0);
+    // eight CLI processes: slow on a loaded CI machine
+  }, 90_000);
 
   it('CLI: `testpion docs` writes Markdown documentation with examples and no secrets', async () => {
     const cli = resolve('packages/cli/bin/testpion.js');
