@@ -90,7 +90,7 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
         The mock server answers requests with the <b>saved examples</b> of this collection, on this computer only. Point <span className="mono">{'{{baseUrl}}'}</span> at it to develop or test a client before the real API exists. Send
         the header <span className="mono">x-mock-response-code: 404</span> or <span className="mono">x-mock-response-name</span> to pick a specific example.
       </p>
-      <div className="flex items-end gap-3">
+      <div className="flex items-start gap-3">
         <Field label="Port" hint="Empty = any free port">
           <Input value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))} placeholder="auto" className="w-28 mono" disabled={info.running} />
         </Field>
@@ -101,11 +101,11 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
           <Input value={fallback} onChange={(e) => setFallback(e.target.value)} placeholder="https://api.example.com" className="mono" disabled={info.running} aria-label="Fallback URL" />
         </Field>
         {info.running ? (
-          <Button variant="danger" icon={<Square size={12} />} onClick={() => void stop()}>
+          <Button variant="danger" className="mt-6" icon={<Square size={12} />} onClick={() => void stop()}>
             Stop
           </Button>
         ) : (
-          <Button variant="primary" icon={<Play size={12} />} loading={busy} disabled={!routes.length} onClick={() => void start()}>
+          <Button variant="primary" className="mt-6" icon={<Play size={12} />} loading={busy} disabled={!routes.length} onClick={() => void start()}>
             Start mock server
           </Button>
         )}
