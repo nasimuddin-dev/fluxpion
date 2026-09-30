@@ -3,14 +3,22 @@
 // Starts the demo servers, copies the example workspace into a temporary profile,
 // launches Electron in capture mode and writes docs/public/images/*.jpg.
 const { spawn, spawnSync } = require('node:child_process');
-const { cpSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
+const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { join, resolve } = require('node:path');
+const { dirname, join, resolve } = require('node:path');
 
 const root = resolve(__dirname, '..', '..', '..');
 const home = mkdtempSync(join(tmpdir(), 'aps-capture-'));
 const ws = join(home, 'examples', 'veterinary-workspace');
-cpSync(join(root, 'examples', 'veterinary-workspace'), ws, { recursive: true, filter: (s) => !/[\\/](runs|traces|payloads)([\\/]|$)|database\.sqlite/.test(s) });
+// the committed example only (git HEAD), so local, uncommitted edits to it never end up in public screenshots
+const tracked = spawnSync('git', ['ls-files', '-z', 'examples/veterinary-workspace'], { cwd: root, encoding: 'utf8' }).stdout.split('\0').filter(Boolean);
+for (const rel of tracked) {
+  if (/[\\/](runs|traces|payloads)([\\/]|$)|database\.sqlite/.test(rel)) continue;
+  const content = spawnSync('git', ['show', `HEAD:${rel}`], { cwd: root, maxBuffer: 64 * 1024 * 1024 }).stdout;
+  const dest = join(ws, rel.slice('examples/veterinary-workspace/'.length));
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, content);
+}
 // the copied workspace launches the repo's MCP server (which needs the repo's node_modules)
 writeFileSync(
   join(ws, 'mcp-servers.json'),

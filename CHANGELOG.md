@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 — 2026-09-30
+
+Highlights: the **Collections explorer**, everything saved in the workspace in one panel next to every view (Ctrl+B); **Postman-style request settings**; saved **evaluations** and **load tests** that run by name from the CLI and MCP (`testpion eval run`, `testpion load --saved`); **Export** beside Import; body types keep their content when you switch; and an update prompt that still appears if the window can't show it.
 
 - **Collections explorer**: the Collections button, now right under Home, shows or hides a panel with everything saved in the workspace, next to every view (Ctrl+B). Its collapsible sections are collections (the full tree: run, move, edit folders, settings), saved gRPC requests, WebSocket connections, MCP servers, AI prompts, evaluations and load tests, environments (click to activate), API specs (coverage, compare versions) and monitors. One filter covers them all, and clicking an item opens it in its editor. It refreshes when anything is saved, in any view. While it's open, the views' own saved lists step aside.
 - **Update prompt you can't miss**: if the window can't show the update question (it failed to render, or crashed), TestPion asks with a native dialog instead.
