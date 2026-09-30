@@ -26,7 +26,7 @@ testpion docs <collection>    Write Markdown (or --html) documentation for a col
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)
 testpion export-environment <name>   Export an environment in Postman's format
 testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
-testpion load <url>           Safeguarded load test (--threshold "p95<500" "errors<1%" to pass/fail)
+testpion load <url>           Safeguarded load test (--threshold "p95<500" "errors<1%" to pass/fail; --grpc <method> for a gRPC server)
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, Insomnia, Bruno (a collection folder too), WSDL (SOAP), HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order|diff -w  List environments; set their order; compare two
 testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)

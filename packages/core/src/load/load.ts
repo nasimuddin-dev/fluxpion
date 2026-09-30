@@ -7,12 +7,15 @@ import { sleep } from '../util/concurrency.js';
 import { estimateCost, type ProviderRegistry } from '../ai/index.js';
 import type { Redactor } from '../util/redact.js';
 import { CookieJar } from '../cookies/cookie-jar.js';
+import { parseGrpcTarget, prepareGrpcCall, type GrpcRequestSpec } from '../protocols/grpc/grpc.js';
 
 export type LoadTarget =
   | { kind: 'http'; request: HttpRequestSpec }
   | { kind: 'llm'; model: ModelRef; prompt: string; stream?: boolean }
   /** Each virtual user runs these requests in order, again and again (a collection or folder; see collectionLoadTarget). */
-  | { kind: 'sequence'; name?: string; requests: Array<{ name: string; request: HttpRequestSpec }> };
+  | { kind: 'sequence'; name?: string; requests: Array<{ name: string; request: HttpRequestSpec }> }
+  /** A unary or server-streaming gRPC method (one client, calls multiplexed over its connection). */
+  | { kind: 'grpc'; request: GrpcRequestSpec };
 
 export interface LoadTestConfig {
   target: LoadTarget;
@@ -125,6 +128,12 @@ export async function runLoadTest(
     for (const r of cfg.target.requests) checkLoadSafeguards(cfg, buildUrl(r.request.url, r.request.params, r.request.pathVariables).toString());
   }
   if (cfg.virtualUsers < 1 || cfg.durationSec <= 0) throw new ApsError('ConfigurationError', 'virtualUsers and durationSec must be positive');
+  // gRPC: the same host safeguards, then one prepared caller for the whole test
+  const grpcCaller = cfg.target.kind === 'grpc' ? await (async (t) => {
+    const { address, tls } = parseGrpcTarget(t.request.target, t.request.tls);
+    checkLoadSafeguards(cfg, `${tls ? 'https' : 'http'}://${address}`);
+    return prepareGrpcCall(t.request);
+  })(cfg.target) : undefined;
 
   const ctrl = new AbortController();
   const onAbort = () => ctrl.abort();
@@ -219,7 +228,18 @@ export async function runLoadTest(
     }
     const t0 = performance.now();
     try {
-      if (cfg.target.kind === 'http') {
+      if (grpcCaller) {
+        const r = await grpcCaller.call(signal);
+        const ms = performance.now() - t0;
+        latency.record(ms);
+        secLat.record(ms);
+        status[r.codeName] = (status[r.codeName] ?? 0) + 1;
+        if (r.code !== 0) {
+          errors++;
+          secErr++;
+          if (r.codeName === 'UNAVAILABLE' || r.codeName === 'DEADLINE_EXCEEDED') connFail++;
+        }
+      } else if (cfg.target.kind === 'http') {
         const { response } = await executeHttp(cfg.target.request, { signal, discardBody: true, redactor: deps.redactor });
         const ms = performance.now() - t0;
         bytes += response.size;
@@ -330,6 +350,7 @@ export async function runLoadTest(
   } finally {
     clearInterval(ticker);
     deps.signal?.removeEventListener('abort', onAbort);
+    grpcCaller?.close();
   }
   void active;
   const final = snapshot(true);

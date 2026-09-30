@@ -7,6 +7,8 @@ import {
   EnvSecretStore,
   WorkspaceManager,
   collectionLoadTarget,
+  parseGrpcTarget,
+  reflectServer,
   evaluateThresholds,
   parseThreshold,
   createEngineContext,
@@ -73,12 +75,14 @@ export function registerRunCommands(program: Command): void {
   program
     .command('load')
     .description('run a load test against a URL or a collection (safeguarded: local hosts only unless --allow-remote)')
-    .argument('[url]', 'target URL (or use --collection)')
+    .argument('[url]', 'target URL (or use --collection); with --grpc, the gRPC server address (host:port, grpcs://host:port for TLS)')
     .option('--collection <nameOrId>', 'load-test a collection: every virtual user sends its requests in order, again and again')
     .option('-w, --workspace <nameOrPath>', 'with --collection: workspace name or directory')
     .option('-e, --environment <name>', 'with --collection: environment')
     .option('--folder <nameOrId...>', 'with --collection: only these folders or requests')
     .option('--warm-up', 'with --collection: run it once first with scripts (e.g. to log in), then use the variables they set')
+    .option('--grpc <method>', 'load-test a gRPC method (package.Service/Method) on the server given as [url]; -d is the request message as JSON, -H metadata')
+    .option('--proto <files...>', 'with --grpc: .proto files (default: ask the server through reflection)')
     .option('-X, --method <method>', 'HTTP method', 'GET')
     .option('-H, --header <header...>', 'headers "Name: value"')
     .option('-d, --data <body>', 'request body')
@@ -108,7 +112,16 @@ export function registerRunCommands(program: Command): void {
       const settings = mgr.loadSettings();
       let target: LoadTarget = { kind: 'http', request: { method: o.method, url: url ?? '', headers, body: o.data ? { type: /^\s*[{[]/.test(o.data) ? 'json' : 'text', content: o.data } : undefined } };
       let isProduction = false;
-      if (o.collection) {
+      if (o.grpc) {
+        if (!url) throw new CliError('Give the gRPC server address, e.g. testpion load localhost:50051 --grpc pkg.Service/Method', EXIT.CONFIG_ERROR);
+        const protoFiles = ((o.proto as string[] | undefined) ?? []).map((f) => ({ name: f.replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
+        let descriptorSet: string | undefined;
+        if (!protoFiles.length) {
+          const t = parseGrpcTarget(url);
+          descriptorSet = (await reflectServer(t, { metadata: headers })).descriptorSet;
+        }
+        target = { kind: 'grpc', request: { target: url, method: o.grpc, message: o.data ?? '{}', metadata: headers, protoFiles, descriptorSet } };
+      } else if (o.collection) {
         const { store } = openWorkspace(o.workspace, undefined, mgr);
         const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings, environment: o.environment });
         try {

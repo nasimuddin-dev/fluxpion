@@ -279,6 +279,49 @@ function parseMessage(text: string | undefined, what: string): unknown {
 }
 
 /** Call a gRPC method. Stopping (signal) a streaming call keeps the messages received so far. */
+/**
+ * A reusable caller for load tests: the protos are parsed and the client (one HTTP/2 connection) is
+ * created once, then call() runs the method again and again. Unary and server-streaming methods
+ * (a streamed call counts when the stream ends).
+ */
+export async function prepareGrpcCall(spec: GrpcRequestSpec): Promise<{ method: string; call(signal?: AbortSignal): Promise<{ code: number; codeName: string }>; close(): void }> {
+  const { address, tls: tlsFromTarget } = parseGrpcTarget(spec.target, spec.tls);
+  const tls = tlsFromTarget || !!spec.tlsOptions?.ca || !!spec.tlsOptions?.cert;
+  await assertUrlAllowed(new URL(`${tls ? 'https' : 'http'}://${address}`));
+  const root = grpcRoot(spec);
+  const name = spec.method.replace(/^\//, '');
+  const info = describeRoot(root).find((m) => m.name === name || `${m.service.split('.').pop()}/${m.method}` === name);
+  if (!info) throw new ApsError('ValidationError', `Method "${spec.method}" is not in the proto files`);
+  if (info.clientStreaming) throw new ApsError('ValidationError', 'Load tests call unary and server-streaming methods');
+  const pkg = grpc.loadPackageDefinition(protoLoader.fromJSON(root.toJSON(), LOADER_OPTIONS));
+  const Ctor = info.service.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], pkg) as grpc.ServiceClientConstructor | undefined;
+  if (!Ctor) throw new ApsError('ValidationError', `Service ${info.service} could not be loaded`);
+  const channel = grpcChannel(address, tls, spec.tlsOptions);
+  const client = new Ctor(address, channel.credentials, channel.options);
+  const fn = (client as unknown as Record<string, (...a: unknown[]) => unknown>)[info.method]!.bind(client);
+  const input = parseMessage(spec.message, 'request message');
+  const md = new grpc.Metadata();
+  for (const h of spec.metadata ?? []) if (h.enabled !== false && h.key) md.add(h.key.toLowerCase(), h.value);
+  return {
+    method: info.name,
+    call: (signal) =>
+      new Promise((resolve, reject) => {
+        const callOpts: grpc.CallOptions = { deadline: new Date(Date.now() + (spec.timeoutMs ?? 30_000)) };
+        const done = (code: number) => resolve({ code, codeName: CODE_NAMES[code] ?? String(code) });
+        let c: grpc.ClientUnaryCall | grpc.ClientReadableStream<unknown>;
+        if (info.serverStreaming) {
+          const r = fn(input, md, callOpts) as grpc.ClientReadableStream<unknown>;
+          r.on('data', () => undefined);
+          r.on('error', (e: grpc.ServiceError) => done(e.code ?? grpc.status.UNKNOWN));
+          r.on('status', (s: grpc.StatusObject) => s.code === grpc.status.OK && done(s.code));
+          c = r;
+        } else c = fn(input, md, callOpts, (err: grpc.ServiceError | null) => done(err ? (err.code ?? grpc.status.UNKNOWN) : grpc.status.OK)) as grpc.ClientUnaryCall;
+        signal?.addEventListener('abort', () => (c.cancel(), reject(new ApsError('CancelledError', 'cancelled'))), { once: true });
+      }),
+    close: () => client.close(),
+  };
+}
+
 export async function executeGrpc(spec: GrpcRequestSpec, opts: { signal?: AbortSignal; redactor?: Redactor; onMessage?: (data: unknown, atMs: number) => void } = {}): Promise<GrpcResponseData> {
   const t0 = performance.now();
   const ms = () => Math.round((performance.now() - t0) * 100) / 100;

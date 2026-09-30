@@ -59,7 +59,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `compare_responses` | Compare two responses by history id: status, timing, header changes and a field-by-field JSON body diff (`$.path` added / removed / changed). Sensitive values are masked. |
 | `set_environment_variable` | Set plain variables of an environment (optionally creating it). Secret variables are refused. |
 | `reorder_environments` | Set the order of environments in the environment picker (names or ids, first to last). |
-| `load_test` | Load-test a local URL or a collection (localhost and private networks only, at most 50 virtual users for 60 seconds; optional warm-up). Returns throughput, latency percentiles, error rate and per-request numbers; `thresholds` (e.g. `["p95<500", "errors<1%"]`) adds pass/fail per rule. |
+| `load_test` | Load-test a local URL, a collection or a gRPC method (`grpc: { target, method, message }`) (localhost and private networks only, at most 50 virtual users for 60 seconds; optional warm-up). Returns throughput, latency percentiles, error rate and per-request numbers; `thresholds` (e.g. `["p95<500", "errors<1%"]`) adds pass/fail per rule. |
 | `export_traces` | Send the newest traces (optionally of one kind) to an OpenTelemetry collector as OTLP, redacted; header values may be `{{variables}}`. |
 | `save_test` | Save a collection's REST or GraphQL request as a YAML test file under `tests/`, with its checks. |
 | `graphql_operation` | Build a valid, ready-to-run operation for a root field of a GraphQL endpoint (introspected): variables with placeholder values and a selection of fields, so agents don't guess field names. |

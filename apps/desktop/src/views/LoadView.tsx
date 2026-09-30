@@ -41,7 +41,9 @@ function foldersOf(c: Collection | undefined): Array<{ id: string; name: string 
 }
 
 const drafts = persisted('load', {
-  kind: 'http' as 'http' | 'llm' | 'collection',
+  kind: 'http' as 'http' | 'llm' | 'collection' | 'grpc',
+  grpcTarget: 'localhost:50051',
+  grpcMethod: '',
   collectionId: '',
   folderId: '',
   warmUp: true,
@@ -150,7 +152,9 @@ export function LoadView() {
     setPreparing(d.kind === 'collection');
     try {
       const target =
-        d.kind === 'http'
+        d.kind === 'grpc'
+          ? { kind: 'grpc', request: { target: d.grpcTarget, method: d.grpcMethod, message: d.body || '{}', metadata: d.headers } }
+          : d.kind === 'http'
           ? { kind: 'http', request: { method: d.method, url: d.url, headers: d.headers, body: d.body ? { type: /^\s*[{[]/.test(d.body) ? 'json' : 'text', content: d.body } : undefined } }
           : d.kind === 'llm'
             ? { kind: 'llm', model: { provider: d.provider || providers[0]?.id, name: d.model || undefined }, prompt: d.prompt, stream: true }
@@ -187,9 +191,10 @@ export function LoadView() {
         <div className="flex items-center gap-2">
           <Gauge size={16} />
           <span className="font-semibold">Load test</span>
-          <Select className="ml-auto" value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' | 'collection' })} aria-label="Target">
+          <Select className="ml-auto" value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' | 'collection' | 'grpc' })} aria-label="Target">
             <option value="http">HTTP endpoint</option>
             <option value="collection">Collection</option>
+            <option value="grpc">gRPC method</option>
             <option value="llm">LLM provider</option>
           </Select>
         </div>
@@ -219,23 +224,31 @@ export function LoadView() {
             <Toggle checked={d.warmUp} onChange={(warmUp) => set({ warmUp })} label="Run it once first with scripts (for example to log in), then use the variables they set" />
             <p className="text-xs text-muted">Every virtual user sends the HTTP and GraphQL requests in order, again and again. Scripts don't run under load; variables are resolved once, before it starts.</p>
           </>
-        ) : d.kind === 'http' ? (
+        ) : d.kind === 'http' || d.kind === 'grpc' ? (
           <>
-            <div className="flex gap-2">
-              <Select className="w-24 mono" value={d.method} onChange={(e) => set({ method: e.target.value })}>
-                {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </Select>
-              <VarInput className="flex-1 h-8" value={d.url} onChange={(url) => set({ url })} ariaLabel="Target URL" />
-            </div>
+            {d.kind === 'grpc' ? (
+              <div className="flex flex-col gap-2">
+                <VarInput className="h-8" value={d.grpcTarget} onChange={(grpcTarget) => set({ grpcTarget })} ariaLabel="gRPC server" placeholder="localhost:50051 or grpcs://host:443" />
+                <Input className="mono" value={d.grpcMethod} onChange={(e) => set({ grpcMethod: e.target.value })} aria-label="gRPC method" placeholder="package.Service/Method (unary or server streaming)" />
+                <p className="text-xs text-muted">The methods come from the server (reflection). Every virtual user calls the method again and again over one connection.</p>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Select className="w-24 mono" value={d.method} onChange={(e) => set({ method: e.target.value })}>
+                  {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </Select>
+                <VarInput className="flex-1 h-8" value={d.url} onChange={(url) => set({ url })} ariaLabel="Target URL" />
+              </div>
+            )}
             <div className="border border-line rounded-md">
               <Tabs
                 value={tab}
                 onChange={setTab}
                 tabs={[
-                  { id: 'headers', label: 'Headers', badge: d.headers.length },
-                  { id: 'body', label: 'Body' },
+                  { id: 'headers', label: d.kind === 'grpc' ? 'Metadata' : 'Headers', badge: d.headers.length },
+                  { id: 'body', label: d.kind === 'grpc' ? 'Message' : 'Body' },
                 ]}
               />
               {tab === 'headers' ? (
@@ -412,7 +425,7 @@ export function LoadView() {
               <div className="text-xs text-muted font-semibold mb-1">Status code distribution</div>
               <div className="flex gap-2 flex-wrap">
                 {Object.entries(s.statusCodes).map(([k, v]) => (
-                  <Badge key={k} tone={/^2/.test(k) ? 'ok' : /^[45]/.test(k) || isNaN(Number(k)) ? 'bad' : 'warn'}>
+                  <Badge key={k} tone={/^2/.test(k) || k === 'OK' ? 'ok' : /^[45]/.test(k) || isNaN(Number(k)) ? 'bad' : 'warn'}>
                     {k}: {v}
                   </Badge>
                 ))}

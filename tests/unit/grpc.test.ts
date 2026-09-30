@@ -124,3 +124,17 @@ describe('gRPC', () => {
     expect(b.messages!.map((m) => (m.data as { name: string }).name)).toEqual(['X', 'Y']);
   });
 });
+
+describe('gRPC load tests', () => {
+  it('calls a unary method again and again over one connection', async () => {
+    const { runLoadTest } = await import('../../packages/core/src/index.js');
+    const s = await runLoadTest({ target: { kind: 'grpc', request: { target, method: 'vet.v1.PetService/GetPet', message: '{"id":"7"}', protoFiles: FILES } }, virtualUsers: 4, durationSec: 1 }, {});
+    expect(s.requests).toBeGreaterThan(20);
+    expect(s.errors).toBe(0);
+    expect(s.statusCodes).toEqual({ OK: s.requests });
+    const nf = await runLoadTest({ target: { kind: 'grpc', request: { target, method: 'vet.v1.PetService/GetPet', message: '{"id":"404"}', protoFiles: FILES } }, virtualUsers: 2, durationSec: 0.5 }, {});
+    expect(nf.errors).toBe(nf.requests);
+    expect(Object.keys(nf.statusCodes)).toEqual(['NOT_FOUND']);
+    await expect(runLoadTest({ target: { kind: 'grpc', request: { target, method: 'vet.v1.PetService/CreatePets', protoFiles: FILES } }, virtualUsers: 1, durationSec: 0.2 }, {})).rejects.toThrow(/unary and server-streaming/);
+  });
+});

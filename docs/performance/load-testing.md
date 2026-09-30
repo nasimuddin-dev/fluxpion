@@ -30,6 +30,14 @@ Choose **Collection** as the target in the **Load** view (or `testpion load --co
 testpion load --collection "Veterinary API" -w . -e Staging --folder Patients --warm-up --vus 20 --duration 60
 ```
 
+## A gRPC method
+
+Choose **gRPC method** as the target (or `testpion load <server> --grpc <method>`) to load-test a unary or server-streaming method: give the server (`localhost:50051`, `grpcs://host:443` for TLS), the method (`package.Service/Method`), the message as JSON and optional metadata. The methods come from the server through reflection (or `--proto` files in the CLI). Each virtual user calls the method again and again over one HTTP/2 connection; results count gRPC status codes (`OK`, `NOT_FOUND` …), and anything other than `OK` is an error.
+
+```bash
+testpion load localhost:50051 --grpc vet.v1.PetService/GetPet -d '{"id":"1"}' --vus 20 --duration 30 --threshold "p95<50"
+```
+
 ## Pass or fail (thresholds)
 
 Give rules that decide whether the test passed, like k6 thresholds. They're checked on the final numbers: in the **Load** view under **Pass if** (a green or red summary with each rule's actual value), and with `--threshold` in the CLI, which exits with 1 when a rule fails (so a CI job fails on a slow build):

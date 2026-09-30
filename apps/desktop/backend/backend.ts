@@ -20,6 +20,8 @@ import {
   Tracer,
   WebSocketSession,
   SocketIoSession,
+  reflectServer,
+  parseGrpcTarget,
   MqttSession,
   WorkspaceManager,
   WorkspaceSearch,
@@ -1177,6 +1179,18 @@ export class Backend {
     // a collection: its requests in order (after an optional warm-up run with scripts), variables resolved once
     let target = p.config.target;
     let info: { requests: string[]; unresolved: string[]; warmUp?: { passed: number; failed: number } } | undefined;
+    // gRPC: without proto files, the server describes itself (reflection)
+    if (target.kind === 'grpc') {
+      try {
+        const r = ctx.vars.resolveDeep(target.request);
+        if (!r.protoFiles?.length && !r.descriptorSet) r.descriptorSet = (await reflectServer(parseGrpcTarget(r.target, r.tls), { metadata: r.metadata })).descriptorSet;
+        target = { kind: 'grpc', request: r };
+      } catch (e) {
+        this.controllers.delete(id);
+        void ctx.dispose();
+        throw e;
+      }
+    }
     if (p.collection) {
       const col = this.ws.getCollection(p.collection.collectionId);
       if (!col) throw new ApsError('ConfigurationError', 'Collection not found');

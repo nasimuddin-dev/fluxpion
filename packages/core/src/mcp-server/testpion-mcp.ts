@@ -776,6 +776,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           durationSec: { type: 'number', description: 'Seconds, 1–60 (default 10)' },
           warmUp: { type: 'boolean', description: 'With collection: run it once with scripts first' },
           thresholds: { type: 'array', items: { type: 'string' }, description: 'Pass/fail rules, e.g. ["p95<500", "errors<1%", "rps>=20", "p99[Get pet]<800"]; the result says which passed' },
+          grpc: { type: 'object', description: 'Instead of url/collection: a gRPC method, { target: "localhost:50051", method: "pkg.Service/Method", message: {…} } (the server is asked through reflection)', properties: { target: { type: 'string' }, method: { type: 'string' }, message: { type: 'object' } }, required: ['target', 'method'] },
         },
       },
       run: async (a) => {
@@ -783,7 +784,8 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const vus = Math.min(50, Math.max(1, Number(a.virtualUsers) || 5));
         const duration = Math.min(60, Math.max(1, Number(a.durationSec) || 10));
         const c = a.collection ? findCollection(a.collection) : undefined;
-        if (!c && !a.url) throw new ApsError('ValidationError', 'Give a url or a collection');
+        const g = a.grpc as { target?: string; method?: string; message?: unknown } | undefined;
+        if (!c && !a.url && !g) throw new ApsError('ValidationError', 'Give a url, a collection or grpc');
         const thresholds = Array.isArray(a.thresholds) ? (a.thresholds as unknown[]).map(String) : [];
         thresholds.forEach(parseThreshold); // a typo fails before the test runs
         const ctx = createEngineContext({ store, secrets, settings, environment, collectionId: c?.id });
@@ -804,6 +806,10 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             const t = await collectionLoadTarget({ collection: c, selection, services: ctx.services, warmUp: a.warmUp === true });
             target = t.target;
             prep = { requests: t.target.requests.map((x) => x.name), unresolved: t.unresolved };
+          } else if (g) {
+            const gt = ctx.vars.resolve(String(g.target));
+            const descriptorSet = (await reflectServer(parseGrpcTarget(gt))).descriptorSet;
+            target = { kind: 'grpc', request: { target: gt, method: String(g.method), message: JSON.stringify(ctx.vars.resolveDeep(g.message ?? {})), descriptorSet } };
           } else target = { kind: 'http', request: { method: 'GET', url: ctx.vars.resolve(String(a.url)) } };
           const s = await runLoadTest(
             { target, virtualUsers: vus, durationSec: duration, allowRemoteHosts: false, environmentIsProduction: !!ctx.environment?.isProduction, maxVirtualUsers: 50 },

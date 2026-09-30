@@ -109,7 +109,7 @@ YAML tests in your repository, with parallel workers, backpressure, retries, tim
   <img src="/images/load.jpg" alt="The Load view with live throughput, latency, error and virtual-user charts" width="1440" height="900" loading="lazy">
 </figure>
 
-Load-test one endpoint or a whole collection (every virtual user runs its requests in order, with per-user cookies and an optional warm-up run for tokens). Configure virtual users, ramp-up and ramp-down, and an RPS cap. See p50–p99 latency, error rate and status distribution, per request for collections, plus AI metrics (tokens/s, TTFT, cost) for LLM targets. Pass/fail thresholds (`p95<500`, `errors<1%`, `p99[Get pet]<800`) fail a CI job on a slow build. Safeguards block production and remote hosts unless you opt in.
+Load-test one endpoint, a gRPC method or a whole collection (every virtual user runs its requests in order, with per-user cookies and an optional warm-up run for tokens). Configure virtual users, ramp-up and ramp-down, and an RPS cap. See p50–p99 latency, error rate and status distribution, per request for collections, plus AI metrics (tokens/s, TTFT, cost) for LLM targets. Pass/fail thresholds (`p95<500`, `errors<1%`, `p99[Get pet]<800`) fail a CI job on a slow build. Safeguards block production and remote hosts unless you opt in.
 
 [Load testing](/performance/load-testing)
 
