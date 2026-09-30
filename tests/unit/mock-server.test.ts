@@ -161,4 +161,38 @@ describe('mock server: matching on the request body and headers', () => {
       await m.close();
     }
   });
+
+  it('fills dynamic variables in example bodies and headers on every response', async () => {
+    const c: Collection = {
+      schemaVersion: '1.0',
+      id: 'dyn',
+      name: 'Dyn',
+      version: 1,
+      variables: [],
+      updatedAt: new Date(0).toISOString(),
+      items: [
+        {
+          kind: 'http',
+          id: 'r',
+          name: 'User',
+          request: { method: 'GET', url: '{{baseUrl}}/user' },
+          examples: [{ id: 'e', name: 'ok', status: 200, headers: [{ key: 'X-Request-Id', value: '{{$guid}}', enabled: true }], body: '{"id":"{{$guid}}","name":"{{$randomFirstName}}","n":{{$randomInt(5,5)}},"keep":"{{notDynamic}}"}' }],
+        },
+      ],
+    };
+    const m = await startMockServer(c);
+    try {
+      const a = await fetch(`${m.url}/user`);
+      const j = (await a.json()) as { id: string; name: string; n: number; keep: string };
+      expect(j.id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(j.name).toMatch(/^[A-Z]/);
+      expect(j.n).toBe(5);
+      expect(j.keep).toBe('{{notDynamic}}');
+      expect(a.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/);
+      const b = (await (await fetch(`${m.url}/user`)).json()) as { id: string };
+      expect(b.id).not.toBe(j.id);
+    } finally {
+      await m.close();
+    }
+  });
 });

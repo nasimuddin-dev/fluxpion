@@ -55,4 +55,6 @@ Every example is a route: the method and path of the example's request (or of th
 
 The response has the example's status, headers and body, plus `x-mock-example: <name>` and permissive CORS headers so a browser app on another port can call it. A request that matches no example gets `404` with a JSON list of the available routes.
 
+**Fresh data on every call:** [dynamic variables](/api-testing/environments#built-in-variables) in an example's body or headers are filled in each time, as in Postman's mocks. An example body like `{"id": "{{$guid}}", "name": "{{$randomFullName}}", "createdAt": "{{$isoTimestamp}}"}` returns a new id, name and time for every request. Other `{{variables}}` are sent as written.
+
 :::

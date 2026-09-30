@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import type { Collection, CollectionNode, SavedExample, SavedHttpRequest } from '../model/types.js';
 import { ApsError } from '../errors.js';
+import { dynamicValue } from '../vars/dynamic.js';
 
 /** One example the mock server can answer with. */
 export interface MockRoute {
@@ -220,6 +221,18 @@ function readBody(req: IncomingMessage): Promise<string | undefined> {
   });
 }
 
+/**
+ * Dynamic variables in a saved example (`{{$randomFirstName}}`, `{{$guid}}`, `{{$timestamp}}` …) get a
+ * fresh value on every response, like Postman's mock servers. Other `{{…}}` text is left as it is.
+ */
+export function fillDynamic(text: string): string {
+  if (!text.includes('{{')) return text;
+  return text.replace(/\{\{\s*(\$[\w.]+(?:\([^)]*\))?)\s*\}\}/g, (m, name: string) => {
+    const v = dynamicValue(name);
+    return v === undefined ? m : String(v);
+  });
+}
+
 export async function startMockServer(collection: Collection, opts: MockServerOptions = {}): Promise<MockServer> {
   const host = opts.host ?? '127.0.0.1';
   if (!LOCAL_HOSTS.has(host)) throw new ApsError('ConfigurationError', `The mock server only listens on localhost, not ${host}`);
@@ -252,9 +265,9 @@ export async function startMockServer(collection: Collection, opts: MockServerOp
       return;
     }
     const headers: Record<string, string> = { ...cors, 'x-mock-example': encodeURIComponent(r.example.name) };
-    for (const { key, value } of r.example.headers) if (key && !HOP_HEADERS.test(key)) headers[key.toLowerCase()] = value;
+    for (const { key, value } of r.example.headers) if (key && !HOP_HEADERS.test(key)) headers[key.toLowerCase()] = fillDynamic(value);
     res.writeHead(r.example.status, r.example.statusText || undefined, headers);
-    res.end(req.method === 'HEAD' ? undefined : r.example.body);
+    res.end(req.method === 'HEAD' ? undefined : fillDynamic(r.example.body));
     opts.onRequest?.({ method: req.method ?? 'GET', path: u.pathname, status: r.example.status, example: r.example.name, request: r.requestName });
   };
 
