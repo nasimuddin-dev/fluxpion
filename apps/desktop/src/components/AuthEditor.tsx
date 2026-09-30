@@ -1,5 +1,7 @@
 import type { AuthConfig } from '../types';
-import { Field, Input, Select } from './ui';
+import { Button, Field, Input, Select } from './ui';
+import { call } from '../api';
+import { useApp } from '../store';
 import { KeyValueEditor } from './KeyValueEditor';
 
 const TYPES: Array<{ id: AuthConfig['type']; label: string }> = [
@@ -129,9 +131,14 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth?: Aut
               <Input className="mono" value={a.tokenUrl} onChange={(e) => set({ tokenUrl: e.target.value })} />
             </Field>
             {a.grantType === 'authorization_code' && (
-              <Field label="Authorization URL" hint="Opens your browser; the redirect is captured on 127.0.0.1.">
-                <Input className="mono" value={a.authUrl ?? ''} onChange={(e) => set({ authUrl: e.target.value })} />
-              </Field>
+              <>
+                <Field label="Authorization URL" hint="Opens your browser; the redirect is captured on 127.0.0.1.">
+                  <Input className="mono" value={a.authUrl ?? ''} onChange={(e) => set({ authUrl: e.target.value })} />
+                </Field>
+                <Field label="Callback URL" hint="The redirect URL registered with the provider. Empty: any free port, /callback.">
+                  <Input className="mono" placeholder="http://localhost:8080/callback" value={a.redirectUri ?? ''} onChange={(e) => set({ redirectUri: e.target.value || undefined })} />
+                </Field>
+              </>
             )}
             <Field label="Client ID">
               <Input className="mono" value={a.clientId} onChange={(e) => set({ clientId: e.target.value })} />
@@ -144,6 +151,12 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth?: Aut
             </Field>
             <Field label="Audience">
               <Input value={a.audience ?? ''} onChange={(e) => set({ audience: e.target.value })} />
+            </Field>
+            <Field label="Client authentication">
+              <Select value={a.clientAuth ?? 'body'} onChange={(e) => set({ clientAuth: e.target.value === 'header' ? 'header' : undefined })}>
+                <option value="body">Send client credentials in the body</option>
+                <option value="header">Send as Basic Auth header</option>
+              </Select>
             </Field>
             {a.grantType === 'password' && (
               <>
@@ -161,7 +174,17 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth?: Aut
               <input type="checkbox" checked={a.usePkce !== false} onChange={(e) => set({ usePkce: e.target.checked })} /> Use PKCE (S256)
             </label>
           )}
-          <p className="text-xs text-muted">Tokens are cached in memory until they expire and are redacted from history, traces and reports.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted flex-1">Tokens are cached in memory until they expire (then refreshed with the refresh token, when the provider gave one) and are redacted from history, traces and reports.</p>
+            <Button
+              size="sm"
+              onClick={() =>
+                void call<number>('auth.clearTokens').then((n) => useApp.getState().toast(n ? `Forgot ${n} cached token${n > 1 ? 's' : ''}: the next request gets a new one` : 'No cached tokens', 'info'))
+              }
+            >
+              Forget tokens
+            </Button>
+          </div>
         </>
       )}
       {a.type === 'digest' && (

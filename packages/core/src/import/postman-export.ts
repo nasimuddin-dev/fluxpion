@@ -52,6 +52,8 @@ function pmAuth(a: AuthConfig | undefined, notes: string[], where: string): PmAu
           username: a.username,
           password: a.password,
           ...(a.usePkce ? { grant_type: 'authorization_code_with_pkce' } : {}),
+          redirect_uri: a.redirectUri,
+          client_authentication: a.clientAuth === 'header' ? 'header' : undefined,
         }),
       };
     case 'digest':

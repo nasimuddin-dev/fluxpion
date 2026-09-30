@@ -8,6 +8,7 @@ import {
   getProxySettings,
   describeCertificates,
   getTlsTrust,
+  clearTokenCache,
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
@@ -26,6 +27,8 @@ export function appHandlers(be: Backend): Handlers {
       electron: process.versions.electron,
     }),
     'settings.get': () => be.settings,
+    /** Forget cached OAuth 2.0 tokens (Auth tab ▸ Forget tokens); returns how many there were. */
+    'auth.clearTokens': () => clearTokenCache(),
     'settings.save': (s: AppSettings) => {
       // refuse a malformed certificate instead of saving it and ignoring it
       if (s.tls?.extraCa) {

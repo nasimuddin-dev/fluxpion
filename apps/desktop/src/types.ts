@@ -27,6 +27,8 @@ export type AuthConfig =
       username?: string;
       password?: string;
       usePkce?: boolean;
+      redirectUri?: string;
+      clientAuth?: 'body' | 'header';
     }
   | { type: 'headers'; headers: KeyValue[] }
   /** HTTP Digest (RFC 7616): the first request gets the server's challenge, the second answers it. */

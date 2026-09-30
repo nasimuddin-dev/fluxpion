@@ -66,7 +66,7 @@ const collection: Collection = {
             method: 'POST',
             url: '{{baseUrl}}/pets',
             body: { type: 'json', content: '{"name":"Rex"}' },
-            auth: { type: 'oauth2', grantType: 'client_credentials', tokenUrl: 'https://auth/token', clientId: 'c', clientSecret: '{{secret}}', scope: 'pets' },
+            auth: { type: 'oauth2', grantType: 'client_credentials', tokenUrl: 'https://auth/token', clientId: 'c', clientSecret: '{{secret}}', scope: 'pets', clientAuth: 'header', redirectUri: 'http://localhost:8080/cb' },
           },
         },
         {

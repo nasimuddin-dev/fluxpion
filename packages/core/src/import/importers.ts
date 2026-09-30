@@ -203,6 +203,8 @@ function pmAuth(a: any): AuthConfig | undefined {
         username: opt('username'),
         password: opt('password'),
         usePkce: g === 'authorization_code_with_pkce' || undefined,
+        redirectUri: opt('redirect_uri'),
+        clientAuth: get(a.oauth2, 'client_authentication') === 'header' ? 'header' : undefined,
       };
     }
     default:

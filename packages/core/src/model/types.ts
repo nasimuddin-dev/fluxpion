@@ -44,6 +44,10 @@ export type AuthConfig =
       password?: string;
       usePkce?: boolean;
       redirectPort?: number;
+      /** Callback URL registered with the provider, e.g. http://localhost:8080/oauth/callback (a loopback address). Default: http://127.0.0.1:<any port>/callback */
+      redirectUri?: string;
+      /** How the client id and secret are sent to the token URL: in the form body (default) or as an HTTP Basic header. */
+      clientAuth?: 'body' | 'header';
     }
   | { type: 'headers'; headers: KeyValue[] }
   /** HTTP Digest (RFC 7616): the first request gets the server's challenge, the second answers it. */
