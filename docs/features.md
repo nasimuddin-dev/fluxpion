@@ -118,7 +118,7 @@ Load-test one endpoint or a whole collection (every virtual user runs its reques
   <img src="/images/traces.jpg" alt="A trace waterfall with nested spans and span attributes" width="1440" height="900" loading="lazy">
 </figure>
 
-Every request, GraphQL operation, MCP call, LLM call, tool call and evaluation becomes a span in an OpenTelemetry-shaped trace, shown as a waterfall with inputs, outputs and attributes.
+Every request, GraphQL operation, MCP call, LLM call, tool call and evaluation becomes a span in an OpenTelemetry-shaped trace, shown as a waterfall with inputs, outputs and attributes. Traces can be sent to Jaeger, Grafana Tempo, Honeycomb or any OpenTelemetry collector (OTLP), from the app or during CLI runs (`--otlp`, or the standard `OTEL_EXPORTER_OTLP_*` variables). See [traces](./test-runner/traces.md).
 
 ## Workspace and productivity
 

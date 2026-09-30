@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **OpenTelemetry export**: send traces to Jaeger, Grafana Tempo, Honeycomb or any OTLP/HTTP collector: `--otlp <url>` (or the standard `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS`) on `testpion test`, `run` and `run-collection`, **Send to OpenTelemetry** in the Traces view, and the `export_traces` MCP tool. Traces are redacted; a new docs page covers traces.
 - **GraphQL code snippets**: the GraphQL view's **Code** button shows the call as cURL, fetch, Python, Go and the other snippet languages.
 - **Watch mode**: `testpion test --watch`, `testpion run --watch` and `testpion run-collection --watch` run again whenever a test, collection, environment or data file changes (the run's own results don't count).
 - **HTTP/2**: requests over https use HTTP/2 when the server supports it, the response shows an **HTTP/2** badge (`httpVersion` in results), and the request setting **HTTP/1.1 only** turns it off. HTTP/2 responses get their standard status text (`200 OK`).

@@ -40,6 +40,10 @@ import {
   type RunEvent,
   type TestCase,
   type TestResult,
+  type Trace,
+  type Redactor,
+  exportOtlp,
+  otlpTargetFromEnv,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, cyan, CliError, collectVar, openWorkspace, readImport, loadCollectionRef, cleanupFailedRun, readResults } from './shared.js';
 
@@ -82,6 +86,8 @@ export interface RunCliOptions {
   suite?: string;
   failOnRegression?: boolean;
   logLevel?: string;
+  otlp?: string;
+  otlpHeader?: string[];
 }
 
 export async function executeRun(paths: string[], o: RunCliOptions, label?: string): Promise<number> {
@@ -134,6 +140,7 @@ export async function executeRun(paths: string[], o: RunCliOptions, label?: stri
     console.log(dim(`workspace: ${ephemeral ? '(ephemeral)' : store.root}${environment ? ` · environment: ${environment}` : ''} · run: ${runId}`));
   }
 
+  const otlp = otlpExporter(o);
   const concurrency = Number(o.concurrency ?? suite?.concurrency ?? 4);
   const ctrl = new AbortController();
   let interrupted = 0;
@@ -164,7 +171,10 @@ export async function executeRun(paths: string[], o: RunCliOptions, label?: stri
       resultsFile,
       resume: !!o.resume,
       traceMode: o.trace,
-      onTrace: (trace) => void store.saveTrace(trace, 'test', runId),
+      onTrace: (trace) => {
+        void store.saveTrace(trace, 'test', runId);
+        otlp.add(trace);
+      },
       onEvent,
       environment,
       bail: o.bail,
@@ -174,6 +184,7 @@ export async function executeRun(paths: string[], o: RunCliOptions, label?: stri
     throw e;
   } finally {
     process.off('SIGINT', onSigint);
+    await otlp.flush(ctx.redactor, { 'testpion.run.id': runId, 'testpion.run.name': name }, !!o.quiet);
     await ctx.dispose();
   }
 
@@ -235,7 +246,7 @@ export async function finishRun(a: {
   return summary.failed + summary.errors > 0 || (o.failOnRegression && regressionFailed) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
 }
 
-export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel'> {
+export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel' | 'otlp' | 'otlpHeader'> {
   iterationData?: string;
   iterationCount?: string;
   delayRequest?: string;
@@ -361,6 +372,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
     ctrl.abort();
   };
   process.on('SIGINT', onSigint);
+  const otlp = otlpExporter(o);
   let lastIteration = 0;
   let summary: RunSummary;
   try {
@@ -378,7 +390,10 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
       signal: ctrl.signal,
       resultsFile,
       traceMode: o.trace,
-      onTrace: (trace) => void store.saveTrace(trace, 'test', runId),
+      onTrace: (trace) => {
+        void store.saveTrace(trace, 'test', runId);
+        otlp.add(trace);
+      },
       environment,
       onEvent: (e: RunEvent) => {
         if (e.type !== 'test-end' || o.quiet) return;
@@ -404,6 +419,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
     const n = writeScopeFile(resolve(o.exportGlobals), 'globals', ctx.vars.scopeValues('global'), isSecret, 'globals');
     if (!o.quiet) console.log(dim(`Globals written to ${resolve(o.exportGlobals)} (${n} variables; secret values left empty)`));
   }
+  await otlp.flush(ctx.redactor, { 'testpion.run.id': runId, 'testpion.run.name': collection.name }, !!o.quiet);
   await ctx.dispose();
   if (o.exportCookieJar) {
     const file = resolve(o.exportCookieJar);
@@ -559,6 +575,62 @@ export async function executeMock(ref: string, o: { workspace?: string; port?: s
   return EXIT.SUCCESS;
 }
 
+/**
+ * OpenTelemetry export of a run's traces: to --otlp, or to the collector in the standard
+ * OTEL_EXPORTER_OTLP_* environment variables. Traces are sent in batches while the run goes on.
+ */
+export function otlpExporter(o: { otlp?: string; otlpHeader?: string[] }) {
+  const headers: Record<string, string> = {};
+  for (const h of o.otlpHeader ?? []) {
+    const i = h.indexOf(':');
+    if (i <= 0) throw new CliError(`--otlp-header expects key:value, got "${h}"`, EXIT.CONFIG_ERROR);
+    headers[h.slice(0, i).trim()] = h.slice(i + 1).trim();
+  }
+  const envTarget = otlpTargetFromEnv();
+  const target = o.otlp ? { endpoint: o.otlp, headers: { ...(envTarget?.headers ?? {}), ...headers } } : envTarget;
+  let pending: Trace[] = [];
+  let sent = 0;
+  let url = '';
+  let failed: string | undefined;
+  let chain: Promise<void> = Promise.resolve();
+  let redactor: Redactor | undefined;
+  let resource: Record<string, string> = {};
+  const send = () => {
+    if (!target || !pending.length || failed) return;
+    const batch = pending;
+    pending = [];
+    chain = chain.then(() =>
+      exportOtlp(batch, target, { redactor, resource }).then(
+        (r) => {
+          sent += r.spans;
+          url = r.url;
+        },
+        (e: Error) => {
+          failed = e.message;
+        },
+      ),
+    );
+  };
+  return {
+    enabled: !!target,
+    add(trace: Trace) {
+      if (!target) return;
+      pending.push(trace);
+      if (pending.length >= 200) send();
+    },
+    async flush(r: Redactor, res: Record<string, string>, quiet: boolean) {
+      if (!target) return;
+      redactor = r;
+      resource = res;
+      send();
+      await chain;
+      if (failed) console.error(yellow(`OpenTelemetry export failed: ${failed}`));
+      else if (!quiet && sent) console.log(dim(`OpenTelemetry: ${sent} spans sent to ${url}`));
+      else if (!quiet) console.log(dim('OpenTelemetry: no traces to send (only failing tests are traced; add --trace all for every test)'));
+    },
+  };
+}
+
 export function runOptions(cmd: Command): Command {
   return cmd
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
@@ -580,5 +652,7 @@ export function runOptions(cmd: Command): Command {
     .option('-v, --verbose', 'show passing checks')
     .option('-q, --quiet', 'only print the summary exit code')
     .option('--log-level <level>', 'ERROR | WARN | INFO | DEBUG | TRACE (secrets are always redacted)')
-    .option('--watch', 'run again whenever a test, collection, environment or data file changes (until Ctrl+C)');
+    .option('--watch', 'run again whenever a test, collection, environment or data file changes (until Ctrl+C)')
+    .option('--otlp <url>', 'send the traces to an OpenTelemetry collector (OTLP/HTTP, e.g. http://localhost:4318); default: OTEL_EXPORTER_OTLP_ENDPOINT')
+    .option('--otlp-header <key:value...>', 'headers for the collector, e.g. an API key (also OTEL_EXPORTER_OTLP_HEADERS)');
 }

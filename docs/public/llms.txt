@@ -28,6 +28,7 @@ Key facts for agents:
 - .env files import as environments (secret-looking keys become secret variables) and environments export as .env.
 - CI: `testpion ci <github|gitlab|azure|jenkins> -w <ws> [--suite s | --collection c [--folder f]] [-e env] --json` (or MCP `ci_config`) returns { path, content, secrets, command }; the pipeline installs the CLI from github.com/nasimuddin-dev/testpion at the version's tag (the CLI is not on npm).
 - A complete example workspace against free public APIs is at `examples/public-workspace` (REST, GraphQL, gRPC, WebSocket, SSE, MCP, AI; suites `all` and `offline`); the desktop app opens it on first launch. Docs: /getting-started/examples
+- OpenTelemetry: `testpion test|run-collection --trace all --otlp http://collector:4318` (or OTEL_EXPORTER_OTLP_ENDPOINT/HEADERS) sends traces as OTLP/HTTP JSON; MCP `export_traces`; Traces view ▸ Send to OpenTelemetry.
 - Watch mode for local development: `testpion test --watch`, `testpion run-collection <c> --watch` re-run on file changes.
 - Imports (app, `testpion import <file> -w <ws> --json`): OpenAPI 3 / Swagger 2, Postman v2.1, Insomnia v4/v5, Bruno (collection folder of .bru files, a .bru file, or JSON export; Bruno scripts run with the bru/req/res API and assertions become tests), Hoppscotch, WSDL 1.1 (SOAP 1.1/1.2 requests with SOAPAction and sample envelopes from the XSD; file or ?wsdl link), HAR, cURL/fetch/PowerShell snippets.
 - Postman v2.1 collections and environments import and export losslessly where the formats overlap.

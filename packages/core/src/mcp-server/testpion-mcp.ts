@@ -26,6 +26,7 @@ import { securityLint, variableFlow } from '../eval/security.js';
 import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { introspect } from '../protocols/graphql/graphql.js';
 import { buildGraphQLOperation } from '../protocols/graphql/operation-builder.js';
+import { exportOtlp } from '../trace/otlp.js';
 import { collectionToOpenApiText } from '../openapi/from-collection.js';
 import { renameVariable, variableUsages } from '../storage/variable-refactor.js';
 import { setEnvironmentVariables } from '../storage/env-edit.js';
@@ -337,6 +338,37 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             },
             { redactor: ctx.redactor, cookieJar: ctx.services.cookieJar },
           );
+        } finally {
+          await ctx.dispose();
+        }
+      },
+    },
+    {
+      name: 'export_traces',
+      write: true,
+      description:
+        'Send the workspace’s most recent traces (requests, test runs, MCP and LLM calls) to an OpenTelemetry collector as OTLP/HTTP JSON, redacted. Header values may be {{variables}} (e.g. a secret API key). Returns how many spans were sent.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          endpoint: str('Collector URL, e.g. http://localhost:4318 (…/v1/traces is added)'),
+          headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Headers, e.g. { "x-honeycomb-team": "{{honeycombKey}}" }' },
+          limit: { type: 'number', description: 'How many of the newest traces (default 50, max 1000)' },
+          kind: str('Only traces of this kind: http, graphql, mcp, llm or test'),
+          environment: str('Environment whose variables resolve the headers'),
+        },
+        required: ['endpoint'],
+      },
+      run: async (a) => {
+        const ctx = createEngineContext({ store, secrets, settings, environment: checkEnvironment(a.environment) });
+        try {
+          const limit = Math.min(Math.max(Number(a.limit) || 50, 1), 1000);
+          const ids = store.meta.listTraces({ kind: a.kind ? String(a.kind) : undefined, limit }).items.map((t) => t.id);
+          const traces = ids.map((id) => store.loadTrace(id)).filter((t): t is NonNullable<typeof t> => !!t);
+          if (!traces.length) return { spans: 0, traces: 0, message: 'No traces yet' };
+          const headers = Object.fromEntries(Object.entries((a.headers as Record<string, string>) ?? {}).map(([k, v]) => [k, ctx.vars.resolve(String(v))]));
+          const r = await exportOtlp(traces, { endpoint: ctx.vars.resolve(String(a.endpoint)), headers }, { redactor: ctx.redactor, resource: { 'testpion.workspace': store.workspace.name } });
+          return { ...r, traces: traces.length };
         } finally {
           await ctx.dispose();
         }

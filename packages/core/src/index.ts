@@ -13,6 +13,7 @@ export * from './log/logger.js';
 export * from './vars/variables.js';
 export * from './vars/dynamic.js';
 export * from './trace/tracer.js';
+export * from './trace/otlp.js';
 
 export * from './protocols/http/client.js';
 export * from './protocols/http/auth.js';

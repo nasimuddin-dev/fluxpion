@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };

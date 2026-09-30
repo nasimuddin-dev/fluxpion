@@ -127,6 +127,7 @@ const docsSidebar = [
       { text: 'Datasets', link: '/test-runner/datasets' },
       { text: 'CI/CD', link: '/test-runner/ci-cd' },
       { text: 'Monitors', link: '/test-runner/monitors' },
+      { text: 'Traces & OpenTelemetry', link: '/test-runner/traces' },
     ],
   },
   {

@@ -11,7 +11,6 @@ Plans change with feedback. Vote or comment on [GitHub issues](https://github.co
 
 - **Signed installers:** Windows Authenticode, and macOS Developer ID with notarization (macOS in-place updates need it).
 - **Published CLI package** on npm, so `npx testpion` works without cloning the repository.
-- **OpenTelemetry export** of traces (OTLP), next to the built-in trace viewer.
 - **WSDL 2.0** and following `xsd:import` in WSDL imports.
 
 ## Later
@@ -29,6 +28,7 @@ Everything below is in the app today; the [changelog](/changelog) has the detail
 - **Imports:** OpenAPI, Postman, Insomnia, Bruno (collection folders too, with Bruno scripts running as they are), Hoppscotch, WSDL, HAR and pasted cURL / fetch / PowerShell; recording traffic through a local proxy.
 - **Running:** a Collection Runner and Newman-compatible `testpion run-collection`, suites, monitors (scheduled runs with webhooks), load tests of one endpoint or a whole collection, CI pipeline generation, and watch mode.
 - **AI:** an AI Lab with model comparison, evaluations for LLMs, RAG and agents, an assistant in the request builder, and `testpion mcp-server` for AI agents.
+- **OpenTelemetry export** of traces (OTLP/HTTP) from the app, the CLI and MCP.
 - **Updates** inside the app (Windows installer and Linux AppImage; other builds are pointed to the download page).
 
 ## Optional cloud features (not in the local-first core)

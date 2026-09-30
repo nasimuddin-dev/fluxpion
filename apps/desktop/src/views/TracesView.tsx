@@ -1,11 +1,14 @@
-import { Activity, RefreshCw } from 'lucide-react';
+import { Activity, RefreshCw, Send } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { call } from '../api';
+import { asError, call } from '../api';
+import { persisted, useApp } from '../store';
+import { KeyValueEditor } from '../components/KeyValueEditor';
+import type { KeyValue } from '../types';
 import { useIntent } from '../hooks';
 import type { Trace } from '../types';
 import { formatMs, timeAgo } from '../lib/format';
 import { TraceView } from '../components/TraceView';
-import { Badge, cx, Empty, IconButton, Input, Select, Split, VirtualList } from '../components/ui';
+import { Badge, Button, cx, Empty, IconButton, Input, Modal, Select, Split, VirtualList } from '../components/ui';
 
 interface TraceMeta {
   id: string;
@@ -17,7 +20,56 @@ interface TraceMeta {
   spanCount: number;
 }
 
+/** The collector (and its headers) are remembered; a header value only when it is a {{variable}} (never a typed-in key). */
+const otlpSettings = persisted<{ endpoint: string; headers: KeyValue[] }>('otlp', { endpoint: 'http://localhost:4318', headers: [] });
+const isVarRef = (v: string) => /^\s*\{\{[^}]+\}\}\s*$/.test(v);
+
+function OtlpDialog({ ids, selected, onClose }: { ids: string[]; selected?: string; onClose(): void }) {
+  const env = useApp((s) => s.environment);
+  const [cfg, setCfg] = useState(otlpSettings.load);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => otlpSettings.save({ endpoint: cfg.endpoint, headers: cfg.headers.map((h) => (isVarRef(h.value) ? h : { ...h, value: '' })) }), [cfg]);
+  const send = async (list: string[]) => {
+    setBusy(true);
+    try {
+      const r = await call<{ spans: number; url: string }>('traces.exportOtlp', { ids: list, endpoint: cfg.endpoint, headers: cfg.headers, environment: env });
+      useApp.getState().toast(`Sent ${r.spans} spans to ${r.url}`, 'success');
+      onClose();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title="Send to OpenTelemetry"
+      onClose={onClose}
+      width={620}
+      footer={
+        <>
+          {selected && (
+            <Button loading={busy} disabled={!cfg.endpoint.trim()} onClick={() => void send([selected])}>
+              Send selected trace
+            </Button>
+          )}
+          <Button variant="primary" icon={<Send size={13} />} loading={busy} disabled={!cfg.endpoint.trim() || !ids.length} onClick={() => void send(ids)}>
+            Send {ids.length === 1 ? 'the trace' : `${ids.length.toLocaleString()} traces`} shown
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-muted mb-3">Sends traces as OTLP/HTTP JSON to a collector (Jaeger, Grafana Tempo, Honeycomb, an OpenTelemetry Collector …), redacted. The CLI does this during runs with <span className="mono">--otlp</span> or the standard <span className="mono">OTEL_EXPORTER_OTLP_ENDPOINT</span>.</p>
+      <label className="block text-xs text-muted mb-1">Collector URL (…/v1/traces is added)</label>
+      <Input className="w-full mono mb-3" value={cfg.endpoint} onChange={(e) => setCfg({ ...cfg, endpoint: e.target.value })} placeholder="http://localhost:4318" />
+      <label className="block text-xs text-muted mb-1">Headers, e.g. an API key as a secret variable: x-honeycomb-team = {'{{honeycombKey}}'}</label>
+      <KeyValueEditor rows={cfg.headers} onChange={(headers) => setCfg({ ...cfg, headers })} keyPlaceholder="Header" />
+    </Modal>
+  );
+}
+
 export function TracesView() {
+  const [otlpOpen, setOtlpOpen] = useState(false);
   const [items, setItems] = useState<TraceMeta[]>([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
@@ -57,7 +109,11 @@ export function TracesView() {
           <IconButton label="Refresh" onClick={() => load(true)}>
             <RefreshCw size={14} />
           </IconButton>
+          <IconButton label="Send to OpenTelemetry (OTLP)" onClick={() => setOtlpOpen(true)}>
+            <Send size={14} />
+          </IconButton>
         </div>
+        {otlpOpen && <OtlpDialog ids={items.map((t) => t.id)} selected={sel} onClose={() => setOtlpOpen(false)} />}
         <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} traces</div>
         {items.length ? (
           <VirtualList

@@ -11,6 +11,7 @@ import {
   ciConfig,
   type CiConfigOptions,
   type LoadTestConfig,
+  exportOtlp,
 } from '@testpion/core';
 import type { Backend, Handlers, EvalRunParams } from '../backend.js';
 
@@ -76,6 +77,18 @@ export function testingHandlers(be: Backend): Handlers {
 
     'traces.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listTraces(q),
     'traces.get': ({ id }: { id: string }) => be.ws.loadTrace(id),
+    /** Send traces to an OpenTelemetry collector (OTLP/HTTP JSON). Header values may use {{variables}} (e.g. a secret API key). */
+    'traces.exportOtlp': async ({ ids, endpoint, headers, environment }: { ids: string[]; endpoint: string; headers?: Array<{ key: string; value: string; enabled?: boolean }>; environment?: string }) => {
+      if (!ids?.length) throw new ApsError('ValidationError', 'No traces to send');
+      const ctx = be.context({ environment });
+      try {
+        const traces = ids.slice(0, 2000).map((id) => be.ws.loadTrace(id)).filter((t): t is NonNullable<typeof t> => !!t);
+        const h = Object.fromEntries(ctx.vars.resolveDeep(headers ?? []).filter((x) => x.key && x.enabled !== false).map((x) => [x.key, x.value]));
+        return await exportOtlp(traces, { endpoint: ctx.vars.resolve(endpoint), headers: h }, { redactor: ctx.redactor, resource: { 'testpion.workspace': be.ws.workspace.name } });
+      } finally {
+        await ctx.dispose();
+      }
+    },
 
     'load.start': (p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean } }) => be.startLoad(p),
     'load.stop': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
