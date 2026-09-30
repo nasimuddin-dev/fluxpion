@@ -16,6 +16,7 @@ import {
   type GraphQLRequestSpec,
   type HttpRequestSpec,
   historyResponse,
+  SocketIoSession,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
@@ -130,6 +131,52 @@ export function requestsHandlers(be: Backend): Handlers {
       be.wsSessions.get(id)?.close();
       be.wsSessions.delete(id);
       be.wsConsole.delete(id);
+    },
+
+    /* Socket.IO: messages and status arrive on the WebSocket channels (wsock.messages / wsock.status) */
+    'sio.connect': async (p: { url: string; path?: string; headers?: Array<{ key: string; value: string; enabled?: boolean }>; auth?: string; transport?: 'websocket' | 'polling'; environment?: string }) => {
+      const ctx = be.context({ environment: p.environment });
+      let auth: Record<string, unknown> | undefined;
+      if (p.auth?.trim()) {
+        try {
+          auth = JSON.parse(ctx.vars.resolve(p.auth)) as Record<string, unknown>;
+        } catch (e) {
+          throw new ApsError('ValidationError', `The auth payload is not valid JSON: ${(e as Error).message}`);
+        }
+      }
+      const s = new SocketIoSession(ctx.vars.resolve(p.url), { path: p.path ? ctx.vars.resolve(p.path) : undefined, headers: ctx.vars.resolveDeep(p.headers ?? []), auth, transports: p.transport === 'websocket' ? ['websocket'] : undefined });
+      const b = be.batched<unknown>('wsock.messages');
+      s.onMessage((m) => b.push({ id: s.id, message: m }));
+      s.onStatus((st) => be.host.emit('wsock.status', { id: s.id, status: st }));
+      be.sioSessions.set(s.id, s);
+      try {
+        await s.connect();
+      } catch (e) {
+        be.sioSessions.delete(s.id);
+        throw e;
+      } finally {
+        await ctx.dispose();
+      }
+      return { id: s.id };
+    },
+    'sio.emit': async ({ id, event, args, ack }: { id: string; event: string; args?: string; ack?: boolean }) => {
+      const s = be.sioSessions.get(id);
+      if (!s) throw new ApsError('ProtocolError', 'Socket.IO is not connected');
+      let list: unknown[] = [];
+      if (args?.trim()) {
+        try {
+          const v = JSON.parse(args) as unknown;
+          // a JSON list is the argument list; anything else is a single argument
+          list = Array.isArray(v) ? v : [v];
+        } catch {
+          list = [args];
+        }
+      }
+      return s.emit(event, list, ack);
+    },
+    'sio.close': ({ id }: { id: string }) => {
+      be.sioSessions.get(id)?.close();
+      be.sioSessions.delete(id);
     },
   };
 }

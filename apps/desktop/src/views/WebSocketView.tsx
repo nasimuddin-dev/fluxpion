@@ -19,9 +19,24 @@ interface WsMessage {
   data: string;
   size: number;
   binary?: boolean;
+  /** Socket.IO: the event name, and whether this is an acknowledgement. */
+  event?: string;
+  ack?: boolean;
 }
 
-type Draft = { url: string; protocols: string; headers: KeyValue[]; message: string };
+type Draft = {
+  url: string;
+  protocols: string;
+  headers: KeyValue[];
+  message: string;
+  /** Plain WebSocket, or a Socket.IO server (events with JSON arguments, acknowledgements). */
+  mode?: 'websocket' | 'socketio';
+  event?: string;
+  ack?: boolean;
+  /** Socket.IO endpoint path (default /socket.io) and handshake auth payload (JSON). */
+  path?: string;
+  auth?: string;
+};
 const hostOf = (url: string) => url.replace(/^wss?:\/\//, '').split(/[/?#]/)[0] || 'Connection';
 
 const drafts = persisted<Draft>('websocket', { url: '{{wsUrl}}', protocols: '', headers: [] as KeyValue[], message: '{\n  "type": "ping"\n}' });
@@ -33,7 +48,8 @@ export function WebSocketView() {
   const [messages, setMessages] = useState<WsMessage[]>([]);
   const [selected, setSelected] = useState<WsMessage>();
   const [filter, setFilter] = useState('');
-  const [tab, setTab] = useState<'message' | 'headers'>('message');
+  const [tab, setTab] = useState<'message' | 'headers' | 'auth'>('message');
+  const sio = d.mode === 'socketio';
   const env = useApp((s) => s.environment);
   // saved connections (URL, subprotocols, handshake headers, message) with folders
   const saved = useLibrary<Draft>('websocket');
@@ -73,7 +89,9 @@ export function WebSocketView() {
   const connect = async () => {
     setStatus('connecting');
     try {
-      const r = await call<{ id: string }>('wsock.connect', { url: d.url, protocols: d.protocols ? d.protocols.split(',').map((s) => s.trim()) : undefined, headers: d.headers, environment: env });
+      const r = sio
+        ? await call<{ id: string }>('sio.connect', { url: d.url, path: d.path || undefined, headers: d.headers, auth: d.auth, environment: env })
+        : await call<{ id: string }>('wsock.connect', { url: d.url, protocols: d.protocols ? d.protocols.split(',').map((s) => s.trim()) : undefined, headers: d.headers, environment: env });
       setSession(r.id);
       setStatus('open');
     } catch (e) {
@@ -87,8 +105,10 @@ export function WebSocketView() {
       useApp.getState().toast(`Could not connect: ${err.message || 'the connection failed'}`, 'error');
     }
   };
-  const disconnect = () => session && call('wsock.close', { id: session }).then(() => setStatus('closed'));
-  const send = () => session && call('wsock.send', { id: session, data: d.message }).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
+  const disconnect = () => session && call(sio ? 'sio.close' : 'wsock.close', { id: session }).then(() => setStatus('closed'));
+  const send = () =>
+    session &&
+    (sio ? call('sio.emit', { id: session, event: d.event ?? '', args: d.message, ack: !!d.ack }) : call('wsock.send', { id: session, data: d.message })).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
   const shown = filter ? messages.filter((m) => m.data.toLowerCase().includes(filter.toLowerCase())) : messages;
   let parsed: unknown;
   try {
@@ -120,8 +140,19 @@ export function WebSocketView() {
     <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <Badge tone={status === 'open' ? 'ok' : status === 'connecting' ? 'warn' : 'default'}>{status}</Badge>
-        <VarInput ariaLabel="WebSocket URL" className="flex-1 h-8" value={d.url} onChange={(url) => setD({ ...d, url })} placeholder="wss://example.com/socket" />
-        <Input className="w-48" placeholder="Subprotocols" title="Subprotocols, comma separated (e.g. graphql-ws, mqtt)" value={d.protocols} onChange={(e) => setD({ ...d, protocols: e.target.value })} />
+        <div className="flex rounded-md border border-line overflow-hidden text-xs shrink-0" role="group" aria-label="Protocol">
+          {(['websocket', 'socketio'] as const).map((m) => (
+            <button key={m} type="button" disabled={status !== 'closed'} className={cx('px-2 py-1', (d.mode ?? 'websocket') === m ? 'bg-accent-soft text-fg' : 'text-muted hover:text-fg')} onClick={() => setD({ ...d, mode: m })}>
+              {m === 'websocket' ? 'WebSocket' : 'Socket.IO'}
+            </button>
+          ))}
+        </div>
+        <VarInput ariaLabel="WebSocket URL" className="flex-1 h-8" value={d.url} onChange={(url) => setD({ ...d, url })} placeholder={sio ? 'http://localhost:3000/namespace' : 'wss://example.com/socket'} />
+        {sio ? (
+          <Input className="w-40" placeholder="/socket.io" title="Socket.IO path on the server (default /socket.io)" value={d.path ?? ''} onChange={(e) => setD({ ...d, path: e.target.value })} />
+        ) : (
+          <Input className="w-48" placeholder="Subprotocols" title="Subprotocols, comma separated (e.g. graphql-ws, mqtt)" value={d.protocols} onChange={(e) => setD({ ...d, protocols: e.target.value })} />
+        )}
         {status === 'open' ? (
           <Button icon={<Unplug size={13} />} onClick={disconnect}>
             Disconnect
@@ -142,21 +173,38 @@ export function WebSocketView() {
               value={tab}
               onChange={setTab}
               tabs={[
-                { id: 'message', label: 'Message' },
+                { id: 'message', label: sio ? 'Emit' : 'Message' },
                 { id: 'headers', label: 'Handshake headers', badge: d.headers.length },
+                ...(sio ? [{ id: 'auth' as const, label: 'Auth' }] : []),
               ]}
             />
             {tab === 'message' ? (
               <>
+                {sio && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
+                    <Input className="h-7 min-h-7 mono flex-1" placeholder="Event name, e.g. message" aria-label="Event name" value={d.event ?? ''} onChange={(e) => setD({ ...d, event: e.target.value })} />
+                    <label className="text-xs text-muted flex items-center gap-1.5 shrink-0" title="Wait for the server's acknowledgement (callback) and show it">
+                      <input type="checkbox" checked={!!d.ack} onChange={(e) => setD({ ...d, ack: e.target.checked })} /> Acknowledgement
+                    </label>
+                  </div>
+                )}
+                {sio && <div className="px-2 pt-1 text-[11px] text-muted">Arguments as JSON; a JSON list sends several arguments.</div>}
                 <div className="flex-1 min-h-0">
                   <CodeEditor language="json" value={d.message} onChange={(message) => setD({ ...d, message })} />
                 </div>
                 <div className="p-2 border-t border-line flex justify-end">
-                  <Button variant="primary" icon={<Send size={13} />} disabled={status !== 'open'} onClick={send}>
-                    Send
+                  <Button variant="primary" icon={<Send size={13} />} disabled={status !== 'open' || (sio && !d.event?.trim())} onClick={send}>
+                    {sio ? 'Emit' : 'Send'}
                   </Button>
                 </div>
               </>
+            ) : tab === 'auth' ? (
+              <div className="h-full flex flex-col">
+                <p className="px-2 py-1.5 text-xs text-muted border-b border-line">The handshake's auth payload (JSON), e.g. {'{ "token": "{{accessToken}}" }'}. Values may use {'{{variables}}'}.</p>
+                <div className="flex-1 min-h-0">
+                  <CodeEditor language="json" value={d.auth ?? ''} onChange={(auth) => setD({ ...d, auth })} placeholder='{ "token": "{{accessToken}}" }' />
+                </div>
+              </div>
             ) : (
               <div className="p-2">
                 <KeyValueEditor rows={d.headers} onChange={(headers) => setD({ ...d, headers })} keyPlaceholder="Header" />
@@ -182,6 +230,7 @@ export function WebSocketView() {
                     <button onClick={() => setSelected(m)} className={cx('w-full h-full flex items-center gap-2 px-2 text-sm border-b border-line/50 text-left hover:bg-hover', selected?.id === m.id && 'bg-accent/10')}>
                       {m.direction === 'sent' ? <ArrowUpRight size={13} className="text-accent shrink-0" /> : m.direction === 'received' ? <ArrowDownLeft size={13} className="text-ok shrink-0" /> : <Info size={13} className="text-muted shrink-0" />}
                       <span className="text-xs text-muted tabular-nums shrink-0">{new Date(m.time).toLocaleTimeString()}</span>
+                      {m.event && <Badge tone={m.ack ? 'ok' : 'accent'}>{m.ack ? `ack ${m.event}` : m.event}</Badge>}
                       <span className={cx('truncate mono text-xs', m.direction === 'system' && 'text-muted')}>{m.data}</span>
                     </button>
                   )}

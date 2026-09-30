@@ -1,6 +1,6 @@
 ---
 title: "WebSocket"
-description: "Connect to WebSocket servers, send and inspect messages, save connections in folders, and read clear connection errors."
+description: "Connect to WebSocket and Socket.IO servers, send messages and events (with acknowledgements), save connections in folders, and read clear connection errors."
 ---
 
 ::: v-pre
@@ -14,6 +14,17 @@ The **WebSocket** view connects to a `ws://` or `wss://` server, sends messages 
 3. Write a message (JSON or any text) and click **Send**.
 
 The message log lists sent (↗), received (↙) and connection (ⓘ) messages with their time. Filter it, and click a message to see it in full (JSON as a tree). Connecting, sending and closing also appear in the [console](./rest.md#console).
+
+## Socket.IO
+
+Switch the protocol to **Socket.IO** to talk to a [Socket.IO](https://socket.io) server:
+
+- The URL is the server and the namespace, e.g. `http://localhost:3000/chat` (`https://` for TLS). Set the **path** if the server doesn't use `/socket.io`.
+- **Auth** is the handshake's auth payload (JSON), e.g. `{ "token": "{{accessToken}}" }`; handshake headers work too.
+- On **Emit**, give the **event name** and its arguments as JSON (a JSON list sends several arguments). Tick **Acknowledgement** to wait for the server's reply (callback); it appears as `ack <event>`.
+- Every event the server sends appears with its name. A refused connection shows the server's reason (e.g. `not authorized`).
+
+The demo servers include a Socket.IO namespace: `http://127.0.0.1:4015/chat` (emit `say`; the server broadcasts `said` and acknowledges).
 
 ## Saved connections
 

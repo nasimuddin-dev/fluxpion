@@ -9,6 +9,7 @@
  *   GraphQL         http://127.0.0.1:4011/graphql
  *   Mock LLM        http://127.0.0.1:4012/v1  (OpenAI-compatible: chat completions, streaming, tools, embeddings)
  *   WebSocket echo  ws://127.0.0.1:4013
+ *   Socket.IO       http://127.0.0.1:4015/chat (events: say → said, with acknowledgement; welcome on connect)
  *   gRPC            127.0.0.1:4014        (vet.v1.PetService, examples/veterinary-workspace/protos/vet/v1/pets.proto)
  */
 import { createServer } from 'node:http';
@@ -19,6 +20,7 @@ import { WebSocketServer } from 'ws';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ReflectionService } from '@grpc/reflection';
+import { Server as SocketIoServer } from 'socket.io';
 
 const json = (res, status, body, headers = {}) => {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
@@ -342,6 +344,21 @@ async function startGrpcServer(port) {
   return server;
 }
 
+/** Socket.IO: a /chat namespace that greets, echoes "say" as "said" and acknowledges it. */
+async function startSocketIo(port) {
+  const http = createServer();
+  const sio = new SocketIoServer(http, { cors: { origin: '*' } });
+  sio.of('/chat').on('connection', (socket) => {
+    socket.emit('welcome', { id: socket.id, time: new Date().toISOString() });
+    socket.on('say', (msg, ack) => {
+      sio.of('/chat').emit('said', { from: socket.id, msg });
+      if (typeof ack === 'function') ack({ ok: true, received: msg });
+    });
+  });
+  await listen(http, port);
+  return { http, sio };
+}
+
 export async function startAll(base = 4010) {
   const rest = await listen(createRestServer(), base);
   const gql = await listen(createGraphQLServer(), base + 1);
@@ -352,6 +369,7 @@ export async function startAll(base = 4010) {
     ws.once('error', reject);
   });
   const grpcServer = await startGrpcServer(base + 4);
+  const socketIo = await startSocketIo(base + 5);
   return {
     rest,
     gql,
@@ -360,6 +378,7 @@ export async function startAll(base = 4010) {
     grpc: grpcServer,
     close: async () => {
       grpcServer.forceShutdown();
+      socketIo.sio.close();
       for (const s of [rest, gql, llm]) {
         s.closeAllConnections?.();
         await new Promise((r) => s.close(r));
@@ -378,6 +397,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   console.log(`GraphQL    http://127.0.0.1:${base + 1}/graphql`);
   console.log(`Mock LLM   http://127.0.0.1:${base + 2}/v1   (OpenAI-compatible)`);
   console.log(`WebSocket  ws://127.0.0.1:${base + 3}`);
+  console.log(`Socket.IO  http://127.0.0.1:${base + 5}/chat   (say → said, acknowledged)`);
   console.log(`gRPC       127.0.0.1:${base + 4}   (vet.v1.PetService; proto: examples/veterinary-workspace/protos/vet/v1/pets.proto)`);
   console.log('MCP        node examples/servers/mcp-server.mjs   (stdio)');
 }
