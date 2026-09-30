@@ -30,6 +30,8 @@ export interface CiConfigOptions extends CiTarget {
   workspaceDir?: string;
   /** TestPion version to install (a git tag of the TestPion repository); default this version. */
   version?: string;
+  /** An OpenAPI document in the repository: pull requests fail when it has breaking changes against the target branch. */
+  openapi?: string;
 }
 
 export interface CiSecret {
@@ -89,6 +91,10 @@ export function ciConfig(store: WorkspaceStore, o: CiConfigOptions): CiConfig {
   const command = ciCommand(o, 'node "$TESTPION_CLI"');
   const install = `git clone --depth 1 --branch ${tag} ${REPO} "$TESTPION_HOME_DIR" && cd "$TESTPION_HOME_DIR" && npm ci --no-audit --no-fund && npm run build -w @testpion/core -w @testpion/cli`;
   const name = o.suite ? `suite ${o.suite}` : o.collection ? `collection ${o.collection}` : 'tests';
+  // pull requests: compare the OpenAPI document with the target branch's (skipped when the branch doesn't have it yet)
+  const spec = o.openapi?.trim() ? q(o.openapi.trim().replace(/^\.\//, '')) : undefined;
+  const diffAgainst = (ref: string, tmp: string) =>
+    `git fetch --depth 1 origin ${ref} && if git show FETCH_HEAD:${spec} > ${tmp}; then node "$TESTPION_CLI" openapi-diff ${tmp} ${spec} --fail-on-breaking; else echo "No ${spec} on the target branch yet"; fi`;
   switch (o.provider) {
     case 'github':
       return {
@@ -117,7 +123,14 @@ ${secrets.map((s) => `      ${s.name}: \${{ secrets.${s.name} }}   # ${s.descrip
           node-version: 24
       - name: Install the TestPion CLI (${tag})
         run: ${install}
-      - name: Run ${name}
+${
+  spec
+    ? `      - name: Check ${spec} for breaking changes
+        if: github.event_name == 'pull_request'
+        run: ${diffAgainst('${{ github.base_ref }}', '"$RUNNER_TEMP/openapi.base"')}
+`
+    : ''
+}      - name: Run ${name}
         run: ${command}
       - name: Upload reports
         if: always()
@@ -142,7 +155,7 @@ api-tests:
     TESTPION_CLI: /tmp/testpion/packages/cli/bin/testpion.js
   script:
     - (${install})
-    - ${command}
+${spec ? `    - if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then ${diffAgainst('"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"', '/tmp/openapi.base')}; fi\n` : ''}    - ${command}
   artifacts:
     when: always
     paths: [test-results]
@@ -174,7 +187,14 @@ steps:
       versionSpec: '24.x'
   - script: ${install}
     displayName: Install the TestPion CLI (${tag})
-  - script: ${command}
+${
+  spec
+    ? `  - script: ${diffAgainst('$(System.PullRequest.TargetBranch)', '$(Agent.TempDirectory)/openapi.base')}
+    displayName: Check ${spec} for breaking changes
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+`
+    : ''
+}  - script: ${command}
     displayName: Run ${name}
 ${secrets.length ? `    env:\n${secrets.map((s) => `      ${s.name}: $(${s.name})`).join('\n')}\n` : ''}  - task: PublishTestResults@2
     condition: always()
@@ -204,7 +224,15 @@ ${secrets.map((s) => `    ${s.name} = credentials('${s.name}')   // ${s.descript
     stage('Install TestPion CLI') {
       steps { sh 'rm -rf "$TESTPION_HOME_DIR" && ${install.replace(/'/g, "\\'")}' }
     }
-    stage('API tests') {
+${
+  spec
+    ? `    stage('Breaking API changes') {
+      when { changeRequest() }
+      steps { sh '${diffAgainst('"$CHANGE_TARGET"', '"$WORKSPACE/.openapi.base"').replace(/'/g, "\\'")}' }
+    }
+`
+    : ''
+}    stage('API tests') {
       steps { sh '${command.replace(/'/g, "\\'")}' }
     }
   }

@@ -495,6 +495,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           tests: { type: 'array', items: { type: 'string' }, description: 'Test files or folders under tests/' },
           environment: str('Environment name'),
           workspaceDir: str('The workspace folder relative to the repository root (default ".")'),
+          openapi: str('OpenAPI document in the repository (e.g. openapi.yaml): pull requests fail on breaking changes against the target branch'),
         },
         required: ['provider'],
       },

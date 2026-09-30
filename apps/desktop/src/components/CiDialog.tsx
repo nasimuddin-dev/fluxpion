@@ -41,6 +41,7 @@ export function CiDialog() {
   const [target, setTarget] = useState<string>(req.collection ? `collection:${req.collection}` : req.suite ? `suite:${req.suite}` : 'tests');
   const [environment, setEnvironment] = useState(useApp.getState().environment ?? '');
   const [workspaceDir, setWorkspaceDir] = useState('.');
+  const [openapi, setOpenapi] = useState('');
   const [suites, setSuites] = useState<string[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [cfg, setCfg] = useState<CiConfig>();
@@ -57,6 +58,7 @@ export function CiDialog() {
       provider,
       environment: environment || undefined,
       workspaceDir: workspaceDir.trim() || '.',
+      openapi: openapi.trim() || undefined,
       ...(kind === 'suite' ? { suite: value } : kind === 'collection' ? { collection: value, folders: value === req.collection ? req.folders : undefined } : {}),
     };
   };
@@ -71,7 +73,7 @@ export function CiDialog() {
       (e) => (setCfg(undefined), setError(asError(e).message)),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider, target, environment, workspaceDir]);
+  }, [provider, target, environment, workspaceDir, openapi]);
 
   const copy = async () => {
     if (!cfg) return;
@@ -143,6 +145,9 @@ export function CiDialog() {
           </Field>
           <Field label="Workspace folder in the repository">
             <Input className="mono" value={workspaceDir} onChange={(e) => setWorkspaceDir(e.target.value)} placeholder="." />
+          </Field>
+          <Field label="OpenAPI document (optional)" hint="Pull requests fail when it has breaking changes against the target branch.">
+            <Input className="mono" value={openapi} onChange={(e) => setOpenapi(e.target.value)} placeholder="openapi.yaml" />
           </Field>
         </div>
         {error && <div className="text-sm text-bad">{error}</div>}

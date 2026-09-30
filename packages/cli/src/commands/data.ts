@@ -273,12 +273,13 @@ export function registerDataCommands(program: Command): void {
     .option('--tests <paths...>', 'test files or folders under tests/ (default: all)')
     .option('-e, --environment <name>', 'environment to run with')
     .option('--workspace-dir <path>', 'the workspace folder relative to the repository root', '.')
+    .option('--openapi <file>', 'OpenAPI document in the repository: pull requests fail on breaking changes against the target branch')
     .option('-o, --out <file>', 'write the file here (default: print it)')
     .option('--json', 'print { path, content, secrets, command } as JSON')
     .action((provider: string, o) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
-        const c = ciConfig(store, { provider: provider as CiProvider, suite: o.suite, collection: o.collection, folders: o.folder, tests: o.tests, environment: o.environment, workspaceDir: o.workspaceDir });
+        const c = ciConfig(store, { provider: provider as CiProvider, suite: o.suite, collection: o.collection, folders: o.folder, tests: o.tests, environment: o.environment, workspaceDir: o.workspaceDir, openapi: o.openapi });
         if (o.json) return console.log(JSON.stringify(c, null, 2));
         if (o.out) {
           writeFileSync(resolve(o.out), c.content);

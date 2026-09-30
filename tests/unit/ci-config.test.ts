@@ -44,6 +44,17 @@ describe('CI pipeline generation', () => {
     expect(ciCommand({ provider: 'github' })).toBe('testpion test tests -w . -r console junit html -o test-results');
   });
 
+  it('adds a breaking-change check of an OpenAPI document on pull requests', () => {
+    for (const provider of ['github', 'gitlab', 'azure', 'jenkins'] as CiProvider[]) {
+      const c = ciConfig(store, { provider, openapi: './api/openapi.yaml' });
+      expect(c.content, provider).toContain('openapi-diff');
+      expect(c.content, provider).toContain('FETCH_HEAD:api/openapi.yaml');
+      expect(c.content, provider).toContain('--fail-on-breaking');
+      expect(ciConfig(store, { provider }).content, provider).not.toContain('openapi-diff');
+    }
+    expect(ciConfig(store, { provider: 'github', openapi: 'openapi.yaml' }).content).toContain("if: github.event_name == 'pull_request'");
+  });
+
   it('rejects unknown providers, suites, collections and environments', () => {
     expect(() => ciConfig(store, { provider: 'travis' as CiProvider })).toThrow(/github, gitlab, azure, jenkins/);
     expect(() => ciConfig(store, { provider: 'github', suite: 'nope' })).toThrow(/No suite "nope"/);

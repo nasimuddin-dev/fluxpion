@@ -45,6 +45,7 @@ TestPion writes the pipeline file for you, like Postman's *Run in CI*. It works 
   testpion ci github -w . --suite regression -e Staging -o .github/workflows/testpion.yml
   testpion ci gitlab -w api-tests --collection "My API" --folder Smoke -e Staging --workspace-dir api-tests
   testpion ci azure -w . --json          # { path, content, secrets, command }
+  testpion ci github -w . --suite regression --openapi api/openapi.yaml   # also check the spec on pull requests
   ```
 
 - **AI agents:** the `ci_config` tool of the [MCP server](/ai-testing/mcp-server).
@@ -55,6 +56,8 @@ The pipeline does four things:
 2. Runs the tests with the `console`, `junit` and `html` reports.
 3. Publishes `junit.xml` as test results, where the CI system supports it.
 4. Keeps the reports as build artifacts.
+
+With an **OpenAPI document** (`--openapi`, or the field in the dialog), pull requests also compare the document with the target branch's version and fail on [breaking changes](#catch-breaking-api-changes).
 
 A failing test fails the build. The file never contains secret values. Instead, TestPion lists the **CI secrets to create**, such as `TESTPION_SECRET_ENV_STAGING_APIKEY` for the *Staging* environment's secret `apiKey`, and the pipeline passes them to the CLI.
 
