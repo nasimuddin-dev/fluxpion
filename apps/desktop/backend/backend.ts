@@ -220,6 +220,15 @@ export class Backend {
       last: (id) => lastMonitorResult(this.ws, id),
       run: (m) => runMonitorNow(this, m, 'schedule'),
       onResult: (monitor, result, previous) => this.host.emit('monitor.result', { monitor, result, previous }),
+      resolve: (m, text) => {
+        const ctx = this.context({ environment: m.environment });
+        try {
+          return ctx.vars.resolve(text);
+        } finally {
+          void ctx.dispose();
+        }
+      },
+      onWebhook: (m, r) => (r.ok ? this.logger.info(`Monitor ${m.name}: webhook notified`) : this.logger.warn(`Monitor ${m.name}: webhook failed: ${r.error ?? `HTTP ${r.status}`}`)),
       onError: (m, e) => this.logger.error(`Monitor ${m.name} could not run: ${(e as Error).message}`),
     });
     if (!host.noMonitors) this.monitorScheduler.start();

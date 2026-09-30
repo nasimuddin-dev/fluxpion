@@ -27,6 +27,42 @@ export interface MonitorData {
   iterations?: number;
   /** Stop a run at the first failure. */
   bail?: boolean;
+  /**
+   * Called when the monitor starts failing or recovers: a Slack / Teams / Discord incoming webhook or any
+   * URL (POST JSON with `text`, `content` and the details). May be a {{variable}} of the environment.
+   */
+  webhook?: string;
+}
+
+/** Whether a result changes the monitor's state (first failure, or passing again after failing). */
+export function monitorStateChanged(result: MonitorResult, previous?: MonitorResult): boolean {
+  const bad = result.status !== 'passed';
+  const wasBad = previous ? previous.status !== 'passed' : false;
+  return bad !== wasBad;
+}
+
+/**
+ * Tell the monitor's webhook that it started failing or recovered. Never throws (a failing webhook must
+ * not break the schedule); returns what happened for logs.
+ */
+export async function notifyMonitorWebhook(url: string, monitor: Pick<Monitor, 'id' | 'name'>, result: MonitorResult, opts: { signal?: AbortSignal } = {}): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const bad = result.status !== 'passed';
+  const text = bad
+    ? `🔴 Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error ?? 'error'}` : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
+    : `🟢 Monitor "${monitor.name}" passes again (${result.passed} of ${result.total} requests)`;
+  try {
+    if (!/^https?:\/\//i.test(url)) throw new Error('the webhook must be an http(s) URL');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      // Slack and Teams show `text`, Discord shows `content`; the rest is for any other receiver
+      body: JSON.stringify({ text, content: text, monitor: { id: monitor.id, name: monitor.name }, status: result.status, total: result.total, passed: result.passed, failed: result.failed, errors: result.errors, p50Ms: result.p50Ms, startedAt: result.startedAt, runId: result.runId, error: result.error }),
+      signal: opts.signal ?? AbortSignal.timeout(15_000),
+    });
+    return { ok: res.ok, status: res.status };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 export interface Monitor extends MonitorData {
@@ -97,6 +133,7 @@ export function validateMonitor(store: WorkspaceStore, m: Pick<Monitor, 'name'> 
   const collection = store.getCollection(m.collectionId);
   if (!collectionRequests(collection, m.selection).length) throw invalid(`Nothing to run: the selection has no requests in "${collection.name}"`);
   if (m.environment && !store.getEnvironment(m.environment)) throw invalid(`No environment "${m.environment}"`);
+  if (m.webhook && !/^https?:\/\//i.test(m.webhook.trim()) && !/^\{\{[^}]+\}\}/.test(m.webhook.trim())) throw invalid('The alert webhook must be an http(s) URL or a {{variable}}');
 }
 
 /** Add or replace a monitor (by id). */
@@ -241,6 +278,10 @@ async function* readResults(file: string) {
 }
 
 export interface MonitorSchedulerOptions {
+  /** Resolve {{variables}} in a monitor's webhook URL (with its environment). */
+  resolve?: (m: Monitor, text: string) => string;
+  /** After a webhook call (for logs). */
+  onWebhook?: (m: Monitor, r: { ok: boolean; status?: number; error?: string }) => void;
   /** Current monitors (read on every tick, so edits apply without a restart). */
   list(): Monitor[];
   last(id: string): MonitorResult | undefined;
@@ -292,6 +333,11 @@ export class MonitorScheduler {
           const r = await this.o.run(m);
           ran++;
           this.o.onResult?.(m, r, previous);
+          if (m.webhook && monitorStateChanged(r, previous)) {
+            const url = this.o.resolve ? this.o.resolve(m, m.webhook) : m.webhook;
+            const sent = await notifyMonitorWebhook(url, m, r);
+            this.o.onWebhook?.(m, sent);
+          }
         } catch (e) {
           this.o.onError?.(m, e);
         }

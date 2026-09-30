@@ -6,6 +6,8 @@ import {
   MonitorScheduler,
   WorkspaceManager,
   createEngineContext,
+  monitorStateChanged,
+  notifyMonitorWebhook,
   deleteMonitor,
   executeMonitor,
   findMonitor,
@@ -49,6 +51,16 @@ function runner(store: WorkspaceStore) {
     executeMonitor({ store, monitor: m, trigger, context: (o) => createEngineContext({ store, secrets, settings, environment: o.environment, collectionId: o.collectionId }) });
 }
 
+/** A monitor's webhook URL with the {{variables}} of its environment resolved. */
+function webhookUrl(store: WorkspaceStore, m: Monitor): string {
+  const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: new WorkspaceManager().loadSettings(), environment: m.environment });
+  try {
+    return ctx.vars.resolve(m.webhook ?? '');
+  } finally {
+    void ctx.dispose();
+  }
+}
+
 export function registerMonitorCommands(program: Command): void {
   const mon = program.command('monitor').description('collections that run on a schedule (monitors): list, add, remove, run, results, start the scheduler');
 
@@ -77,6 +89,7 @@ export function registerMonitorCommands(program: Command): void {
     .option('-e, --environment <name>', 'environment to run with')
     .option('-n, --iteration-count <n>', 'iterations per run')
     .option('--bail', 'stop a run at the first failure')
+    .option('--webhook <url>', 'POST an alert here when the monitor starts failing or recovers (Slack / Teams / Discord webhook or any URL; {{variables}} work)')
     .option('--paused', 'save it paused')
     .option('--json', 'print the monitor as JSON')
     .action((name: string, o) =>
@@ -95,6 +108,7 @@ export function registerMonitorCommands(program: Command): void {
           enabled: !o.paused,
           iterations: o.iterationCount ? Number(o.iterationCount) : undefined,
           bail: o.bail || undefined,
+          webhook: o.webhook || existing?.webhook,
         });
         console.log(o.json ? JSON.stringify(m, null, 2) : green(`${existing ? 'Updated' : 'Added'} monitor "${m.name}": ${collection.name}, ${m.enabled ? formatEvery(m.everyMinutes) : 'paused'}`));
       }),
@@ -131,7 +145,13 @@ export function registerMonitorCommands(program: Command): void {
         const results: Array<MonitorResult & { name: string }> = [];
         for (const m of chosen) {
           if (!o.json) process.stdout.write(`${m.name} … `);
+          const previous = lastMonitorResult(store, m.id);
           const r = await run(m, ref || o.all ? 'manual' : 'schedule');
+          // cron (`--due`) and manual runs alert the webhook too, when the state changes
+          if (m.webhook && monitorStateChanged(r, previous)) {
+            const sent = await notifyMonitorWebhook(webhookUrl(store, m), m, r);
+            if (!sent.ok && !o.json) console.error(yellow(`webhook for ${m.name} failed: ${sent.error ?? `HTTP ${sent.status}`}`));
+          }
           results.push({ ...r, name: m.name });
           if (!o.json) console.log(`${statusText(r)} ${dim(`${formatDuration(r.durationMs)} · run ${r.runId}`)}`);
         }
@@ -180,6 +200,10 @@ export function registerMonitorCommands(program: Command): void {
           console.log(`${dim(new Date().toISOString())}  ${m.name}  ${statusText(r)}${changed}`);
         },
         onError: (m, e) => console.error(red(`${m.name}: ${(e as Error).message}`)),
+        resolve: (m) => webhookUrl(store, m),
+        onWebhook: (m, r) => {
+          if (!r.ok) console.error(yellow(`webhook for ${m.name} failed: ${r.error ?? `HTTP ${r.status}`}`));
+        },
       });
       const count = listMonitors(store).filter((m) => m.enabled).length;
       if (!o.json) console.log(dim(`Scheduler started: ${count} enabled monitor${count === 1 ? '' : 's'} in ${store.root}. Press Ctrl+C to stop.`));

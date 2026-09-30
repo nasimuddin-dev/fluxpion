@@ -125,6 +125,44 @@ describe('monitors in a workspace', () => {
     expect(r.error).toBeTruthy();
   });
 
+  it('alerts the webhook when a monitor starts failing and when it recovers, not on every run', async () => {
+    const posts: Array<{ text: string; status: string }> = [];
+    const hook = createServer((req, res) => {
+      let b = '';
+      req.on('data', (c) => (b += c));
+      req.on('end', () => (posts.push(JSON.parse(b)), res.writeHead(200).end('ok')));
+    });
+    await new Promise<void>((r) => hook.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${(hook.address() as AddressInfo).port}/hook`;
+    const results: MonitorResult[] = [];
+    let next: MonitorResult['status'] = 'failed';
+    const m = { id: 'mon-alert', name: 'Checkout', collectionId: 'c', everyMinutes: 1, enabled: true, webhook: '{{alertUrl}}' } as Monitor;
+    const s = new MonitorScheduler({
+      list: () => [m],
+      last: () => results[results.length - 1],
+      run: async () => {
+        const r = { monitorId: m.id, runId: `r${results.length}`, startedAt: new Date().toISOString(), durationMs: 5, status: next, total: 4, passed: next === 'passed' ? 4 : 1, failed: next === 'passed' ? 0 : 3, errors: 0, trigger: 'schedule' } as MonitorResult;
+        results.push(r);
+        return r;
+      },
+      resolve: (_m, text) => text.replace('{{alertUrl}}', url),
+    });
+    try {
+      let t = Date.now();
+      await s.tick((t += 120_000)); // passed → failed (first run fails): alert
+      await s.tick((t += 120_000)); // still failing: no alert
+      next = 'passed';
+      await s.tick((t += 120_000)); // recovers: alert
+      await s.tick((t += 120_000)); // still fine: no alert
+      expect(posts.map((p) => [p.status, p.text])).toEqual([
+        ['failed', '🔴 Monitor "Checkout" failed: 3 of 4 requests'],
+        ['passed', '🟢 Monitor "Checkout" passes again (4 of 4 requests)'],
+      ]);
+    } finally {
+      await new Promise<void>((r) => hook.close(() => r()));
+    }
+  });
+
   it('the scheduler runs due monitors once and reports status changes', async () => {
     healthy = true;
     const changes: string[] = [];

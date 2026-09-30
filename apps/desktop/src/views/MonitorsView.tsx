@@ -18,6 +18,7 @@ interface MonitorDraft {
   enabled: boolean;
   iterations?: number;
   bail?: boolean;
+  webhook?: string;
 }
 
 interface MonitorRow extends MonitorDraft {
@@ -434,6 +435,9 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
           <Toggle checked={d.enabled} onChange={(v) => setD({ ...d, enabled: v })} label="Enabled" />
           <Toggle checked={!!d.bail} onChange={(v) => setD({ ...d, bail: v || undefined })} label="Stop at the first failure" />
         </div>
+        <Field label="Alert webhook (optional)" hint="Posted when the monitor starts failing or passes again: a Slack, Teams or Discord incoming webhook, or any URL. {{variables}} of the environment work, so the URL can be a secret.">
+          <Input className="mono" placeholder="https://hooks.slack.com/services/…  or  {{alertWebhook}}" value={d.webhook ?? ''} onChange={(e) => setD({ ...d, webhook: e.target.value || undefined })} aria-label="Alert webhook" />
+        </Field>
       </div>
     </Modal>
   );
