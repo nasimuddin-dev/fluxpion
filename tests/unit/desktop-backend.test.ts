@@ -68,4 +68,21 @@ describe('desktop backend', () => {
       server.close();
     }
   });
+
+  it('WebSocket messages resolve {{variables}} before they are sent', async () => {
+    const { WebSocketServer } = await import('ws');
+    const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await new Promise((r) => wss.once('listening', r));
+    const got: string[] = [];
+    wss.on('connection', (ws) => ws.on('message', (d) => got.push(String(d))));
+    try {
+      const { id } = (await call('wsock.connect', { url: `ws://127.0.0.1:${(wss.address() as AddressInfo).port}` })) as { id: string };
+      await call('wsock.send', { id, data: '{"id":"{{$guid}}","plain":"x"}' });
+      for (let i = 0; i < 40 && !got.length; i++) await new Promise((r) => setTimeout(r, 25));
+      expect(got[0]).toMatch(/^\{"id":"[0-9a-f-]{36}","plain":"x"\}$/);
+      await call('wsock.close', { id });
+    } finally {
+      wss.close();
+    }
+  });
 });

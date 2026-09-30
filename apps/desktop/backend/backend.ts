@@ -497,6 +497,17 @@ export class Backend {
     return ctx;
   }
 
+  /** Resolve {{variables}} in a text with an environment (for messages typed in the WebSocket view and similar). */
+  async resolveText(text: string, environment?: string): Promise<string> {
+    if (!text.includes('{{')) return text;
+    const ctx = this.context({ environment });
+    try {
+      return ctx.vars.resolve(text);
+    } finally {
+      await ctx.dispose();
+    }
+  }
+
   /** Emit high-frequency events in batches so the renderer is not flooded (spec §22). */
   batched<T>(channel: string, intervalMs = 50) {
     return batcher<T>((items) => this.host.emit(channel, items), intervalMs);

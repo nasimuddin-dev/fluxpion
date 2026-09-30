@@ -84,14 +84,21 @@ export function GrpcView() {
   const saved = useLibrary<Saved>('grpc');
   const [savedId, setSavedId] = useSticky<string | undefined>('grpc:saved', undefined);
   const currentSaved = saved.lib.items.find((i) => i.id === savedId);
-  const savedDirty = !!currentSaved && JSON.stringify(currentSaved.data) !== JSON.stringify(d);
+  // descriptors fetched by reflection aren't an edit (a saved request without protos reflects when opened)
+  const comparable = (x: Partial<typeof d>) => JSON.stringify({ ...x, descriptorSet: undefined, reflectedFrom: undefined });
+  const savedDirty = !!currentSaved && comparable(currentSaved.data) !== comparable(d);
   const openSaved = async (id: string) => {
     const it = await saved.find(id);
     if (!it) return;
     setSavedId(id);
-    setD({ ...drafts.load(), ...it.data });
+    // the previous request's protos / reflected descriptors must not carry over to this one
+    const clean = { ...drafts.load(), protoFiles: [] as ProtoFile[], descriptorSet: undefined, reflectedFrom: undefined };
+    const next = { ...clean, ...it.data };
+    setD(next);
     setResult(undefined);
     setError(undefined);
+    // saved without .proto files: describe the service through server reflection straight away
+    if (!next.protoFiles.length && !next.descriptorSet && next.target) void reflect(next, true);
   };
   const saveRequest = async (asNew = false, folder?: string) => {
     if (currentSaved && !asNew) {
@@ -160,12 +167,13 @@ export function GrpcView() {
   };
 
   /** Ask the server for its services (gRPC server reflection) instead of using proto files. */
-  const reflect = async () => {
+  const reflect = async (from: typeof d = d, quiet = false) => {
     setReflecting(true);
     try {
-      const r = await call<{ services: string[]; descriptorSet: string; methods: MethodInfo[] }>('grpc.reflect', { target: d.target, tls: d.tls || undefined, tlsOptions, metadata: d.metadata, environment: env });
-      set({ descriptorSet: r.descriptorSet, reflectedFrom: d.target });
-      useApp.getState().toast(`Server reflection: ${r.services.length} services, ${r.methods.length} methods`, 'success');
+      const r = await call<{ services: string[]; descriptorSet: string; methods: MethodInfo[] }>('grpc.reflect', { target: from.target, tls: from.tls || undefined, tlsOptions, metadata: from.metadata, environment: env });
+      // keep the method the request was saved with (functional update: the draft may have changed meanwhile)
+      setD((cur) => (cur.target === from.target ? { ...cur, descriptorSet: r.descriptorSet, reflectedFrom: from.target } : cur));
+      if (!quiet) useApp.getState().toast(`Server reflection: ${r.services.length} services, ${r.methods.length} methods`, 'success');
       setTab('message');
     } catch (e) {
       useApp.getState().toast(asError(e).message, 'error');

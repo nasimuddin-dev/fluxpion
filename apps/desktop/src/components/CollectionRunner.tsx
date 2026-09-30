@@ -236,11 +236,11 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
             </div>
           </div>
         </div>
-        <div className="border-t border-line p-3 flex items-center gap-2">
-          <Button variant="primary" icon={<Play size={13} />} loading={starting} disabled={!selected.length} onClick={start}>
-            Run {folderId ? findName(collection.items, folderId) : collection.name}
+        <div className="border-t border-line p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <Button variant="primary" className="min-w-0 max-w-full" icon={<Play size={13} />} loading={starting} disabled={!selected.length} onClick={start}>
+            <span className="truncate">Run {folderId ? findName(collection.items, folderId) : collection.name}</span>
           </Button>
-          <span className="text-xs text-muted">
+          <span className="text-xs text-muted whitespace-nowrap">
             {selected.length} request{selected.length === 1 ? '' : 's'} × {iterCount} iteration{iterCount === 1 ? '' : 's'}
           </span>
         </div>

@@ -102,6 +102,22 @@ export function setEditorJsonSchema(path: string, schema: unknown | undefined): 
   });
 }
 
+/* ------------------------------------------------------------------ variables of one editor */
+
+const locals = new Map<string, string[]>();
+
+/** Names that are defined for the editor with this `path` only, e.g. a prompt's input variables. */
+export function setEditorLocalVariables(path: string, names: string[] | undefined): void {
+  if (names?.length) locals.set(path, names);
+  else locals.delete(path);
+}
+
+function localVariablesOf(model: Monaco.editor.ITextModel): VarInfo[] {
+  const uri = model.uri.toString();
+  for (const [path, names] of locals) if (uri === path || uri.endsWith(`/${path}`) || model.uri.path.replace(/^\//, '') === path) return names.map((name) => ({ name, scope: 'input' }));
+  return [];
+}
+
 /* ------------------------------------------------------------------ install */
 
 export function installEditorIntel(monaco: typeof Monaco): void {
@@ -116,7 +132,7 @@ export function installEditorIntel(monaco: typeof Monaco): void {
         const line = model.getLineContent(position.lineNumber);
         const at = varAt(line, position.column);
         if (!at) return { suggestions: [] };
-        const vars = await editorVariables();
+        const vars = [...localVariablesOf(model), ...(await editorVariables())];
         const range = new monaco.Range(position.lineNumber, at.start, position.lineNumber, position.column);
         return {
           suggestions: vars.map((v, i) => ({
@@ -168,7 +184,7 @@ export function installEditorIntel(monaco: typeof Monaco): void {
         ids = editor.deltaDecorations(ids, []);
         return;
       }
-      const known = new Set((await editorVariables()).map((v) => v.name));
+      const known = new Set([...localVariablesOf(model), ...(await editorVariables())].map((v) => v.name));
       const decos: Monaco.editor.IModelDeltaDecoration[] = [];
       for (const m of text.matchAll(/\{\{\s*([\w.$-]+)\s*\}\}/g)) {
         const s = model.getPositionAt(m.index!);

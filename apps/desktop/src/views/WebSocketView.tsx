@@ -111,7 +111,7 @@ export function WebSocketView() {
   const disconnect = () => session && call(sio ? 'sio.close' : 'wsock.close', { id: session }).then(() => setStatus('closed'));
   const send = () =>
     session &&
-    (sio ? call('sio.emit', { id: session, event: d.event ?? '', args: d.message, ack: !!d.ack }) : call('wsock.send', { id: session, data: d.message })).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
+    (sio ? call('sio.emit', { id: session, event: d.event ?? '', args: d.message, ack: !!d.ack, environment: env }) : call('wsock.send', { id: session, data: d.message, environment: env })).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
   const shown = filter ? messages.filter((m) => m.data.toLowerCase().includes(filter.toLowerCase())) : messages;
   let parsed: unknown;
   try {

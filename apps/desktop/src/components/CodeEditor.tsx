@@ -2,7 +2,7 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEffect, useState } from 'react';
 import { useApp } from '../store';
 import { Spinner } from './ui';
-import { setEditorJsonSchema } from '../editor-intel';
+import { setEditorJsonSchema, setEditorLocalVariables } from '../editor-intel';
 
 /**
  * Monaco (several MB with its language workers) loads the first time an editor is shown, not at
@@ -37,6 +37,7 @@ export function CodeEditor({
   minimal,
   placeholder,
   jsonSchema,
+  localVariables,
 }: {
   value: string;
   onChange?(v: string): void;
@@ -49,6 +50,8 @@ export function CodeEditor({
   placeholder?: string;
   /** JSON Schema for a JSON editor (needs `path`): completion of keys and values, hover and validation. */
   jsonSchema?: unknown;
+  /** {{variables}} defined for this editor only (needs `path`), e.g. a prompt's inputs: not flagged as unknown, and offered in completion. */
+  localVariables?: string[];
 }) {
   const theme = useEditorTheme();
   const fontSize = useApp((s) => s.settings?.fontSize ?? 14);
@@ -58,6 +61,13 @@ export function CodeEditor({
     setEditorJsonSchema(path, jsonSchema);
     return () => setEditorJsonSchema(path, undefined);
   }, [path, jsonSchema]);
+  const localKey = localVariables?.join(',');
+  useEffect(() => {
+    if (!path || !localVariables?.length) return;
+    setEditorLocalVariables(path, localVariables);
+    return () => setEditorLocalVariables(path, undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, localKey]);
   if (!ready) return <div className="h-full w-full grid place-items-center"><Spinner /></div>;
   return (
     <div className="h-full w-full min-h-0 relative">

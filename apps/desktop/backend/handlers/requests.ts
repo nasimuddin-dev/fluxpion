@@ -118,8 +118,10 @@ export function requestsHandlers(be: Backend): Handlers {
       });
       return { id: s.id };
     },
-    'wsock.send': ({ id, data }: { id: string; data: string }) => {
+    'wsock.send': async ({ id, data: raw, environment }: { id: string; data: string; environment?: string }) => {
       const s = be.wsSessions.get(id);
+      // {{variables}} in the message resolve like in requests (dynamic ones such as {{$guid}} too)
+      const data = await be.resolveText(raw, environment);
       s?.send(data);
       const c = be.wsConsole.get(id);
       if (s && c) {
@@ -159,9 +161,11 @@ export function requestsHandlers(be: Backend): Handlers {
       }
       return { id: s.id };
     },
-    'sio.emit': async ({ id, event, args, ack }: { id: string; event: string; args?: string; ack?: boolean }) => {
+    'sio.emit': async ({ id, event: rawEvent, args: rawArgs, ack, environment }: { id: string; event: string; args?: string; ack?: boolean; environment?: string }) => {
       const s = be.sioSessions.get(id);
       if (!s) throw new ApsError('ProtocolError', 'Socket.IO is not connected');
+      const event = await be.resolveText(rawEvent, environment);
+      const args = rawArgs === undefined ? undefined : await be.resolveText(rawArgs, environment);
       let list: unknown[] = [];
       if (args?.trim()) {
         try {

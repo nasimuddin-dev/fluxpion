@@ -200,7 +200,7 @@ function PromptEditor({ d, set }: { d: Draft; set(p: Partial<Draft>): void }) {
       <div className="flex-1 min-h-0">
         {sub === 'prompt' && (
           <Split id="ai-prompt-vars" direction="vertical" initial={62}>
-            <CodeEditor language="markdown" value={d.prompt} onChange={(prompt) => set({ prompt })} />
+            <CodeEditor language="markdown" path="ai-lab-prompt.md" localVariables={vars} value={d.prompt} onChange={(prompt) => set({ prompt })} />
             <div className="h-full overflow-auto p-3">
               <div className="text-xs font-semibold text-muted mb-2">Input variables {vars.length ? '' : '— use {{name}} in the template'}</div>
               <div className="flex flex-col gap-2">
@@ -213,7 +213,7 @@ function PromptEditor({ d, set }: { d: Draft; set(p: Partial<Draft>): void }) {
             </div>
           </Split>
         )}
-        {sub === 'system' && <CodeEditor language="markdown" value={d.system} onChange={(system) => set({ system })} />}
+        {sub === 'system' && <CodeEditor language="markdown" path="ai-lab-system.md" localVariables={vars} value={d.system} onChange={(system) => set({ system })} />}
         {sub === 'format' && (
           <div className="h-full flex flex-col">
             <div className="flex gap-4 px-3 py-2 text-sm border-b border-line">

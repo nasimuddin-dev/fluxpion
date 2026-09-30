@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fixes from a first-run pass over the examples.**
+  - WebSocket messages and Socket.IO events now resolve `{{variables}}` (including `{{$guid}}` and the like) before they are sent. They used to go out literally.
+  - A saved gRPC request without `.proto` files describes its service through server reflection as soon as it is opened, so **Invoke** works straight away. Descriptors from the previously open request no longer carry over, and reflecting no longer marks the request as edited.
+  - AI Lab no longer marks a prompt's own input variables (`{{message}}`) as unknown, and suggests them in autocomplete.
+  - The Collection Runner's "5 requests × 1 iteration" line no longer wraps one word per line.
 - **Proxy settings.** **Settings ▸ Proxy**: use `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` (the default), a custom proxy with a bypass list and optional credentials (the password is kept in the secret store), or no proxy. It covers requests, `pm.sendRequest`, OAuth token calls, AI providers, MCP over HTTP and datasets; a request's own proxy still wins. The CLI now honours the proxy environment variables (`TESTPION_NO_PROXY=1` turns that off).
 - **Import from Insomnia, Bruno and Hoppscotch.** Insomnia exports (v4 JSON, v5 YAML) with their environments, Bruno collection exports with environments, and Hoppscotch collections: folders, requests, bodies, headers, parameters, auth (bearer, basic, digest, API key, OAuth 1/2, AWS) and variables (`{{ _.x }}` and `<<x>>` become `{{x}}`). Their scripts come over as comments. Imports no longer replace an environment you already have (Postman environments included): a clash is added as *Name (imported)*.
 - **Compare environments.** **Compare** in the Envs view shows two environments side by side: variables missing on one side, different values, disabled variables and secrets set on one side only (secret values are never shown). `testpion env diff` does the same from the terminal (exit 1 when they differ, handy in CI), and AI agents get `compare_environments`.
