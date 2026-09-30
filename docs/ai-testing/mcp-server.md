@@ -62,7 +62,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `openapi_diff` | Breaking and other changes between two OpenAPI versions (links, workspace paths such as `specs/…`, or text). |
 | `import_definition` | Import an OpenAPI document, Postman / Insomnia / Bruno / Hoppscotch collection, HAR or .env, from a public link (`url`) or `text`. OpenAPI imports get contract checks. |
 
-`save_request`, `import_definition` and `reorder_environments` change workspace files, `load_test` generates load,, and `--read-only` hides them together with the tools that send requests.
+`save_request`, `import_definition` and `reorder_environments` change workspace files, `load_test` generates load, and `--read-only` hides them together with the tools that send requests.
 
 ## What agents can and can't see
 

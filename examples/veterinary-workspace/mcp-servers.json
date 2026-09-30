@@ -3,10 +3,10 @@
   "servers": [
     {
       "id": "customer-mcp",
-      "name": "customer-mcp",
-      "transport": "stdio",
-      "command": "node",
-      "args": ["{{workspaceDir}}/../servers/mcp-server.mjs"]
+      "name": "drive-mcp",
+      "transport": "streamable-http",
+      "url": "https://drivemcp.googleapis.com/mcp/v1",
+      "headers": []
     }
   ]
 }

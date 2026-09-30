@@ -3,11 +3,36 @@
   "name": "Development",
   "color": "#1a7f37",
   "variables": [
-    { "key": "baseUrl", "value": "http://127.0.0.1:4010", "enabled": true },
-    { "key": "graphqlEndpoint", "value": "http://127.0.0.1:4011/graphql", "enabled": true },
-    { "key": "wsUrl", "value": "ws://127.0.0.1:4013", "enabled": true },
-    { "key": "clientId", "value": "demo", "enabled": true },
-    { "key": "clientSecret", "value": "demo-secret", "enabled": true },
-    { "key": "model", "value": "mock-gpt", "enabled": true }
-  ]
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:4010",
+      "enabled": true
+    },
+    {
+      "key": "graphqlEndpoint",
+      "value": "http://127.0.0.1:4011/graphql",
+      "enabled": true
+    },
+    {
+      "key": "wsUrl",
+      "value": "ws://127.0.0.1:4013",
+      "enabled": true
+    },
+    {
+      "key": "clientId",
+      "value": "demo",
+      "enabled": true
+    },
+    {
+      "key": "clientSecret",
+      "value": "demo-secret",
+      "enabled": true
+    },
+    {
+      "key": "model",
+      "value": "mock-gpt",
+      "enabled": true
+    }
+  ],
+  "isProduction": false
 }
