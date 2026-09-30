@@ -1,0 +1,14 @@
+name: Country by code (GraphQL)
+type: graphql
+tags: [graphql, public]
+endpoint: "{{countriesGraphql}}"
+query: |
+  query Country($code: ID!) {
+    country(code: $code) { name capital currency }
+  }
+variables:
+  code: BR
+assertions:
+  - { type: http-status, expected: 200 }
+  - { type: graphql-no-errors }
+  - { type: equals, path: $.data.country.capital, expected: Brasília }

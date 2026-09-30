@@ -41,6 +41,9 @@ describe('MCP mock server', () => {
     expect(mockToolResult(def, 'search_customer', { customer_id: '1' }).structuredContent).toEqual({ id: '123', name: 'Ada Lovelace', tier: 'gold' });
     expect(mockToolResult(def, 'echo', { message: 'hi' }).content).toEqual([{ type: 'text', text: 'you said hi' }]);
     expect(mockToolResult(def, 'nope').isError).toBe(true);
+    // placeholders in JSON responses: a whole-string placeholder keeps the argument's type
+    const templ = { name: 't', tools: [{ name: 'forecast', responses: [{ json: { city: '{{args.city}}', days: '{{args.days}}', note: 'for {{args.city}}', list: ['{{args.city}}'] } }] }] };
+    expect(mockToolResult(templ as never, 'forecast', { city: 'Paris', days: 3 }).structuredContent).toEqual({ city: 'Paris', days: 3, note: 'for Paris', list: ['Paris'] });
   });
 
   it('serves tools, resources and prompts over Streamable HTTP to a real MCP client', async () => {

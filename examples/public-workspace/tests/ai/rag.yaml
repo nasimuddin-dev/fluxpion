@@ -1,0 +1,22 @@
+name: Opening hours (RAG)
+type: rag
+tags: [ai, rag, offline]
+question: What are the opening hours on weekdays?
+contexts:
+  - id: doc-1
+    text: The pet shop opens at 9am and closes at 5pm on weekdays.
+    score: 0.93
+  - id: doc-2
+    text: Parking is free on Sundays.
+    score: 0.38
+expected: The shop opens at 9am and closes at 5pm on weekdays.
+model: { provider: demo, name: demo, temperature: 0 }
+evaluators:
+  - type: context-precision
+    threshold: 0.5
+  - type: context-recall
+  - type: groundedness
+  - type: citation
+  - type: similarity
+    expected: The shop opens at 9am and closes at 5pm on weekdays.
+    threshold: 0.4

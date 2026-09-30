@@ -1,0 +1,12 @@
+# Contract test: the response must match the OpenAPI document, not only return 200.
+name: Petstore responses match the OpenAPI contract
+type: http
+tags: [rest, contract, public]
+method: GET
+url: "{{petstore}}/pet/findByStatus?status=available"
+headers:
+  Accept: application/json
+assertions:
+  - { type: status, expected: 200 }
+  - { type: openapi, spec: specs/petstore.json }
+  - { type: type, path: $, expected: array }

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0",
+  "servers": [
+    {
+      "id": "petstore-mcp",
+      "name": "Petstore MCP",
+      "folder": "Public servers",
+      "transport": "streamable-http",
+      "url": "https://petstore.run.mcp.com.ai/mcp"
+    },
+    {
+      "id": "deepwiki",
+      "name": "DeepWiki",
+      "folder": "Public servers",
+      "transport": "streamable-http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    {
+      "id": "weather-mock",
+      "name": "Weather (offline mock)",
+      "folder": "Mocks",
+      "transport": "mock",
+      "mockFile": "mocks/weather.mcp-mock.yaml"
+    }
+  ]
+}

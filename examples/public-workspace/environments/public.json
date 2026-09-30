@@ -1,0 +1,21 @@
+{
+  "id": "public",
+  "name": "Public APIs",
+  "color": "#2f7bff",
+  "variables": [
+    { "key": "httpbin", "value": "https://httpbin.org", "enabled": true, "description": "HTTP request & response service" },
+    { "key": "jsonplaceholder", "value": "https://jsonplaceholder.typicode.com", "enabled": true, "description": "Fake REST API (writes are simulated)" },
+    { "key": "petstore", "value": "https://petstore3.swagger.io/api/v3", "enabled": true, "description": "Swagger Petstore (OpenAPI 3)" },
+    { "key": "countriesGraphql", "value": "https://countries.trevorblades.com/", "enabled": true },
+    { "key": "rickAndMortyGraphql", "value": "https://rickandmortyapi.com/graphql", "enabled": true },
+    { "key": "grpcHost", "value": "grpcb.in:9000", "enabled": true, "description": "gRPC test server with reflection (plain text)" },
+    { "key": "wsEcho", "value": "wss://ws.postman-echo.com/raw", "enabled": true },
+    { "key": "wsEcho2", "value": "wss://echo.websocket.org", "enabled": true },
+    { "key": "sseStream", "value": "https://stream.wikimedia.org/v2/stream/recentchange", "enabled": true },
+    { "key": "petstoreMcp", "value": "https://petstore.run.mcp.com.ai/mcp", "enabled": true },
+    { "key": "basicUser", "value": "testpion", "enabled": true },
+    { "key": "basicPassword", "value": "demo-password", "enabled": true, "description": "httpbin accepts whatever the URL says; not a real secret" },
+    { "key": "demoToken", "value": "demo-token-123", "enabled": true, "description": "httpbin /bearer accepts any token" },
+    { "key": "petId", "value": "10", "enabled": true }
+  ]
+}

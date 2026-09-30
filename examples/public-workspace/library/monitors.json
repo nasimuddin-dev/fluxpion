@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "folders": [],
+  "items": [
+    {
+      "id": "mon-public-health",
+      "name": "Public APIs health",
+      "data": {
+        "collectionId": "httpbin",
+        "selection": ["hb-basics"],
+        "environment": "Public APIs",
+        "everyMinutes": 60,
+        "enabled": false
+      }
+    }
+  ]
+}

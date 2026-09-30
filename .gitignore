@@ -18,6 +18,13 @@ examples/veterinary-workspace/payloads/
 examples/veterinary-workspace/reports/
 examples/veterinary-workspace/baselines/
 examples/veterinary-workspace/collections/.keep
+examples/public-workspace/database.sqlite*
+examples/public-workspace/metadata.jsonl
+examples/public-workspace/runs/
+examples/public-workspace/traces/
+examples/public-workspace/payloads/
+examples/public-workspace/reports/
+examples/public-workspace/baselines/
 
 # Claude Code (personal settings and the daily development routine backlog)
 .claude/settings.local.json

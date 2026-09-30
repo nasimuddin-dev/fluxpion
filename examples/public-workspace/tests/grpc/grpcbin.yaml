@@ -1,0 +1,26 @@
+# No .proto files needed: grpcb.in supports server reflection (protos: []).
+defaults:
+  type: grpc
+  target: "{{grpcHost}}"
+  protos: []
+  tags: [grpc, public]
+tests:
+  - name: gRPC unary call
+    method: hello.HelloService/SayHello
+    message: { greeting: TestPion }
+    assertions:
+      - { type: grpc-status, expected: OK }
+      - { type: equals, path: $.reply, expected: hello TestPion }
+
+  - name: gRPC server streaming
+    method: hello.HelloService/LotsOfReplies
+    message: { greeting: TestPion }
+    assertions:
+      - { type: grpc-status, expected: OK }
+      - { type: greater-than, path: $.length, expected: 1 }
+
+  - name: gRPC numbers
+    method: addsvc.Add/Sum
+    message: { a: 20, b: 22 }
+    assertions:
+      - { type: equals, path: $.v, expected: "42" }

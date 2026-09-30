@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "folders": ["Echo servers"],
+  "items": [
+    {
+      "id": "ws-postman-echo",
+      "name": "Postman echo (JSON)",
+      "folder": "Echo servers",
+      "data": {
+        "url": "{{wsEcho}}",
+        "protocols": "",
+        "headers": [],
+        "message": "{\n  \"type\": \"greeting\",\n  \"from\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\"\n}",
+        "mode": "websocket"
+      }
+    },
+    {
+      "id": "ws-echo-org",
+      "name": "echo.websocket.org (text)",
+      "folder": "Echo servers",
+      "data": {
+        "url": "{{wsEcho2}}",
+        "protocols": "",
+        "headers": [],
+        "message": "Hello from TestPion",
+        "mode": "websocket"
+      }
+    }
+  ]
+}

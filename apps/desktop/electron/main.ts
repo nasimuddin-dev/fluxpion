@@ -121,6 +121,8 @@ function start(): void {
       backend: osBackendName(),
     },
     emit,
+    // bundled with the installer (electron-builder extraResources); the repo's copy when running from source
+    examplesDir: app.isPackaged ? join(process.resourcesPath, 'examples', 'public-workspace') : join(__dirname, '..', '..', '..', 'examples', 'public-workspace'),
     openExternal: (url) => shell.openExternal(url),
     openPath: (p) => shell.openPath(p),
     saveDialog: async (opts) => (win ? (await dialog.showSaveDialog(win, opts)).filePath || undefined : undefined),
@@ -221,6 +223,8 @@ function start(): void {
         role: 'help',
         submenu: [
           { label: 'Check for Updates…', click: () => emit('update.checkManual', {}) },
+          { type: 'separator' },
+          { label: 'Open Examples Workspace', click: () => menu('open-examples') },
           { type: 'separator' },
           { label: 'Documentation', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/testpion/') },
           { label: 'Release Notes', click: () => void shell.openExternal('https://nasimuddin-dev.github.io/testpion/changelog') },

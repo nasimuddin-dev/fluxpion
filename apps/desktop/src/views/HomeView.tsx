@@ -2,6 +2,7 @@ import { BookOpen, Bot, FolderPlus, FolderTree, GitBranch, History, KeyRound, Ne
 import { useEffect, useState, type ReactNode } from 'react';
 import { call, modKey } from '../api';
 import { promptText, useApp } from '../store';
+import { runMenuCommand } from '../menu-commands';
 import type { Collection, CollectionNode, HttpRequestSpec } from '../types';
 import { timeAgo, uid } from '../lib/format';
 import { Badge, cx, Empty, Kbd, statusTone } from '../components/ui';
@@ -60,6 +61,9 @@ function Card({ title, icon, action, children }: { title: string; icon: ReactNod
 const count = (nodes: CollectionNode[]): number => nodes.reduce((a, n) => a + (n.kind === 'folder' ? count(n.items) : 1), 0);
 
 /** Postman-style home: quick actions, recent requests, collections and environments of the workspace. */
+/** Id of the examples workspace that ships with the app (examples/public-workspace). */
+const EXAMPLES_ID = 'ws-testpion-examples';
+
 export function HomeView() {
   const ws = useApp((s) => s.workspace);
   const env = useApp((s) => s.environment);
@@ -94,6 +98,19 @@ export function HomeView() {
           <p className="relative text-sm font-medium text-accent">{greeting()} 👋</p>
           <h1 className="relative text-[1.75rem] font-semibold tracking-tight mt-1">{ws ? ws.name : 'Welcome to TestPion'}</h1>
           <p className="relative text-sm text-muted mt-1.5 max-w-2xl">Build, test and debug REST, GraphQL, gRPC, WebSocket, MCP and AI APIs. Everything stays on this computer.</p>
+          {ws?.id === EXAMPLES_ID ? (
+            <p className="relative text-sm mt-3 max-w-3xl">
+              These examples use free public APIs. Open a collection and press <b>Send</b>, run a whole collection, or run the <b>All examples</b> and <b>Offline</b> suites in{' '}
+              <button className="text-accent hover:underline" onClick={() => setView('tests')}>
+                Tests
+              </button>
+              . MCP has public servers, WebSocket and gRPC have saved connections, and AI Lab has prompts that run on an offline demo model.
+            </p>
+          ) : (
+            <button className="relative block mt-3 text-sm text-accent hover:underline" onClick={() => void runMenuCommand('open-examples')}>
+              Explore the examples workspace: REST, GraphQL, gRPC, WebSocket, MCP and AI against public APIs →
+            </button>
+          )}
           {env && (
             <p className="relative mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-bg/70 px-3 py-1 text-xs text-muted">
               <span className="w-2 h-2 rounded-full" style={{ background: ws?.environments.find((e) => e.name === env)?.color ?? 'var(--ok)' }} />

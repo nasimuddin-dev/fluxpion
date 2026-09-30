@@ -1,0 +1,19 @@
+# The same kind of MCP tests against an offline mock server (mocks/weather.mcp-mock.yaml): no network needed.
+defaults:
+  type: mcp
+  server: { name: Weather (offline mock) }
+  tags: [mcp, offline]
+tests:
+  - name: Mock MCP tool returns a forecast
+    tool: { name: get_forecast }
+    arguments: { city: Paris }
+    assertions:
+      - { type: status, expected: success }
+      - { type: equals, path: $.city, expected: Paris }
+      - { type: equals, path: "$.days[0].sky", expected: sunny }
+
+  - name: Mock MCP tool reports an error
+    tool: { name: get_forecast }
+    arguments: { city: Atlantis }
+    assertions:
+      - { type: status, expected: error }

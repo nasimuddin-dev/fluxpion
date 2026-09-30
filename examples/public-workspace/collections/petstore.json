@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "1.0",
+  "id": "petstore",
+  "name": "Swagger Petstore (OpenAPI contract)",
+  "description": "The public [Swagger Petstore](https://petstore3.swagger.io) sample API. Every request also has an **openapi** check against `specs/petstore.json`, so a response that doesn't match the documented contract fails, even with status 200.\n\nThe Petstore is shared by everyone on the internet: pets can change or disappear between requests, so a run may occasionally fail for reasons outside your control.",
+  "version": 1,
+  "variables": [],
+  "updatedAt": "2026-09-29T00:00:00.000Z",
+  "items": [
+    {
+      "kind": "http",
+      "id": "ps-find",
+      "name": "Find available pets",
+      "request": {
+        "method": "GET",
+        "url": "{{petstore}}/pet/findByStatus",
+        "params": [
+          {
+            "key": "status",
+            "value": "available",
+            "enabled": true
+          }
+        ],
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "enabled": true
+          }
+        ]
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "openapi",
+          "spec": "specs/petstore.json"
+        }
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "ps-add",
+      "name": "Add a pet",
+      "request": {
+        "method": "POST",
+        "url": "{{petstore}}/pet",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "enabled": true
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "type": "json",
+          "content": "{\n  \"id\": {{$randomInt}}{{$randomInt}},\n  \"name\": \"TestPion pet\",\n  \"photoUrls\": [\"https://example.com/pet.png\"],\n  \"status\": \"available\",\n  \"category\": { \"id\": 1, \"name\": \"Dogs\" },\n  \"tags\": [{ \"id\": 1, \"name\": \"testpion\" }]\n}"
+        }
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "equals",
+          "path": "$.name",
+          "expected": "TestPion pet"
+        },
+        {
+          "type": "openapi",
+          "spec": "specs/petstore.json"
+        }
+      ],
+      "testScript": "pm.collectionVariables.set('newPetId', pm.response.json().id);"
+    },
+    {
+      "kind": "http",
+      "id": "ps-get",
+      "name": "Get a pet by id",
+      "request": {
+        "method": "GET",
+        "url": "{{petstore}}/pet/{{petId}}",
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "enabled": true
+          }
+        ]
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "exists",
+          "path": "$.name"
+        },
+        {
+          "type": "openapi",
+          "spec": "specs/petstore.json"
+        }
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "ps-missing",
+      "name": "Unknown pet is a 404",
+      "request": {
+        "method": "GET",
+        "url": "{{petstore}}/pet/987654321987",
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "enabled": true
+          }
+        ]
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 404
+        }
+      ]
+    }
+  ]
+}

@@ -28,7 +28,7 @@ export interface McpMockResponse {
   when?: Record<string, unknown>;
   /** Text content; `{{args.name}}` is replaced by the call's argument. */
   text?: string;
-  /** JSON content (sent as text JSON and as structuredContent). */
+  /** JSON content (sent as text JSON and as structuredContent); `{{args.name}}` works in its strings. */
   json?: unknown;
   /** Raw MCP content items, if you need images or several parts. */
   content?: unknown[];
@@ -65,6 +65,21 @@ const fill = (s: string, vars: Record<string, unknown>) =>
     return v === undefined ? m : typeof v === 'string' ? v : JSON.stringify(v);
   });
 
+/** `{{args.x}}` in every string of a JSON value; a string that is only a placeholder keeps the argument's type. */
+const fillDeep = (v: unknown, vars: Record<string, unknown>): unknown => {
+  if (typeof v === 'string') {
+    const whole = /^\{\{\s*([\w.]+)\s*\}\}$/.exec(v);
+    if (whole) {
+      const got = whole[1]!.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), vars);
+      if (got !== undefined) return got;
+    }
+    return fill(v, vars);
+  }
+  if (Array.isArray(v)) return v.map((x) => fillDeep(x, vars));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fillDeep(x, vars)]));
+  return v;
+};
+
 /** The MCP result for a tool call against the mock. */
 export function mockToolResult(d: McpMockDefinition, name: string, args: Record<string, unknown> = {}): { content: unknown[]; isError?: boolean; structuredContent?: unknown } {
   const tool = d.tools?.find((t) => t.name === name);
@@ -73,7 +88,10 @@ export function mockToolResult(d: McpMockDefinition, name: string, args: Record<
   const r = rs.find((x) => x.when && subset(args, x.when)) ?? rs.find((x) => !x.when);
   if (!r) return { content: [{ type: 'text', text: `Mock response for ${name}: ${JSON.stringify(args)}` }] };
   if (r.content) return { content: r.content, ...(r.isError ? { isError: true } : {}) };
-  if (r.json !== undefined) return { content: [{ type: 'text', text: JSON.stringify(r.json) }], structuredContent: r.json, ...(r.isError ? { isError: true } : {}) };
+  if (r.json !== undefined) {
+    const json = fillDeep(r.json, { args });
+    return { content: [{ type: 'text', text: JSON.stringify(json) }], structuredContent: json, ...(r.isError ? { isError: true } : {}) };
+  }
   return { content: [{ type: 'text', text: fill(r.text ?? '', { args }) }], ...(r.isError ? { isError: true } : {}) };
 }
 

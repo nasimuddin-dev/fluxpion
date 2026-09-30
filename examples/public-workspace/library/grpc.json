@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "folders": ["grpcb.in"],
+  "items": [
+    {
+      "id": "grpc-hello",
+      "name": "Say hello (unary)",
+      "folder": "grpcb.in",
+      "data": {
+        "target": "{{grpcHost}}",
+        "method": "hello.HelloService/SayHello",
+        "message": "{\n  \"greeting\": \"TestPion\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": false,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-hello-stream",
+      "name": "Lots of replies (server streaming)",
+      "folder": "grpcb.in",
+      "data": {
+        "target": "{{grpcHost}}",
+        "method": "hello.HelloService/LotsOfReplies",
+        "message": "{\n  \"greeting\": \"TestPion\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": false,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-sum",
+      "name": "Add two numbers",
+      "folder": "grpcb.in",
+      "data": {
+        "target": "{{grpcHost}}",
+        "method": "addsvc.Add/Sum",
+        "message": "{\n  \"a\": 20,\n  \"b\": 22\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": false,
+        "timeoutMs": 30000
+      }
+    }
+  ]
+}

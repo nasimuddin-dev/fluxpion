@@ -534,6 +534,28 @@ export class WorkspaceManager {
     return { id: next.id, name: newName, path: dest, updatedAt: next.updatedAt };
   }
 
+  /**
+   * Copy a bundled workspace (such as the examples that ship with the app) into the data folder, once:
+   * if a workspace with the same id is already there, that one is returned untouched, so the user's
+   * edits survive app updates. Execution artefacts are never copied.
+   */
+  installTemplate(templateDir: string): WorkspaceInfo {
+    const w = readJson<Workspace>(join(templateDir, 'workspace.json'));
+    const existing = this.list().find((x) => x.id === w.id);
+    if (existing) return existing;
+    let dest = join(this.appDir, 'workspaces', slugify(w.name));
+    let i = 2;
+    while (existsSync(dest)) dest = join(this.appDir, 'workspaces', `${slugify(w.name)}-${i++}`);
+    cpSync(templateDir, dest, {
+      recursive: true,
+      filter: (s) => {
+        const top = relative(templateDir, s).split(/[\\/]/)[0] ?? '';
+        return !['runs', 'traces', 'payloads', 'reports', 'baselines'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
+      },
+    });
+    return { id: w.id, name: w.name, path: dest, updatedAt: w.updatedAt };
+  }
+
   /** Whether the app created this workspace (inside its data folder) rather than a folder the user opened. */
   isManaged(path: string): boolean {
     return resolve(path).startsWith(resolve(this.appDir, 'workspaces'));

@@ -30,6 +30,7 @@ const backend = new Backend({
     for (const c of clients) c.write(data);
   },
   openExternal: (url) => console.log(`[bridge] open ${url}`),
+  examplesDir: process.env.TESTPION_EXAMPLES ?? join(process.cwd(), 'examples', 'public-workspace'),
 });
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {

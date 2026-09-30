@@ -34,6 +34,13 @@ export function workspaceHandlers(be: Backend): Handlers {
       be.openStore(root);
       return be.handlers['ws.current']!({});
     },
+    /** Open the examples workspace that ships with the app (copied into the data folder the first time). */
+    'ws.openExamples': () => {
+      const info = be.installExamples();
+      if (!info) throw new ApsError('ConfigurationError', 'This installation has no examples workspace', { suggestions: [] });
+      be.openStore(info.path);
+      return be.handlers['ws.current']!({});
+    },
     'ws.open': async ({ ref }: { ref?: string }) => {
       let path = ref ? be.manager.resolve(ref) : undefined;
       if (!ref && be.host.openDialog) {

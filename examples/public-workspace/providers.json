@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0",
+  "providers": [
+    {
+      "id": "demo",
+      "name": "Offline demo model",
+      "kind": "mock",
+      "baseUrl": "mock://local",
+      "defaultModel": "demo",
+      "headers": [
+        {
+          "key": "x-mock-rules",
+          "value": "[{\"match\":\"ignore (all )?previous instructions|reveal (your|the) system prompt\",\"response\":\"I'm sorry, I can't share that. I can help with questions about pets and orders.\"},{\"match\":\"customer:.*(cancel|can't make it|cannot make it)\",\"response\":\"{\\\"intent\\\":\\\"cancellation\\\"}\"},{\"match\":\"customer:.*(refill|prescription)\",\"response\":\"{\\\"intent\\\":\\\"refill\\\"}\"},{\"match\":\"customer:.*(book|appointment|schedule)\",\"response\":\"{\\\"intent\\\":\\\"booking\\\"}\"},{\"match\":\"customer:\",\"response\":\"{\\\"intent\\\":\\\"other\\\"}\"},{\"match\":\"pet (number |id |#)?(\\\\d+)\",\"toolCall\":{\"name\":\"getPetById\",\"arguments\":{\"petId\":10}}},{\"match\":\"opening hours|when .*open\",\"response\":\"The shop opens at 9am and closes at 5pm on weekdays [doc-1].\"},{\"match\":\"summari[sz]e\",\"response\":\"TestPion tests REST, GraphQL, gRPC, WebSocket, MCP and AI apps from one place.\"},{\"match\":\"haiku\",\"response\":\"Requests fly out fast / assertions catch every slip / green checks greet the dawn\"}]"
+        },
+        { "key": "x-mock-latency-ms", "value": "120" }
+      ]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "kind": "openai-compatible",
+      "baseUrl": "https://api.openai.com/v1",
+      "defaultModel": "gpt-4o-mini",
+      "apiKey": "{{$secret.provider.openai.apiKey}}"
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "kind": "anthropic",
+      "baseUrl": "https://api.anthropic.com",
+      "defaultModel": "claude-haiku-4-5-20251001",
+      "apiKey": "{{$secret.provider.anthropic.apiKey}}"
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "kind": "gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com",
+      "defaultModel": "gemini-2.5-flash",
+      "apiKey": "{{$secret.provider.gemini.apiKey}}"
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (local)",
+      "kind": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "defaultModel": "llama3.2"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# Evaluation: one test per dataset row. Uses the offline demo model; switch `provider` to openai,
+# anthropic, gemini or ollama (add the API key under Settings ▸ Providers) to evaluate a real model.
+name: Intent classification
+type: llm
+tags: [ai, evaluation, offline]
+model: { provider: demo, name: demo, temperature: 0 }
+prompt: |
+  Classify the customer intent as JSON {"intent": "booking" | "cancellation" | "refill" | "other"}.
+  Customer: {{message}}
+responseFormat: { type: json }
+dataset:
+  path: ../../datasets/intents.jsonl
+evaluators:
+  - type: exact-match
+    path: $.intent
+    expected: "{{expected}}"
+  - type: tokens
+    max: 500

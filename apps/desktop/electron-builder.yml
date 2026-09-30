@@ -23,6 +23,19 @@ files:
   - "!dist-electron/web-server.cjs"
   - package.json
 asar: true
+# The examples workspace (public APIs, every protocol): copied into the user's data folder and opened on first launch.
+extraResources:
+  - from: ../../examples/public-workspace
+    to: examples/public-workspace
+    filter:
+      - "**/*"
+      - "!runs/**"
+      - "!traces/**"
+      - "!payloads/**"
+      - "!reports/**"
+      - "!baselines/**"
+      - "!database.sqlite*"
+      - "!metadata.jsonl"
 npmRebuild: false
 # Auto-update source (electron-updater). Builds use --publish never; the release workflow uploads
 # the installers plus latest.yml / latest-linux.yml and the .blockmap files to the GitHub Release.

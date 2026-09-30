@@ -1,0 +1,17 @@
+# MCP tool tests against a public MCP server (Streamable HTTP), defined in mcp-servers.json.
+defaults:
+  type: mcp
+  server: { name: Petstore MCP }
+  tags: [mcp, public]
+tests:
+  - name: Petstore MCP finds available pets
+    tool: { name: findPetsByStatus }
+    arguments: { status: available }
+    assertions:
+      - { type: status, expected: success }
+
+  - name: Petstore MCP gets a pet by id
+    tool: { name: getPetById }
+    arguments: { petId: 10 }
+    assertions:
+      - { type: status, expected: success }

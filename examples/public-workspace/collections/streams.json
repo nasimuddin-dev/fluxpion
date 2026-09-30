@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "id": "live-streams",
+  "name": "Live streams (SSE)",
+  "description": "Server-Sent Events: the response never ends, events arrive live. Press **Send**, watch the **Events** tab fill up, then press **Stop** (the events received so far stay). These requests are kept out of the other collections so a collection run doesn't wait on an endless stream.",
+  "version": 1,
+  "variables": [],
+  "updatedAt": "2026-09-29T00:00:00.000Z",
+  "items": [
+    {
+      "kind": "http",
+      "id": "sse-wikimedia",
+      "name": "Wikipedia edits, live",
+      "description": "Every edit on Wikimedia sites as it happens ([EventStreams](https://stream.wikimedia.org)). Busy: dozens of events per second.",
+      "request": {
+        "method": "GET",
+        "url": "{{sseStream}}",
+        "headers": [{ "key": "Accept", "value": "text/event-stream", "enabled": true }]
+      }
+    }
+  ]
+}

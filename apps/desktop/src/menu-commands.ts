@@ -19,6 +19,7 @@ export type MenuCommand =
   | 'new-environment'
   | 'new-workspace'
   | 'open-workspace'
+  | 'open-examples'
   | 'import'
   | 'export-collection'
   | 'export-environment'
@@ -75,6 +76,12 @@ export async function runMenuCommand(cmd: MenuCommand): Promise<void> {
           await call('ws.open', { ref: path });
         }
         return void (await s.refreshWorkspace());
+      }
+      case 'open-examples': {
+        await call('ws.openExamples', {});
+        await s.refreshWorkspace();
+        s.toast('Opened the TestPion Examples workspace', 'success');
+        return s.setView('home');
       }
       case 'import':
         return s.openIntent('collections', { import: true });

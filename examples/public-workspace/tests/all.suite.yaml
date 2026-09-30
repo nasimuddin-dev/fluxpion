@@ -1,0 +1,15 @@
+# Everything: REST, contract, GraphQL, gRPC, MCP (public and mock), AI evaluation, safety, RAG and an agent.
+name: All examples
+tests:
+  - rest/httpbin.yaml
+  - rest/petstore-contract.yaml
+  - graphql/countries.yaml
+  - grpc/grpcbin.yaml
+  - mcp/petstore-mcp.yaml
+  - mcp/weather-mock.yaml
+  - ai/intent-evaluation.yaml
+  - ai/safety.yaml
+  - ai/rag.yaml
+  - agent/petstore-agent.yaml
+concurrency: 4
+environment: Public APIs

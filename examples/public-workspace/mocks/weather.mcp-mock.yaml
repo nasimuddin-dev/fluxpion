@@ -1,0 +1,37 @@
+name: weather-mock
+instructions: A fake weather service that works offline. Try get_forecast with city "Paris", or "Atlantis" for an error.
+tools:
+  - name: get_forecast
+    description: Weather forecast for a city.
+    inputSchema:
+      type: object
+      properties:
+        city: { type: string, description: City name }
+        days: { type: integer, minimum: 1, maximum: 7, default: 3 }
+      required: [city]
+    annotations: { readOnlyHint: true }
+    responses:
+      - when: { city: Atlantis }
+        text: "No city called {{args.city}}"
+        isError: true
+      - json: { city: "{{args.city}}", unit: celsius, days: [{ day: 1, high: 21, low: 12, sky: sunny }, { day: 2, high: 19, low: 11, sky: cloudy }, { day: 3, high: 17, low: 10, sky: rain }] }
+  - name: get_alerts
+    description: Active weather alerts for a region.
+    inputSchema:
+      type: object
+      properties: { region: { type: string } }
+      required: [region]
+    responses:
+      - json: { region: "{{args.region}}", alerts: [] }
+resources:
+  - uri: weather://stations
+    name: Weather stations
+    mimeType: application/json
+    text: '[{"id":"PAR-01","city":"Paris"},{"id":"LON-02","city":"London"}]'
+prompts:
+  - name: packing_list
+    description: What to pack for a trip, based on the forecast.
+    arguments: [{ name: city, required: true }, { name: days, required: false }]
+    messages:
+      - role: user
+        text: "Check the forecast for {{city}} and suggest a packing list for {{days}} days."

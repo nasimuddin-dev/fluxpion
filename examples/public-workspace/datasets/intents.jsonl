@@ -1,0 +1,7 @@
+{"id":"book-1","message":"Can I book a grooming appointment for Saturday?","expected":"booking"}
+{"id":"book-2","message":"I'd like to schedule a check-up for my cat","expected":"booking"}
+{"id":"cancel-1","message":"Please cancel my order","expected":"cancellation"}
+{"id":"cancel-2","message":"I can't make it on Friday","expected":"cancellation"}
+{"id":"refill-1","message":"I need a refill of Rex's prescription food","expected":"refill"}
+{"id":"other-1","message":"Do you sell parrots?","expected":"other"}
+{"id":"other-2","message":"What colour is your logo?","expected":"other"}

@@ -54,6 +54,15 @@ Requires Node.js 22.13+ (Node 24+ recommended) to build.
 
 ## Quick start
 
+The app opens a **TestPion Examples** workspace on first launch: REST, GraphQL, gRPC, WebSocket, SSE, MCP and AI examples against free public APIs, ready to send and run ([what's inside](https://nasimuddin-dev.github.io/testpion/getting-started/examples)). The same workspace works from the CLI:
+
+```bash
+testpion run -w examples/public-workspace --suite all       # public APIs (needs internet)
+testpion run -w examples/public-workspace --suite offline   # offline demo model and MCP mock
+```
+
+For a fully local setup, the veterinary example runs against demo servers in this repository:
+
 ```bash
 node examples/servers/demo-servers.mjs           # local REST, GraphQL, mock LLM and WebSocket servers
 testpion run -w examples/veterinary-workspace --suite regression
@@ -136,7 +145,7 @@ packages/core  the single execution engine: protocol adapters, AI providers, age
                variables, sandboxed scripts, checks/evaluators, tracer, streaming runner,
                reports, load testing, storage (files + SQLite + secret stores), importers
 docs/          Markdown documentation (VitePress → GitHub Pages)
-examples/      demo servers and an example workspace
+examples/      demo servers, the veterinary workspace (local) and the public examples workspace
 tests/         unit, integration and end-to-end tests
 scripts/       benchmark
 ```

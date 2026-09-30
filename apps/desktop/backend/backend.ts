@@ -88,6 +88,7 @@ import {
   MonitorScheduler,
   listMonitors,
   lastMonitorResult,
+  type WorkspaceInfo,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -107,6 +108,8 @@ export interface BackendHost {
   saveDialog?(opts: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | undefined>;
   openDialog?(opts: { directory?: boolean; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | undefined>;
   openPath?(path: string): void | Promise<unknown>;
+  /** The examples workspace shipped with the app (copied into the data folder on first launch). */
+  examplesDir?: string;
   /** Don't run monitors on their schedule (tests, one-off tools). */
   noMonitors?: boolean;
 }
@@ -208,6 +211,18 @@ export class Backend {
     if (!host.noMonitors) this.monitorScheduler.start();
   }
 
+  /** Copy the bundled examples workspace into the data folder (once); undefined when this host has none. */
+  installExamples(): WorkspaceInfo | undefined {
+    const dir = this.host.examplesDir;
+    if (!dir || !existsSync(join(dir, 'workspace.json'))) return undefined;
+    try {
+      return this.manager.installTemplate(dir);
+    } catch (e) {
+      this.logger.warn(`Could not install the examples workspace: ${(e as Error).message}`);
+      return undefined;
+    }
+  }
+
   /** Open the last workspace, or create a starter workspace on first launch. */
   private bootstrapWorkspace(): void {
     try {
@@ -218,7 +233,9 @@ export class Backend {
       const s = this.manager.create('My Workspace');
       s.saveProviders([{ id: 'offline', name: 'Offline mock', kind: 'mock', baseUrl: DEFAULT_BASE_URLS.mock! }]);
       s.close();
-      this.openStore(this.manager.resolve('My Workspace')!);
+      // first launch: start in the examples (public APIs, every protocol), next to an empty workspace
+      const examples = this.installExamples();
+      this.openStore(examples?.path ?? this.manager.resolve('My Workspace')!);
     } catch (e) {
       this.logger.error('Failed to open workspace', normalizeError(e));
     }

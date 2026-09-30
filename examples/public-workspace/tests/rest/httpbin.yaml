@@ -1,0 +1,40 @@
+# REST tests as a file: several tests share defaults; values can come from the environment.
+defaults:
+  type: http
+  tags: [rest, public]
+tests:
+  - id: httpbin-get
+    name: httpbin echoes query parameters
+    method: GET
+    url: "{{httpbin}}/get?tool=testpion"
+    assertions:
+      - { type: status, expected: 200 }
+      - { type: equals, path: $.args.tool, expected: testpion }
+      - { type: latency, max: 5000 }
+
+  - id: httpbin-post
+    name: httpbin echoes a JSON body
+    method: POST
+    url: "{{httpbin}}/post"
+    body: { order: 42, items: [kibble, leash] }
+    extract:
+      echoedOrder: $.json.order
+    assertions:
+      - { type: status, expected: 200 }
+      - { type: equals, path: "$.json.items[1]", expected: leash }
+
+  - id: httpbin-chained
+    name: A later test uses an extracted value
+    dependsOn: httpbin-post
+    method: GET
+    url: "{{httpbin}}/anything/orders/{{echoedOrder}}"
+    assertions:
+      - { type: status, expected: 200 }
+      - { type: contains, path: $.url, expected: /orders/42 }
+
+  - id: httpbin-teapot
+    name: Status 418 is expected here
+    method: GET
+    url: "{{httpbin}}/status/418"
+    assertions:
+      - { type: status, expected: 418 }

@@ -1,0 +1,9 @@
+# Runs without internet: offline demo model and the mock MCP server.
+name: Offline
+tests:
+  - mcp/weather-mock.yaml
+  - ai/intent-evaluation.yaml
+  - ai/safety.yaml
+  - ai/rag.yaml
+concurrency: 4
+environment: Public APIs

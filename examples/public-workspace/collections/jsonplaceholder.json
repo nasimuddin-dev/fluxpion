@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0",
+  "id": "jsonplaceholder",
+  "name": "Scripts & chaining (JSONPlaceholder)",
+  "description": "A fake blog API from [JSONPlaceholder](https://jsonplaceholder.typicode.com). Writes are simulated: the server answers as if it saved them.\n\nThe requests pass data along with scripts: **List posts** saves the first post's id in `postId`, and the next requests use `{{postId}}`. Run the collection in order to see it (right-click ▸ **Run collection**). **Posts as a table** draws the response with `pm.visualizer` (open the **Visualize** tab of the response).",
+  "version": 1,
+  "variables": [{ "key": "userId", "value": "1", "enabled": true }],
+  "preRequestScript": "// runs before every request in this collection\npm.variables.set('requestedAt', new Date().toISOString());",
+  "updatedAt": "2026-09-29T00:00:00.000Z",
+  "items": [
+    {
+      "kind": "http",
+      "id": "jp-list",
+      "name": "List posts of a user",
+      "request": { "method": "GET", "url": "{{jsonplaceholder}}/posts", "params": [{ "key": "userId", "value": "{{userId}}", "enabled": true }] },
+      "assertions": [
+        { "type": "status", "expected": 200 },
+        { "type": "greater-than", "path": "$.length", "expected": 0 }
+      ],
+      "testScript": "const posts = pm.response.json();\npm.test('every post belongs to the user', () => {\n  for (const p of posts) pm.expect(p.userId).to.eql(Number(pm.collectionVariables.get('userId')));\n});\n// pass the first post's id to the next requests\npm.collectionVariables.set('postId', posts[0].id);\nconsole.log('Saved postId', posts[0].id);"
+    },
+    {
+      "kind": "http",
+      "id": "jp-get",
+      "name": "Get the post",
+      "request": { "method": "GET", "url": "{{jsonplaceholder}}/posts/{{postId}}" },
+      "assertions": [
+        { "type": "status", "expected": 200 },
+        { "type": "exists", "path": "$.title" }
+      ],
+      "testScript": "pm.test('it is the post we asked for', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('postId'))));"
+    },
+    {
+      "kind": "http",
+      "id": "jp-comments",
+      "name": "Comments of the post",
+      "request": { "method": "GET", "url": "{{jsonplaceholder}}/posts/:id/comments", "pathVariables": [{ "key": "id", "value": "{{postId}}", "enabled": true }] },
+      "assertions": [
+        { "type": "status", "expected": 200 },
+        { "type": "contains", "path": "$[0].email", "expected": "@" }
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "jp-create",
+      "name": "Create a post",
+      "request": {
+        "method": "POST",
+        "url": "{{jsonplaceholder}}/posts",
+        "headers": [{ "key": "Content-Type", "value": "application/json; charset=UTF-8", "enabled": true }],
+        "body": { "type": "json", "content": "{\n  \"title\": \"Hello from {{appName}}\",\n  \"body\": \"Created at {{requestedAt}}\",\n  \"userId\": {{userId}}\n}" }
+      },
+      "assertions": [
+        { "type": "status", "expected": 201 },
+        { "type": "equals", "path": "$.title", "expected": "Hello from TestPion" },
+        { "type": "exists", "path": "$.id" }
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "jp-update",
+      "name": "Update the post",
+      "request": {
+        "method": "PATCH",
+        "url": "{{jsonplaceholder}}/posts/{{postId}}",
+        "headers": [{ "key": "Content-Type", "value": "application/json", "enabled": true }],
+        "body": { "type": "json", "content": "{ \"title\": \"Updated title\" }" }
+      },
+      "assertions": [
+        { "type": "status", "expected": 200 },
+        { "type": "equals", "path": "$.title", "expected": "Updated title" }
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "jp-delete",
+      "name": "Delete the post",
+      "request": { "method": "DELETE", "url": "{{jsonplaceholder}}/posts/{{postId}}" },
+      "assertions": [{ "type": "status", "expected": 200 }]
+    },
+    {
+      "kind": "http",
+      "id": "jp-visualize",
+      "name": "Posts as a table (Visualizer)",
+      "request": { "method": "GET", "url": "{{jsonplaceholder}}/posts", "params": [{ "key": "_limit", "value": "8", "enabled": true }] },
+      "assertions": [{ "type": "status", "expected": 200 }],
+      "testScript": "const template = `\n<style>table{border-collapse:collapse;font:13px system-ui}td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}</style>\n<table>\n  <tr><th>#</th><th>Title</th></tr>\n  {{#each posts}}<tr><td>{{id}}</td><td>{{title}}</td></tr>{{/each}}\n</table>`;\npm.visualizer.set(template, { posts: pm.response.json() });"
+    }
+  ]
+}

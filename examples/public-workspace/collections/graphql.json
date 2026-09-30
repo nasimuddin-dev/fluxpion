@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "1.0",
+  "id": "graphql-public",
+  "name": "GraphQL (Countries, Rick and Morty)",
+  "description": "Queries against two free GraphQL APIs: [Countries](https://countries.trevorblades.com) and [Rick and Morty](https://rickandmortyapi.com). Open one in the **GraphQL** view to explore the schema, get autocomplete and see the response.",
+  "version": 1,
+  "variables": [],
+  "updatedAt": "2026-09-29T00:00:00.000Z",
+  "items": [
+    {
+      "kind": "folder",
+      "id": "gq-countries",
+      "name": "Countries",
+      "items": [
+        {
+          "kind": "graphql",
+          "id": "gq-country",
+          "name": "Country by code",
+          "request": {
+            "endpoint": "{{countriesGraphql}}",
+            "query": "query Country($code: ID!) {\n  country(code: $code) {\n    name\n    capital\n    currency\n    emoji\n    languages { name }\n  }\n}",
+            "variables": { "code": "JP" },
+            "operationName": "Country"
+          },
+          "assertions": [
+            { "type": "http-status", "expected": 200 },
+            { "type": "graphql-no-errors" },
+            { "type": "equals", "path": "$.data.country.capital", "expected": "Tokyo" }
+          ]
+        },
+        {
+          "kind": "graphql",
+          "id": "gq-continent",
+          "name": "Countries of a continent",
+          "request": {
+            "endpoint": "{{countriesGraphql}}",
+            "query": "query Continent($code: ID!) {\n  continent(code: $code) {\n    name\n    countries { code name }\n  }\n}",
+            "variables": { "code": "EU" }
+          },
+          "assertions": [
+            { "type": "graphql-no-errors" },
+            { "type": "equals", "path": "$.data.continent.name", "expected": "Europe" },
+            { "type": "greater-than", "path": "$.data.continent.countries.length", "expected": 40 }
+          ]
+        },
+        {
+          "kind": "graphql",
+          "id": "gq-invalid",
+          "name": "Invalid field returns an error",
+          "request": {
+            "endpoint": "{{countriesGraphql}}",
+            "query": "{\n  country(code: \"FR\") {\n    name\n    population\n  }\n}"
+          },
+          "assertions": [{ "type": "exists", "path": "$.errors[0].message" }]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "gq-rick",
+      "name": "Rick and Morty",
+      "items": [
+        {
+          "kind": "graphql",
+          "id": "gq-characters",
+          "name": "Characters (paged, filtered)",
+          "request": {
+            "endpoint": "{{rickAndMortyGraphql}}",
+            "query": "query Characters($page: Int, $name: String) {\n  characters(page: $page, filter: { name: $name }) {\n    info { count pages next }\n    results { id name status species }\n  }\n}",
+            "variables": { "page": 1, "name": "rick" }
+          },
+          "assertions": [
+            { "type": "graphql-no-errors" },
+            { "type": "greater-than", "path": "$.data.characters.info.count", "expected": 0 },
+            { "type": "contains", "path": "$.data.characters.results[0].name", "expected": "Rick" }
+          ]
+        },
+        {
+          "kind": "graphql",
+          "id": "gq-episode",
+          "name": "Episode with its characters",
+          "request": {
+            "endpoint": "{{rickAndMortyGraphql}}",
+            "query": "query Episode($id: ID!) {\n  episode(id: $id) {\n    name\n    air_date\n    episode\n    characters { name }\n  }\n}",
+            "variables": { "id": "1" }
+          },
+          "assertions": [
+            { "type": "graphql-no-errors" },
+            { "type": "equals", "path": "$.data.episode.episode", "expected": "S01E01" }
+          ]
+        }
+      ]
+    }
+  ]
+}

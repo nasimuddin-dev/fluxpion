@@ -1,0 +1,19 @@
+# An agent (the offline demo model) that uses the tools of a public MCP server.
+# The model decides to call getPetById; the test checks which tools were used and with what arguments.
+name: Pet shop agent looks up a pet
+type: agent
+tags: [ai, agent, mcp, public]
+model: { provider: demo, name: demo }
+system: You are a pet shop assistant. Use the tools to answer questions about pets.
+input: What can you tell me about pet 10?
+mcpServers: [Petstore MCP]
+maxSteps: 3
+evaluators:
+  - type: tool-called
+    tool: getPetById
+    arguments: { petId: 10 }
+  - type: tool-not-called
+    tool: deletePet
+  - type: max-tool-calls
+    max: 2
+  - type: tool-args-valid
