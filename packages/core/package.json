@@ -1,6 +1,6 @@
 {
   "name": "@testpion/core",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "TestPion core engine: protocol adapters, execution, assertions, evaluation, tracing, storage.",
   "license": "MIT",
   "type": "module",

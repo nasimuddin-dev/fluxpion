@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.1 — 2026-09-30
+
+Highlights: fixes a **blank window on start** (after opening a GraphQL request from the TestPion Examples); **one sidebar layout in every view** (saved items, Environments, History or Runs); **saved evaluations and load tests** you can run again from their folders; and **API coverage** of an OpenAPI document by your tests (app, `testpion coverage --min`, MCP `api_coverage`).
 
 - **Fix: blank window on start** after opening a GraphQL request whose variables are saved as a JSON object (e.g. in the TestPion Examples workspace). The app remembers the last view, so it failed on every start. The variables now open as JSON text, editors accept any saved value, and a problem in one view no longer blanks the window: it shows the error with **Try again** and **Reset this view**.
 - **Fix: the test suite no longer writes to your real settings** (it added temporary workspaces to the list). Leftover entries from the temp folder are forgotten automatically.
