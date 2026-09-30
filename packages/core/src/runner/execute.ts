@@ -41,6 +41,8 @@ import { applyCookieJarOps, type CookieJar } from '../cookies/cookie-jar.js';
 import { realtimeModeFor, runRealtimeExchange } from '../protocols/realtime.js';
 
 export interface ExecServices {
+  /** Source of a workspace script package (pm.require), when there is one. */
+  scriptPackage?: (name: string) => string | undefined;
   vars: VariableScope;
   providers: ProviderRegistry;
   mcp: McpManager;
@@ -112,7 +114,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
           : test.type === 'graphql'
             ? { method: 'POST', url: test.endpoint, headers: [...(test.headers ?? [])], body: JSON.stringify({ query: test.query, variables: test.graphqlVariables, operationName: test.operationName }) }
             : undefined;
-      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName } }, { sendRequest });
+      const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName } }, { sendRequest, requirePackage: svc.scriptPackage });
       root.event('pre-request script', { logs: s.logs, error: s.error });
       if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
       applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
@@ -184,7 +186,7 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
       jar: svc.cookieJar?.list(),
       info: { requestName: test.name, requestId: test.id, environmentName: svc.environmentName },
       data: { body: ctx.body, toolCalls: ctx.toolCalls, tokens: ctx.tokens, error: ctx.error },
-    }, { sendRequest });
+    }, { sendRequest, requirePackage: svc.scriptPackage });
     if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
     applyScriptOutput(s, [scope, svc.vars], { redactor: svc.redactor, persist: svc.persistVariable });
     if (s.nextRequest !== undefined) metadata.nextRequest = s.nextRequest;

@@ -112,6 +112,7 @@ export function createEngineContext(opts: ContextOptions): EngineContext {
     cookieJar: opts.cookieJar === false ? undefined : (opts.cookieJar ?? new CookieJar()),
     environmentName: environment?.name,
     readFile: (path: string) => readFileSync(store.safePath(path, opts.fileRoot ?? store.root), 'utf8'),
+    scriptPackage: (name: string) => store.readScriptPackage(name),
   };
   return { services, vars, redactor, environment, collection, dispose: () => mcp.close() };
 }

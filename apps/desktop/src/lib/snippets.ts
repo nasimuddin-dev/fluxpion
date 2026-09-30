@@ -124,6 +124,8 @@ declare const pm: {
     request: string | { url: string; method?: string; header?: Array<{ key: string; value: string }> | Record<string, string>; body?: { mode: 'raw'; raw: string } | { mode: 'urlencoded'; urlencoded: Array<{ key: string; value: string }> } },
     callback?: (err: Error | null, res: { code: number; status: string; responseTime: number; headers: PmHeaderList; json(): any; text(): string } | null) => void,
   ): void;
+  /** A workspace script package (packages/<name>.js), like Postman's package library. */
+  require(name: string): any;
   uuid(): string;
 };
 declare const postman: {
@@ -152,4 +154,6 @@ declare function btoa(s: string): string;
 declare function atob(s: string): string;
 /** TestPion's name for the script API: the same object as pm. */
 declare const tp: typeof pm;
+/** In a script package: what it offers to pm.require. */
+declare const module: { exports: any };
 `;

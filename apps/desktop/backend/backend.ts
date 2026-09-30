@@ -606,7 +606,7 @@ export class Backend {
           request: { method: request.method, url: request.url, headers: request.headers ?? [], body: bodyText },
           jar: ctx.services.cookieJar?.list(),
           info: { requestName: p.name, requestId: p.requestId, environmentName: ctx.environment?.name },
-        }, { sendRequest: scriptSender });
+        }, { sendRequest: scriptSender, requirePackage: (n) => this.ws.readScriptPackage(n) });
         scriptLogs.push(...out.logs, ...sentLogs(out));
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
@@ -668,7 +668,7 @@ export class Backend {
           cookies: responseCookies(response.cookies, ctx.services.cookieJar, response.url),
           jar: ctx.services.cookieJar?.list(),
           info: { requestName: p.name, requestId: p.requestId, environmentName: ctx.environment?.name },
-        }, { sendRequest: scriptSender });
+        }, { sendRequest: scriptSender, requirePackage: (n) => this.ws.readScriptPackage(n) });
         scriptLogs.push(...out.logs, ...sentLogs(out));
         if (out.visualizer !== undefined) visual = out.visualizer;
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
@@ -823,7 +823,7 @@ export class Backend {
           request: { method: 'POST', url: request.endpoint, headers: request.headers ?? [], body: JSON.stringify({ query: request.query, variables: request.variables }) },
           jar: ctx.services.cookieJar?.list(),
           info,
-        }, { sendRequest: scriptSender });
+        }, { sendRequest: scriptSender, requirePackage: (n) => this.ws.readScriptPackage(n) });
         scriptLogs.push(...out.logs.map((message) => ({ phase: 'pre-request' as const, message: ctx.redactor.redactString(message) })));
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
@@ -850,7 +850,7 @@ export class Backend {
           response: { status: r.response.status, headers: r.response.headers, body: r.response.bodyPreview, time: r.response.durationMs },
           jar: ctx.services.cookieJar?.list(),
           info,
-        }, { sendRequest: scriptSender });
+        }, { sendRequest: scriptSender, requirePackage: (n) => this.ws.readScriptPackage(n) });
         scriptLogs.push(...out.logs.map((message) => ({ phase: 'test' as const, message: ctx.redactor.redactString(message) })));
         applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
         if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);

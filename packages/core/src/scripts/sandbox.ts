@@ -91,6 +91,8 @@ export interface ScriptOptions {
   sendRequest?: ScriptRequestSender;
   /** Most `pm.sendRequest` calls per script run (default 20). */
   maxRequests?: number;
+  /** Source of a workspace script package, for `pm.require(name)`. */
+  requirePackage?: (name: string) => string | undefined;
 }
 
 const emptyScopes = () => ({
@@ -186,6 +188,13 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
       }
     });
     fn('__host_dynamic', (name) => JSON.stringify(dynamicValue(name ?? '') ?? null));
+    fn('__host_package', (name) => {
+      try {
+        return JSON.stringify(opts.requirePackage?.(name ?? '') ?? null);
+      } catch {
+        return 'null';
+      }
+    });
     fn('__host_hash', (a, s) => createHash(alg(a)).update(s ?? '').digest('hex'));
     fn('__host_hmac', (a, key, s) => createHmac(alg(a), key ?? '').update(s ?? '').digest('hex'));
     fn('__host_b64', (s) => Buffer.from(s ?? '', 'utf8').toString('base64'));

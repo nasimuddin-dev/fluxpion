@@ -482,6 +482,17 @@ const CryptoJS = {
 };
 const btoa = (s) => __host_b64(String(s));
 const atob = (s) => __host_unb64(String(s));
+const __packages = {};
+function __requirePackage(name) {
+  if (__packages[name]) return __packages[name].exports;
+  const src = JSON.parse(__host_package(name));
+  if (src === null) throw new Error('pm.require("' + name + '"): there is no package with that name in this workspace (packages/' + name + '.js)');
+  const module = { exports: {} };
+  __packages[name] = module;
+  const run = new Function('module', 'exports', 'pm', 'require', src + '\n//# sourceURL=package:' + name);
+  run(module, module.exports, pm, (n) => (['crypto-js', 'uuid', 'tv4', 'lodash', 'moment'].includes(n) ? require(n) : __requirePackage(n)));
+  return module.exports;
+}
 const require = (name) => {
   if (name === 'crypto-js') return CryptoJS;
   if (name === 'uuid') return { v4: () => __host_uuid() };
@@ -509,6 +520,8 @@ const pm = {
   info: Object.assign({ eventName: __in.response ? 'test' : 'prerequest', iteration: 0, iterationCount: 1, requestName: '', requestId: '' }, __in.info || {}),
   cookies: { get: (n) => (__in.cookies || {})[n], has: (n) => Object.prototype.hasOwnProperty.call(__in.cookies || {}, n), toObject: () => Object.assign({}, __in.cookies || {}), jar: __cookieJar },
   sendRequest: __sendRequest,
+  // Postman's package library: workspace packages (packages/<name>.js) as CommonJS modules
+  require: (name) => __requirePackage(String(name)),
   execution: { setNextRequest: (n) => { __out.nextRequest = n === null ? null : String(n); }, skipRequest: () => { __out.skipRequest = true; } },
   // Postman Visualizer: a Handlebars template and its data, rendered by the host (Visualize tab)
   visualizer: {

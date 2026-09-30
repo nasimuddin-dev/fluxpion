@@ -153,6 +153,11 @@ export function workspaceHandlers(be: Backend): Handlers {
     'ws.search': ({ query }: { query: string }) => be.search?.search(query, 60) ?? [],
 
     /** Saved items with folders of one kind (websocket, ai-prompts, mcp …), stored in library/<kind>.json. */
+    /* Script packages (pm.require): packages/<name>.js in the workspace */
+    'packages.list': () => be.ws.listScriptPackages(),
+    'packages.get': ({ name }: { name: string }) => be.ws.readScriptPackage(name) ?? null,
+    'packages.save': ({ name, code }: { name: string; code: string }) => be.ws.saveScriptPackage(name, code),
+    'packages.delete': ({ name }: { name: string }) => be.ws.deleteScriptPackage(name),
     'lib.get': ({ kind }: { kind: string }) => be.ws.getLibrary(kind),
     'lib.save': ({ kind, library }: { kind: string; library: { folders: string[]; items: Array<{ id: string; name: string; folder?: string; data: unknown }> } }) => {
       const before = new Map(be.ws.getLibrary(kind).items.map((i) => [i.id, JSON.stringify(i.data)]));

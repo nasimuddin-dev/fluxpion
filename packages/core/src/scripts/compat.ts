@@ -6,7 +6,6 @@ export const SCRIPT_MODULES = ['crypto-js', 'uuid', 'tv4', 'lodash', 'moment'];
 const UNSUPPORTED: Array<{ re: RegExp; api: string; hint: string }> = [
   { re: /\bcheerio\b/, api: 'cheerio', hint: 'parse HTML with regular expressions or xml2Json() for XHTML' },
   { re: /\bpm\.vault\b/, api: 'pm.vault', hint: 'use a secret environment variable (pm.environment.get)' },
-  { re: /\bpm\.require\s*\(/, api: 'pm.require (package library)', hint: 'paste the package code into a collection-level script' },
   { re: /\bpm\.execution\.location\b/, api: 'pm.execution.location', hint: 'use pm.info.requestName' },
 ];
 
@@ -19,10 +18,13 @@ export interface ScriptWarning {
   hint: string;
 }
 
-function check(code: string | undefined, where: string, script: ScriptWarning['script'], out: ScriptWarning[]): void {
+function check(code: string | undefined, where: string, script: ScriptWarning['script'], out: ScriptWarning[], hasPackage: (name: string) => boolean): void {
   if (!code?.trim()) return;
   for (const u of UNSUPPORTED) if (u.api && u.re.test(code)) out.push({ where, script, api: u.api, hint: u.hint });
-  for (const m of code.matchAll(/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+  // Postman's package library: works once the package is in the workspace (packages/<name>.js)
+  for (const m of code.matchAll(/\bpm\.require\s*\(\s*['"]([^'"]+)['"]\s*\)/g))
+    if (!hasPackage(m[1]!)) out.push({ where, script, api: `pm.require('${m[1]}')`, hint: `add the package to the workspace as packages/${m[1]}.js (Script packages)` });
+  for (const m of code.matchAll(/(?<![\w.$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
     const name = m[1]!;
     if (!SCRIPT_MODULES.includes(name) && name !== 'cheerio') out.push({ where, script, api: `require('${name}')`, hint: `available modules: ${SCRIPT_MODULES.join(', ')}` });
   }
@@ -32,15 +34,15 @@ function check(code: string | undefined, where: string, script: ScriptWarning['s
  * Script APIs in a collection that TestPion's sandbox doesn't provide, so an import can say which
  * requests need a change before they are run. Everything else in Postman's `pm.*` API is supported.
  */
-export function scriptCompatibility(collection: Collection): ScriptWarning[] {
+export function scriptCompatibility(collection: Collection, hasPackage: (name: string) => boolean = () => false): ScriptWarning[] {
   const out: ScriptWarning[] = [];
-  check(collection.preRequestScript, '(collection)', 'pre-request', out);
-  check(collection.testScript, '(collection)', 'test', out);
+  check(collection.preRequestScript, '(collection)', 'pre-request', out, hasPackage);
+  check(collection.testScript, '(collection)', 'test', out, hasPackage);
   const walk = (nodes: CollectionNode[], path: string[]) => {
     for (const n of nodes) {
       const where = [...path, n.name].join(' / ');
-      if ('preRequestScript' in n) check(n.preRequestScript, where, 'pre-request', out);
-      if ('testScript' in n) check(n.testScript, where, 'test', out);
+      if ('preRequestScript' in n) check(n.preRequestScript, where, 'pre-request', out, hasPackage);
+      if ('testScript' in n) check(n.testScript, where, 'test', out, hasPackage);
       if (n.kind === 'folder') walk(n.items, [...path, n.name]);
     }
   };

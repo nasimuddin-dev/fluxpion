@@ -184,6 +184,23 @@ pm.environment.set('patientId', pm.response.json().items[0].id);
 | Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `pm.sendRequest`, `pm.visualizer.set/clear`, `postman.setNextRequest`, `postman.setEnvironmentVariable` / `clearEnvironmentVariable` / `getResponseHeader` / `getResponseCookie` (and the globals versions), `xml2Json` (XML and SOAP responses, as in Postman), `setTimeout` / `setInterval` (the callbacks run after the script, in delay order, without waiting), `pm.response.size()`, `pm.expect.fail()`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `require('tv4')`, lodash as `_` or `require('lodash')`, `moment` (formatting, `add`/`subtract`, `startOf`/`endOf`, `diff`, comparisons; times are UTC), `console.log` |
 | Bruno | Scripts imported from [Bruno](/api-testing/collections#bruno) run with Bruno's API: `bru.getEnvVar` / `setEnvVar` / `getVar` / `setVar` / `interpolate` / `setNextRequest` / `runner.skipRequest`, `req.getUrl` / `setHeader` / `getBody` / `setBody` …, `res.status` / `res.body` / `res.getBody()` / `res.getHeader()` / `res('path')`, `test()` and `expect()` |
 
+**Script packages** (`pm.require`) are shared modules for scripts, like Postman's package library: code you'd otherwise copy into many requests (signing, token handling, common checks). Open **Scripts ▸ Packages…** to create and edit them; each is a CommonJS module in the workspace's `packages/` folder (`packages/@clinic/auth.js` for `@clinic/auth`), so they're versioned with the workspace and run the same in the app, the CLI and monitors.
+
+```js
+// packages/@clinic/auth.js
+module.exports = {
+  bearer(token) {
+    return 'Bearer ' + token;
+  },
+};
+
+// in a pre-request script
+const auth = pm.require('@clinic/auth');
+pm.request.headers.upsert({ key: 'Authorization', value: auth.bearer(pm.environment.get('token')) });
+```
+
+A package can `pm.require` other packages and `require()` the built-in modules; each is loaded once per script run. Postman collections that use packages work once the packages are added with the same names.
+
 **`pm.sendRequest`** sends another HTTP request from a pre-request or test script, for example to fetch a token first:
 
 ```js

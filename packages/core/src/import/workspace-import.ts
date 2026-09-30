@@ -54,7 +54,7 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
   }
   if (collection) {
     out.collection = store.saveCollection(collection);
-    const warnings = scriptCompatibility(collection);
+    const warnings = scriptCompatibility(collection, (name) => store.readScriptPackage(name) !== undefined);
     if (warnings.length) out.scriptWarnings = warnings;
   }
   // an import never replaces an environment the workspace already has: a clash gets a new id and name

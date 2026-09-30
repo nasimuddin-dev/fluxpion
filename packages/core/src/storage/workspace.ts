@@ -79,6 +79,9 @@ export interface TestFileNode {
  *   workspace.json  database.sqlite  collections/  environments/  tests/  datasets/
  *   traces/  payloads/  reports/  runs/  baselines/  providers.json  mcp-servers.json
  */
+/** Script package names for pm.require: utils, or @team/utils. */
+export const SCRIPT_PACKAGE_NAME = /^(@[A-Za-z0-9][\w.-]*\/)?[A-Za-z0-9][\w.-]*$/;
+
 export class WorkspaceStore {
   readonly meta: MetaStore;
   private ws: Workspace;
@@ -161,6 +164,36 @@ export class WorkspaceStore {
 
   getCollection(id: string): Collection {
     return readJson<Collection>(this.path('collections', `${slugify(id)}.json`));
+  }
+
+  /* Script packages (pm.require): packages/<name>.js, e.g. packages/@clinic/auth.js for "@clinic/auth". */
+  private packagePath(name: string): string {
+    if (!SCRIPT_PACKAGE_NAME.test(name)) throw new ApsError('ValidationError', `"${name}" is not a package name`, { suggestions: ['Use a name like utils, or @team/utils (letters, digits, . _ -).'] });
+    return this.safePath(`${name}.js`, this.path('packages'));
+  }
+  listScriptPackages(): Array<{ name: string; size: number }> {
+    const dir = this.path('packages');
+    if (!existsSync(dir)) return [];
+    const out: Array<{ name: string; size: number }> = [];
+    for (const f of readdirSync(dir, { withFileTypes: true })) {
+      if (f.isFile() && f.name.endsWith('.js')) out.push({ name: f.name.slice(0, -3), size: statSync(join(dir, f.name)).size });
+      else if (f.isDirectory() && f.name.startsWith('@'))
+        for (const g of readdirSync(join(dir, f.name))) if (g.endsWith('.js')) out.push({ name: `${f.name}/${g.slice(0, -3)}`, size: statSync(join(dir, f.name, g)).size });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  readScriptPackage(name: string): string | undefined {
+    if (!SCRIPT_PACKAGE_NAME.test(name)) return undefined;
+    const p = this.packagePath(name);
+    return existsSync(p) ? readFileSync(p, 'utf8') : undefined;
+  }
+  saveScriptPackage(name: string, code: string): void {
+    const p = this.packagePath(name);
+    mkdirSync(dirname(p), { recursive: true });
+    atomicWrite(p, code);
+  }
+  deleteScriptPackage(name: string): void {
+    rmSync(this.packagePath(name), { force: true });
   }
 
   saveCollection(c: Collection): Collection {
@@ -384,6 +417,7 @@ export class WorkspaceStore {
       mcpServers: this.getMcpServers(),
       tests,
       library: this.libraryKinds().reduce<Record<string, Library>>((all, kind) => ({ ...all, [kind]: this.getLibrary(kind) }), {}),
+      packages: Object.fromEntries(this.listScriptPackages().map((p) => [p.name, this.readScriptPackage(p.name) ?? ''])),
     };
   }
 
@@ -411,6 +445,8 @@ export interface WorkspaceBundle {
   tests: Record<string, string>;
   /** Saved items with folders by kind (WebSocket connections, AI prompts …); absent in older exports. */
   library?: Record<string, Pick<Library, 'folders' | 'items'>>;
+  /** Script packages for pm.require, by name; absent in older exports. */
+  packages?: Record<string, string>;
 }
 
 /* ------------------------------------------------------------------ app-level manager */
@@ -622,6 +658,7 @@ export class WorkspaceManager {
     store.saveProviders(bundle.providers ?? []);
     store.saveMcpServers(bundle.mcpServers ?? []);
     for (const [kind, lib] of Object.entries(bundle.library ?? {})) store.saveLibrary(kind, { folders: lib.folders ?? [], items: lib.items ?? [] });
+    for (const [name, code] of Object.entries(bundle.packages ?? {})) if (SCRIPT_PACKAGE_NAME.test(name) && typeof code === 'string') store.saveScriptPackage(name, code);
     for (const [rel, content] of Object.entries(bundle.tests ?? {})) {
       const p = store.safePath(rel, store.path('tests'));
       mkdirSync(dirname(p), { recursive: true });

@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { Package } from 'lucide-react';
 import { SNIPPETS } from '../lib/snippets';
 import { CodeEditor } from './CodeEditor';
 import { cx } from './ui';
+
+const ScriptPackagesDialog = lazy(() => import('./ScriptPackagesDialog').then((m) => ({ default: m.ScriptPackagesDialog })));
 
 /**
  * Pre-request / Post-response scripts with a snippet list (Postman layout). Scripts use the
@@ -9,6 +12,7 @@ import { cx } from './ui';
  */
 export function ScriptsPanel({ pre, post, onPre, onPost }: { pre: string; post: string; onPre(v: string): void; onPost(v: string): void }) {
   const [which, setWhich] = useState<'pre' | 'post'>(() => (pre && !post ? 'pre' : 'post'));
+  const [packagesOpen, setPackagesOpen] = useState(false);
   const value = which === 'pre' ? pre : post;
   const set = which === 'pre' ? onPre : onPost;
   const snippets = SNIPPETS.filter((s) => s.kind === 'both' || s.kind === (which === 'pre' ? 'pre' : 'test'));
@@ -26,6 +30,14 @@ export function ScriptsPanel({ pre, post, onPre, onPost }: { pre: string; post: 
             {code.trim() && <span className="w-1.5 h-1.5 rounded-full bg-ok ml-auto" title="Has a script" />}
           </button>
         ))}
+        <button className="w-full text-left px-3 py-1.5 mt-2 flex items-center gap-2 text-muted hover:text-fg hover:bg-hover border-t border-line" title="Shared code that scripts load with pm.require('name')" onClick={() => setPackagesOpen(true)}>
+          <Package size={13} /> Packages…
+        </button>
+        {packagesOpen && (
+          <Suspense fallback={null}>
+            <ScriptPackagesDialog onClose={() => setPackagesOpen(false)} />
+          </Suspense>
+        )}
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="text-xs text-muted px-3 py-1.5 border-b border-line">
