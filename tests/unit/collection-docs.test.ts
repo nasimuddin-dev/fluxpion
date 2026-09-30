@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectionMarkdown, docsAnchor, type Collection } from '../../packages/core/src/index.js';
+import { collectionHtml, collectionMarkdown, docsAnchor, type Collection } from '../../packages/core/src/index.js';
 
 const collection: Collection = {
   schemaVersion: '1.0',
@@ -77,3 +77,30 @@ describe('collectionMarkdown', () => {
     expect(collectionMarkdown(collection, { examples: false })).not.toContain('Example: Created');
   });
 });
+
+describe('collection docs as HTML', () => {
+  it('is one self-contained page with a sidebar, anchors and masked secrets', () => {
+    const html = collectionHtml(collection);
+    expect(html.startsWith('<!doctype html>')).toBe(true);
+    expect(html).toContain('<title>Pets API · API documentation</title>');
+    expect(html).toMatch(/<a class="toc d[23]" href="#[\w-]+">Create pet<\/a>/);
+    expect(html).toContain('<strong>pets</strong>');
+    expect(html).not.toContain('k-SECRET');
+    // no external resources
+    expect(html).not.toMatch(/<(script|link)[^>]+(src|href)=/);
+  });
+
+  it('never runs HTML or scripts from descriptions', () => {
+    const evil: Collection = {
+      ...collection,
+      description: 'Hi <script>alert(1)</script> <img src=x onerror=alert(2)> [click](javascript:alert(3)) ![p](http://tracker.example/p.png)',
+    };
+    const html = collectionHtml(evil);
+    expect(html).not.toContain('<script>alert(1)');
+    expect(html).toContain('&lt;script&gt;alert(1)');
+    expect(html).not.toMatch(/<img src=x/);
+    expect(html).not.toContain('javascript:alert(3)');
+    expect(html).not.toContain('<img src="http://tracker');
+  });
+});
+

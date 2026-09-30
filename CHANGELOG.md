@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Publish collection docs as HTML.** The collection **Docs** tab has **Export HTML**: one self-contained web page with a searchable sidebar, copy buttons and light/dark themes, ready to host or share (`testpion docs --html` from the terminal). HTML in descriptions is shown as text, links are limited to http(s), and secrets are masked.
 - **Run in CI.** TestPion writes the pipeline file that runs a suite, a collection (or some folders) or all tests on every push: GitHub Actions, GitLab CI, Azure Pipelines or Jenkins. It installs the TestPion CLI pinned to your version, publishes JUnit results, keeps the reports, and lists the CI secrets to create (never their values). Open it from the Tests view, a collection's menu (**Run in CI…**) or the command palette; from the terminal it is `testpion ci`, and AI agents get `ci_config`.
 - Docs: the CI/CD page no longer says `npx testpion` (the CLI isn't on npm); it shows how pipelines install it.
 - **WebSocket and Socket.IO tests.** A test with `type: websocket` (or `socketio`) connects, sends messages or emits events in order, listens, and checks what came back: `$.received[0]`, JSON fields of replies, `contains` on the text, `status: 101`. A connection that fails is an error with the reason. The examples workspace tests two public echo servers.

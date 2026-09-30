@@ -101,6 +101,7 @@ Collections document themselves, like Postman's API documentation:
 - **Collection docs:** the collection's **Docs** tab renders the whole collection as one page. It starts with the collection description, then a table of contents, then every folder and request: method and URL, description, auth, path variables, query parameters, headers, body and saved examples. Click **Edit description** to write the collection description, with a live preview. Click **Save** to keep it.
 - **Secrets stay out:** values of sensitive headers, parameters, variables and body fields are shown as `••••••` or `REDACTED`. References like `{{accessToken}}` are shown as written, since they are not secrets.
 - **Export Markdown** downloads the page as a `.md` file, ready for a wiki, a README or a static site. The CLI does the same: `testpion docs "Veterinary API" -o API.md`.
+- **Export HTML** saves one self-contained web page, like Postman's published documentation. It has a sidebar of requests with search, copy buttons on code, and light and dark themes. It loads nothing from the internet, so you can host it anywhere (GitHub Pages, an intranet, a shared drive) or email it. HTML in descriptions is shown as text and never runs, and secrets are masked. From the terminal: `testpion docs "Veterinary API" --html -o api.html`.
 
 Markdown is rendered with GitHub-flavoured syntax (tables, fenced code, task lists) and sanitised: scripts and event handlers are removed, and links open in your browser.
 

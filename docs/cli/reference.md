@@ -14,7 +14,7 @@ testpion run-collection <collection>   Run a collection like Postman's Collectio
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
 testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
-testpion docs <collection>    Write Markdown documentation for a collection
+testpion docs <collection>    Write Markdown (or --html) documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)
 testpion export-environment <name>   Export an environment in Postman's format
 testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
@@ -152,6 +152,7 @@ Writes the [documentation](/api-testing/collections#documentation) of a collecti
 
 ```bash
 testpion docs "Veterinary API" -o API.md
+testpion docs "Veterinary API" --html -o api.html   # one self-contained page to publish
 testpion docs api.postman_collection.json > API.md
 ```
 

@@ -7,6 +7,7 @@ import {
   exampleFromResponse,
   startMockServer,
   collectionMarkdown,
+  collectionHtml,
   exportPostmanCollection,
   withRequestExamples,
   type SavedExample,
@@ -58,7 +59,23 @@ export function collectionsHandlers(be: Backend): Handlers {
     'col.docs': ({ id, collection, environment }: { id?: string; collection?: Collection; environment?: string }) => {
       const c = collection ?? be.ws.getCollection(id!);
       const ctx = be.context({ environment, collectionId: collection ? undefined : c.id });
-      return collectionMarkdown(c, { redactor: ctx.redactor });
+      try {
+        return collectionMarkdown(c, { redactor: ctx.redactor });
+      } finally {
+        void ctx.dispose();
+      }
+    },
+    /** The documentation as a self-contained HTML page, saved through the host (or downloaded in a browser). */
+    'col.exportDocsHtml': async ({ id, collection, environment }: { id?: string; collection?: Collection; environment?: string }) => {
+      const c = collection ?? be.ws.getCollection(id!);
+      const ctx = be.context({ environment, collectionId: collection ? undefined : c.id });
+      try {
+        const html = collectionHtml(c, { redactor: ctx.redactor });
+        const name = `${c.name.replace(/[\\/:*?"<>|]+/g, '-')}.html`;
+        return await be.saveOrDownload(name, [{ name: 'HTML', extensions: ['html'] }], (dest) => writeFileSync(dest, html), () => Buffer.from(html));
+      } finally {
+        await ctx.dispose();
+      }
     },
     /** Replace a saved request's examples (rename, edit, delete). */
     'col.setExamples': (p: { collectionId: string; requestId: string; examples: SavedExample[] }) => {

@@ -1,9 +1,10 @@
-import { Download, Eye, Pencil } from 'lucide-react';
+import { Download, Eye, Globe, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { useApp } from '../store';
 import type { Collection } from '../types';
 import { download } from '../lib/format';
+import { finishSave, type SaveResult } from '../lib/files';
 import { Markdown } from './Markdown';
 import { Button, cx, useDebounced } from './ui';
 
@@ -20,6 +21,14 @@ export function CollectionDocs({ collection, onDescription }: { collection: Coll
   useEffect(() => {
     call<string>('col.docs', { collection: debounced, environment: env }).then(setMarkdown, (e) => setMarkdown(`> ${asError(e).message}`));
   }, [debounced, env]);
+
+  const exportHtml = async () => {
+    try {
+      finishSave(await call<SaveResult>('col.exportDocsHtml', { collection, environment: env }), 'Documentation');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -40,6 +49,9 @@ export function CollectionDocs({ collection, onDescription }: { collection: Coll
         <span className="text-xs text-muted ml-2">Sensitive values are masked. Request docs are written in each request’s Docs tab.</span>
         <Button size="sm" variant="ghost" className="ml-auto" icon={<Download size={12} />} disabled={!markdown} onClick={() => download(`${collection.name}.md`, markdown, 'text/markdown')}>
           Export Markdown
+        </Button>
+        <Button size="sm" variant="ghost" icon={<Globe size={12} />} disabled={!markdown} onClick={() => void exportHtml()}>
+          Export HTML
         </Button>
       </div>
       {mode === 'edit' ? (

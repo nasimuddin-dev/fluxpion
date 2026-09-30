@@ -16,6 +16,7 @@ import {
   isRequestSnippet,
   Redactor,
   collectionMarkdown,
+  collectionHtml,
   exportPostmanCollection,
   exportPostmanEnvironment,
   type CollectionNode,
@@ -64,13 +65,15 @@ export function registerDataCommands(program: Command): void {
     });
   program
     .command('docs')
-    .description('write Markdown documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file')
+    .description('write Markdown or HTML (--html) documentation for a collection (descriptions, requests, parameters, examples; secrets masked)\n<collection> is a collection name or id in the workspace, or a TestPion / Postman v2.1 collection file')
     .argument('<collection>', 'collection name, id or file')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-o, --out <file>', 'write to this file instead of stdout')
     .option('--no-examples', 'leave out saved examples')
-    .action((ref: string, o: { workspace?: string; out?: string; examples?: boolean }) => {
-      const md = collectionMarkdown(loadCollectionRef(ref, o.workspace), { examples: o.examples });
+    .option('--html', 'a self-contained HTML page (sidebar, search, copy buttons) to publish or share')
+    .action((ref: string, o: { workspace?: string; out?: string; examples?: boolean; html?: boolean }) => {
+      const c = loadCollectionRef(ref, o.workspace);
+      const md = o.html ? collectionHtml(c, { examples: o.examples }) : collectionMarkdown(c, { examples: o.examples });
       if (o.out) {
         writeFileSync(resolve(o.out), md);
         console.error(dim(`Documentation written to ${resolve(o.out)}`));
