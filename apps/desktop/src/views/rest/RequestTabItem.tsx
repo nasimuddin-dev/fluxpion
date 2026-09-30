@@ -5,8 +5,8 @@ import { useState } from 'react';
 import { cx, Menu, type MenuItem } from '../../components/ui';
 import { TAB_WIDTH, PINNED_TAB_WIDTH, RestTab } from './types';
 
-/** One tab of the request tab strip: right-click (or ⋯) for pin, duplicate and close actions. */
-export function RequestTabItem({ tab: t, active, menu, onSelect, onClose }: { tab: RestTab; active: boolean; menu: MenuItem[]; onSelect(): void; onClose(): void }) {
+/** One tab of the request tab strip: right-click (or ⋯) for rename, pin, duplicate and close actions; double-click to rename. */
+export function RequestTabItem({ tab: t, active, menu, onSelect, onClose, onRename }: { tab: RestTab; active: boolean; menu: MenuItem[]; onSelect(): void; onClose(): void; onRename?(): void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
@@ -14,6 +14,7 @@ export function RequestTabItem({ tab: t, active, menu, onSelect, onClose }: { ta
       aria-selected={active}
       title={t.dirty ? `${t.name} (unsaved changes)` : t.name}
       onClick={onSelect}
+      onDoubleClick={onRename}
       onAuxClick={(e) => e.button === 1 && !t.pinned && onClose()}
       onContextMenu={(e) => {
         e.preventDefault();

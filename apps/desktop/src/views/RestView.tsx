@@ -349,6 +349,21 @@ export function RestView() {
     });
     setActive(copy.id);
   };
+  /** Rename a tab; a saved request is renamed in its collection too. */
+  const renameTab = async (t: RestTab) => {
+    const name = (await promptText('Rename request', { message: 'Request name', value: t.name, okLabel: 'Rename' }))?.trim();
+    if (!name || name === t.name) return;
+    setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, name } : x)));
+    if (!t.collectionId || !t.requestId) return;
+    try {
+      const c = (await call<Collection[]>('col.list')).find((x) => x.id === t.collectionId);
+      if (!c || !findNode(c.items, t.requestId)) return;
+      await saveCollection({ ...c, items: mapNodes(c.items, (x) => (x.id === t.requestId ? { ...x, name } : x)) });
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+
   const tabMenu = (t: RestTab) => {
     const i = ordered.findIndex((x) => x.id === t.id);
     const others = ordered.filter((x) => x.id !== t.id && !x.pinned).map((x) => x.id);
@@ -356,6 +371,7 @@ export function RestView() {
     const unpinned = ordered.filter((x) => !x.pinned).map((x) => x.id);
     return [
       { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, onSelect: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))) },
+      { label: 'Rename…', icon: <Pencil size={13} />, shortcut: 'Double-click', onSelect: () => void renameTab(t) },
       { label: 'Duplicate tab', icon: <Copy size={13} />, onSelect: () => duplicateTab(t) },
       { label: 'Close tab', icon: <X size={13} />, separator: true, onSelect: () => closeTab(t.id), shortcut: 'Middle-click' },
       { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: !others.length, onSelect: () => closeTabs(others) },
@@ -554,7 +570,7 @@ export function RestView() {
       <div className="h-full flex flex-col min-w-0">
         <div ref={stripRef} className="flex items-end h-9 border-b border-line bg-panel/40 overflow-hidden shrink-0" role="tablist">
           {shown.map((t) => (
-            <RequestTabItem key={t.id} tab={t} active={!noTabs && t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} />
+            <RequestTabItem key={t.id} tab={t} active={!noTabs && t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} onRename={() => void renameTab(t)} />
           ))}
           <IconButton label="New request tab" className="mx-1 mb-0.5 shrink-0" onClick={newTab}>
             <Plus size={14} />
