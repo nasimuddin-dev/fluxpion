@@ -105,7 +105,9 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
       const req =
         test.type === 'http'
           ? { method: test.request.method, url: test.request.url, headers: [...(test.request.headers ?? [])], body: test.request.body && 'content' in test.request.body ? test.request.body.content : undefined }
-          : undefined;
+          : test.type === 'graphql'
+            ? { method: 'POST', url: test.endpoint, headers: [...(test.headers ?? [])], body: JSON.stringify({ query: test.query, variables: test.graphqlVariables, operationName: test.operationName }) }
+            : undefined;
       const s = await runScript(test.preRequestScript, { ...scriptScopes(scope, test.variables), request: req, jar: svc.cookieJar?.list(), info: { requestName: test.name, requestId: test.id } }, { sendRequest });
       root.event('pre-request script', { logs: s.logs, error: s.error });
       if (svc.cookieJar) applyCookieJarOps(svc.cookieJar, s.jarOps);
@@ -117,6 +119,8 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
         const body = test.request.body && 'content' in test.request.body && s.request.body !== undefined ? { ...test.request.body, content: s.request.body } : test.request.body;
         test = { ...test, request: { ...test.request, method: s.request.method, url: s.request.url, headers: s.request.headers, body } };
       }
+      // GraphQL: the endpoint and headers can change (the query stays as written)
+      if (test.type === 'graphql' && s.request) test = { ...test, endpoint: s.request.url, headers: s.request.headers };
       if (s.nextRequest !== undefined) metadata.nextRequest = s.nextRequest;
       if (s.skipRequest) {
         root.end({ status: 'ok' });
@@ -165,7 +169,12 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
   if (test.testScript) {
     const s = await runScript(test.testScript, {
       ...scriptScopes(scope, test.variables),
-      request: test.type === 'http' ? { method: test.request.method, url: scope.resolve(test.request.url), headers: scope.resolveDeep([...(test.request.headers ?? [])]) } : undefined,
+      request:
+        test.type === 'http'
+          ? { method: test.request.method, url: scope.resolve(test.request.url), headers: scope.resolveDeep([...(test.request.headers ?? [])]) }
+          : test.type === 'graphql'
+            ? { method: 'POST', url: scope.resolve(test.endpoint), headers: scope.resolveDeep([...(test.headers ?? [])]) }
+            : undefined,
       response: { status: ctx.status, headers: ctx.headers, body: ctx.text, time: ctx.latencyMs },
       cookies: ctx.cookies,
       jar: svc.cookieJar?.list(),

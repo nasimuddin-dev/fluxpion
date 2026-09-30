@@ -12,6 +12,7 @@ import { AuthEditor } from '../components/AuthEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { addToFolder, findNode, mapNodes } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
+import { ScriptsPanel } from '../components/ScriptsPanel';
 import { JsonTree, RawView } from '../components/JsonView';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
@@ -45,6 +46,8 @@ interface Draft {
   collectionId?: string;
   requestId?: string;
   name: string;
+  preRequestScript?: string;
+  testScript?: string;
 }
 
 const DEFAULT_QUERY = `# Write your query. Ctrl+Space for schema-aware suggestions, Ctrl+Enter to run.
@@ -84,8 +87,8 @@ export function GraphQLView() {
     }
   };
   const [running, setRunning] = useState<string>();
-  const [result, setResult] = useState<{ response?: HttpResponseData; errors?: unknown[]; checks?: CheckResult[]; error?: NormalizedError; operationType?: string }>();
-  const [sub, setSub] = useState<'variables' | 'headers' | 'auth' | 'tests'>('variables');
+  const [result, setResult] = useState<{ response?: HttpResponseData; errors?: unknown[]; checks?: CheckResult[]; error?: NormalizedError; operationType?: string; scriptLogs?: Array<{ phase: string; message: string }> }>();
+  const [sub, setSub] = useState<'variables' | 'headers' | 'auth' | 'scripts' | 'tests'>('variables');
   const [resTab, setResTab] = useState<'response' | 'raw' | 'tests'>('response');
   const env = useApp((s) => s.environment);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
@@ -125,8 +128,13 @@ export function GraphQLView() {
         id,
         request: { endpoint: d.endpoint, query: d.query, variables: d.variables, operationName: opName, headers: d.headers, auth: d.auth?.type === 'inherit' ? undefined : d.auth },
         environment: env,
+        collectionId: d.collectionId,
+        requestId: d.requestId,
+        name: d.name,
         operationName: opName,
         assertions: d.assertions,
+        preRequestScript: d.preRequestScript,
+        testScript: d.testScript,
       });
       setResult(r);
       if (r.checks?.some((c: CheckResult) => !c.passed)) setResTab('tests');
@@ -146,7 +154,7 @@ export function GraphQLView() {
       const c = cols.find((x) => x.id === p.collectionId);
       const n = c && (findNode(c.items, p.requestId) as SavedGraphQLRequest | undefined);
       if (n?.kind === 'graphql')
-        setD({ endpoint: n.request.endpoint, query: n.request.query, variables: n.request.variables ?? '', headers: n.request.headers ?? [], auth: n.request.auth, assertions: n.assertions ?? [], collectionId: c!.id, requestId: n.id, name: n.name, operationName: n.request.operationName });
+        setD({ endpoint: n.request.endpoint, query: n.request.query, variables: n.request.variables ?? '', headers: n.request.headers ?? [], auth: n.request.auth, assertions: n.assertions ?? [], collectionId: c!.id, requestId: n.id, name: n.name, operationName: n.request.operationName, preRequestScript: n.preRequestScript, testScript: n.testScript });
     }
   });
 
@@ -164,7 +172,18 @@ export function GraphQLView() {
       c = cols.find((x) => x.name === pick) ?? { schemaVersion: '1.0', id: uid('col-'), name: pick, version: 0, variables: [], items: [], updatedAt: '' };
     }
     const name = d.requestId ? d.name : ((await promptText('Save operation', { message: 'Request name', value: d.operationName ?? operations[0]?.name ?? d.name, okLabel: 'Save' })) ?? d.name);
-    const node: SavedGraphQLRequest = { kind: 'graphql', id: d.requestId ?? uid('gql-'), name, request: { endpoint: d.endpoint, query: d.query, variables: d.variables, headers: d.headers, auth: d.auth, operationName: d.operationName }, assertions: d.assertions };
+    // keep what this view doesn't edit (favorite …) when updating a saved request
+    const before = d.requestId ? (findNode(c.items, d.requestId) as SavedGraphQLRequest | undefined) : undefined;
+    const node: SavedGraphQLRequest = {
+      ...(before?.kind === 'graphql' ? before : {}),
+      kind: 'graphql',
+      id: d.requestId ?? uid('gql-'),
+      name,
+      request: { endpoint: d.endpoint, query: d.query, variables: d.variables, headers: d.headers, auth: d.auth, operationName: d.operationName },
+      assertions: d.assertions,
+      preRequestScript: d.preRequestScript || undefined,
+      testScript: d.testScript || undefined,
+    };
     const items = d.requestId && findNode(c.items, d.requestId) ? mapNodes(c.items, (n) => (n.id === node.id ? node : n)) : addToFolder(c.items, undefined, node);
     await call('col.save', { ...c, items });
     set({ collectionId: c.id, requestId: node.id, name });
@@ -245,6 +264,7 @@ export function GraphQLView() {
                         { id: 'variables', label: 'Variables' },
                         { id: 'headers', label: 'Headers', badge: d.headers.length },
                         { id: 'auth', label: 'Auth' },
+                        { id: 'scripts', label: 'Scripts', badge: (d.preRequestScript?.trim() ? 1 : 0) + (d.testScript?.trim() ? 1 : 0) || undefined },
                         { id: 'tests', label: 'Tests', badge: d.assertions.length },
                       ]}
                     />
@@ -256,6 +276,7 @@ export function GraphQLView() {
                         </div>
                       )}
                       {sub === 'auth' && <AuthEditor auth={d.auth} onChange={(auth) => set({ auth })} />}
+                      {sub === 'scripts' && <ScriptsPanel pre={d.preRequestScript ?? ''} post={d.testScript ?? ''} onPre={(v) => set({ preRequestScript: v })} onPost={(v) => set({ testScript: v })} />}
                       {sub === 'tests' && <AssertionEditor checks={d.assertions} onChange={(assertions) => set({ assertions })} groups={['Response', 'Body', 'GraphQL']} />}
                     </div>
                   </div>
@@ -284,7 +305,17 @@ export function GraphQLView() {
                   <div className="flex-1 min-h-0">
                     {resTab === 'response' && (result.response.json !== undefined ? <JsonTree data={result.response.json} onAssert={(a) => (set({ assertions: [...d.assertions, a as never] }), useApp.getState().toast(`Added a check on ${a.path} (Tests tab)`, 'success'))} /> : <RawView text={result.response.bodyPreview} />)}
                     {resTab === 'raw' && <RawView text={result.response.bodyPreview} />}
-                    {resTab === 'tests' && <CheckList checks={result.checks ?? []} />}
+                    {resTab === 'tests' && (
+                      <div className="h-full overflow-auto">
+                        <CheckList checks={result.checks ?? []} />
+                        {!!result.scriptLogs?.length && (
+                          <div className="border-t border-line p-3">
+                            <div className="text-xs font-medium text-muted mb-1">Script output</div>
+                            <pre className="mono text-xs whitespace-pre-wrap break-all">{result.scriptLogs.map((l) => `[${l.phase}] ${l.message}`).join('\n')}</pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (

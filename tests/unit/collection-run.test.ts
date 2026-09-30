@@ -23,6 +23,7 @@ beforeAll(async () => {
     seen.push({ url: req.url!, auth: req.headers.authorization });
     res.setHeader('content-type', 'application/json');
     if (req.url === '/token') res.end(JSON.stringify({ access_token: 'tok-123' }));
+    else if (req.url === '/graphql') res.end(JSON.stringify({ data: { trace: req.headers['x-trace'] ?? null, auth: req.headers.authorization ?? null } }));
     else res.end(JSON.stringify({ path: req.url, auth: req.headers.authorization ?? null }));
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -122,5 +123,43 @@ describe('collection runner', () => {
     const c = collection();
     (c.items[0] as any).items[0].testScript = "pm.execution.setNextRequest('r-token');";
     await expect(runCollection({ name: 'runaway', collection: c, services: services(), maxRequestsPerIteration: 5 })).rejects.toThrow(/setNextRequest loop/);
+  });
+
+  it('runs collection, folder and request scripts for GraphQL requests too', async () => {
+    seen.length = 0;
+    const c: Collection = {
+      ...collection(),
+      testScript: undefined,
+      preRequestScript: "pm.request.headers.upsert({ key: 'X-Trace', value: 'from-collection' });",
+      items: [
+        {
+          kind: 'folder',
+          id: 'f-g',
+          name: 'GraphQL',
+          testScript: "pm.test('folder sees data', () => pm.expect(pm.response.json().data).to.be.an('object'));",
+          items: [
+            {
+              kind: 'graphql',
+              id: 'g1',
+              name: 'Who',
+              request: { endpoint: '{{baseUrl}}/graphql', query: '{ trace }', auth: { type: 'bearer', token: 'gql-tok' } },
+              preRequestScript: "pm.environment.set('seenUrl', pm.request.url.toString());",
+              testScript: "pm.test('header from the collection script', () => pm.expect(pm.response.json().data.trace).to.equal('from-collection'));\npm.environment.set('gqlAuth', pm.response.json().data.auth);",
+            },
+          ],
+        },
+      ],
+    };
+    const svc = services();
+    const results: TestResult[] = [];
+    const summary = await runCollection({ name: 'gql', collection: c, services: svc, onEvent: (e: RunEvent) => void (e.type === 'test-end' && results.push(e.result)) });
+    expect(summary).toMatchObject({ total: 1, passed: 1 });
+    expect(results[0]!.checks.map((x) => [x.name, x.passed])).toEqual([
+      ['folder sees data', true],
+      ['header from the collection script', true],
+      ['graphql-no-errors', true],
+    ]);
+    expect(svc.vars.get('seenUrl')).toBe('{{baseUrl}}/graphql');
+    expect(svc.vars.get('gqlAuth')).toBe('Bearer gql-tok');
   });
 });

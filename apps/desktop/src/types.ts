@@ -148,6 +148,8 @@ export interface SavedGraphQLRequest {
   favorite?: boolean;
   request: { endpoint: string; query: string; variables?: string; operationName?: string; headers?: KeyValue[]; auth?: AuthConfig };
   assertions?: CheckConfig[];
+  preRequestScript?: string;
+  testScript?: string;
 }
 export interface CollectionFolder {
   kind: 'folder';

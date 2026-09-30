@@ -571,6 +571,10 @@ export interface SavedGraphQLRequest {
   name: string;
   request: GraphQLRequestSpec;
   assertions?: CheckConfig[];
+  /** Run before the request (after the collection's and folders'); pm.request.url is the endpoint, headers can be changed. */
+  preRequestScript?: string;
+  /** Run after the response (pm.response is the GraphQL HTTP response). */
+  testScript?: string;
 }
 
 export interface CollectionFolder {

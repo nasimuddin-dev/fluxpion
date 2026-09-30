@@ -789,8 +789,30 @@ export class Backend {
     const ctx = this.context({ environment: p.environment, collectionId: p.collectionId });
     const tracer = new Tracer(p.operationName ?? 'GraphQL', ctx.redactor);
     const span = tracer.start('graphql', 'graphql', { input: { query: p.request.query, variables: p.request.variables } });
+    const scriptSender = scriptRequestSender({ redactor: ctx.redactor, cookieJar: ctx.services.cookieJar, signal: ctrl.signal, timeoutMs: this.settings.defaultTimeoutMs });
+    const scriptLogs: Array<{ phase: 'pre-request' | 'test'; message: string }> = [];
+    const folders = ctx.collection && p.requestId ? folderChain(ctx.collection, p.requestId) : [];
+    const info = { requestName: p.name ?? p.operationName, requestId: p.requestId };
     try {
-      const spec = ctx.vars.resolveDeep(p.request);
+      // collection, folder (outer to inner) and request pre-request scripts, as for REST requests
+      let request = p.request;
+      const fv = folderVariables(folders);
+      if (Object.keys(fv).length) ctx.vars.setScope('request', fv);
+      for (const script of [ctx.collection?.preRequestScript, ...folders.map((f) => f.preRequestScript), p.preRequestScript]) {
+        if (!script?.trim()) continue;
+        const out = await runScript(script, {
+          ...scriptScopes(ctx.vars),
+          request: { method: 'POST', url: request.endpoint, headers: request.headers ?? [], body: JSON.stringify({ query: request.query, variables: request.variables }) },
+          jar: ctx.services.cookieJar?.list(),
+          info,
+        }, { sendRequest: scriptSender });
+        scriptLogs.push(...out.logs.map((message) => ({ phase: 'pre-request' as const, message: ctx.redactor.redactString(message) })));
+        applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
+        if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
+        if (out.error) throw new ApsError('ScriptError', `Pre-request script failed: ${out.error}`);
+        if (out.request) request = { ...request, endpoint: out.request.url, headers: out.request.headers };
+      }
+      const spec = ctx.vars.resolveDeep(request);
       const r = await executeGraphQL(spec, { signal: ctrl.signal, redactor: ctx.redactor, maxPreviewBytes: this.settings.maxPreviewBytes, payloadDir: this.ws.path('payloads'), cookieJar: ctx.services.cookieJar });
       span.end({ status: r.errors?.length ? 'error' : 'ok', output: r.response.json });
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), {
@@ -802,6 +824,21 @@ export class Backend {
         latencyMs: r.response.durationMs,
         graphqlErrors: r.errors,
       });
+      for (const script of [ctx.collection?.testScript, ...folders.map((f) => f.testScript), p.testScript]) {
+        if (!script?.trim()) continue;
+        const out = await runScript(script, {
+          ...scriptScopes(ctx.vars),
+          request: { method: 'POST', url: r.prepared.url, headers: spec.headers ?? [] },
+          response: { status: r.response.status, headers: r.response.headers, body: r.response.bodyPreview, time: r.response.durationMs },
+          jar: ctx.services.cookieJar?.list(),
+          info,
+        }, { sendRequest: scriptSender });
+        scriptLogs.push(...out.logs.map((message) => ({ phase: 'test' as const, message: ctx.redactor.redactString(message) })));
+        applyScriptOutput(out, [ctx.vars], { redactor: ctx.redactor, persist: ctx.services.persistVariable });
+        if (ctx.services.cookieJar) applyCookieJarOps(ctx.services.cookieJar, out.jarOps);
+        for (const t of out.tests) checks.push({ type: 'script', name: t.name, passed: t.passed, source: 'deterministic', message: t.message ?? (t.passed ? 'passed' : 'failed') });
+        if (out.error) checks.push({ type: 'script', name: 'test script', passed: false, source: 'deterministic', message: out.error });
+      }
       const trace = tracer.finish();
       this.ws.saveTrace(trace, 'graphql');
       this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'graphql', name: p.operationName ?? 'GraphQL query', method: 'POST', url: r.prepared.url, status: r.response.status, durationMs: r.response.durationMs, size: r.response.size, request: ctx.redactor.redact(p.request), traceId: trace.traceId });
@@ -819,16 +856,16 @@ export class Backend {
         size: r.response.size,
         request: { headers: r.prepared.headers, body: clip(JSON.stringify(ctx.redactor.redact({ query: spec.query, variables: spec.variables, operationName: spec.operationName }), null, 2)) },
         response: { headers: ctx.redactor.redact(r.response.headers), body: clip(r.response.json !== undefined ? JSON.stringify(ctx.redactor.redact(r.response.json), null, 2) : ctx.redactor.redactString(r.response.bodyPreview)) },
-        logs: [],
+        logs: scriptLogs,
         failedChecks: checks.filter((c) => !c.passed).length + (r.errors?.length ? 1 : 0),
       });
-      return { id, ...r, checks, traceId: trace.traceId };
+      return { id, ...r, checks, traceId: trace.traceId, scriptLogs };
     } catch (e) {
       span.fail(e);
       this.ws.saveTrace(tracer.finish('error'), 'graphql');
       const err = normalizeError(e);
-      this.consoleEntry({ id, time: new Date().toISOString(), source: 'request', kind: 'graphql', name: p.operationName ?? 'GraphQL query', method: 'POST', url: ctx.redactor.redactUrl(ctx.vars.resolve(p.request.endpoint)), status: err.kind, logs: [], error: err.message });
-      return { id, error: err };
+      this.consoleEntry({ id, time: new Date().toISOString(), source: 'request', kind: 'graphql', name: p.operationName ?? 'GraphQL query', method: 'POST', url: ctx.redactor.redactUrl(ctx.vars.resolve(p.request.endpoint)), status: err.kind, logs: scriptLogs, error: err.message });
+      return { id, error: err, scriptLogs };
     } finally {
       this.controllers.delete(id);
     }
@@ -1174,8 +1211,13 @@ export interface GqlSendParams {
   request: GraphQLRequestSpec;
   environment?: string;
   collectionId?: string;
+  /** The saved request, for folder scripts and pm.info. */
+  requestId?: string;
+  name?: string;
   operationName?: string;
   assertions?: CheckConfig[];
+  preRequestScript?: string;
+  testScript?: string;
 }
 
 export interface AiChatParams {

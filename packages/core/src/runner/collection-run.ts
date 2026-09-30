@@ -74,17 +74,16 @@ export function collectionRequestToTest(collection: Collection, ref: CollectionR
     variables: ref.folders.some((f) => f.variables?.length) ? { ...folderVariables(ref.folders), ...(extra.data ?? {}) } : extra.data,
     assertions: ref.node.assertions,
   };
-  if (ref.node.kind === 'graphql') {
-    const r = ref.node.request;
-    return { ...base, type: 'graphql', endpoint: r.endpoint, query: r.query, graphqlVariables: r.variables, operationName: r.operationName, headers: r.headers, auth: ref.auth ?? r.auth };
-  }
-  return {
-    ...base,
-    type: 'http',
-    request: { ...ref.node.request, auth: ref.auth ?? { type: 'none' } },
+  // collection, folder (outer to inner) and request scripts run for GraphQL requests too, as in Postman
+  const scripts = {
     preRequestScript: joinScripts(collection.preRequestScript, ...ref.folders.map((f) => f.preRequestScript), ref.node.preRequestScript),
     testScript: joinScripts(collection.testScript, ...ref.folders.map((f) => f.testScript), ref.node.testScript),
   };
+  if (ref.node.kind === 'graphql') {
+    const r = ref.node.request;
+    return { ...base, ...scripts, type: 'graphql', endpoint: r.endpoint, query: r.query, graphqlVariables: r.variables, operationName: r.operationName, headers: r.headers, auth: ref.auth ?? r.auth };
+  }
+  return { ...base, ...scripts, type: 'http', request: { ...ref.node.request, auth: ref.auth ?? { type: 'none' } } };
 }
 
 export interface CollectionRunOptions extends Omit<RunOptions, 'tests' | 'concurrency' | 'setup' | 'teardown' | 'resume'> {

@@ -211,7 +211,7 @@ function graphqlItem(n: SavedGraphQLRequest, notes: string[]): Record<string, un
   const variables = q.variables === undefined ? '' : typeof q.variables === 'string' ? q.variables : JSON.stringify(q.variables, null, 2);
   return {
     name: n.name,
-    ...events(undefined, undefined, statusTests(n.assertions, notes, n.name)),
+    ...events(n.preRequestScript, n.testScript, statusTests(n.assertions, notes, n.name)),
     request: {
       method: 'POST',
       header: kv(q.headers),

@@ -29,4 +29,18 @@ assertions:
 
 `graphql-errors` asserts that errors occurred, either as a count (`expected: 1`) or by message (`expected: Cannot query field`). A GraphQL test without assertions checks `graphql-no-errors` by default.
 
+## Scripts
+
+GraphQL requests have pre-request and test scripts, like REST requests (the **Scripts** tab in the GraphQL view, `preRequestScript` / `testScript` in YAML). In a collection, the collection's and folders' scripts run for GraphQL requests too, as in Postman.
+
+- In a pre-request script, `pm.request.url` is the endpoint and `pm.request.headers` can be changed (for example to add a signature or a trace id); the body holds the query and variables as JSON. The query itself stays as written.
+- In a test script, `pm.response` is the GraphQL HTTP response: `pm.response.json().data`, `pm.response.json().errors`.
+
+```js
+pm.test('the patient has a name', () => {
+  pm.expect(pm.response.json().data.patient.name).to.be.a('string');
+});
+pm.environment.set('patientId', pm.response.json().data.patient.id);
+```
+
 :::

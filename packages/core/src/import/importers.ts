@@ -323,6 +323,8 @@ export function importPostman(text: string): { collection: Collection } {
           id: shortId('gql-'),
           name: it.name ?? url,
           request: { endpoint: url, query: g.query ?? '', variables: typeof g.variables === 'string' && g.variables.trim() ? g.variables : undefined, headers, auth },
+          ...(pmScript(it.event, 'prerequest') ? { preRequestScript: pmScript(it.event, 'prerequest') } : {}),
+          ...(pmScript(it.event, 'test') ? { testScript: pmScript(it.event, 'test') } : {}),
         };
       }
       let body: BodyConfig | undefined;
