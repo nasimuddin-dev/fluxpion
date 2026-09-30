@@ -7,7 +7,7 @@ description: "Run test suites in parallel with bounded concurrency, retries, tim
 
 # Test runner
 
-Tests are YAML or JSON files under `tests/`. A file can hold one test, a `tests:` list (with `defaults:`), or a dataset template. Suites are `*.suite.yaml` files:
+Tests are YAML or JSON files under `tests/`, of type `http`, `graphql`, `grpc`, `websocket` (or `socketio`), `mcp`, `llm`, `rag` or `agent`. A file can hold one test, a `tests:` list (with `defaults:`), or a dataset template. Suites are `*.suite.yaml` files:
 
 ```yaml
 name: Regression

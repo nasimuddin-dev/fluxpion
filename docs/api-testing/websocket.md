@@ -36,6 +36,32 @@ The **Saved connections** list keeps connections (URL, subprotocols, handshake h
 
 Saved connections live in the workspace (`library/websocket.json`). Use `{{variables}}` for tokens in headers, and keep the values in [secret variables](./environments.md#secrets).
 
+## WebSocket tests
+
+A test file with `type: websocket` connects, sends messages in order, listens for `waitMs`, and closes. The assertions run on:
+
+- `$.received`: each message the server sent, parsed as JSON when it is JSON. With Socket.IO, each item is `{ event, data }`.
+- `$.messages`: everything, with direction and time.
+- The plain text of the received messages, for `contains` without a path.
+
+A test that can't connect is an error that gives the reason.
+
+```yaml
+name: Echo server replies
+type: websocket              # socketio for Socket.IO (or an http(s):// URL)
+url: "{{wsEcho}}"
+send:
+  - hello                    # a text frame
+  - { type: ping, id: 1 }    # objects are sent as JSON
+waitMs: 1500
+assertions:
+  - { type: status, expected: 101 }            # connected (Switching Protocols)
+  - { type: equals, path: "$.received[0]", expected: hello }
+  - { type: equals, path: "$.received[1].type", expected: ping }
+```
+
+For Socket.IO, `send` items are `{ event, args, ack }`. Add `path:` if the server doesn't use `/socket.io`, and `auth:` for a handshake payload. The same exchange works from the terminal with [`testpion ws`](../cli/reference.md), and for AI agents with the `realtime_exchange` MCP tool.
+
 ## When a connection fails
 
 The reason is shown in the message log, with what to try:

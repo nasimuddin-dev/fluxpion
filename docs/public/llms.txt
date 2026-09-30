@@ -5,6 +5,7 @@
 Key facts for agents:
 
 - Workspaces are folders of JSON/YAML files (`workspace.json`, `collections/*.json`, `environments/*.json`, `tests/**/*.yaml`) that can be committed to git. Secret values are never in these files.
+- Test types: http, graphql, grpc, websocket (or socketio: connect, `send` messages / `{event,args,ack}`, assert on `$.received[n]`), mcp, llm, rag, agent.
 - A complete example workspace against free public APIs is at `examples/public-workspace` (REST, GraphQL, gRPC, WebSocket, SSE, MCP, AI; suites `all` and `offline`); the desktop app opens it on first launch. Docs: /getting-started/examples
 - Postman v2.1 collections and environments import and export losslessly where the formats overlap.
 - To let an agent use a workspace, register the MCP server: `testpion mcp-server -w <workspace>` (stdio). Tools: `list_collections`, `list_requests`, `get_request`, `list_environments`, `collection_docs`, `send_request`, `run_collection`, `parse_request_snippet`, `save_request`, `reorder_environments`. Add `--read-only` to disable sending and saving.

@@ -227,7 +227,7 @@ export interface CheckResult {
 
 /* ------------------------------------------------------------------ tests */
 
-export type TestType = 'http' | 'graphql' | 'grpc' | 'mcp' | 'llm' | 'rag' | 'agent';
+export type TestType = 'http' | 'graphql' | 'grpc' | 'websocket' | 'mcp' | 'llm' | 'rag' | 'agent';
 
 export interface TestBase {
   id?: string;
@@ -280,6 +280,26 @@ export interface GrpcTest extends TestBase {
    */
   protos: string[];
   tls?: boolean;
+}
+
+/**
+ * Connect to a WebSocket (or Socket.IO) server, send messages / emit events in order, listen for `waitMs`,
+ * close. Assertions run on `{ connected, received: [...], messages: [...] }`: `received` holds each
+ * received payload (parsed as JSON when it is JSON; Socket.IO: `{ event, data }`).
+ */
+export interface WebSocketTest extends TestBase {
+  type: 'websocket';
+  /** ws:// or wss:// (WebSocket), http(s)://host/namespace (Socket.IO). */
+  url: string;
+  mode?: 'websocket' | 'socketio';
+  /** WebSocket: text frames (objects are sent as JSON). Socket.IO: `{ event, args?, ack? }`. */
+  send?: Array<string | Record<string, unknown>>;
+  /** How long to listen after the last message (ms, default 1500). */
+  waitMs?: number;
+  headers?: KeyValue[];
+  protocols?: string[];
+  auth?: Record<string, unknown>;
+  path?: string;
 }
 
 export interface McpTest extends TestBase {
@@ -345,7 +365,7 @@ export interface AgentTest extends TestBase {
   maxSteps?: number;
 }
 
-export type TestCase = HttpTest | GraphQLTest | GrpcTest | McpTest | LlmTest | RagTest | AgentTest;
+export type TestCase = HttpTest | GraphQLTest | GrpcTest | WebSocketTest | McpTest | LlmTest | RagTest | AgentTest;
 
 export interface SuiteConfig {
   name: string;

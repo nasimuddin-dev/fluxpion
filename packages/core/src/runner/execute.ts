@@ -6,6 +6,7 @@ import type {
   CheckResult,
   GraphQLTest,
   GrpcTest,
+  WebSocketTest,
   HttpTest,
   LlmTest,
   McpServerConfig,
@@ -37,6 +38,7 @@ import { applyScriptOutput, scriptRequestSender, scriptScopes, type PersistVaria
 import { query, tryParseJson } from '../util/jsonpath.js';
 import { withTimeout } from '../util/concurrency.js';
 import { applyCookieJarOps, type CookieJar } from '../cookies/cookie-jar.js';
+import { runRealtimeExchange } from '../protocols/realtime.js';
 
 export interface ExecServices {
   vars: VariableScope;
@@ -130,6 +132,8 @@ export async function executeTest(testIn: TestCase, svc: ExecServices, opts: { t
           return runGraphQL(test, scope, svc, root, signal);
         case 'grpc':
           return runGrpc(test, scope, svc, root, signal);
+        case 'websocket':
+          return runWebSocket(test, scope, svc, root, signal);
         case 'mcp':
           return runMcp(test, scope, svc, root, signal);
         case 'llm':
@@ -353,6 +357,39 @@ async function runGrpc(test: GrpcTest, scope: VariableScope, svc: ExecServices, 
     s.fail(e);
     throw e;
   }
+}
+
+async function runWebSocket(test: WebSocketTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {
+  const r = scope.resolveDeep({ url: test.url, send: test.send ?? [], headers: test.headers, auth: test.auth, path: test.path });
+  const mode = test.mode ?? (/^https?:/i.test(r.url) ? 'socketio' : 'websocket');
+  // WebSocket frames are text: objects are sent as JSON. Socket.IO items are { event, args, ack } (or an event name).
+  const send = r.send.map((m) => (mode === 'websocket' ? (typeof m === 'string' ? m : JSON.stringify(m)) : typeof m === 'string' ? m : { event: String(m.event ?? 'message'), args: Array.isArray(m.args) ? m.args : m.data !== undefined ? [m.data] : [], ack: !!m.ack }));
+  const s = span.child(`${mode} ${svc.redactor.redactUrl(r.url)}`, 'internal', { input: { send } });
+  const out = await runRealtimeExchange(
+    { url: r.url, mode, send, waitMs: test.waitMs, headers: r.headers, protocols: test.protocols, auth: r.auth, path: r.path },
+    { redactor: svc.redactor, cookieJar: svc.cookieJar, signal },
+  );
+  if (!out.connected) {
+    const why = out.messages.filter((m) => m.direction === 'system').map((m) => m.data).join('; ') || 'the server did not accept the connection';
+    s.fail(new Error(why));
+    throw new ApsError('NetworkError', `Could not connect to ${svc.redactor.redactUrl(r.url)}: ${why}`, { suggestions: [] });
+  }
+  const parse = (t: string): unknown => {
+    try {
+      return JSON.parse(t);
+    } catch {
+      return t;
+    }
+  };
+  const received = out.messages.filter((m) => m.direction === 'received').map((m) => (mode === 'socketio' ? { event: m.event, data: parse(m.data) } : parse(m.data)));
+  const body = { connected: true, received, messages: out.messages };
+  s.setAttributes({ mode, received: received.length });
+  s.end({ status: 'ok', output: summarize(received, 16_000) });
+  return {
+    ctx: { testType: 'websocket', status: mode === 'websocket' ? 101 : 200, body, text: out.messages.filter((m) => m.direction === 'received').map((m) => m.data).join('\n'), latencyMs: out.durationMs },
+    partial: { input: `${mode} ${svc.redactor.redactUrl(r.url)} · ${send.length} sent`, output: summarize(received) },
+    metadata: { url: svc.redactor.redactUrl(r.url), mode, received: received.length },
+  };
 }
 
 async function runMcp(test: McpTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {

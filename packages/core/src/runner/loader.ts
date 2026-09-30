@@ -126,6 +126,24 @@ export function normalizeTest(raw: Record<string, unknown>, file?: string, index
         variables: vars,
       };
     }
+    case 'websocket':
+    case 'ws':
+    case 'socketio': {
+      const send = raw.send ?? raw.messages ?? raw.message;
+      return {
+        ...base,
+        type: 'websocket',
+        url: String(raw.url ?? ''),
+        ...(raw.mode || type === 'socketio' ? { mode: (raw.mode ?? 'socketio') as 'websocket' | 'socketio' } : {}),
+        send: (Array.isArray(send) ? send : send !== undefined ? [send] : []) as Array<string | Record<string, unknown>>,
+        ...(raw.waitMs ?? raw.wait ? { waitMs: Number(raw.waitMs ?? raw.wait) } : {}),
+        headers: kvList(raw.headers),
+        ...(raw.protocols ? { protocols: (Array.isArray(raw.protocols) ? raw.protocols : String(raw.protocols).split(',')).map((p) => String(p).trim()).filter(Boolean) } : {}),
+        ...(raw.auth ? { auth: raw.auth as Record<string, unknown> } : {}),
+        ...(raw.path ? { path: String(raw.path) } : {}),
+        variables: vars,
+      };
+    }
     case 'mcp': {
       const server = raw.server as string | { name?: string; id?: string } | undefined;
       const tool = raw.tool as string | { name: string } | undefined;

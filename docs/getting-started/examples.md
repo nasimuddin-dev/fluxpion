@@ -20,7 +20,7 @@ The workspace is copied into your data folder once. You can change it freely: ap
 | GraphQL queries with variables, and an error case | Collection **GraphQL (Countries, Rick and Morty)**; open it in the GraphQL view to browse the schema | [Countries](https://countries.trevorblades.com), [Rick and Morty](https://rickandmortyapi.com) |
 | Server-Sent Events, live | Collection **Live streams (SSE)**; press Stop when you've seen enough | [Wikimedia EventStreams](https://stream.wikimedia.org) |
 | gRPC through server reflection (no `.proto` files): unary, server streaming | gRPC view ▸ **Saved requests** | grpcb.in |
-| WebSocket echo | WebSocket view ▸ **Saved connections** | Postman echo, echo.websocket.org |
+| WebSocket echo | WebSocket view ▸ **Saved connections**; tests in Tests ▸ `websocket/echo.yaml` | Postman echo, echo.websocket.org |
 | MCP over Streamable HTTP | MCP view ▸ **Petstore MCP**, **DeepWiki** | petstore.run.mcp.com.ai, mcp.deepwiki.com |
 | MCP mock (offline) | MCP view ▸ **Weather (offline mock)**, from `mocks/weather.mcp-mock.yaml` | none |
 | AI prompts: JSON output, summaries, a prompt injection | AI Lab ▸ **Saved prompts** | the offline demo model |

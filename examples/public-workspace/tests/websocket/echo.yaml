@@ -1,0 +1,21 @@
+# WebSocket tests: connect, send messages in order, listen, then assert on what came back.
+defaults:
+  type: websocket
+  waitMs: 2000
+  tags: [websocket, public]
+tests:
+  - name: Postman echo returns text and JSON
+    url: "{{wsEcho}}"
+    send:
+      - hello from TestPion
+      - { type: ping, id: 1 }
+    assertions:
+      - { type: status, expected: 101 }
+      - { type: equals, path: "$.received[0]", expected: hello from TestPion }
+      - { type: equals, path: "$.received[1].type", expected: ping }
+
+  - name: echo.websocket.org echoes a message
+    url: "{{wsEcho2}}"
+    send: [TestPion says hi]
+    assertions:
+      - { type: contains, expected: TestPion says hi }
