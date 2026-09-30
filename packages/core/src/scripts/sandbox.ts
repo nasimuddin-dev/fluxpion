@@ -3,6 +3,7 @@ import { newQuickJSWASMModuleFromVariant, shouldInterruptAfterDeadline, type Qui
 import variant from '@jitl/quickjs-singlefile-mjs-release-sync';
 import { EPILOGUE, PRELUDE } from './prelude.js';
 import { dynamicValue } from '../vars/dynamic.js';
+import { validateSchema } from '../eval/checks.js';
 import type { CookieJarOp, StoredCookie } from '../cookies/cookie-jar.js';
 
 /**
@@ -153,6 +154,14 @@ async function runScriptOnce(code: string, input: ScriptInput, opts: ScriptOptio
     };
     const alg = (a: string) => (HASHES.has(a) ? a : 'sha256');
     fn('__host_uuid', () => randomUUID());
+    fn('__host_schema', (schema, data) => {
+      try {
+        const r = validateSchema(JSON.parse(schema ?? '{}'), JSON.parse(data ?? 'null'));
+        return JSON.stringify({ valid: r.valid, errors: r.errors.slice(0, 5) });
+      } catch (e) {
+        return JSON.stringify({ valid: false, errors: [`invalid schema: ${(e as Error).message}`] });
+      }
+    });
     fn('__host_dynamic', (name) => JSON.stringify(dynamicValue(name ?? '') ?? null));
     fn('__host_hash', (a, s) => createHash(alg(a)).update(s ?? '').digest('hex'));
     fn('__host_hmac', (a, key, s) => createHmac(alg(a), key ?? '').update(s ?? '').digest('hex'));

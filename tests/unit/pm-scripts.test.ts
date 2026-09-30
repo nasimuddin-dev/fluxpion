@@ -168,4 +168,28 @@ describe('Postman-compatible scripts (pm.*)', () => {
     expect(guid).toMatch(/^[0-9a-f-]{36}$/);
     expect([n, nope, name]).toEqual(['3', '{{$nope}}', 'Rex']);
   });
+
+  it('validates JSON schemas for real (pm.response, pm.expect, tv4)', async () => {
+    const good = { type: 'object', required: ['items', 'total'], properties: { total: { type: 'integer' }, items: { type: 'array', items: { required: ['id', 'name'] } } } };
+    const bad = { type: 'object', required: ['missing'], properties: { total: { type: 'string' } } };
+    const out = await runScript(
+      `const good = ${JSON.stringify(good)}, bad = ${JSON.stringify(bad)};
+       pm.test("response matches", () => pm.response.to.have.jsonSchema(good));
+       pm.test("response mismatch", () => pm.response.to.have.jsonSchema(bad));
+       pm.test("expect matches", () => pm.expect(pm.response.json().items[0]).to.have.jsonSchema({ type: "object", properties: { id: { type: "number" } } }));
+       pm.test("expect mismatch", () => pm.expect({ id: "x" }).to.have.jsonSchema({ properties: { id: { type: "number" } } }));
+       const tv4 = require("tv4");
+       pm.test("tv4", () => { pm.expect(tv4.validate(pm.response.json(), good)).to.be.true; pm.expect(tv4.validate({}, bad)).to.be.false; pm.expect(tv4.error.message).to.include("missing"); });`,
+      { variables: {}, response },
+    );
+    expect(out.error).toBeUndefined();
+    expect(out.tests.map((t) => [t.name, t.passed])).toEqual([
+      ['response matches', true],
+      ['response mismatch', false],
+      ['expect matches', true],
+      ['expect mismatch', false],
+      ['tv4', true],
+    ]);
+    expect(out.tests[1]!.message).toMatch(/must have required property 'missing'/);
+  });
 });

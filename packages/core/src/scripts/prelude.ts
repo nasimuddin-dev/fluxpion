@@ -41,6 +41,18 @@ function __resolve(key) {
     if (Object.prototype.hasOwnProperty.call(__scopes[s], key)) return __scopes[s][key];
   return undefined;
 }
+// JSON Schema validation (draft-07 / 2019-09 keywords, formats) runs on the host with Ajv; errors come back as text.
+function __schemaCheck(data, schema) {
+  if (!schema || typeof schema !== 'object') return { valid: false, errors: ['a JSON schema object is required'] };
+  return JSON.parse(__host_schema(JSON.stringify(schema), JSON.stringify(data === undefined ? null : data)));
+}
+// tv4, as used by older Postman scripts: tv4.validate(data, schema) → boolean, with tv4.error.
+const tv4 = {
+  error: null,
+  validate(data, schema) { const r = __schemaCheck(data, schema); tv4.error = r.valid ? null : { message: r.errors[0] || 'invalid' }; return r.valid; },
+  validateResult(data, schema) { const r = __schemaCheck(data, schema); return { valid: r.valid, error: r.valid ? null : { message: r.errors[0] || 'invalid' }, missing: [] }; },
+  validateMultiple(data, schema) { const r = __schemaCheck(data, schema); return { valid: r.valid, errors: r.errors.map((m) => ({ message: m })), missing: [] }; },
+};
 function __replaceIn(str) {
   return String(str).replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (m, k) => { let v = __resolve(k.trim()); if (v === undefined && k.trim()[0] === '$') v = JSON.parse(__host_dynamic(k.trim())) ?? undefined; return v === undefined ? m : typeof v === 'object' ? JSON.stringify(v) : String(v); });
 }
@@ -127,6 +139,7 @@ function __chai(actual, state) {
   Object.defineProperty(self, 'lengthOf', { get: lengthOf });
   Object.defineProperty(self, 'length', { get: lengthOf });
   self.match = (re) => assert(new RegExp(re).test(String(actual)), 'expected ' + S + ' to match ' + re);
+  self.jsonSchema = (schema) => { const r = __schemaCheck(actual, schema); return assert(r.valid, 'expected ' + S + ' to match the JSON schema: ' + r.errors.join('; ')); };
   self.string = (s) => assert(String(actual).indexOf(s) >= 0, 'expected ' + S + ' to contain ' + __fmt(s));
   self.oneOf = (arr) => assert(arr.some((x) => __deepEq(x, actual)), 'expected ' + S + ' to be one of ' + __fmt(arr));
   self.keys = function () {
@@ -204,7 +217,7 @@ if (__in.response) {
     chain.header = (k, v) => { const h = hdrs.find((x) => x.key.toLowerCase() === String(k).toLowerCase()); return v === undefined ? a(!!h, 'expected response to have header ' + k) : a(!!h && h.value === String(v), 'expected header ' + k + ' to be ' + v + ' but got ' + (h && h.value)); };
     chain.body = (b) => (b === undefined ? a(!!res.body, 'expected response to have a body') : a(typeof b === 'string' ? res.body === b : __deepEq(jsonBody(), b), 'expected response body to match'));
     chain.jsonBody = (path, val) => { let j; try { j = jsonBody(); } catch (e) { return a(false, 'expected response body to be JSON'); } if (path === undefined) return a(true, ''); const v = String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), j); return val === undefined ? a(v !== undefined, 'expected JSON body to have ' + path) : a(__deepEq(v, val), 'expected JSON body ' + path + ' to equal ' + __fmt(val)); };
-    chain.jsonSchema = () => a(true, '');
+    chain.jsonSchema = (schema) => { let j; try { j = jsonBody(); } catch (e) { return a(false, 'expected response body to be JSON'); } const r = __schemaCheck(j, schema); return a(r.valid, 'expected response body to match the JSON schema: ' + r.errors.join('; ')); };
     chain.responseTime = { below: (n) => a((res.time || 0) < n, 'expected response time below ' + n + 'ms') };
     const flag = (n, cond, msg) => Object.defineProperty(chain, n, { get: () => a(cond(), msg) });
     flag('ok', () => code === 200, 'expected response to be ok (200) but got ' + code);
@@ -340,7 +353,8 @@ const atob = (s) => __host_unb64(String(s));
 const require = (name) => {
   if (name === 'crypto-js') return CryptoJS;
   if (name === 'uuid') return { v4: () => __host_uuid() };
-  throw new Error('require("' + name + '") is not available in the sandbox (supported: crypto-js, uuid)');
+  if (name === 'tv4') return tv4;
+  throw new Error('require("' + name + '") is not available in the sandbox (supported: crypto-js, uuid, tv4)');
 };
 
 /* ---------------- pm / aps ---------------- */

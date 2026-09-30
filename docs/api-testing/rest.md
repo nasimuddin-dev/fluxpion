@@ -175,11 +175,11 @@ pm.environment.set('patientId', pm.response.json().items[0].id);
 
 | Area | API |
 |---|---|
-| Tests | `pm.test`, chai-style `pm.expect(…).to.…` (`equal`, `eql`, `deep`, `a`/`an`, `include`, `property`, `lengthOf`, `above`/`below`, `oneOf`, `keys`, `match`, `not`, `true`/`false`/`null`/`ok`/`empty` …), legacy `tests["name"] = bool` |
+| Tests | `pm.test`, chai-style `pm.expect(…).to.…` (`equal`, `eql`, `deep`, `a`/`an`, `include`, `property`, `lengthOf`, `above`/`below`, `oneOf`, `keys`, `match`, `jsonSchema`, `not`, `true`/`false`/`null`/`ok`/`empty` …), JSON Schema checks with `pm.response.to.have.jsonSchema(schema)` or `tv4.validate(data, schema)` (validated with Ajv: draft-07 keywords and formats), legacy `tests["name"] = bool` |
 | Response | `pm.response.code`, `.status`, `.responseTime`, `.headers.get()`, `.json()`, `.text()`, `pm.response.to.have.status/header/body/jsonBody`, `pm.response.to.be.ok/success/error/json`, legacy `responseCode`, `responseBody` |
 | Request | `pm.request.method`, `.url.toString()/update()`, `.headers.add/upsert/remove/get`, `.body.toString()/update()` |
 | Variables | `pm.variables`, `pm.environment`, `pm.collectionVariables`, `pm.globals` (`get/set/unset/has/clear/toObject/replaceIn`; `replaceIn` also fills dynamic variables such as `{{$randomFirstName}}`), `pm.iterationData` |
-| Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `pm.sendRequest`, `pm.visualizer.set/clear`, `postman.setNextRequest`, `postman.setEnvironmentVariable`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `console.log` |
+| Other | `pm.info`, `pm.cookies`, `pm.cookies.jar()` (`get`, `getAll`, `set`, `unset`, `clear`), `pm.execution.setNextRequest`, `pm.sendRequest`, `pm.visualizer.set/clear`, `postman.setNextRequest`, `postman.setEnvironmentVariable`, `CryptoJS` (hashes, HMAC, Base64/Hex/Utf8), `btoa`/`atob`, `require('crypto-js')`, `require('tv4')`, `console.log` |
 
 **`pm.sendRequest`** sends another HTTP request from a pre-request or test script, for example to fetch a token first:
 
