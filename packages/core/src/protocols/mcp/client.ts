@@ -10,7 +10,16 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CreateMessageRequestSchema,
+  ElicitRequestSchema,
+  ListRootsRequestSchema,
+  LoggingMessageNotificationSchema,
+  type CreateMessageRequest,
+  type CreateMessageResult,
+  type ElicitRequest,
+  type ElicitResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { McpServerConfig } from '../../model/types.js';
 import { ApsError } from '../../errors.js';
 import type { Redactor } from '../../util/redact.js';
@@ -145,8 +154,20 @@ export interface McpCallResult {
   raw: unknown;
 }
 
+/**
+ * Answers to requests the server sends to the client: its roots (folders it may work in), sampling
+ * (the server asks for an LLM completion) and elicitation (the server asks the user for input).
+ */
+export interface McpClientHandlers {
+  roots?: () => Array<{ uri: string; name?: string }>;
+  sampling?: (params: CreateMessageRequest['params']) => Promise<CreateMessageResult>;
+  elicitation?: (params: ElicitRequest['params']) => Promise<ElicitResult>;
+}
+export type McpClientFeature = 'roots' | 'sampling' | 'elicitation';
+
 /** A live connection to one MCP server. */
 export class McpSession {
+  private handlers: McpClientHandlers;
   private client: Client;
   private transport?: TracingTransport;
   private listeners: McpEventListener[] = [];
@@ -157,10 +178,33 @@ export class McpSession {
   constructor(
     readonly config: McpServerConfig,
     private redactor?: Redactor,
-    /** `cookieJar`: HTTP transports send its cookies and store the ones the server sets. */
-    private opts: { cookieJar?: CookieJar } = {},
+    /**
+     * `cookieJar`: HTTP transports send its cookies and store the ones the server sets.
+     * `handlers` / `features`: the client capabilities to declare (roots, sampling, elicitation) and how
+     * to answer; handlers can be swapped later with setHandlers (features are fixed at connect).
+     */
+    private opts: { cookieJar?: CookieJar; handlers?: McpClientHandlers; features?: McpClientFeature[] } = {},
   ) {
-    this.client = new Client({ name: 'testpion', version: ENGINE_VERSION }, { capabilities: {} });
+    this.handlers = opts.handlers ?? {};
+    const features = new Set<McpClientFeature>(opts.features ?? (Object.keys(this.handlers) as McpClientFeature[]));
+    const capabilities: Record<string, object> = {};
+    if (features.has('roots')) capabilities.roots = { listChanged: false };
+    if (features.has('sampling')) capabilities.sampling = {};
+    if (features.has('elicitation')) capabilities.elicitation = {};
+    this.client = new Client({ name: 'testpion', version: ENGINE_VERSION }, { capabilities });
+    if (features.has('roots')) this.client.setRequestHandler(ListRootsRequestSchema, async () => ({ roots: this.handlers.roots?.() ?? [] }));
+    if (features.has('sampling'))
+      this.client.setRequestHandler(CreateMessageRequestSchema, async (req) => {
+        if (!this.handlers.sampling) throw new Error('Sampling is not answered here: set a sampling reply for this test');
+        return this.handlers.sampling(req.params);
+      });
+    if (features.has('elicitation'))
+      this.client.setRequestHandler(ElicitRequestSchema, async (req) => (this.handlers.elicitation ? this.handlers.elicitation(req.params) : { action: 'decline' }));
+  }
+
+  /** Change how server requests (roots, sampling, elicitation) are answered. */
+  setHandlers(h: McpClientHandlers): void {
+    this.handlers = h;
   }
 
   onEvent(l: McpEventListener): () => void {
@@ -363,21 +407,23 @@ export class McpManager {
     private onEvent?: (serverId: string, e: McpTraceEvent) => void,
   ) {}
 
-  async get(ref: string | McpServerConfig): Promise<McpSession> {
+  /** `features`: client capabilities the session must declare (sessions are pooled per server and feature set). */
+  async get(ref: string | McpServerConfig, features: McpClientFeature[] = []): Promise<McpSession> {
     const cfg = this.resolveConfig(ref);
     if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server "${typeof ref === 'string' ? ref : ref.name}"`, {
       suggestions: ['Define the server in the MCP view (or mcp-servers.json in the workspace).'],
     });
-    let p = this.sessions.get(cfg.id);
+    const key = features.length ? `${cfg.id}|${[...features].sort().join(',')}` : cfg.id;
+    let p = this.sessions.get(key);
     if (!p) {
       p = (async () => {
-        const s = new McpSession(cfg, this.redactor);
+        const s = new McpSession(cfg, this.redactor, { features });
         if (this.onEvent) s.onEvent((e) => this.onEvent!(cfg.id, e));
         await s.connect();
         return s;
       })();
-      this.sessions.set(cfg.id, p);
-      p.catch(() => this.sessions.delete(cfg.id));
+      this.sessions.set(key, p);
+      p.catch(() => this.sessions.delete(key));
     }
     return p;
   }

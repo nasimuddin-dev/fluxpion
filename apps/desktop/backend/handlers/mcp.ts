@@ -1,5 +1,6 @@
 /** RPC handlers: MCP servers: connect, discover, call tools, read resources, prompts, tests and mocks. */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { stringify as toYaml } from 'yaml';
 import {
   ApsError,
@@ -15,8 +16,48 @@ import {
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
+/** Requests an inspected server sent to the client (elicitation, sampling) that wait for the user. */
+interface PendingClientRequest {
+  serverId: string;
+  resolve(result: unknown): void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export function mcpHandlers(be: Backend): Handlers {
+  const pending = new Map<string, PendingClientRequest>();
+  // ask the UI and wait (at most 10 minutes); the answer comes back with mcp.clientRespond
+  const askUser = <T>(serverId: string, serverName: string, kind: 'elicitation' | 'sampling', params: unknown, onTimeout: T): Promise<T> =>
+    new Promise<T>((resolve) => {
+      const id = shortId('mcpreq-');
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        be.host.emit('mcp.clientRequestDone', { id });
+        resolve(onTimeout);
+      }, 10 * 60_000);
+      pending.set(id, { serverId, resolve: resolve as (r: unknown) => void, timer });
+      be.host.emit('mcp.clientRequest', { id, serverId, serverName, kind, params: be.mcpRedactors.get(serverId)?.redact(params) ?? params });
+    });
+  const cancelPending = (serverId: string) => {
+    for (const [id, p] of pending)
+      if (p.serverId === serverId) {
+        clearTimeout(p.timer);
+        pending.delete(id);
+        p.resolve({ action: 'cancel' });
+        be.host.emit('mcp.clientRequestDone', { id });
+      }
+  };
   return {
+    /** The user's answer to a server's elicitation or sampling request. */
+    'mcp.clientRespond': ({ id, result }: { id: string; result: unknown }) => {
+      const p = pending.get(id);
+      if (!p) throw new ApsError('ValidationError', 'That request is no longer waiting (it timed out or the server disconnected)');
+      clearTimeout(p.timer);
+      pending.delete(id);
+      p.resolve(result);
+    },
+    /** Draft a reply to a sampling request with the AI assistant's model (the user reviews it before it is sent). */
+    'mcp.sampleDraft': async ({ params, environment }: { params: { systemPrompt?: string; maxTokens?: number; messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string } }> }; environment?: string }) =>
+      be.sampleWithAssistant(params, environment),
     'mcp.servers': () => be.ws.getMcpServers().map((s) => ({ ...s, connected: !!be.mcpSessions.get(s.id)?.connected })),
     'mcp.saveServers': ({ servers }: { servers: McpServerConfig[] }) => {
       be.ws.saveMcpServers(servers);
@@ -28,7 +69,19 @@ export function mcpHandlers(be: Backend): Handlers {
       if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
       const ctx = be.context({ environment });
       const resolved = be.ws.resolveMcpServer(ctx.vars.resolveDeep(cfg));
-      const session = new McpSession(resolved, ctx.redactor, { cookieJar: ctx.services.cookieJar });
+      // the inspector offers roots (the workspace folder) and lets the user answer elicitation and sampling
+      const session = new McpSession(resolved, ctx.redactor, {
+        cookieJar: ctx.services.cookieJar,
+        handlers: {
+          roots: () => [{ uri: pathToFileURL(be.ws.root).href, name: be.ws.workspace.name }],
+          elicitation: (params) => askUser(serverId, cfg.name, 'elicitation', params, { action: 'cancel' as const }),
+          sampling: async (params) => {
+            const r = await askUser<{ text?: string; model?: string; action?: string }>(serverId, cfg.name, 'sampling', params, { action: 'cancel' });
+            if (!r.text) throw new ApsError('ValidationError', 'The user declined the sampling request');
+            return { role: 'assistant' as const, content: { type: 'text' as const, text: r.text }, model: r.model ?? 'user', stopReason: 'endTurn' };
+          },
+        },
+      });
       const b = be.batched<unknown>('mcp.events');
       session.onEvent((e) => b.push({ serverId, event: e }));
       be.mcpSessions.set(serverId, session);
@@ -89,6 +142,7 @@ export function mcpHandlers(be: Backend): Handlers {
       return { path: rel, tools: def.tools?.length ?? 0, calls: calls.length, resources: Object.keys(texts).length };
     },
     'mcp.disconnect': async ({ serverId }: { serverId: string }) => {
+      cancelPending(serverId);
       await be.mcpSessions.get(serverId)?.close();
       be.mcpSessions.delete(serverId);
       be.mcpRedactors.delete(serverId);

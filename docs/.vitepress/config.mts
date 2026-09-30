@@ -103,6 +103,7 @@ const docsSidebar = [
       { text: 'Connecting', link: '/mcp/connecting' },
       { text: 'Tools', link: '/mcp/tools' },
       { text: 'Resources & Prompts', link: '/mcp/resources' },
+      { text: 'Elicitation & Sampling', link: '/mcp/client-features' },
       { text: 'Debugging', link: '/mcp/debugging' },
       { text: 'Mock Server', link: '/mcp/mocking' },
     ],

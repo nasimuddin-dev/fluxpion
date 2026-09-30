@@ -8,6 +8,7 @@ import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
 import { Spinner, TooltipProvider } from './components/ui';
+import { McpClientRequests } from './components/McpClientRequests';
 
 /**
  * Each tool is a separate product surface. Loading it only when selected keeps
@@ -288,6 +289,7 @@ export default function App() {
           <CiDialog />
         </Suspense>
       )}
+      <McpClientRequests />
       {recordOpen && (
         <Suspense fallback={null}>
           <RecordDialog onClose={() => useApp.getState().set({ recordOpen: false })} />

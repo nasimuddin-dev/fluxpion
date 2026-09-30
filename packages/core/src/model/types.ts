@@ -332,6 +332,12 @@ export interface McpTest extends TestBase {
   arguments?: Record<string, unknown>;
   resource?: string;
   prompt?: { name: string; arguments?: Record<string, string> };
+  /** How to answer the server's elicitation requests (it asks the user for input): accept with content, decline or cancel. */
+  elicitation?: { action?: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> };
+  /** How to answer the server's sampling requests (it asks for an LLM completion): a fixed reply. */
+  sampling?: { text: string; model?: string };
+  /** Roots (folders) the client offers the server: paths or file:// URIs. */
+  roots?: string[];
 }
 
 export interface ResponseFormat {

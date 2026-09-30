@@ -964,6 +964,23 @@ export class Backend {
     }
   }
 
+  /** A reply to an MCP server's sampling request, drafted with the assistant's model. */
+  async sampleWithAssistant(params: { systemPrompt?: string; maxTokens?: number; messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string } }> }, environment?: string) {
+    const providerRef = this.settings.assistantProvider;
+    if (!providerRef) throw new ApsError('ConfigurationError', 'The AI assistant is off', { suggestions: ['Open Settings ▸ AI assistant to choose a model, or write the reply yourself.'] });
+    const ctx = this.context({ environment });
+    const { provider, model } = ctx.services.providers.resolveModel({ provider: providerRef, name: this.settings.assistantModel });
+    const r = await provider.chat({
+      model,
+      maxTokens: Math.min(params.maxTokens ?? 1000, 4000),
+      messages: [
+        ...(params.systemPrompt ? [{ role: 'system' as const, content: params.systemPrompt }] : []),
+        ...params.messages.map((m) => ({ role: m.role, content: m.content.type === 'text' ? (m.content.text ?? '') : `[${m.content.type}]` })),
+      ],
+    });
+    return { text: r.text, model: `${providerRef}/${model}` };
+  }
+
   async assistant(p: { task: string; context: unknown; question?: string; environment?: string }) {
     const providerRef = this.settings.assistantProvider;
     if (!providerRef)

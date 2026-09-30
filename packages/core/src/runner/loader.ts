@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import type { AuthConfig, BodyConfig, HttpRequestSpec, KeyValue, ModelRef, SuiteConfig, TestCase } from '../model/types.js';
+import type { AuthConfig, BodyConfig, HttpRequestSpec, KeyValue, McpTest, ModelRef, SuiteConfig, TestCase } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { slugify } from '../util/ids.js';
 import { readDataset, type DatasetSource } from './datasets.js';
@@ -161,6 +161,9 @@ export function normalizeTest(raw: Record<string, unknown>, file?: string, index
         arguments: (raw.arguments ?? raw.args) as Record<string, unknown> | undefined,
         resource: raw.resource as string | undefined,
         prompt: raw.prompt as { name: string; arguments?: Record<string, string> } | undefined,
+        ...(raw.elicitation ? { elicitation: raw.elicitation as McpTest['elicitation'] } : {}),
+        ...(raw.sampling ? { sampling: (typeof raw.sampling === 'string' ? { text: raw.sampling } : raw.sampling) as McpTest['sampling'] } : {}),
+        ...(raw.roots ? { roots: (Array.isArray(raw.roots) ? raw.roots : [raw.roots]).map(String) } : {}),
         variables: vars,
       } as TestCase;
     }

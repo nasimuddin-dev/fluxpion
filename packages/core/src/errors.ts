@@ -92,7 +92,9 @@ export function normalizeError(err: unknown): NormalizedError {
   const e = err as { name?: string; message?: string; code?: string; cause?: { code?: string; message?: string; errors?: Array<{ code?: string }> } };
   const message = e?.message ?? String(err);
   // undici wraps socket errors in `cause`; dual-stack connects report an AggregateError
-  const code = e?.code ?? e?.cause?.code ?? e?.cause?.errors?.find((x) => x?.code)?.code;
+  // Node codes are strings (ECONNREFUSED); JSON-RPC / MCP errors have numeric codes (-32602)
+  const rawCode: unknown = e?.code ?? e?.cause?.code ?? e?.cause?.errors?.find((x) => x?.code)?.code;
+  const code = rawCode === undefined || rawCode === null ? undefined : String(rawCode);
 
   const NETWORK_CODES = /^(ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EPIPE|EHOSTUNREACH|ENETUNREACH|ENETDOWN|ECONNABORTED|UND_ERR_SOCKET|UND_ERR_CLOSED)$/;
   const looksNetwork = (code && (NETWORK_CODES.test(code) || /CERT|SSL|TLS/i.test(code))) || (e?.name === 'TypeError' && /fetch failed/i.test(message));

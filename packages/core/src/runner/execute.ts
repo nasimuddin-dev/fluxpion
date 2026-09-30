@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import type {
   AgentTest,
@@ -423,11 +424,35 @@ async function runWebSocket(test: WebSocketTest, scope: VariableScope, svc: Exec
 }
 
 async function runMcp(test: McpTest, scope: VariableScope, svc: ExecServices, span: SpanHandle, signal: AbortSignal): Runner {
+  // what the server asked the client during this test (elicitation, sampling), for the trace and the result
+  const serverRequests: Array<{ kind: string; params: unknown }> = [];
   const connect = span.child('mcp session', 'mcp', { attributes: { server: typeof test.server === 'string' ? test.server : test.server.name } });
   let session;
   try {
-    // sessions are pooled per run, so this is only slow for the first test using a server
-    session = await svc.mcp.get(test.server);
+    // sessions are pooled per run (and per client capability set), so this is only slow for the first test using a server
+    const features = [...(test.elicitation ? ['elicitation' as const] : []), ...(test.sampling ? ['sampling' as const] : []), ...(test.roots ? ['roots' as const] : [])];
+    session = await svc.mcp.get(test.server, features);
+    const asked: Array<{ kind: string; params: unknown }> = serverRequests;
+    session.setHandlers({
+      ...(test.roots ? { roots: () => test.roots!.map((r) => ({ uri: /^[a-z][\w+.-]*:\/\//i.test(r) ? r : pathToFileURL(r).href })) } : {}),
+      ...(test.elicitation
+        ? {
+            elicitation: async (params) => {
+              asked.push({ kind: 'elicitation', params });
+              const action = test.elicitation!.action ?? 'accept';
+              return action === 'accept' ? { action, content: scope.resolveDeep(test.elicitation!.content ?? {}) as Record<string, string | number | boolean> } : { action };
+            },
+          }
+        : {}),
+      ...(test.sampling
+        ? {
+            sampling: async (params) => {
+              asked.push({ kind: 'sampling', params });
+              return { role: 'assistant' as const, content: { type: 'text' as const, text: scope.resolve(test.sampling!.text) }, model: test.sampling!.model ?? 'testpion-fixed-reply', stopReason: 'endTurn' };
+            },
+          }
+        : {}),
+    });
     connect.end({ output: { server: session.config.name, transport: session.config.transport } });
   } catch (e) {
     connect.fail(e);
@@ -438,11 +463,12 @@ async function runMcp(test: McpTest, scope: VariableScope, svc: ExecServices, sp
     const s = span.child(`tools/call ${test.tool}`, 'mcp', { attributes: { server: session.config.name, tool: test.tool }, input: args });
     const r = await session.callTool(test.tool, args, { signal });
     const { body, text } = mcpResultBody(r);
-    s.end({ status: r.isError ? 'error' : 'ok', output: r.raw });
+    if (serverRequests.length) s.setAttributes({ serverRequests: serverRequests.length });
+    s.end({ status: r.isError ? 'error' : 'ok', output: serverRequests.length ? { result: r.raw, serverRequests } : r.raw });
     return {
       ctx: { testType: 'mcp', body, text, isError: r.isError, latencyMs: r.durationMs },
       partial: { input: `${test.tool}(${summarize(args, 500)})`, output: summarize(svc.redactor.redact(body)) },
-      metadata: { server: session.config.name, tool: test.tool },
+      metadata: { server: session.config.name, tool: test.tool, ...(serverRequests.length ? { serverRequests: svc.redactor.redact(serverRequests) } : {}) },
     };
   }
   if (test.resource) {
