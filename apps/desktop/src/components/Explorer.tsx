@@ -6,7 +6,8 @@ import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig 
 import { uid } from '../lib/format';
 import { addToFolder, CATEGORY_META, CollectionTree, type ExtraGroup } from './CollectionTree';
 import type { RequestCategory } from '../lib/collection-filter';
-import { newRequestItems } from './EditorTabs';
+import { newRequestItems, useEditorTabsStore } from './EditorTabs';
+import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
 
 /**
@@ -170,7 +171,16 @@ export function Explorer() {
   const [servers, setServers] = useState<Array<McpServerConfig & { connected?: boolean }>>([]);
   const [specs, setSpecs] = useState<string[]>([]);
   // the request that's open (as recorded for Back / Forward) is highlighted in the tree
-  const openRequestId = useApp((s) => (s.nav.current.payload?.requestId ?? s.nav.current.payload?.savedId) as string | undefined);
+  // (or, for a tab restored at start-up, the item its active tab shows)
+  const navItem = useApp((s) => (s.nav.current.payload?.requestId ?? s.nav.current.payload?.savedId) as string | undefined);
+  const view = useApp((s) => s.view);
+  const activeDoc = useDocs((s) => s.active[view]);
+  const tabItem = useEditorTabsStore((s) => {
+    const group = isDocView(view) ? `${view}:${activeDoc ?? 'main'}` : view;
+    const tabs = s.byView[group] ?? [];
+    return (tabs.find((t) => t.key === s.activeByView[group]) ?? (tabs.length === 1 ? tabs[0] : undefined))?.item;
+  });
+  const openRequestId = tabItem ?? navItem;
 
   const load = useCallback(async () => {
     const quiet = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);

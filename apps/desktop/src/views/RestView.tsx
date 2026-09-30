@@ -525,6 +525,7 @@ export function RestView() {
       title: t.name,
       badge: t.request.method,
       badgeClass: `method-${t.request.method}`,
+      item: t.requestId,
       dirty: t.dirty,
       pinned: t.pinned,
       onSelect: () => setActive(t.id),

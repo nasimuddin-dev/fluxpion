@@ -20,6 +20,8 @@ export interface EditorTab {
   badgeClass?: string;
   dirty?: boolean;
   pinned?: boolean;
+  /** The saved request (or gRPC call, connection) the tab shows, highlighted in the sidebar. */
+  item?: string;
   onSelect?(): void;
   onClose(): void;
   /** Close several of this editor's tabs at once (one question about unsaved changes); by keys. */
