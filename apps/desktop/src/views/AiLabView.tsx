@@ -628,6 +628,7 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
               <div className="text-sm font-medium flex items-center gap-2">
                 {x.name}
                 {x.hasKey && <KeyRound size={11} className="text-warn" />}
+                {(x as { builtIn?: boolean }).builtIn && <Badge>Settings</Badge>}
               </div>
               <div className="text-xs text-muted">{KINDS.find((k) => k[0] === x.kind)?.[1]}</div>
             </button>
@@ -648,7 +649,23 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
         </div>
       </div>
       <div className="h-full overflow-auto">
-        {p ? (
+        {p && (p as { builtIn?: boolean }).builtIn ? (
+          <div className="p-4 flex flex-col gap-3 max-w-2xl">
+            <div className="text-lg font-semibold">{p.name}</div>
+            <p className="text-sm text-muted">
+              This provider uses the Anthropic API key saved in <b>Settings ▸ AI assistant</b> (kept in the OS secret store). It is available in every workspace; tests and prompts refer to it as <code>claude-app</code>.
+            </p>
+            <div className="text-sm">
+              Model: <span className="mono">{p.defaultModel}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => useApp.getState().setView('settings')}>Open Settings</Button>
+              <Button variant="primary" loading={testing} onClick={() => void test()}>
+                Test connection
+              </Button>
+            </div>
+          </div>
+        ) : p ? (
           <div className="p-4 flex flex-col gap-3 max-w-2xl">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Name">
