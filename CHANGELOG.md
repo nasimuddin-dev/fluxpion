@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Checks from the response.** Click a key in a JSON response to copy its JSONPath or add a check on it to the request's Tests: equals its current value, exists, has its type, or (for arrays) its length / not empty.
+- **Checks from the response.** Click a key in a JSON response to copy its JSONPath or add a check on it to the request's Tests: equals its current value, exists, has its type, or (for arrays) its length / not empty. Works in the REST and GraphQL views.
 - **Recently deleted.** Deleted collections and environments stay restorable for 30 days (a git-ignored `trash/` folder in the workspace): **Recently deleted** in the Collections and Envs lists, or `testpion trash list|restore|empty`. A restored environment keeps its secret values; a restored item never replaces one with the same name.
 - **Keyboard shortcuts list.** Press `?` (outside a text field), use **Help ▸ Keyboard Shortcuts** or the command palette to see every shortcut, with the right modifier key for your platform.
 - **Icons on every menu.** The application menu (File, Edit, View, Window, Help) has an icon on every item, in the same style as the rest of the app, and follows the light or dark system theme. The command palette shows an icon for each command. Right-clicking a text field (the URL bar, any input) now opens an Undo / Redo / Cut / Copy / Paste / Select All menu.
