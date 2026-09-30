@@ -7,6 +7,10 @@ description: "Test LLM APIs across providers with prompt templates, structured o
 
 # AI testing
 
+## Saved prompts
+
+The Playground's **Saved prompts** list keeps prompts with their model, parameters, system prompt, variables, structured output and evaluators, grouped in folders. **Save** stores the current prompt (or the changes to the opened one, shown as *edited*); open a prompt to run it again. Folders work as in the REST collections: create them with the folder button, and move prompts with the `⋯` / right-click menu or by dragging. Saved prompts live in the workspace (`library/ai-prompts.json`).
+
 ## Providers
 
 | Kind | Notes |

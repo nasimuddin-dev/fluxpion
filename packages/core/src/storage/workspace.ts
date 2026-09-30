@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
-import type { AppSettings, Collection, Environment, McpServerConfig, ProviderConfig, Trace, Workspace } from '../model/types.js';
+import type { AppSettings, Collection, Environment, Library, McpServerConfig, ProviderConfig, Trace, Workspace } from '../model/types.js';
 import { SCHEMA_VERSION, defaultSettings } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import { shortId, slugify } from '../util/ids.js';
@@ -260,6 +260,25 @@ export class WorkspaceStore {
     writeJson(this.path('mcp-servers.json'), { schemaVersion: SCHEMA_VERSION, servers });
   }
 
+  /* saved items with folders (WebSocket connections, AI prompts, MCP server folders …), one file per kind */
+  getLibrary<T = unknown>(kind: string): Library<T> {
+    const lib = readJson<Partial<Library<T>>>(this.libraryPath(kind), {});
+    return { schemaVersion: SCHEMA_VERSION, folders: lib.folders ?? [], items: lib.items ?? [] };
+  }
+
+  saveLibrary<T = unknown>(kind: string, lib: Pick<Library<T>, 'folders' | 'items'>): Library<T> {
+    const folders = [...new Set([...(lib.folders ?? []), ...lib.items.map((i) => i.folder).filter((f): f is string => !!f)])].sort((a, b) => a.localeCompare(b));
+    const next: Library<T> = { schemaVersion: SCHEMA_VERSION, folders, items: lib.items.map((i) => ({ ...i, id: i.id || shortId('lib-'), name: i.name || 'Untitled' })) };
+    mkdirSync(this.path('library'), { recursive: true });
+    writeJson(this.libraryPath(kind), next);
+    return next;
+  }
+
+  private libraryPath(kind: string): string {
+    if (!/^[a-z][a-z0-9-]{0,40}$/.test(kind)) throw new ApsError('ValidationError', `Invalid library kind "${kind}"`);
+    return this.path('library', `${kind}.json`);
+  }
+
   /* tests */
   testTree(dir = this.path('tests')): TestFileNode[] {
     if (!existsSync(dir)) return [];
@@ -361,7 +380,14 @@ export class WorkspaceStore {
       providers: this.getProviders(),
       mcpServers: this.getMcpServers(),
       tests,
+      library: this.libraryKinds().reduce<Record<string, Library>>((all, kind) => ({ ...all, [kind]: this.getLibrary(kind) }), {}),
     };
+  }
+
+  /** Kinds of saved items this workspace has (library/*.json). */
+  libraryKinds(): string[] {
+    const dir = this.path('library');
+    return existsSync(dir) ? readdirSync(dir).filter((f) => /^[a-z][a-z0-9-]{0,40}\.json$/.test(f)).map((f) => f.slice(0, -5)) : [];
   }
 
   close(): void {
@@ -380,6 +406,8 @@ export interface WorkspaceBundle {
   providers: ProviderConfig[];
   mcpServers: McpServerConfig[];
   tests: Record<string, string>;
+  /** Saved items with folders by kind (WebSocket connections, AI prompts …); absent in older exports. */
+  library?: Record<string, Pick<Library, 'folders' | 'items'>>;
 }
 
 /* ------------------------------------------------------------------ app-level manager */
@@ -568,6 +596,7 @@ export class WorkspaceManager {
     for (const e of bundle.environments ?? []) store.saveEnvironment(e);
     store.saveProviders(bundle.providers ?? []);
     store.saveMcpServers(bundle.mcpServers ?? []);
+    for (const [kind, lib] of Object.entries(bundle.library ?? {})) store.saveLibrary(kind, { folders: lib.folders ?? [], items: lib.items ?? [] });
     for (const [rel, content] of Object.entries(bundle.tests ?? {})) {
       const p = store.safePath(rel, store.path('tests'));
       mkdirSync(dirname(p), { recursive: true });

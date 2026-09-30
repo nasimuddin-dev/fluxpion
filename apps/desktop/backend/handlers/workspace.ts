@@ -127,6 +127,9 @@ export function workspaceHandlers(be: Backend): Handlers {
     },
     'ws.search': ({ query }: { query: string }) => be.search?.search(query, 60) ?? [],
 
+    /** Saved items with folders of one kind (websocket, ai-prompts, mcp …), stored in library/<kind>.json. */
+    'lib.get': ({ kind }: { kind: string }) => be.ws.getLibrary(kind),
+    'lib.save': ({ kind, library }: { kind: string; library: { folders: string[]; items: Array<{ id: string; name: string; folder?: string; data: unknown }> } }) => be.ws.saveLibrary(kind, library),
     'env.list': () => be.ws.listEnvironments(),
     'env.save': async ({ env, secrets }: { env: Environment; secrets?: Record<string, string> }) => {
       for (const [k, v] of Object.entries(secrets ?? {})) if (v) await be.secrets.set(secretKeys.envVar(env.id, k), v);

@@ -1,6 +1,8 @@
-import { KeyRound, Play, Plus, RefreshCw, Save, Square, Trash2, WifiOff } from 'lucide-react';
+import { FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Sparkles, Square, Trash2, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSticky } from '../lib/sticky';
+import { useLibrary } from '../lib/library';
+import { FolderList } from '../components/FolderList';
 import { stringifyYaml } from '../lib/yaml';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
@@ -33,6 +35,8 @@ interface ChatResult {
   traceId: string;
   error?: NormalizedError;
 }
+
+type SavedPrompt = Pick<Draft, 'provider' | 'model' | 'system' | 'prompt' | 'input' | 'temperature' | 'topP' | 'maxTokens' | 'seed' | 'format' | 'schema' | 'expected' | 'evaluators'>;
 
 interface Draft {
   provider: string;
@@ -250,6 +254,30 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
   const [resTab, setResTab] = useSticky<'output' | 'json' | 'evaluation' | 'prompt'>('ai:playground:resTab', 'output');
   const env = useApp((s) => s.environment);
   const idRef = useRef<string | undefined>(undefined);
+  // saved prompts (model, prompt, system, variables, structured output, evaluators) with folders
+  const saved = useLibrary<SavedPrompt>('ai-prompts');
+  const [savedId, setSavedId] = useSticky<string | undefined>('ai:saved', undefined);
+  const current = saved.lib.items.find((i) => i.id === savedId);
+  const snapshot = (): SavedPrompt => ({ provider: d.provider, model: d.model, system: d.system, prompt: d.prompt, input: d.input, temperature: d.temperature, topP: d.topP, maxTokens: d.maxTokens, seed: d.seed, format: d.format, schema: d.schema, expected: d.expected, evaluators: d.evaluators });
+  const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(snapshot());
+  const openSaved = (id: string) => {
+    const it = saved.lib.items.find((i) => i.id === id);
+    if (!it) return;
+    setSavedId(id);
+    // parameters the saved prompt doesn't set go back to their defaults (not the previous prompt's values)
+    set({ temperature: undefined, topP: undefined, maxTokens: undefined, seed: undefined, ...it.data });
+    setResult(undefined);
+  };
+  const savePrompt = async (asNew = false, folder?: string) => {
+    if (current && !asNew) {
+      await saved.put({ ...current, data: snapshot() });
+      useApp.getState().toast(`Saved "${current.name}"`, 'success');
+      return;
+    }
+    const name = await promptText('Save prompt', { message: 'Name', value: d.prompt.split('\n')[0]!.slice(0, 40) || 'Prompt', okLabel: 'Save' });
+    if (!name) return;
+    setSavedId(await saved.put({ name, folder, data: snapshot() }));
+  };
   useEffect(
     () =>
       on<Array<{ id: string; delta: string }>>('ai.deltas', (items) => {
@@ -315,11 +343,35 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
   if (!providers.length) return <NoProviders />;
   const r = result && !('error' in result) ? result : undefined;
   return (
-    <div className="h-full flex flex-col">
+    <Split id="ai-saved" sidebar initial={18} min={12}>
+    <div className="h-full bg-panel/50">
+      <FolderList
+        id="ai-saved"
+        title="Saved prompts"
+        itemNoun="prompt"
+        addLabel="Save current prompt"
+        folders={saved.lib.folders}
+        selected={savedId}
+        onSelect={openSaved}
+        onAdd={(folder) => void savePrompt(true, folder)}
+        ops={saved.ops}
+        items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: `${i.data.model || i.data.provider}`, icon: <Sparkles size={12} className="text-muted" /> }))}
+        empty={
+          <Empty title="No saved prompts">
+            Save a prompt with its model, variables, structured output and evaluators to run it again later, and group prompts in folders.
+          </Empty>
+        }
+      />
+    </div>
+    <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line flex-wrap">
         <ModelPicker providers={providers} provider={d.provider} model={d.model} onChange={onModel} />
+        {current && <span className="text-sm text-muted truncate">{current.name}{dirty ? ' · edited' : ''}</span>}
         <div className="ml-auto flex gap-2">
-          <Button icon={<Save size={13} />} onClick={saveAsTest}>
+          <Button icon={<Save size={13} />} title={current ? `Save changes to "${current.name}"` : 'Save this prompt'} onClick={() => void savePrompt()}>
+            {current && dirty ? 'Save*' : 'Save'}
+          </Button>
+          <Button icon={<FlaskConical size={13} />} onClick={saveAsTest}>
             Save as test
           </Button>
           {running ? (
@@ -387,6 +439,7 @@ function Playground({ providers }: { providers: ProviderConfig[] }) {
         </Split>
       </div>
     </div>
+    </Split>
   );
 }
 

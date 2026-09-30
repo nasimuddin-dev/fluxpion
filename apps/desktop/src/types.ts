@@ -270,7 +270,7 @@ export interface ProviderConfig {
   hasKey?: boolean;
 }
 
-export type McpServerConfig = { id: string; name: string; connected?: boolean } & (
+export type McpServerConfig = { id: string; name: string; connected?: boolean; folder?: string } & (
   | { transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
   | { transport: 'streamable-http'; url: string; headers?: KeyValue[] }
   | { transport: 'sse'; url: string; headers?: KeyValue[] }
@@ -315,4 +315,18 @@ export interface WorkspaceCurrent {
   path: string;
   environments: Environment[];
   migrations: string[];
+}
+
+/** Saved items of one kind with folders (see lib.get / lib.save). */
+export interface LibraryItem<T = unknown> {
+  id: string;
+  name: string;
+  folder?: string;
+  data: T;
+  updatedAt?: string;
+}
+
+export interface Library<T = unknown> {
+  folders: string[];
+  items: Array<LibraryItem<T>>;
 }

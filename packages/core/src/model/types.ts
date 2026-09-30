@@ -142,7 +142,7 @@ export type McpTransportConfig =
   /** An MCP mock running in-process from a definition file (`mocks/*.mcp-mock.yaml`, relative to the workspace). */
   | { transport: 'mock'; mockFile: string };
 
-export type McpServerConfig = { id: string; name: string } & McpTransportConfig;
+export type McpServerConfig = { id: string; name: string; /** Folder in the MCP view's server list. */ folder?: string } & McpTransportConfig;
 
 /* ------------------------------------------------------------------ ai */
 
@@ -658,4 +658,21 @@ export function defaultSettings(): AppSettings {
     settingsRevision: 2,
     checkForUpdates: true,
   };
+}
+
+/** Saved items of one kind with folders (library/<kind>.json in a workspace). */
+export interface LibraryItem<T = unknown> {
+  id: string;
+  name: string;
+  /** Folder name; empty or missing is the top level. */
+  folder?: string;
+  data: T;
+  updatedAt?: string;
+}
+
+export interface Library<T = unknown> {
+  schemaVersion: string;
+  /** Every folder, including empty ones. */
+  folders: string[];
+  items: Array<LibraryItem<T>>;
 }

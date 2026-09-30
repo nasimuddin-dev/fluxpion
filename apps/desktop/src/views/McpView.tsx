@@ -14,6 +14,7 @@ import { useSticky } from '../lib/sticky';
 import { downloadContent } from '../lib/files';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { CheckList, ErrorPanel } from '../components/Results';
+import { FolderList, type FolderListOps } from '../components/FolderList';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
 
 interface Tool {
@@ -124,6 +125,36 @@ export function McpView() {
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
+  // folders of the server list (empty folders included) live in the workspace library "mcp"
+  const [folders, setFolders] = useState<string[]>([]);
+  useEffect(() => {
+    void call<{ folders: string[] }>('lib.get', { kind: 'mcp' }).then((l) => setFolders(l.folders), () => undefined);
+  }, []);
+  const saveFolders = async (next: string[]) => {
+    setFolders(next);
+    await call('lib.save', { kind: 'mcp', library: { folders: next, items: [] } });
+  };
+  const serverOps: FolderListOps = {
+    renameItem: (id, name) => saveServers(servers.map((s) => (s.id === id ? { ...s, name } : s))),
+    moveItem: (id, folder) => saveServers(servers.map((s) => (s.id === id ? { ...s, folder } : s))),
+    deleteItem: async (id) => {
+      if (servers.find((s) => s.id === id)?.connected) await disconnect(id);
+      await saveServers(servers.filter((s) => s.id !== id));
+    },
+    duplicateItem: (id) => {
+      const s = servers.find((x) => x.id === id);
+      if (s) return saveServers([...servers, { ...s, id: uid('mcp-'), name: `${s.name} copy` }]);
+    },
+    setFolders: saveFolders,
+    renameFolder: async (from, to) => {
+      await saveFolders(folders.map((f) => (f === from ? to : f)));
+      await saveServers(servers.map((s) => (s.folder === from ? { ...s, folder: to } : s)));
+    },
+    deleteFolder: async (name) => {
+      await saveFolders(folders.filter((f) => f !== name));
+      await saveServers(servers.map((s) => (s.folder === name ? { ...s, folder: undefined } : s)));
+    },
+  };
   const saveServers = async (list: McpServerConfig[]) => {
     await call('mcp.saveServers', { servers: list.map(({ connected: _c, ...s }) => s) });
     await load();
@@ -133,37 +164,39 @@ export function McpView() {
     <>
     <Split id="mcp-servers" sidebar initial={20} min={14}>
       <div className="h-full flex flex-col bg-panel/50">
-        <SectionTitle
-          right={
-            <IconButton label="Add MCP server" onClick={() => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [] })}>
-              <Plus size={14} />
-            </IconButton>
-          }
-        >
-          MCP servers
-        </SectionTitle>
-        <div className="flex-1 overflow-auto">
-          {servers.map((s) => (
-            <div key={s.id} className={cx('group px-3 py-2 cursor-pointer border-l-2', selected === s.id ? 'bg-accent/10 border-accent' : 'border-transparent hover:bg-hover')} onClick={() => setSelected(s.id)}>
-              <div className="flex items-center gap-2 text-sm">
-                <CircleDot size={10} className={s.connected ? 'text-ok' : 'text-muted'} />
-                <span className="font-medium truncate">{s.name}</span>
-                <IconButton label="Edit server" className="ml-auto h-5 w-5 opacity-0 group-hover:opacity-100" onClick={(e) => (e.stopPropagation(), setEditing(s))}>
-                  <Pencil size={12} />
-                </IconButton>
-              </div>
-              <div className="text-xs text-muted truncate mono pl-4">{serverSummary(s)}</div>
-            </div>
-          ))}
-          {!servers.length && (
+        <FolderList
+          id="mcp-servers"
+          title="MCP servers"
+          itemNoun="server"
+          addLabel="Add MCP server"
+          folders={folders}
+          selected={selected}
+          onSelect={setSelected}
+          onAdd={(folder) => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) })}
+          items={servers.map((s) => ({
+            id: s.id,
+            name: s.name,
+            folder: s.folder,
+            icon: <CircleDot size={10} className={s.connected ? 'text-ok' : 'text-muted'} />,
+            subtitle: serverSummary(s),
+          }))}
+          itemMenu={(id) => {
+            const s = servers.find((x) => x.id === id)!;
+            return [
+              { label: 'Edit…', icon: <Pencil size={14} />, onSelect: () => setEditing(s) },
+              s.connected ? { label: 'Disconnect', icon: <Unplug size={14} />, onSelect: () => void disconnect(id) } : { label: 'Connect', icon: <Plug size={14} />, onSelect: () => (setSelected(id), void connect(id)) },
+            ];
+          }}
+          ops={serverOps}
+          empty={
             <Empty title="No MCP servers">
               Add a server using stdio (a local command), Streamable HTTP, legacy SSE or a mock definition.
               <Button className="mt-2" onClick={() => setEditing({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-everything'] })}>
                 Add server
               </Button>
             </Empty>
-          )}
-        </div>
+          }
+        />
       </div>
       <div className="h-full flex flex-col min-w-0">
         {server ? (
@@ -241,6 +274,7 @@ export function McpView() {
       {editing && (
         <ServerModal
           server={editing}
+          folders={folders}
           onClose={() => setEditing(null)}
           onDelete={
             servers.some((s) => s.id === editing.id)
@@ -269,7 +303,7 @@ function serverSummary(s: McpServerConfig): string {
   return s.url;
 }
 
-function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerConfig; onClose(): void; onSave(s: McpServerConfig): void; onDelete?(): void }) {
+function ServerModal({ server, folders = [], onClose, onSave, onDelete }: { server: McpServerConfig; folders?: string[]; onClose(): void; onSave(s: McpServerConfig): void; onDelete?(): void }) {
   const [s, setS] = useState<McpServerConfig>(server);
   const [json, setJson] = useState(false);
   const [jsonText, setJsonText] = useState(JSON.stringify(server, null, 2));
@@ -320,10 +354,10 @@ function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerC
                   const t = e.target.value as McpServerConfig['transport'];
                   setS(
                     t === 'stdio'
-                      ? { id: s.id, name: s.name, transport: 'stdio', command: 'node', args: [] }
+                      ? { id: s.id, name: s.name, folder: s.folder, transport: 'stdio', command: 'node', args: [] }
                       : t === 'mock'
-                        ? { id: s.id, name: s.name, transport: 'mock', mockFile: 'mocks/server.mcp-mock.yaml' }
-                        : { id: s.id, name: s.name, transport: t, url: 'http://127.0.0.1:3000/mcp', headers: [] },
+                        ? { id: s.id, name: s.name, folder: s.folder, transport: 'mock', mockFile: 'mocks/server.mcp-mock.yaml' }
+                        : { id: s.id, name: s.name, folder: s.folder, transport: t, url: 'http://127.0.0.1:3000/mcp', headers: [] },
                   );
                 }}
               >
@@ -334,6 +368,14 @@ function ServerModal({ server, onClose, onSave, onDelete }: { server: McpServerC
               </Select>
             </Field>
           </div>
+          <Field label="Folder" hint="Optional: groups servers in the list.">
+            <Input list="mcp-folders" value={s.folder ?? ''} placeholder="(top level)" onChange={(e) => setS({ ...s, folder: e.target.value.trim() ? e.target.value : undefined })} />
+            <datalist id="mcp-folders">
+              {folders.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+          </Field>
           {s.transport === 'stdio' ? (
             <>
               <Field label="Command" hint="On Windows use npx.cmd or the full path to node.exe. Variables like {{workspaceDir}} are resolved.">

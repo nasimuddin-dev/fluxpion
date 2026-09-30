@@ -1,7 +1,10 @@
-import { ArrowDownLeft, ArrowUpRight, Info, Plug, Send, Trash2, Unplug } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Info, Plug, Radio, Save, Send, Trash2, Unplug } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
-import { persisted, useApp } from '../store';
+import { persisted, promptText, useApp } from '../store';
+import { FolderList } from '../components/FolderList';
+import { useLibrary } from '../lib/library';
+import { useSticky } from '../lib/sticky';
 import type { KeyValue } from '../types';
 import { CodeEditor } from '../components/CodeEditor';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -18,7 +21,10 @@ interface WsMessage {
   binary?: boolean;
 }
 
-const drafts = persisted('websocket', { url: '{{wsUrl}}', protocols: '', headers: [] as KeyValue[], message: '{\n  "type": "ping"\n}' });
+type Draft = { url: string; protocols: string; headers: KeyValue[]; message: string };
+const hostOf = (url: string) => url.replace(/^wss?:\/\//, '').split(/[/?#]/)[0] || 'Connection';
+
+const drafts = persisted<Draft>('websocket', { url: '{{wsUrl}}', protocols: '', headers: [] as KeyValue[], message: '{\n  "type": "ping"\n}' });
 
 export function WebSocketView() {
   const [d, setD] = useState(drafts.load);
@@ -29,6 +35,27 @@ export function WebSocketView() {
   const [filter, setFilter] = useState('');
   const [tab, setTab] = useState<'message' | 'headers'>('message');
   const env = useApp((s) => s.environment);
+  // saved connections (URL, subprotocols, handshake headers, message) with folders
+  const saved = useLibrary<Draft>('websocket');
+  const [savedId, setSavedId] = useSticky<string | undefined>('ws:saved', undefined);
+  const current = saved.lib.items.find((i) => i.id === savedId);
+  const dirty = !!current && JSON.stringify(current.data) !== JSON.stringify(d);
+  const open = (id: string) => {
+    const it = saved.lib.items.find((i) => i.id === id);
+    if (!it) return;
+    setSavedId(id);
+    setD({ ...drafts.load(), ...it.data });
+  };
+  const save = async (asNew = false, folder?: string) => {
+    if (current && !asNew) {
+      await saved.put({ ...current, data: d });
+      useApp.getState().toast(`Saved "${current.name}"`, 'success');
+      return;
+    }
+    const name = await promptText('Save connection', { message: 'Name', value: hostOf(d.url), okLabel: 'Save' });
+    if (!name) return;
+    setSavedId(await saved.put({ name, folder, data: d }));
+  };
   const sessionRef = useRef<string | undefined>(undefined);
   sessionRef.current = session;
   useEffect(() => drafts.save(d), [d]);
@@ -70,7 +97,27 @@ export function WebSocketView() {
     parsed = undefined;
   }
   return (
-    <div className="h-full flex flex-col">
+    <Split id="ws-saved" sidebar initial={18} min={12}>
+    <div className="h-full bg-panel/50">
+      <FolderList
+        id="ws-saved"
+        title="Saved connections"
+        itemNoun="connection"
+        addLabel="Save current connection"
+        folders={saved.lib.folders}
+        selected={savedId}
+        onSelect={open}
+        onAdd={(folder) => void save(true, folder)}
+        ops={saved.ops}
+        items={saved.lib.items.map((i) => ({ id: i.id, name: i.name, folder: i.folder, subtitle: i.data.url, icon: <Radio size={12} className="text-muted" /> }))}
+        empty={
+          <Empty title="No saved connections">
+            Save a connection (URL, subprotocols, headers and message) to open it again later, and group them in folders.
+          </Empty>
+        }
+      />
+    </div>
+    <div className="h-full flex flex-col min-w-0">
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <Badge tone={status === 'open' ? 'ok' : status === 'connecting' ? 'warn' : 'default'}>{status}</Badge>
         <VarInput ariaLabel="WebSocket URL" className="flex-1 h-8" value={d.url} onChange={(url) => setD({ ...d, url })} placeholder="wss://example.com/socket" />
@@ -84,6 +131,9 @@ export function WebSocketView() {
             Connect
           </Button>
         )}
+        <Button icon={<Save size={13} />} title={current ? `Save changes to "${current.name}"` : 'Save this connection'} onClick={() => void save()}>
+          {current ? (dirty ? 'Save*' : 'Save') : 'Save'}
+        </Button>
       </div>
       <div className="flex-1 min-h-0">
         <Split id="ws-main" initial={40}>
@@ -145,5 +195,6 @@ export function WebSocketView() {
         </Split>
       </div>
     </div>
+    </Split>
   );
 }
