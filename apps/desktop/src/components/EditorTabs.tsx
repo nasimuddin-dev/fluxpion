@@ -1,8 +1,8 @@
-import { ArrowRightToLine, ChevronDown, ListX, Pin, Plug, Plus, Radio, SquareX, Waypoints, X } from 'lucide-react';
+import { ArrowRightToLine, ChevronDown, Copy, FileCheck2, ListX, Pencil, Pin, PinOff, Plug, Plus, Radio, SquareX, Waypoints, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { useApp, type ViewId } from '../store';
-import { isDocView, useDoc, useDocs } from '../lib/docs';
+import { docKey, isDocView, useDoc, useDocs } from '../lib/docs';
 import { cx, Menu, type MenuItem } from './ui';
 
 /**
@@ -27,6 +27,12 @@ export interface EditorTab {
   /** Close several of this editor's tabs at once (one question about unsaved changes); by keys. */
   closeMany?(keys: string[]): void;
   onRename?(): void;
+  /** Open a copy of this tab (not saved yet). */
+  onDuplicate?(): void;
+  /** Save what the tab holds as a YAML test file. */
+  onSaveAsTest?(): void;
+  /** Pin or unpin the tab (pinned tabs come first and stay open on "close other / all"). */
+  onTogglePin?(): void;
   menu?(): MenuItem[];
 }
 
@@ -39,9 +45,21 @@ interface EditorTabsState {
   /** Editors that have a tab open: they stay mounted (and come back after a restart). REST always does. */
   openViews: ViewId[];
   setOpen(view: ViewId, open: boolean): void;
+  /** Pinned tabs of the single- and multi-document editors, by tab key (REST keeps its own). */
+  pinned: Record<string, boolean>;
+  togglePin(key: string): void;
 }
 
 const OPEN_KEY = 'aps.openEditors';
+const PIN_KEY = 'aps.pinnedTabs';
+function loadPinned(): Record<string, boolean> {
+  try {
+    const v = JSON.parse(localStorage.getItem(PIN_KEY) ?? '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
 function loadOpen(): ViewId[] {
   try {
     const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]');
@@ -55,6 +73,18 @@ export const useEditorTabsStore = create<EditorTabsState>((set, get) => ({
   byView: {},
   activeByView: {},
   openViews: loadOpen(),
+  pinned: loadPinned(),
+  togglePin: (key) => {
+    const next = { ...get().pinned };
+    if (next[key]) delete next[key];
+    else next[key] = true;
+    try {
+      localStorage.setItem(PIN_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+    set({ pinned: next });
+  },
   setOpen: (view, open) => {
     const cur = get().openViews;
     if (open === cur.includes(view)) return;
@@ -110,12 +140,39 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
     if (current === view) setHidden(false);
   }, [current, view]);
   const key = `${view}:${docId ?? 'main'}`;
+  const pinned = useEditorTabsStore((s) => !!s.pinned[key]);
+  const common = {
+    pinned,
+    onTogglePin: () => useEditorTabsStore.getState().togglePin(key),
+    onDuplicate:
+      tab?.onDuplicate ??
+      (docId
+        ? () => {
+            // the copy starts from this document's draft, not linked to the saved item (saving creates a new one)
+            try {
+              const draft = JSON.parse(localStorage.getItem(`aps.draft.${view}${docKey(docId)}`) ?? 'null') as Record<string, unknown> | null;
+              const copy = useDocs.getState().newDoc(view);
+              if (draft) {
+                delete draft.requestId;
+                delete draft.collectionId;
+                delete draft.savedId;
+                if (typeof draft.name === 'string' && draft.name) draft.name = `${draft.name} copy`;
+                localStorage.setItem(`aps.draft.${view}${docKey(copy)}`, JSON.stringify(draft));
+              }
+              useApp.getState().setView(view);
+            } catch {
+              /* storage unavailable */
+            }
+          }
+        : undefined),
+  };
   useEditorTabs(
     key,
     docId && tab
       ? [
           {
             ...tab,
+            ...common,
             key,
             view,
             onSelect: () => useDocs.getState().select(view, docId),
@@ -136,6 +193,7 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
       ? [
           {
             ...tab,
+            ...common,
             key,
             view,
             onClose: () => {
@@ -181,11 +239,16 @@ function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
   };
   const others = all.filter((x) => x !== t && !x.pinned);
   const right = all.slice(i + 1).filter((x) => !x.pinned);
+  // the same items as a REST tab; what an editor can't do is shown disabled, so every menu reads the same
   return [
-    { label: 'Close tab', icon: <X size={14} />, shortcut: 'Middle-click', onSelect: () => t.onClose() },
-    { label: 'Close other tabs', icon: <SquareX size={14} />, disabled: !others.length, onSelect: () => close(others) },
-    { label: 'Close tabs to the right', icon: <ArrowRightToLine size={14} />, disabled: !right.length, onSelect: () => close(right) },
-    { label: 'Close all tabs', icon: <ListX size={14} />, onSelect: () => close(all) },
+    { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, disabled: !t.onTogglePin, onSelect: () => t.onTogglePin?.() },
+    { label: 'Rename…', icon: <Pencil size={13} />, shortcut: 'Double-click', disabled: !t.onRename, onSelect: () => t.onRename?.() },
+    { label: 'Duplicate tab', icon: <Copy size={13} />, disabled: !t.onDuplicate, onSelect: () => t.onDuplicate?.() },
+    { label: 'Save as test file…', icon: <FileCheck2 size={13} />, disabled: !t.onSaveAsTest, onSelect: () => t.onSaveAsTest?.() },
+    { label: 'Close tab', icon: <X size={13} />, separator: true, shortcut: 'Middle-click', disabled: !!t.pinned, onSelect: () => t.onClose() },
+    { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: !others.length, onSelect: () => close(others) },
+    { label: 'Close tabs to the right', icon: <ArrowRightToLine size={13} />, disabled: !right.length, onSelect: () => close(right) },
+    { label: 'Close all tabs', icon: <ListX size={13} />, disabled: !all.some((x) => !x.pinned), onSelect: () => close(all) },
   ];
 }
 
@@ -209,7 +272,8 @@ export function EditorTabStrip() {
   const activeByView = useEditorTabsStore((s) => s.activeByView);
   const docs = useDocs((s) => s.docs);
   const activeDocs = useDocs((s) => s.active);
-  const tabs = ORDER.flatMap((v) => (isDocView(v) ? (docs[v] ?? []).flatMap((d) => byView[`${v}:${d}`] ?? []) : (byView[v] ?? byView[`${v}:main`] ?? [])));
+  const inOrder = ORDER.flatMap((v) => (isDocView(v) ? (docs[v] ?? []).flatMap((d) => byView[`${v}:${d}`] ?? []) : (byView[v] ?? byView[`${v}:main`] ?? [])));
+  const tabs = [...inOrder.filter((t) => t.pinned), ...inOrder.filter((t) => !t.pinned)];
   const activeKey = isDocView(view) ? `${view}:${activeDocs[view]}` : activeByView[view];
   const [menuFor, setMenuFor] = useState<string>();
   const stripRef = useRef<HTMLDivElement>(null);

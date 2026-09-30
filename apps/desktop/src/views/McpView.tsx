@@ -167,7 +167,22 @@ export function McpView() {
   };
 
   // this editor's tab in the shared tab strip (while a server is selected)
-  useSingleEditorTab('mcp', server ? { title: server.name, badge: 'MCP', badgeClass: 'text-accent' } : undefined);
+  useSingleEditorTab(
+    'mcp',
+    server
+      ? {
+          title: server.name,
+          badge: 'MCP',
+          badgeClass: 'text-accent',
+          // an MCP tab is its server: renaming or duplicating the tab renames or copies the server
+          onRename: async () => {
+            const name = (await promptText('Rename server', { message: 'Name', value: server.name, okLabel: 'Rename' }))?.trim();
+            if (name) await serverOps.renameItem(server.id, name);
+          },
+          onDuplicate: () => void serverOps.duplicateItem?.(server.id),
+        }
+      : undefined,
+  );
   return (
     <>
     <Split id="mcp-servers" sidebar collapsed initial={20} min={14}>

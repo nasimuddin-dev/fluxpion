@@ -111,7 +111,7 @@ export function WebSocketView() {
       useApp.getState().toast(`Saved "${current.name}"`, 'success');
       return;
     }
-    const name = await promptText('Save connection', { message: 'Name', value: hostOf(d.url), okLabel: 'Save' });
+    const name = await promptText('Save connection', { message: 'Name', value: tabTitle || hostOf(d.url), okLabel: 'Save' });
     if (!name) return;
     setSavedId(await saved.put({ name, folder, collectionId, data: persistable(d) }));
   };
@@ -206,7 +206,26 @@ export function WebSocketView() {
     parsed = undefined;
   }
   // this editor's tab in the shared tab strip
-  useSingleEditorTab('websocket', { title: current?.name ?? (d.url || 'WebSocket'), badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]', item: savedId });
+  const saveTest = () => {
+    const parsed = (() => {
+      try {
+        return JSON.parse(d.message) as unknown;
+      } catch {
+        return d.message;
+      }
+    })();
+    const send = mqtt ? (d.topic ? [{ topic: d.topic, payload: d.message, qos: d.qos ?? 0 }] : []) : sio ? (d.event ? [{ event: d.event, args: Array.isArray(parsed) ? parsed : [parsed], ack: !!d.ack }] : []) : d.message.trim() ? [d.message] : [];
+    void saveAsTestFile(`${hostOf(d.url)} replies`, { kind: 'websocket', mode: d.mode ?? 'websocket', url: d.url, send, subscribe: mqtt ? (d.subscriptions ?? []).map((s) => s.topic) : undefined, headers: mqtt ? undefined : d.headers, username: mqtt ? d.username : undefined, password: mqtt ? d.password : undefined });
+  };
+  const [tabTitle, setTabTitle] = useSticky<string | undefined>(`ws:title:${docId ?? 'main'}`, undefined);
+  const title = current?.name ?? tabTitle ?? (d.url || 'WebSocket');
+  const renameTab = async () => {
+    const name = (await promptText('Rename', { message: 'Name', value: title, okLabel: 'Rename' }))?.trim();
+    if (!name) return;
+    if (current) await saved.put({ ...current, name });
+    else setTabTitle(name);
+  };
+  useSingleEditorTab('websocket', { title, badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]', item: savedId, onRename: () => void renameTab(), onSaveAsTest: saveTest });
   return (
     <Split id="ws-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell
@@ -279,17 +298,7 @@ export function WebSocketView() {
         <Button
           icon={<FileCheck2 size={13} />}
           title="Save as a YAML test file (tests/websocket): connect, send this message, check that something comes back"
-          onClick={() => {
-            const parsed = (() => {
-              try {
-                return JSON.parse(d.message) as unknown;
-              } catch {
-                return d.message;
-              }
-            })();
-            const send = mqtt ? (d.topic ? [{ topic: d.topic, payload: d.message, qos: d.qos ?? 0 }] : []) : sio ? (d.event ? [{ event: d.event, args: Array.isArray(parsed) ? parsed : [parsed], ack: !!d.ack }] : []) : d.message.trim() ? [d.message] : [];
-            void saveAsTestFile(`${hostOf(d.url)} replies`, { kind: 'websocket', mode: d.mode ?? 'websocket', url: d.url, send, subscribe: mqtt ? (d.subscriptions ?? []).map((s) => s.topic) : undefined, headers: mqtt ? undefined : d.headers, username: mqtt ? d.username : undefined, password: mqtt ? d.password : undefined });
-          }}
+          onClick={saveTest}
         >
           Test
         </Button>

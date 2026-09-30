@@ -326,7 +326,20 @@ export function GraphQLView() {
   };
 
   // this editor's tab in the shared tab strip
-  useSingleEditorTab('graphql', { title: d.name || 'GraphQL query', badge: 'GQL', badgeClass: 'text-[#e535ab]', item: d.requestId });
+  const saveTest = () => {
+    let variables: Record<string, unknown> | undefined;
+    try {
+      variables = d.variables.trim() ? (JSON.parse(d.variables) as Record<string, unknown>) : undefined;
+    } catch {
+      variables = undefined;
+    }
+    void saveAsTestFile(d.name || selectedOp?.name || 'GraphQL query', { kind: 'graphql', endpoint: d.endpoint, query: d.query, variables, operationName: operations.length > 1 ? selectedOp?.name : undefined, headers: d.headers, auth: d.auth }, d.assertions);
+  };
+  const renameTab = async () => {
+    const name = await promptText('Rename', { message: 'Name', value: d.name || 'GraphQL query', okLabel: 'Rename' });
+    if (name?.trim()) setD((x) => ({ ...x, name: name.trim() }));
+  };
+  useSingleEditorTab('graphql', { title: d.name || 'GraphQL query', badge: 'GQL', badgeClass: 'text-[#e535ab]', item: d.requestId, onRename: () => void renameTab(), onSaveAsTest: saveTest });
   return (
     <div className="h-full flex flex-col">
       {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}
@@ -372,15 +385,7 @@ export function GraphQLView() {
         <Button
           icon={<FileCheck2 size={13} />}
           title="Save as a YAML test file (tests/graphql) for the Tests view, testpion test and CI"
-          onClick={() => {
-            let variables: Record<string, unknown> | undefined;
-            try {
-              variables = d.variables.trim() ? (JSON.parse(d.variables) as Record<string, unknown>) : undefined;
-            } catch {
-              variables = undefined;
-            }
-            void saveAsTestFile(d.name || selectedOp?.name || 'GraphQL query', { kind: 'graphql', endpoint: d.endpoint, query: d.query, variables, operationName: operations.length > 1 ? selectedOp?.name : undefined, headers: d.headers, auth: d.auth }, d.assertions);
-          }}
+          onClick={saveTest}
         >
           <span className="hidden @[52rem]:inline">Test</span>
         </Button>

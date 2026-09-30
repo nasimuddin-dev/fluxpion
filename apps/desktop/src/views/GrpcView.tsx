@@ -117,7 +117,7 @@ export function GrpcView() {
       useApp.getState().toast(`Saved "${currentSaved.name}"`, 'success');
       return;
     }
-    const name = await promptText('Save gRPC request', { message: 'Name', value: d.method.split('/').pop() || 'gRPC request', okLabel: 'Save' });
+    const name = await promptText('Save gRPC request', { message: 'Name', value: tabTitle || d.method.split('/').pop() || 'gRPC request', okLabel: 'Save' });
     if (!name) return;
     setSavedId(await saved.put({ name, folder, collectionId, data: d }));
   };
@@ -221,7 +221,24 @@ export function GrpcView() {
   const example = useMemo(() => (current ? JSON.stringify(current.example) : ''), [current]);
 
   // this editor's tab in the shared tab strip
-  useSingleEditorTab('grpc', { title: currentSaved?.name ?? (d.method ? d.method.split('/').pop()! : 'gRPC request'), badge: 'gRPC', badgeClass: 'text-[#2ea99e]', item: savedId });
+  const saveTest = () => {
+    let message: unknown = d.message;
+    try {
+      message = JSON.parse(d.message);
+    } catch {
+      /* kept as text */
+    }
+    void saveAsTestFile(`${d.method.split('/').pop() ?? 'gRPC call'} works`, { kind: 'grpc', target: d.target, method: d.method, message, metadata: d.metadata, tls: d.tls });
+  };
+  const [tabTitle, setTabTitle] = useSticky<string | undefined>(`grpc:title:${docId ?? 'main'}`, undefined);
+  const title = currentSaved?.name ?? tabTitle ?? (d.method ? d.method.split('/').pop()! : 'gRPC request');
+  const renameTab = async () => {
+    const name = (await promptText('Rename', { message: 'Name', value: title, okLabel: 'Rename' }))?.trim();
+    if (!name) return;
+    if (currentSaved) await saved.put({ ...currentSaved, name });
+    else setTabTitle(name);
+  };
+  useSingleEditorTab('grpc', { title, badge: 'gRPC', badgeClass: 'text-[#2ea99e]', item: savedId, onRename: () => void renameTab(), onSaveAsTest: d.method ? saveTest : undefined });
   return (
     <Split id="grpc-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell
@@ -308,15 +325,7 @@ export function GrpcView() {
           icon={<FileCheck2 size={13} />}
           disabled={!d.method}
           title="Save as a YAML test file (tests/grpc, using server reflection) for the Tests view, testpion test and CI"
-          onClick={() => {
-            let message: unknown = d.message;
-            try {
-              message = JSON.parse(d.message);
-            } catch {
-              /* kept as text */
-            }
-            void saveAsTestFile(`${d.method.split('/').pop() ?? 'gRPC call'} works`, { kind: 'grpc', target: d.target, method: d.method, message, metadata: d.metadata, tls: d.tls });
-          }}
+          onClick={saveTest}
         >
           Test
         </Button>
