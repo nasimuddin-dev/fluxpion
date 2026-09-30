@@ -9,7 +9,7 @@ import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { SidebarShell } from '../components/SidebarShell';
-import { useEditorTabs } from '../components/EditorTabs';
+import { newRequestItems, useEditorTabs } from '../components/EditorTabs';
 import { uid } from '../lib/format';
 
 /** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
@@ -645,9 +645,17 @@ export function RestView() {
             title="No open requests"
             action={
               <div className="flex gap-2">
-                <Button variant="primary" icon={<Plus size={13} />} onClick={newTab}>
-                  New request
-                </Button>
+                <Menu
+                  width={240}
+                  align="center"
+                  items={newRequestItems()}
+                  trigger={
+                    <Button variant="primary" icon={<Plus size={13} />}>
+                      New request
+                      <ChevronDown size={13} />
+                    </Button>
+                  }
+                />
                 <Button icon={<Sparkles size={13} />} onClick={() => void describeRequest()}>
                   Describe with AI
                 </Button>

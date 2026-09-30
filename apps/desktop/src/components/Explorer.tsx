@@ -27,6 +27,7 @@ import { promptText, useApp, type ViewId } from '../store';
 import type { Collection, Library, McpServerConfig } from '../types';
 import { plural, uid } from '../lib/format';
 import { addToFolder, CollectionTree } from './CollectionTree';
+import { newRequestItems } from './EditorTabs';
 import { Badge, cx, Empty, IconButton, Input, Menu, Tooltip } from './ui';
 
 /** Saved items of the other protocols (library/<kind>.json) and the view that opens them. */
@@ -185,12 +186,8 @@ export function Explorer() {
           }
           items={[
             { label: 'Collection', icon: <FolderPlus size={14} />, onSelect: () => void newCollection() },
-            { label: 'HTTP request', icon: <Plus size={14} />, onSelect: () => intent('rest', { newTab: true }) },
-            { label: 'GraphQL request', icon: <Plus size={14} />, onSelect: () => intent('graphql', { reset: true }) },
-            { label: 'gRPC request', icon: <Waypoints size={14} />, onSelect: () => useApp.getState().setView('grpc') },
-            { label: 'WebSocket, Socket.IO or MQTT', icon: <Radio size={14} />, onSelect: () => useApp.getState().setView('websocket') },
+            ...newRequestItems().map((it, i) => (i === 0 ? { ...it, separator: true } : it)),
             { label: 'Environment', icon: <KeyRound size={14} />, separator: true, onSelect: () => void newEnvironment() },
-            { label: 'MCP server', icon: <Plug size={14} />, onSelect: () => intent('mcp', { addServer: true }) },
             { label: 'Monitor', icon: <AlarmClock size={14} />, onSelect: () => useApp.getState().setView('monitors') },
           ]}
         />

@@ -123,6 +123,18 @@ export function useSingleEditorTab(view: ViewId, tab: Omit<EditorTab, 'key' | 'v
   );
 }
 
+/** "New request" everywhere (tab strip +, empty editor, explorer): every kind of request, the same list. */
+export function newRequestItems(): MenuItem[] {
+  const s = useApp.getState();
+  return [
+    { label: 'HTTP request', icon: <Plus size={14} />, shortcut: 'Ctrl+T', onSelect: () => s.openIntent('rest', { newTab: true }) },
+    { label: 'GraphQL request', icon: <Plus size={14} />, onSelect: () => s.openIntent('graphql', { reset: true }) },
+    { label: 'gRPC request', icon: <Waypoints size={14} />, onSelect: () => s.setView('grpc') },
+    { label: 'WebSocket, Socket.IO or MQTT', icon: <Radio size={14} />, onSelect: () => s.setView('websocket') },
+    { label: 'MCP server', icon: <Plug size={14} />, onSelect: () => s.setView('mcp') },
+  ];
+}
+
 const ORDER: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp'];
 const TAB_W = 190;
 
@@ -146,7 +158,6 @@ export function EditorTabStrip() {
     if (useApp.getState().view !== t.view) useApp.getState().setView(t.view);
     t.onSelect?.();
   };
-  const intent = useApp.getState().openIntent;
   return (
     <div className="flex items-end h-9 border-b border-line bg-panel/40 shrink-0 min-w-0">
       <div ref={stripRef} role="tablist" aria-label="Open requests" className="flex items-end min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -196,13 +207,7 @@ export function EditorTabStrip() {
             <Plus size={14} />
           </button>
         }
-        items={[
-          { label: 'HTTP request', icon: <Plus size={14} />, shortcut: 'Ctrl+T', onSelect: () => intent('rest', { newTab: true }) },
-          { label: 'GraphQL request', icon: <Plus size={14} />, onSelect: () => intent('graphql', { reset: true }) },
-          { label: 'gRPC request', icon: <Waypoints size={14} />, onSelect: () => useApp.getState().setView('grpc') },
-          { label: 'WebSocket, Socket.IO or MQTT', icon: <Radio size={14} />, onSelect: () => useApp.getState().setView('websocket') },
-          { label: 'MCP server', icon: <Plug size={14} />, onSelect: () => useApp.getState().setView('mcp') },
-        ]}
+        items={newRequestItems()}
       />
       {tabs.length > 1 && (
         <Menu

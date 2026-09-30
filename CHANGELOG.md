@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1 — 2026-09-30
+
+- **New request is the same everywhere**: the button on the empty editor, the tab strip's **+** and the explorer's **New** menu all offer HTTP, GraphQL, gRPC, WebSocket / Socket.IO / MQTT and MCP (the empty editor used to create an HTTP request straight away).
+
 ## 0.11.0 — 2026-09-30
 
 Highlights: a simpler layout. There's **one sidebar at a time** and a **shorter rail**: requests of every kind live under Collections. **One tab strip** holds REST, GraphQL, gRPC, WebSocket and MCP side by side, as in Postman, and GraphQL's schema is a toggle on the right.
