@@ -80,6 +80,7 @@ export * from './storage/examples.js';
 export * from './import/importers.js';
 export * from './import/other-tools.js';
 export * from './import/dotenv.js';
+export * from './import/fetch-url.js';
 export * from './import/curl.js';
 export * from './import/snippet.js';
 export * from './import/save-request.js';

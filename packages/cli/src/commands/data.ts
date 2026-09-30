@@ -26,6 +26,7 @@ import {
   exportPostmanCollection,
   exportPostmanEnvironment,
   type CollectionNode,
+  fetchImportText,
   importIntoWorkspace,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
@@ -88,7 +89,7 @@ export function registerDataCommands(program: Command): void {
   program
     .command('import')
     .description('import OpenAPI/Swagger, Postman, Insomnia, Bruno, Hoppscotch, HAR, .env or collection files, or a copied cURL / fetch / PowerShell request, into a workspace')
-    .argument('<file>', 'file to import, or - to read stdin (e.g. a cURL command from the clipboard)')
+    .argument('<file>', 'file to import, an http(s) link to download (OpenAPI URL, GitHub file, Postman API link), or - to read stdin (e.g. a cURL command from the clipboard)')
     .requiredOption('-w, --workspace <nameOrPath>')
     .option('--collection <name>', 'for a cURL / fetch / PowerShell request: the collection to add it to (created if needed)', 'Imported')
     .option('--folder <path>', 'for a request: folder path inside the collection, e.g. "Auth / Tokens"')
@@ -99,7 +100,9 @@ export function registerDataCommands(program: Command): void {
       const mgr = new WorkspaceManager();
       const { store } = openWorkspace(o.workspace, undefined, mgr);
       try {
-        const text = file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
+        const link = /^https?:\/\//i.test(file) ? await fetchImportText(file) : undefined;
+        const text = link ? link.text : file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
+        const source = link?.fileName ?? file;
         if (isRequestSnippet(text)) {
           // secrets in the command (tokens, keys, cookies) become {{variables}}; they are never written to disk
           const r = importRequestSnippet(store.listCollections().filter((c) => !c.problem), text, new Redactor(mgr.loadSettings().redactFields), { collection: o.collection, folder: o.folder, name: o.name });
@@ -112,7 +115,7 @@ export function registerDataCommands(program: Command): void {
           }
           return;
         }
-        const r = importIntoWorkspace(store, text, { contractChecks: o.contractChecks !== false, name: dotenvName(file) });
+        const r = importIntoWorkspace(store, text, { contractChecks: o.contractChecks !== false, name: dotenvName(source) });
         if (o.json) console.log(JSON.stringify({ format: r.format, collection: r.collection?.name, collectionId: r.collection?.id, environment: r.environment?.name, environments: r.environments?.map((e) => e.name), secretsToSet: r.secretsToSet, specPath: r.specPath, contractChecks: r.contractChecks }, null, 2));
         else {
           console.log(green(`Imported ${r.format}: ${r.collection ? `collection "${r.collection.name}"` : ''}${r.environments?.length ? ` ${r.environments.length > 1 ? 'environments' : 'environment'} ${r.environments.map((e) => `"${e.name}"`).join(', ')}` : ''}`));

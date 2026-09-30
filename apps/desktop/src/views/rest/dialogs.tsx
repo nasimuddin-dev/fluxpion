@@ -1,5 +1,5 @@
 /** Save-to-collection and Import dialogs of the REST view. */
-import { Upload } from 'lucide-react';
+import { Link2, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { asError, call } from '../../api';
 import { useApp } from '../../store';
@@ -96,6 +96,8 @@ export function SaveModal({ collections, defaultName, onClose, onSave, onCreate 
 
 export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): void }) {
   const [text, setText] = useState('');
+  const [link, setLink] = useState('');
+  const linkOk = /^https?:\/\/\S+$/i.test(link.trim());
   const [busy, setBusy] = useState(false);
   const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }>; specPath?: string; contractChecks?: number } | null>) => {
     setBusy(true);
@@ -134,8 +136,8 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
             onClick={() =>
               run(async () => {
                 // the browser picker works in the desktop app and in the browser / cloud alike
-                const f = await pickTextFile('.json,.yaml,.yml,.har,.txt,.sh,.ps1');
-                return f ? call('col.import', { text: f.text }) : null;
+                const f = await pickTextFile('.json,.yaml,.yml,.har,.env,.txt,.sh,.ps1');
+                return f ? call('col.import', { text: f.text, fileName: f.name }) : null;
               })
             }
           >
@@ -147,7 +149,19 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
         </>
       }
     >
-      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, Insomnia exports (v4 JSON, v5 YAML), Bruno collection exports, Hoppscotch collections, HAR files, TestPion collections, or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
+      <p className="text-sm text-muted mb-2">OpenAPI 3 / Swagger 2 (JSON or YAML), Postman v2.1 collections and environments, Insomnia exports (v4 JSON, v5 YAML), Bruno collection exports, Hoppscotch collections, HAR files, .env files, TestPion collections (as a file, pasted, or a link), or a request copied as cURL, fetch or PowerShell (saved to the <b>Imported</b> collection, with secrets replaced by variables).</p>
+      <form
+        className="flex gap-2 mb-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (linkOk && !busy) void run(() => call('col.importUrl', { url: link.trim() }));
+        }}
+      >
+        <Input className="flex-1" aria-label="Link to import" placeholder="Or a link: https://…/openapi.json, a GitHub file, a Postman API link" value={link} onChange={(e) => setLink(e.target.value)} />
+        <Button type="submit" icon={<Link2 size={13} />} disabled={!linkOk} loading={busy && linkOk}>
+          Import link
+        </Button>
+      </form>
       <textarea className="field mono w-full h-64 text-xs" placeholder="Paste a document here…" value={text} onChange={(e) => setText(e.target.value)} />
     </Modal>
   );

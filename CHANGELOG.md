@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Import from a link.** The Import dialog has a link box: an OpenAPI URL, a file on GitHub / GitLab / Bitbucket (the page link works) or a Postman collection's API link is downloaded and imported. `testpion import <url>` does the same. Also fixed: a `.env.staging` file chosen with **Choose file…** now becomes the *staging* environment.
 - **Newman command lines work.** `testpion run-collection` now also takes Newman's `-g/--globals`, `--env-var`, `--global-var`, `--export-environment`, `--export-globals` (with the values scripts set; secret values left empty), `-k/--insecure`, `--suppress-exit-code`, `--timeout-request`, `--reporters` and `--reporter-junit-export`. Postman globals files import too.
 - Importing (or running) a JSON file that has a syntax error now says so, with the line and column, instead of "Unrecognised import format".
 - **lodash and moment in scripts.** As in Postman, scripts can use `_` (for example `_.get(json, 'items[0].id')`) or `require('lodash')`, and `moment` (for example `moment().add(1, 'day').format('YYYY-MM-DD')`; times are UTC). Each is loaded only for scripts that use it.

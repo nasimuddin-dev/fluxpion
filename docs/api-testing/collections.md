@@ -50,7 +50,9 @@ A Postman import keeps collection-level and request scripts, path variables, OAu
 
 **Import…** in the workspace menu (top bar) accepts the same files. A TestPion workspace export opens as a new workspace, and anything else (a Postman, Insomnia, Bruno or Hoppscotch file, OpenAPI, HAR) is added to the open workspace.
 
-The CLI can import too: `testpion import openapi.yaml -w my-workspace`.
+**From a link:** paste a URL in the Import dialog's link box and press **Import link**: an OpenAPI URL (`https://petstore3.swagger.io/api/v3/openapi.json`), a file on GitHub, GitLab or Bitbucket (the file page is fine, TestPion downloads the raw file), or a Postman collection's API link. Links must be public http(s) URLs of at most 20 MB; for a private file, download it and import the file.
+
+The CLI can import too, from a file or a link: `testpion import openapi.yaml -w my-workspace`, `testpion import https://petstore3.swagger.io/api/v3/openapi.json -w my-workspace`.
 
 ## Export
 

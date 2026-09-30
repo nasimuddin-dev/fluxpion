@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
   ApsError,
+  fetchImportText,
   importIntoWorkspace,
   exampleFromResponse,
   startMockServer,
@@ -103,6 +104,11 @@ export function collectionsHandlers(be: Backend): Handlers {
       // .env imports: secret-looking values go to the OS secret store, never into workspace files
       const r = importIntoWorkspace(be.ws, text, { name: envName, secrets: be.secrets });
       return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks };
+    },
+    /** Import from a link: an OpenAPI URL, a raw GitHub file, a Postman API link … (downloaded, then imported as text). */
+    'col.importUrl': async ({ url }: { url: string }) => {
+      const f = await fetchImportText(url);
+      return { ...((await be.handlers['col.import']!({ text: f.text, fileName: f.fileName })) as object), url: f.url };
     },
     'col.importFile': async () => {
       const f = await be.host.openDialog?.({ filters: [{ name: 'API definitions, collections and .env files', extensions: ['json', 'yaml', 'yml', 'har', 'env'] }, { name: 'All files', extensions: ['*'] }] });
