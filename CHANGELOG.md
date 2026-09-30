@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 — 2026-09-30
+
+Highlights: a simpler layout. There's **one sidebar at a time** and a **shorter rail**: requests of every kind live under Collections. **One tab strip** holds REST, GraphQL, gRPC, WebSocket and MCP side by side, as in Postman, and GraphQL's schema is a toggle on the right.
 
 - **One sidebar at a time, and a shorter rail**:
   - REST, GraphQL, gRPC, WebSocket and MCP are no longer separate rail items. **Collections** opens them all, with the Collections explorer as their only sidebar; clicking it again (or Ctrl+B) hides the sidebar.

@@ -22,6 +22,12 @@ window.__cap = {
   },
   nav(label) {
     const el = document.querySelector('nav [aria-label="' + label + '"]');
+    // the request editors aren't on the rail (they open from Collections): use their Ctrl+Alt+n shortcut
+    const keys = { REST: '2', GraphQL: '3', gRPC: '4', WebSocket: '5', MCP: '6' };
+    if (!el && keys[label]) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: keys[label], ctrlKey: true, altKey: true, bubbles: true }));
+      return;
+    }
     if (!el) throw new Error('nav not found: ' + label);
     el.click();
   },

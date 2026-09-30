@@ -1,2 +1,2 @@
 /** TestPion's version (the engine, CLI and app are released together). */
-export const ENGINE_VERSION = '0.10.1';
+export const ENGINE_VERSION = '0.11.0';
