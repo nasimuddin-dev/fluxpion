@@ -93,6 +93,18 @@ The status, duration, size, headers, cookies and a timeline (prepare â†’ TTFB â†
 
 The full body is streamed to `payloads/` on disk. The viewer only holds a preview, 2 MB by default and configurable in Settings. Larger bodies show a *truncated* badge; **Save response** exports the complete file.
 
+## Compare across environments
+
+The **Compare across environments** button (next to **Send**) sends the open request with two environments, one after the other, and shows the differences:
+
+- status and time;
+- every changed JSON field (added, removed, changed, or a different type), or a line diff for text;
+- header changes.
+
+Use it to check that Staging and Production answer the same way. Both are real requests: scripts, auth and checks run as usual, and a production environment gets a warning first.
+
+From the terminal: `testpion env diff Staging Production --request "List patients" -w my-workspace [--json]` (exit 1 when the responses differ). AI agents: `compare_request_across_environments`.
+
 ## Checks from the response
 
 In the **Pretty** view of a JSON response, click a key to open its menu:

@@ -245,6 +245,7 @@ Writes a pipeline for GitHub Actions, GitLab CI, Azure Pipelines or Jenkins that
 ```bash
 testpion env list -w my-workspace --json          # environments in display order, variable names only
 testpion env diff Staging Production -w my-workspace --values   # what differs (exit 1 if anything does)
+testpion env diff Staging Production --request "List patients" -w my-workspace   # send it to both, diff the responses
 testpion env order Development Staging Production -w my-workspace
 ```
 

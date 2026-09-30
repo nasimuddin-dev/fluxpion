@@ -28,7 +28,7 @@ interface Diff {
   different: boolean;
   summary: string;
 }
-interface Compared {
+export interface Compared {
   before: Entry;
   after: Entry;
   diff: Diff;
@@ -170,7 +170,8 @@ function BodyView({ text }: { text: string }) {
   }
 }
 
-function CompareView({ c }: { c: Compared }) {
+/** Two responses side by side: status, time, headers and body changes. `labels` name the sides (default: when they were received). */
+export function CompareView({ c, labels }: { c: Compared; labels?: [string, string] }) {
   const d = c.diff;
   const [showVolatile, setShowVolatile] = useState(false);
   const headers = d.headers.filter((h) => showVolatile || !h.volatile);
@@ -178,9 +179,9 @@ function CompareView({ c }: { c: Compared }) {
   return (
     <div className="h-full overflow-auto">
       <div className="px-4 py-3 border-b border-line flex items-center gap-3 flex-wrap">
-        <span className="text-xs text-muted">{new Date(c.before.timestamp).toLocaleString()}</span>
+        <span className={cx('text-xs', labels ? 'font-medium text-fg' : 'text-muted')}>{labels?.[0] ?? new Date(c.before.timestamp).toLocaleString()}</span>
         <ArrowRight size={14} className="text-muted" />
-        <span className="text-xs text-muted">{new Date(c.after.timestamp).toLocaleString()}</span>
+        <span className={cx('text-xs', labels ? 'font-medium text-fg' : 'text-muted')}>{labels?.[1] ?? new Date(c.after.timestamp).toLocaleString()}</span>
         <Badge tone={d.different ? 'warn' : 'ok'}>{d.different ? 'Changed' : 'Same'}</Badge>
         <span className="text-sm">{d.summary}</span>
       </div>
@@ -215,7 +216,7 @@ function CompareView({ c }: { c: Compared }) {
             <div className="rounded-lg border border-line overflow-hidden">
               {d.body.changes.map((ch, i) => (
                 <div key={i} className="flex items-start gap-2 px-3 py-1.5 border-b border-line/60 last:border-0 text-sm">
-                  <span className={cx('shrink-0 text-[0.7rem] font-semibold px-1.5 rounded border w-16 text-center', KIND[ch.kind].className)}>
+                  <span className={cx('shrink-0 whitespace-nowrap text-[0.7rem] font-semibold px-1.5 rounded border min-w-[4.75rem] text-center', KIND[ch.kind].className)}>
                     {KIND[ch.kind].sign} {KIND[ch.kind].label}
                   </span>
                   <span className="mono text-xs shrink-0 pt-0.5 text-fg">{ch.path}</span>
@@ -253,7 +254,7 @@ function CompareView({ c }: { c: Compared }) {
             <div className="rounded-lg border border-line overflow-hidden">
               {headers.map((h) => (
                 <div key={h.name} className={cx('flex items-start gap-2 px-3 py-1.5 border-b border-line/60 last:border-0 text-sm', h.volatile && 'opacity-60')}>
-                  <span className={cx('shrink-0 text-[0.7rem] font-semibold px-1.5 rounded border w-16 text-center', KIND[h.kind].className)}>
+                  <span className={cx('shrink-0 whitespace-nowrap text-[0.7rem] font-semibold px-1.5 rounded border min-w-[4.75rem] text-center', KIND[h.kind].className)}>
                     {KIND[h.kind].sign} {KIND[h.kind].label}
                   </span>
                   <span className="mono text-xs shrink-0 pt-0.5">{h.name}</span>

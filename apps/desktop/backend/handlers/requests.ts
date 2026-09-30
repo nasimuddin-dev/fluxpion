@@ -17,12 +17,29 @@ import {
   type HttpRequestSpec,
   historyResponse,
   SocketIoSession,
+  diffResponses,
+  type HttpResponseData,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
 export function requestsHandlers(be: Backend): Handlers {
   return {
     'http.send': (p: HttpSendParams) => be.httpSend(p),
+    /**
+     * Send the same request with two environments (one after the other, scripts included) and diff the
+     * responses: status, time, headers and a field-by-field body diff.
+     */
+    'http.compareEnvironments': async (p: HttpSendParams & { left: string; right: string }) => {
+      const run = async (environment: string) => {
+        const r = (await be.httpSend({ ...p, id: undefined, environment })) as { response?: HttpResponseData; error?: { message: string } };
+        return { environment, response: r.response, error: r.error?.message };
+      };
+      const a = await run(p.left);
+      const b = await run(p.right);
+      const comparable = (x: typeof a) => (x.response ? { status: x.response.status, durationMs: x.response.durationMs, size: x.response.size, headers: x.response.headers, body: x.response.bodyPreview } : { status: 'error', body: x.error ?? '' });
+      const summary = (x: typeof a) => ({ environment: x.environment, status: x.response?.status, durationMs: x.response?.durationMs, error: x.error });
+      return { left: summary(a), right: summary(b), diff: diffResponses(comparable(a), comparable(b)) };
+    },
     'http.cancel': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
     'http.curl': async (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string }) => be.codeSnippet({ ...p, language: 'curl', revealSecrets: true }),
     'http.code': (p: { request: HttpRequestSpec; environment?: string; collectionId?: string; requestId?: string; language: string; revealSecrets?: boolean }) => be.codeSnippet(p),

@@ -10,6 +10,10 @@ import {
   responseTimeStats,
   ciConfig,
   compareEnvironments,
+  compareRequestAcrossEnvironments,
+  collectionRequests,
+  createEngineContext,
+  ChainSecretStore,
   EnvSecretStore,
   type CiProvider,
   type WorkspaceStore,
@@ -289,10 +293,32 @@ export function registerDataCommands(program: Command): void {
     .requiredOption('-w, --workspace <nameOrPath>')
     .option('--values', 'show values (secrets and sensitive-looking keys stay masked)')
     .option('--all', 'also list variables that are the same')
+    .option('--request <nameOrId>', 'instead: send this saved request with both environments and diff the responses')
+    .option('--collection <nameOrId>', 'collection of --request')
     .option('--json', 'print as JSON')
-    .action((left: string, right: string, o) => {
+    .action(async (left: string, right: string, o) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
+        if (o.request) {
+          const cols = store.listCollections().filter((c) => !c.problem && (!o.collection || c.id === o.collection || c.name.toLowerCase() === String(o.collection).toLowerCase()));
+          const want = String(o.request).toLowerCase();
+          const collection = cols.find((c) => collectionRequests(c).some((r) => r.id === o.request || r.name.toLowerCase() === want));
+          if (!collection) throw new CliError(`No saved request "${o.request}"`, EXIT.CONFIG_ERROR);
+          for (const e of [left, right]) if (!store.getEnvironment(e)) throw new CliError(`No environment "${e}"`, EXIT.CONFIG_ERROR);
+          const settings = new WorkspaceManager().loadSettings();
+          const secrets = new ChainSecretStore([new EnvSecretStore()]);
+          const r = await compareRequestAcrossEnvironments({ collection, request: o.request, left, right, context: (environment) => createEngineContext({ store, secrets, settings, environment, collectionId: collection.id }) });
+          if (o.json) console.log(JSON.stringify(r, null, 2));
+          else {
+            const side = (x: typeof r.left) => `${bold(x.environment)} ${x.error ? red(x.error) : `${x.status} ${dim(formatDuration(x.durationMs ?? 0))}`}`;
+            console.log(`${r.request}: ${side(r.left)} vs ${side(r.right)}`);
+            console.log(`${r.diff.different ? yellow('Different') : green('Same')}: ${r.diff.summary}`);
+            for (const c of r.diff.body.changes) console.log(`  ${c.kind === 'added' ? green('+') : c.kind === 'removed' ? red('-') : yellow('~')} ${c.path}  ${c.kind === 'added' ? JSON.stringify(c.after) : c.kind === 'removed' ? JSON.stringify(c.before) : `${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}`}`);
+            for (const h of r.diff.headers.filter((x) => !x.volatile)) console.log(`  header ${h.name}: ${h.before ?? '(none)'} -> ${h.after ?? '(none)'}`);
+          }
+          process.exitCode = r.diff.different ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+          return;
+        }
         const get = (ref: string) => {
           const e = store.getEnvironment(ref);
           if (!e) throw new CliError(`No environment "${ref}". Available: ${store.listEnvironments().map((x) => x.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);

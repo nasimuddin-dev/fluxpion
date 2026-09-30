@@ -214,7 +214,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_environments', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
+      expect(names).toEqual(['ci_config', 'collection_docs', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'get_request', 'grpc_call', 'list_collections', 'list_environments', 'list_monitors', 'list_requests', 'monitor_results', 'parse_request_snippet', 'realtime_exchange', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_monitor', 'save_request', 'send_request']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -373,6 +373,31 @@ describe('example workspace (end-to-end)', () => {
     expect(results.stdout).toContain('2/2 passed');
     expect((await run([cli, 'monitor', 'remove', 'Diagnostics check', '-w', ws.root], env)).status).toBe(0);
     // eight CLI processes: slow on a loaded CI machine
+  }, 90_000);
+
+  it('compare a saved request across two environments (CLI env diff --request, MCP)', async () => {
+    const cli = resolve('packages/cli/bin/testpion.js');
+    const env = { ...process.env, TESTPION_HOME: join(dir, 'home') };
+    const store = WorkspaceStore.open(ws.root);
+    const dev = store.getEnvironment('Development')!;
+    store.saveEnvironment({ ...dev, id: 'dev-copy', name: 'Dev copy' });
+    store.close();
+    const r = await run([cli, 'env', 'diff', 'Development', 'Dev copy', '--request', 'Health', '-w', ws.root, '--json'], env);
+    const d = JSON.parse(r.stdout);
+    expect(d).toMatchObject({ request: 'Health', left: { environment: 'Development', status: 200 }, right: { environment: 'Dev copy', status: 200 } });
+    // the only body difference is the server's clock
+    expect(d.diff.body.changes.map((c: { path: string }) => c.path)).toEqual(['$.time']);
+
+    const s = new McpSession({ id: 'cmp', name: 'testpion', transport: 'stdio', command: process.execPath, args: [cli, 'mcp-server', '-w', ws.root], env: { TESTPION_HOME: join(dir, 'home') } });
+    await s.connect(20_000);
+    try {
+      const out = JSON.parse(mcpResultBody(await s.callTool('compare_request_across_environments', { collection: 'Veterinary API', request: 'Health', left: 'Development', right: 'Dev copy' })).text);
+      expect(out.left.status).toBe(200);
+      const prod = await s.callTool('compare_request_across_environments', { collection: 'Veterinary API', request: 'Health', left: 'Development', right: 'Production' });
+      expect(prod.isError).toBe(true);
+    } finally {
+      await s.close();
+    }
   }, 90_000);
 
   it('CLI: `testpion docs` writes Markdown documentation with examples and no secrets', async () => {

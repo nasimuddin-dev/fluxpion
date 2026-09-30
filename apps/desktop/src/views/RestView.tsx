@@ -1,4 +1,4 @@
-import { ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
+import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -29,6 +29,7 @@ const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || !!el.closest('.cm-editor'));
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
 import { ResponseViewer } from '../components/ResponseViewer';
+import { EnvCompareDialog } from './rest/EnvCompareDialog';
 import type { TreeAssertion } from '../components/JsonView';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
@@ -57,6 +58,7 @@ export function RestView() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showCode, setShowCode] = useState(false);
+  const [comparingEnvs, setComparingEnvs] = useState(false);
   const [showCookies, setShowCookies] = useState(false);
   const [side, setSideState] = useState<'collections' | 'environments' | 'history'>(() => {
     try {
@@ -666,6 +668,9 @@ export function RestView() {
               Send
             </Button>
           )}
+          <IconButton label="Compare across environments" onClick={() => setComparingEnvs(true)}>
+            <ArrowLeftRight size={16} />
+          </IconButton>
           <IconButton label="Code snippet" onClick={() => setShowCode(true)}>
             <Code2 size={16} />
           </IconButton>
@@ -711,6 +716,7 @@ export function RestView() {
       {saving && <SaveModal collections={collections} defaultName={tab.name} onClose={() => setSaving(false)} onSave={(cid, name, folder) => (setSaving(false), void saveTab(cid, name, folder))} onCreate={saveCollection} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onDone={loadCollections} />}
       {showCookies && <CookiesModal initialDomain={hostOf(tab.request.url) || undefined} onClose={() => setShowCookies(false)} />}
+      {comparingEnvs && <EnvCompareDialog tab={tab} onClose={() => setComparingEnvs(false)} />}
       {showCode && <CodeModal request={toEngineRequest(tab.request)} collectionId={tab.collectionId} requestId={tab.requestId} onClose={() => setShowCode(false)} />}
     </>
   );

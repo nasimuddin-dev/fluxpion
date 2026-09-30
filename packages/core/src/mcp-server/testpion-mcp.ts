@@ -24,6 +24,7 @@ import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
 import { ciConfig, type CiConfigOptions } from '../runner/ci-config.js';
 import { compareEnvironments } from '../storage/env-compare.js';
+import { compareRequestAcrossEnvironments } from '../runner/env-request-compare.js';
 import { executeMonitor, findMonitor, listMonitors, monitorResults, monitorStatus } from '../runner/monitors.js';
 
 /**
@@ -415,6 +416,20 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         };
         const d = compareEnvironments(get(a.left), get(a.right), { secrets, redactor });
         return a.includeSame ? d : { ...d, rows: d.rows.filter((r) => r.status !== 'same') };
+      },
+    },
+    {
+      name: 'compare_request_across_environments',
+      write: true,
+      description:
+        'Send one saved request with two environments (its scripts, auth and checks run as usual) and compare the responses: status, time, headers and a field-by-field JSON body diff. Sensitive values are masked. Production environments are refused unless the server allows them.',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request name or id'), left: str('First environment'), right: str('Second environment') }, required: ['collection', 'request', 'left', 'right'] },
+      run: async (a) => {
+        const left = checkEnvironment(a.left);
+        const right = checkEnvironment(a.right);
+        if (!left || !right) throw new ApsError('ConfigurationError', 'Give two environments (left and right)');
+        const c = findCollection(a.collection);
+        return compareRequestAcrossEnvironments({ collection: c, request: String(a.request), left, right, context: (environment) => createEngineContext({ store, secrets, settings, environment, collectionId: c.id }) });
       },
     },
     {
