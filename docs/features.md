@@ -25,7 +25,7 @@ TestPion combines an API client, a GraphQL playground, an MCP inspector, an LLM 
 - Find where a variable is used and rename it everywhere, with secret values moved along.
 - Markdown docs for every request and a generated documentation page per collection, exportable as Markdown or as a self-contained HTML page to publish (also `testpion docs --html`).
 - Record traffic through a local reverse proxy and save it as a collection with examples.
-- Pre-request and test scripts in a sandbox, assertions, highlighted variables, one-click cURL export, code snippets for 19 languages and libraries (cURL, HTTPie, PowerShell, fetch, Axios, Python requests and httpx, Go, Java OkHttp and HttpClient, Kotlin, C#, PHP, Ruby, Rust, Swift, Dart, raw HTTP), a response Visualizer (`pm.visualizer`), paste-to-request from browser devtools (cURL, fetch, PowerShell), and a console with every request and its script output.
+- Pre-request and test scripts in a sandbox (with top-level `await`, `pm.require` script packages, `pm.vault`, cheerio, lodash and moment), assertions, highlighted variables, one-click cURL export, code snippets for 19 languages and libraries (cURL, HTTPie, PowerShell, fetch, Axios, Python requests and httpx, Go, Java OkHttp and HttpClient, Kotlin, C#, PHP, Ruby, Rust, Swift, Dart, raw HTTP), a response Visualizer (`pm.visualizer`), paste-to-request from browser devtools (cURL, fetch, PowerShell), and a console with every request and its script output.
 - Star frequently used REST or GraphQL requests from their **⋯** menu, then use the star button beside the collection filter to focus the REST sidebar on favorites. Favorites are saved in the collection file and retain their folder context.
 
 [REST guide](/api-testing/rest) · [Authentication](/api-testing/authentication) · [Collections & import](/api-testing/collections)
@@ -36,7 +36,7 @@ TestPion combines an API client, a GraphQL playground, an MCP inspector, an LLM 
   <img src="/images/graphql.jpg" alt="The GraphQL view with the schema explorer, a query in the editor and the response" width="1440" height="900" loading="lazy">
 </figure>
 
-Introspect a schema to get autocomplete, validation and hover docs in the editor, plus a browsable schema explorer. Run operations with variables, scripts and assertions on data, GraphQL errors and latency, and run subscriptions over WebSocket (`graphql-transport-ws` and `graphql-ws`) with events listed live.
+Introspect a schema to get autocomplete, validation and hover docs in the editor, plus a browsable schema explorer. Run operations with variables, scripts and assertions on data, GraphQL errors and latency, and run subscriptions over WebSocket (`graphql-transport-ws` and `graphql-ws`) with events listed live. **Build** writes a whole operation for a root field (typed variables, a selection of fields), and **Code** shows the call as cURL, fetch, Python and more.
 
 [GraphQL guide](/graphql/overview)
 
@@ -65,7 +65,8 @@ See [WebSocket](./api-testing/websocket.md).
 </figure>
 
 - stdio, Streamable HTTP and SSE transports.
-- Tools, resources, resource templates and prompts, with input forms generated from JSON Schema.
+- Tools, resources, resource templates and prompts, with input forms generated from JSON Schema, the server's suggestions (completions) for arguments, and resource subscriptions.
+- Elicitation, sampling and roots: answer a server that asks for input (a form from its schema) or for an LLM completion (reviewed before anything is sent), in the inspector and in tests.
 - A protocol trace of every JSON-RPC message, with direction, payloads and latency.
 - **Save as test** turns a tool call into a regression test.
 - The other direction too: `testpion mcp-server` serves your workspace to AI agents as MCP tools (browse collections, send requests, run collections), with secrets redacted.
@@ -108,7 +109,7 @@ YAML tests in your repository, with parallel workers, backpressure, retries, tim
   <img src="/images/load.jpg" alt="The Load view with live throughput, latency, error and virtual-user charts" width="1440" height="900" loading="lazy">
 </figure>
 
-Load-test one endpoint or a whole collection (every virtual user runs its requests in order, with per-user cookies and an optional warm-up run for tokens). Configure virtual users, ramp-up and ramp-down, and an RPS cap. See p50–p99 latency, error rate and status distribution, per request for collections, plus AI metrics (tokens/s, TTFT, cost) for LLM targets. Safeguards block production and remote hosts unless you opt in.
+Load-test one endpoint or a whole collection (every virtual user runs its requests in order, with per-user cookies and an optional warm-up run for tokens). Configure virtual users, ramp-up and ramp-down, and an RPS cap. See p50–p99 latency, error rate and status distribution, per request for collections, plus AI metrics (tokens/s, TTFT, cost) for LLM targets. Pass/fail thresholds (`p95<500`, `errors<1%`, `p99[Get pet]<800`) fail a CI job on a slow build. Safeguards block production and remote hosts unless you opt in.
 
 [Load testing](/performance/load-testing)
 
