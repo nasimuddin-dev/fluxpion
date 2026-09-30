@@ -1,6 +1,7 @@
 import { Bookmark, FlaskConical, History, KeyRound, Play, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSticky } from '../lib/sticky';
+import { useIntent } from '../hooks';
 import { asError, call } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import type { CheckConfig, ProviderConfig } from '../types';
@@ -122,6 +123,8 @@ export function EvaluationsView() {
     set({ name });
     setSavedId(await saved.put({ name, folder, data: { ...d, name } }));
   };
+  // the Collections explorer / search open a saved evaluation
+  useIntent('evaluations', (p) => p?.savedId && void openSaved(p.savedId));
   const evalRuns = runs.filter((r) => saved.lib.items.some((i) => i.name === r.name) || r.name === d.name);
   const count = useMemo(() => countRecords(d.dataset, d.datasetFormat), [d.dataset, d.datasetFormat]);
   const preview = useMemo(() => previewRecords(d.dataset, d.datasetFormat), [d.dataset, d.datasetFormat]);
@@ -139,8 +142,9 @@ export function EvaluationsView() {
     }
   };
 
+  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
-    <Split id="eval-sidebar" sidebar initial={18} min={12}>
+    <Split id="eval-sidebar" sidebar collapsed={explorerOpen} initial={18} min={12}>
       <SidebarShell
         id="evaluations"
         panes={[

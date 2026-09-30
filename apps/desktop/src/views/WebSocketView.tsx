@@ -195,8 +195,9 @@ export function WebSocketView() {
   } catch {
     parsed = undefined;
   }
+  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
-    <Split id="ws-saved" sidebar initial={18} min={12}>
+    <Split id="ws-saved" sidebar collapsed={explorerOpen} initial={18} min={12}>
     <SidebarShell
       id="websocket"
       panes={[

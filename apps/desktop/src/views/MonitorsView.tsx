@@ -81,7 +81,8 @@ export function MonitorsView() {
 
   useIntent(
     'monitors',
-    (p?: { create?: { collectionId: string; selection?: string[] } }) => {
+    (p?: { create?: { collectionId: string; selection?: string[] }; monitorId?: string }) => {
+      if (p?.monitorId) setSel(p.monitorId);
       if (p?.create) setEditing({ name: '', collectionId: p.create.collectionId, selection: p.create.selection, everyMinutes: 15, enabled: true, environment: useApp.getState().environment });
     },
     'monitors',

@@ -5,6 +5,7 @@ import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { ViewBoundary } from './components/ViewBoundary';
+import { Explorer } from './components/Explorer';
 import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
@@ -116,6 +117,7 @@ export default function App() {
   const ci = useApp((s) => s.ci);
   const openapiDiff = useApp((s) => s.openapiDiff);
   const apiCoverage = useApp((s) => s.apiCoverage);
+  const explorerOpen = useApp((s) => s.explorerOpen);
   const variableUsages = useApp((s) => s.variableUsages);
   const recordOpen = useApp((s) => s.recordOpen);
   const shortcutsOpen = useApp((s) => s.shortcutsOpen);
@@ -171,7 +173,10 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       const { set } = useApp.getState();
-      if (mod && e.key.toLowerCase() === 'k') {
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        useApp.getState().toggleExplorer();
+      } else if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         set({ paletteOpen: true, searchOpen: false });
       } else if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
@@ -263,6 +268,11 @@ export default function App() {
       <TopBar />
       <div className="flex-1 flex min-h-0">
         <Sidebar />
+        {explorerOpen && (
+          <ViewBoundary view="explorer">
+            <Explorer />
+          </ViewBoundary>
+        )}
         <main className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0 relative">
             {visited.map((id) => {
@@ -317,7 +327,7 @@ export default function App() {
       )}
       {apiCoverage && (
         <Suspense fallback={null}>
-          <ApiCoverageDialog runId={apiCoverage.runId} onClose={() => useApp.getState().set({ apiCoverage: undefined })} />
+          <ApiCoverageDialog runId={apiCoverage.runId} spec={apiCoverage.spec} onClose={() => useApp.getState().set({ apiCoverage: undefined })} />
         </Suspense>
       )}
       <Toaster />

@@ -86,6 +86,9 @@ interface AppState {
   paletteOpen: boolean;
   searchOpen: boolean;
   logsOpen: boolean;
+  /** The Collections explorer panel next to the navigation rail (Ctrl+B). */
+  explorerOpen: boolean;
+  toggleExplorer(open?: boolean): void;
   /** Which tab of the bottom panel is shown. */
   bottomTab: 'console' | 'logs';
   assistant?: AssistantRequest;
@@ -95,7 +98,7 @@ interface AppState {
   /** The "Compare OpenAPI versions" dialog. */
   openapiDiff?: boolean;
   /** The API coverage dialog; `runId` preselects a run. */
-  apiCoverage?: { runId?: string };
+  apiCoverage?: { runId?: string; spec?: string };
   /** The "Variable usages" dialog, with the variable to show (true: none chosen yet). */
   variableUsages?: string | true;
   /** The "Record traffic" dialog. */
@@ -129,6 +132,22 @@ export const useApp = create<AppState>((set, get) => ({
   paletteOpen: false,
   searchOpen: false,
   logsOpen: false,
+  explorerOpen: (() => {
+    try {
+      return localStorage.getItem('aps.explorer') !== 'closed';
+    } catch {
+      return true;
+    }
+  })(),
+  toggleExplorer: (open) => {
+    const next = open ?? !get().explorerOpen;
+    try {
+      localStorage.setItem('aps.explorer', next ? 'open' : 'closed');
+    } catch {
+      /* storage unavailable */
+    }
+    set({ explorerOpen: next });
+  },
   bottomTab: 'console',
   toasts: [],
   activity: {},

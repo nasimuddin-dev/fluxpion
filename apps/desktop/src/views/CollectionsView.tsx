@@ -70,9 +70,10 @@ export function CollectionsView() {
   };
   const open = (c: Collection, n: CollectionNode) => useApp.getState().openIntent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id });
   const count = (nodes: CollectionNode[]): number => nodes.reduce((a, n) => a + (n.kind === 'folder' ? count(n.items) : 1), 0);
+  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
     <>
-    <Split id="collections" sidebar initial={24}>
+    <Split id="collections" sidebar collapsed={explorerOpen} initial={24}>
       <div className="h-full flex flex-col bg-panel/50">
         <SectionTitle
           right={

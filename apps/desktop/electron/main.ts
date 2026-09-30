@@ -13,6 +13,9 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 // scripts (charts) never share the app's origin, storage or IPC bridge
 protocol.registerSchemesAsPrivileged([{ scheme: 'tpviz', privileges: { standard: true, secure: true } }]);
 let win: BrowserWindow | null = null;
+/** Whether the window asked for an update check this session (see the native fallback prompt). */
+let rendererCheckedUpdates = false;
+let nativePromptShown = false;
 let backend: Backend | null = null;
 
 // Documentation screenshot mode (scripts/capture.cjs): isolated profile, fixed size, dark theme.
@@ -149,6 +152,7 @@ function start(): void {
   backend.handlers['app.info'] = async (p) => ({ ...((await baseInfo(p)) as object), appVersion: app.getVersion(), packaged: app.isPackaged, canUpdateInPlace: canInstallInPlace() });
   // every check and failure is logged, so "updates don't work" can be diagnosed from the Logs panel
   backend.handlers['update.check'] = async () => {
+    rendererCheckedUpdates = true;
     try {
       const r = await updater.check();
       be.appLog('info', `Update check: running ${r.current}, ${r.version ? `${r.version} available` : 'up to date'}${r.installable ? '' : ' (this installation is updated by downloading the new version)'}`);
@@ -164,6 +168,34 @@ function start(): void {
     } catch (e) {
       be.appLog('error', `Update install failed: ${e instanceof Error ? e.message : String(e)}`);
       throw e;
+    }
+  };
+
+  // Safety net: the update prompt normally comes from the window (5 s after start). If the window can't
+  // show it (it failed to render, or its renderer crashed), ask here with a native dialog instead, so a
+  // broken version can always be replaced by a fixed one.
+  const nativeUpdatePrompt = async (reason: string) => {
+    if (nativePromptShown || !app.isPackaged || capture || be.settings.checkForUpdates === false) return;
+    nativePromptShown = true;
+    try {
+      const r = await updater.check();
+      be.appLog('info', `Update check (${reason}): running ${r.current}, ${r.version ? `${r.version} available` : 'up to date'}`);
+      if (!r.version) return;
+      const choice = await dialog.showMessageBox({
+        type: 'info',
+        title: 'Update available',
+        message: `TestPion ${r.version} is available`,
+        detail: `You have ${r.current}. ${r.installable ? 'Update now downloads it and restarts TestPion.' : 'Update now opens the download page.'}${r.notes ? `\n\n${r.notes.slice(0, 600)}` : ''}`,
+        buttons: ['Update now', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (choice.response !== 0) return;
+      if (r.installable) await updater.install();
+      else await shell.openExternal(r.url);
+    } catch (e) {
+      be.appLog('error', `Update check (${reason}) failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -191,6 +223,12 @@ function start(): void {
     });
   });
   createWindow();
+  win?.webContents.on('render-process-gone', () => void nativeUpdatePrompt('the window crashed'));
+  win?.webContents.once('did-finish-load', () =>
+    setTimeout(() => {
+      if (!rendererCheckedUpdates) void nativeUpdatePrompt('the window did not check');
+    }, 20_000),
+  );
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

@@ -39,7 +39,7 @@ type Filter = 'all' | 'gaps' | 'uncovered';
  * API coverage (same engine as `testpion coverage` and the api_coverage MCP tool): which operations
  * and documented responses of an OpenAPI document the test runs and request history exercised.
  */
-export function ApiCoverageDialog({ runId, onClose }: { runId?: string; onClose(): void }) {
+export function ApiCoverageDialog({ runId, spec: initialSpec, onClose }: { runId?: string; spec?: string; onClose(): void }) {
   const [specs, setSpecs] = useState<string[]>([]);
   const [spec, setSpec] = useState<Side>({ path: undefined });
   const [useRun, setUseRun] = useState(true);
@@ -51,7 +51,7 @@ export function ApiCoverageDialog({ runId, onClose }: { runId?: string; onClose(
   useEffect(() => {
     void call<string[]>('openapi.specs').then((s) => {
       setSpecs(s);
-      setSpec(s.length ? { path: s[0] } : { url: '' });
+      setSpec(initialSpec && s.includes(initialSpec) ? { path: initialSpec } : s.length ? { path: s[0] } : { url: '' });
     });
   }, []);
   const ready = !!(spec.path || spec.url?.trim() || spec.text) && (useRun || history);

@@ -277,7 +277,7 @@ export function Menu({
 }
 
 /** Resizable two-pane split. Size is persisted per `id`. `sidebar` gives the first pane the sidebar surface. */
-export function Split({ id, direction = 'horizontal', initial = 50, min = 15, sidebar, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; sidebar?: boolean; children: [ReactNode, ReactNode] }) {
+export function Split({ id, direction = 'horizontal', initial = 50, min = 15, sidebar, collapsed, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; sidebar?: boolean; /** Hide the first pane (kept mounted, so its state survives). */ collapsed?: boolean; children: [ReactNode, ReactNode] }) {
   const [pct, setPct] = useState(() => Number(localStorage.getItem(`aps.split.${id}`)) || initial);
   const ref = useRef<HTMLDivElement>(null);
   const onDown = useCallback(
@@ -305,13 +305,14 @@ export function Split({ id, direction = 'horizontal', initial = 50, min = 15, si
   const h = direction === 'horizontal';
   return (
     <div ref={ref} className={cx('flex min-h-0 min-w-0 h-full w-full', h ? 'flex-row' : 'flex-col')}>
-      <div className={cx('min-h-0 min-w-0 overflow-hidden flex flex-col', sidebar && 'bg-panel')} style={{ flexBasis: `${pct}%` }}>
+      <div className={cx('min-h-0 min-w-0 overflow-hidden flex flex-col', sidebar && 'bg-panel')} style={{ flexBasis: `${pct}%`, display: collapsed ? 'none' : undefined }}>
         {children[0]}
       </div>
       <div
         role="separator"
         aria-orientation={h ? 'vertical' : 'horizontal'}
         onPointerDown={onDown}
+        hidden={collapsed}
         className={cx(
           'relative shrink-0 bg-line transition-colors duration-150 hover:bg-accent active:bg-accent',
           h ? 'w-px cursor-col-resize before:absolute before:inset-y-0 before:-left-1 before:-right-1' : 'h-px cursor-row-resize before:absolute before:inset-x-0 before:-top-1 before:-bottom-1',

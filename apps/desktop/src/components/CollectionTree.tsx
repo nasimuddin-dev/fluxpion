@@ -1,4 +1,4 @@
-import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2 } from 'lucide-react';
+import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
@@ -53,6 +53,7 @@ export function CollectionTree({
   onChange,
   onNewRequest,
   onRun,
+  onSettings,
   filter,
   favoritesOnly = false,
   onMoved,
@@ -65,6 +66,8 @@ export function CollectionTree({
   onNewRequest(c: Collection, folderId?: string): void;
   /** Open the Collection Runner for a collection or one of its folders. */
   onRun?(c: Collection, folderId?: string): void;
+  /** Open a collection's settings (variables, auth, scripts, runner, docs, mock): shown in its menu. */
+  onSettings?(c: Collection): void;
   filter?: string;
   /** Show starred requests while retaining their containing folders for context. */
   favoritesOnly?: boolean;
@@ -327,6 +330,7 @@ export function CollectionTree({
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
                   extraItems={[
+                    ...(onSettings ? [{ label: 'Settings, runner & docs', icon: <Settings2 size={14} />, onSelect: () => onSettings(c) }] : []),
                     { label: 'Run in CI…', icon: <Workflow size={14} />, onSelect: () => useApp.getState().set({ ci: { collection: c.id } }) },
                     { label: 'Convert scripts to tp.*', icon: <Wand2 size={14} />, onSelect: () => void convertScripts(c, 'tp') },
                     { label: 'Convert scripts to pm.*', icon: <Undo2 size={14} />, onSelect: () => void convertScripts(c, 'pm') },

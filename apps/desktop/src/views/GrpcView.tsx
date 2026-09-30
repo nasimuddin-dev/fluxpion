@@ -212,8 +212,9 @@ export function GrpcView() {
   const statusTone = result ? (result.code === 0 ? 'ok' : result.streamStopped ? 'warn' : 'bad') : 'default';
   const example = useMemo(() => (current ? JSON.stringify(current.example) : ''), [current]);
 
+  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
-    <Split id="grpc-saved" sidebar initial={18} min={12}>
+    <Split id="grpc-saved" sidebar collapsed={explorerOpen} initial={18} min={12}>
     <SidebarShell
       id="grpc"
       panes={[

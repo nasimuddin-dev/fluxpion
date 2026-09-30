@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Collections explorer**: the Collections button, now right under Home, shows or hides a panel with everything saved in the workspace, next to every view (Ctrl+B). Its collapsible sections are collections (the full tree: run, move, edit folders, settings), saved gRPC requests, WebSocket connections, MCP servers, AI prompts, evaluations and load tests, environments (click to activate), API specs (coverage, compare versions) and monitors. One filter covers them all, and clicking an item opens it in its editor. It refreshes when anything is saved, in any view. While it's open, the views' own saved lists step aside.
+- **Update prompt you can't miss**: if the window can't show the update question (it failed to render, or crashed), TestPion asks with a native dialog instead.
 - **`testpion load --saved <name>`** runs a load test saved in the app (options typed on the command line win), and `{{variables}}` in a load-test URL now resolve from the workspace and `-e` environment.
 - **Export beside Import**: the Collections sidebar has an Export menu (the selected collection as TestPion JSON, Postman v2.1, OpenAPI 3.1 or a Bruno folder, or the whole workspace), and the REST sidebar has an export button next to import.
 - **Fix: switching the body type no longer loses what you typed**: each type (JSON/XML/Text/HTML text, form fields, the binary file) is kept while the request is open, so going to None or a form and back brings it back, as in Postman.

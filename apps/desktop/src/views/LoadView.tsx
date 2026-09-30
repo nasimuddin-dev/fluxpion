@@ -11,6 +11,7 @@ import { SidebarShell } from '../components/SidebarShell';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
+import { useIntent } from '../hooks';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
 import type { NormalizedError } from '../api';
@@ -127,6 +128,8 @@ export function LoadView() {
     setD({ ...drafts.load(), ...it.data });
     if (thenRun) setStartWhenReady(true);
   };
+  // the Collections explorer / search open a saved load test
+  useIntent('load', (p) => p?.savedId && void openSaved(p.savedId));
   const saveLoad = async (asNew = false, folder?: string) => {
     if (current && !asNew) {
       await saved.put({ ...current, data: d });
@@ -221,8 +224,9 @@ export function LoadView() {
   }, [startWhenReady, d]);
   const collection = collections.find((c) => c.id === (d.collectionId || collections[0]?.id));
   const s = snap;
+  const explorerOpen = useApp((s) => s.explorerOpen);
   return (
-    <Split id="load-sidebar" sidebar initial={18} min={12}>
+    <Split id="load-sidebar" sidebar collapsed={explorerOpen} initial={18} min={12}>
       <SidebarShell
         id="load"
         panes={[
