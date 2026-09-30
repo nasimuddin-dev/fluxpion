@@ -41,7 +41,10 @@
             "method": "POST",
             "url": "{{httpbin}}/post",
             "headers": [{ "key": "Content-Type", "value": "application/json", "enabled": true }],
-            "body": { "type": "json", "content": "{\n  \"name\": \"Biscuit\",\n  \"species\": \"dog\",\n  \"sentBy\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\",\n  \"at\": \"{{$isoTimestamp}}\"\n}" }
+            "body": {
+              "type": "json",
+              "content": "{\n  \"name\": \"Biscuit\",\n  \"species\": \"dog\",\n  \"sentBy\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\",\n  \"at\": \"{{$isoTimestamp}}\"\n}"
+            }
           },
           "assertions": [
             { "type": "status", "expected": 200 },
@@ -100,10 +103,7 @@
           "id": "hb-delay",
           "name": "Slow response (1 s) with a time limit",
           "request": { "method": "GET", "url": "{{httpbin}}/delay/1" },
-          "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "latency", "max": 8000 }
-          ],
+          "assertions": [{ "type": "status", "expected": 200 }, { "type": "latency", "max": 8000 }],
           "testScript": "pm.test('took at least a second', () => pm.expect(pm.response.responseTime).to.be.above(900));"
         },
         {
@@ -125,7 +125,8 @@
             { "type": "status", "expected": 200 },
             { "type": "header", "header": "content-type", "expected": "xml" },
             { "type": "contains", "expected": "slideshow" }
-          ]
+          ],
+          "testScript": "// xml2Json turns XML (SOAP too) into an object: attributes under \"$\"\nconst doc = xml2Json(pm.response.text());\npm.test('slideshow title', () => pm.expect(doc.slideshow.$.title).to.equal('Sample Slide Show'));\npm.test('two slides', () => pm.expect(doc.slideshow.slide).to.have.lengthOf(2));"
         },
         {
           "kind": "http",

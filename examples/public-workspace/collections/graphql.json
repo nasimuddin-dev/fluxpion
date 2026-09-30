@@ -26,7 +26,8 @@
             { "type": "http-status", "expected": 200 },
             { "type": "graphql-no-errors" },
             { "type": "equals", "path": "$.data.country.capital", "expected": "Tokyo" }
-          ]
+          ],
+          "testScript": "const c = pm.response.json().data.country;\npm.test('speaks Japanese', () => pm.expect(c.languages.map((l) => l.name)).to.include('Japanese'));\npm.environment.set('currency', c.currency);"
         },
         {
           "kind": "graphql",
