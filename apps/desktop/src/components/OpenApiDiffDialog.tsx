@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, FileUp, GitCompare } from 'lucide-react';
+import { CircleAlert, CircleCheck, FileUp, GitCompare, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { useApp } from '../store';
@@ -109,8 +109,22 @@ export function OpenApiDiffDialog({ onClose }: { onClose(): void }) {
         <SidePicker label="New version" specs={specs} value={after} onChange={setAfter} />
         {result && (
           <div className="flex flex-col gap-2 max-h-[46vh] overflow-auto">
-            <div className="text-sm text-muted">
+            <div className="text-sm text-muted flex items-center gap-2">
               {result.operations.old} → {result.operations.new} operations ({result.operations.added} added, {result.operations.removed} removed)
+              {!!(result.breaking.length + result.nonBreaking.length) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  icon={<Sparkles size={12} />}
+                  onClick={() => {
+                    useApp.getState().set({ assistant: { task: 'explain-api-changes', title: 'Impact of the API changes', context: { breaking: result.breaking.slice(0, 80), other: result.nonBreaking.slice(0, 80), operations: result.operations } } });
+                    onClose();
+                  }}
+                >
+                  Explain with AI
+                </Button>
+              )}
             </div>
             {result.breaking.length ? (
               <div>

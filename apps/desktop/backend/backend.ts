@@ -974,6 +974,12 @@ export class Backend {
         'Turn the description into one HTTP request. Output only a JSON object: {"name": short name, "method": HTTP method, "url": full URL, "headers": [{"key": ..., "value": ...}], "body": JSON value or string or null}. Use {{variable}} references for values available in context.variables (for example {{baseUrl}} for the host when the description does not name one). Never invent secrets: use {{variables}} for tokens and keys.',
       'generate-pm-tests':
         'Write a Postman test script for this response using pm.test and pm.expect (chai style, e.g. pm.response.to.have.status(200), pm.expect(json.id).to.be.a("number")). Check the status, important fields and their types, and response time. Output only JavaScript, no explanations.',
+      'explain-api-changes':
+        'These are the changes between two versions of an OpenAPI document. Explain which clients break and how, in order of impact, and what each client team must change. Suggest how the API could stay backwards compatible (e.g. keep the old field, make the new parameter optional, version the endpoint). Be concise; use short headings.',
+      'fix-security':
+        'These are security findings in an API collection (no secret values are included). For each kind of finding, explain the risk in one sentence and the exact fix in TestPion (secret variables, headers instead of query parameters, https, TLS settings). Be concise.',
+      'analyze-load':
+        'Analyse these load test results: throughput, latency percentiles, errors and per-request numbers. Point out the bottleneck requests, whether errors grow with load, and what to investigate or tune next. Be specific and concise.',
       free: 'Answer the developer question about their API/protocol/AI testing work.',
     };
     // request generation may use the names (never the values) of the variables in scope

@@ -1,4 +1,4 @@
-import { AlertTriangle, Gauge, Play, Square } from 'lucide-react';
+import { AlertTriangle, Gauge, Play, Sparkles, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, persisted, useApp } from '../store';
@@ -300,6 +300,20 @@ export function LoadView() {
               <span className="text-sm text-muted">
                 {s.elapsedSec}s elapsed · {s.activeVUs} active VUs
               </span>
+              {s.done && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  icon={<Sparkles size={12} />}
+                  onClick={() => {
+                    const { series, ...summary } = s;
+                    useApp.getState().set({ assistant: { task: 'analyze-load', title: 'Load test analysis', context: { config: { virtualUsers: d.vus, durationSec: d.duration, rampUpSec: d.rampUp, target: d.kind }, results: summary, lastSeconds: series.slice(-30) } } });
+                  }}
+                >
+                  Analyze with AI
+                </Button>
+              )}
             </div>
             <MetricGrid>
               <Metric label="Requests" value={s.requests.toLocaleString()} />

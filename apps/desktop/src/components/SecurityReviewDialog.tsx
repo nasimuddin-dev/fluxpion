@@ -1,9 +1,9 @@
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { call } from '../api';
 import { useApp } from '../store';
 import { plural } from '../lib/format';
-import { Badge, Empty, Modal } from './ui';
+import { Badge, Button, Empty, Modal } from './ui';
 
 interface SecurityFinding {
   severity: 'high' | 'medium' | 'low';
@@ -31,6 +31,18 @@ export function SecurityReviewDialog({ collectionId, name, onClose }: { collecti
           <>
             <div className="text-sm flex items-center gap-2">
               <ShieldAlert size={15} className="text-bad" /> {plural(findings.length, 'finding')}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto"
+                icon={<Sparkles size={12} />}
+                onClick={() => {
+                  useApp.getState().set({ assistant: { task: 'fix-security', title: `Security fixes · ${name}`, context: { collection: name, findings: findings.slice(0, 60).map(({ severity, where, message }) => ({ severity, where, message })) } } });
+                  onClose();
+                }}
+              >
+                How to fix (AI)
+              </Button>
             </div>
             <ul className="flex flex-col max-h-[50vh] overflow-auto">
               {findings.map((f, i) => (

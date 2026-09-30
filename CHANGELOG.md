@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Ask the AI assistant about the new results:** **Explain with AI** in Compare OpenAPI versions (which clients break and how to stay compatible), **How to fix (AI)** in a collection's security review, and **Analyze with AI** after a load test. Secret values are never sent.
 - **API security checks.** **Security** in a collection's toolbar (and `testpion lint "My API" --fail-on high`, MCP `security_review`) finds secrets typed into requests instead of secret variables, secrets in query strings, plain http to other hosts, credentials over http and turned-off TLS checks. The new **Security headers** check tests responses for HSTS, `nosniff`, clickjacking protection, CORS with credentials and exposed server versions.
 - **Partial mocking.** A mock server can forward requests that match no example to the real API (**Forward the rest to** in the Mock tab, `testpion mock --fallback <url>`), so only the endpoints you saved examples for are mocked.
 - **Record traffic into a collection.** **Record traffic** (Collections view, command palette, or `testpion record https://api.example.com -w my-workspace`) runs a small reverse proxy on localhost: point an app at it, use the app, and every request and response is listed. Save them as a collection, with responses as examples and tokens replaced by variables, then replay, test or mock them. Browser apps work (CORS, redirects and cookies are handled).
