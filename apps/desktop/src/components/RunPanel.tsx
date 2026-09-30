@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
 import type { RunSummary, TestResult, Trace } from '../types';
-import { formatCost, formatMs } from '../lib/format';
+import { formatCost, formatMs, plural } from '../lib/format';
 import { CheckList, ErrorPanel, StatusIcon } from './Results';
 import { TraceView } from './TraceView';
 import { finishSave, viewContent, type SaveResult } from '../lib/files';
@@ -313,7 +313,7 @@ function BaselineModal({ runId, onClose }: { runId: string; onClose(): void }) {
             <Select value={compareWith} onChange={(e) => setCompareWith(e.target.value)}>
               {baselines.map((b) => (
                 <option key={b.name} value={b.name}>
-                  {b.name} ({b.tests} tests)
+                  {b.name} ({plural(b.tests, 'test')})
                 </option>
               ))}
             </Select>

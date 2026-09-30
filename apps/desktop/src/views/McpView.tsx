@@ -4,7 +4,7 @@ import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, McpServerConfig } from '../types';
-import { formatMs, uid } from '../lib/format';
+import { formatMs, uid, plural } from '../lib/format';
 import { AssertionEditor } from '../components/AssertionEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { JsonSchemaForm } from '../components/JsonSchemaForm';
@@ -122,7 +122,7 @@ export function McpView() {
   const saveMock = async (id: string) => {
     try {
       const r = await call<{ path: string; tools: number; calls: number; resources: number }>('mcp.mock.save', { serverId: id, addServer: true });
-      useApp.getState().toast(`Saved ${r.path}: ${r.tools} tools, ${r.calls} recorded calls. Added as a mock server.`, 'success');
+      useApp.getState().toast(`Saved ${r.path}: ${plural(r.tools, 'tool')}, ${plural(r.calls, 'recorded call')}. Added as a mock server.`, 'success');
       await load();
     } catch (e) {
       useApp.getState().toast(asError(e).message, 'error');
@@ -781,7 +781,7 @@ function McpTrace({ events, error }: { events: McpEvent[]; error?: NormalizedErr
         {error && <ErrorPanel error={error} />}
         <div className="flex items-center gap-2 px-2 h-9 border-b border-line text-xs">
           <Input className="h-6 min-h-6 w-48 text-xs" placeholder="Filter method (e.g. tools/call)" value={filter} onChange={(e) => setFilter(e.target.value)} />
-          <span className="text-muted">{shown.length} events</span>
+          <span className="text-muted">{plural(shown.length, 'event')}</span>
         </div>
         <div className="grid grid-cols-[70px_22px_1fr_80px_70px] text-[0.72rem] text-muted px-2 py-1 border-b border-line">
           <span>+time</span>
@@ -825,7 +825,7 @@ function PromptMessages({ out }: { out: { messages: unknown[]; description?: str
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm">
-        <span className="text-muted">{messages.length} messages</span>
+        <span className="text-muted">{plural(messages.length, 'message')}</span>
         {out.description && <span className="text-muted truncate">· {out.description}</span>}
         <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setJson(!json)}>
           {json ? 'Messages' : 'JSON'}

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { asError, call } from '../api';
 import { useApp } from '../store';
 import type { Collection, CollectionNode } from '../types';
-import { timeAgo } from '../lib/format';
+import { timeAgo, plural } from '../lib/format';
 import { RunPanel } from './RunPanel';
 import { hasNativeDialogs, pickTextFile } from '../lib/files';
 import { Badge, Button, cx, Empty, Field, Input, Modal, Select, Split, Toggle } from './ui';
@@ -182,7 +182,7 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
                 <button className="truncate text-accent hover:underline text-left" onClick={() => setDataOpen(true)} title="Preview">
                   {data.name}
                 </button>
-                <Badge>{data.count} rows</Badge>
+                <Badge>{plural(data.count, 'row')}</Badge>
                 <button aria-label="Remove data file" className="ml-auto text-muted hover:text-fg" onClick={() => setData(undefined)}>
                   <X size={14} />
                 </button>
@@ -271,7 +271,7 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
     </Split>
 
       {dataOpen && data && (
-        <Modal title={`${data.name} — ${data.count} rows`} onClose={() => setDataOpen(false)} width={760}>
+        <Modal title={`${data.name} — ${plural(data.count, 'row')}`} onClose={() => setDataOpen(false)} width={760}>
           <div className="overflow-auto max-h-[60vh]">
             <table className="text-xs w-full">
               <thead>

@@ -13,6 +13,7 @@ import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Split, Tabs, VirtualList } from '../components/ui';
 import { pickTextFile } from '../lib/files';
 import { useSticky } from '../lib/sticky';
+import { plural } from '../lib/format';
 
 interface ProtoFile {
   name: string;
@@ -430,7 +431,7 @@ export function GrpcView() {
                         <span className="text-muted">
                           Time <span className="text-fg tabular-nums">{Math.round(result.durationMs)} ms</span>
                         </span>
-                        {result.messages && <span className="text-muted">{result.messages.length} messages</span>}
+                        {result.messages && <span className="text-muted">{plural(result.messages.length, 'message')}</span>}
                         {result.details && <span className="text-muted truncate">{result.details}</span>}
                       </>
                     )

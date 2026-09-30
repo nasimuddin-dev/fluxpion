@@ -3,6 +3,7 @@ import { Radio, Square } from 'lucide-react';
 import type { SseEvent } from '../types';
 import { Badge, Button, cx, Empty, Input, VirtualList } from './ui';
 import { JsonTree } from './JsonView';
+import { plural } from '../lib/format';
 
 const ROW = 30;
 
@@ -39,7 +40,7 @@ export function SseEvents({ events, live, onStop, stopped, dropped }: { events: 
         ) : (
           <span className="text-muted">Event stream</span>
         )}
-        <Badge tone="accent">{events.length} events</Badge>
+        <Badge tone="accent">{plural(events.length, 'event')}</Badge>
         {types > 1 && <span className="text-xs text-muted">{types} types</span>}
         {stopped && <Badge tone="warn" title="You stopped the stream; these are the events received until then.">stopped</Badge>}
         {!!dropped && <Badge tone="warn" title="Only the first 10,000 events are kept.">{dropped} not kept</Badge>}

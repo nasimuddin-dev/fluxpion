@@ -82,3 +82,8 @@ export function download(name: string, content: string, type = 'application/json
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** "1 request", "3 requests" (irregular plurals can be passed: plural(n, 'entry', 'entries')). */
+export function plural(n: number, word: string, many = `${word}s`): string {
+  return `${n.toLocaleString()} ${n === 1 ? word : many}`;
+}

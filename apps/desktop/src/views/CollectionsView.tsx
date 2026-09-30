@@ -4,7 +4,7 @@ import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { Collection, CollectionNode } from '../types';
-import { download, timeAgo, uid } from '../lib/format';
+import { download, timeAgo, uid, plural } from '../lib/format';
 import { AuthEditor } from '../components/AuthEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { CollectionRunner } from '../components/CollectionRunner';
@@ -104,7 +104,7 @@ export function CollectionsView() {
             <button key={c.id} onClick={() => setSel(c.id)} className={cx('w-full text-left px-3 py-2 border-b border-line/60', sel === c.id ? 'bg-accent/10' : 'hover:bg-hover')}>
               <div className={cx('text-sm font-medium', c.problem && 'text-bad')}>{c.name}</div>
               <div className="text-xs text-muted">
-                {c.problem ? c.problem : `${count(c.items)} requests · v${c.version} · ${c.updatedAt ? timeAgo(c.updatedAt) : ''}`}
+                {c.problem ? c.problem : `${plural(count(c.items), 'request')} · v${c.version} · ${c.updatedAt ? timeAgo(c.updatedAt) : ''}`}
               </div>
             </button>
           ))}

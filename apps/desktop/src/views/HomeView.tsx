@@ -4,7 +4,7 @@ import { call, modKey } from '../api';
 import { promptText, useApp } from '../store';
 import { runMenuCommand } from '../menu-commands';
 import type { Collection, CollectionNode, HttpRequestSpec } from '../types';
-import { timeAgo, uid } from '../lib/format';
+import { timeAgo, uid, plural } from '../lib/format';
 import { Badge, cx, Empty, Kbd, statusTone } from '../components/ui';
 
 interface HistoryItem {
@@ -175,7 +175,7 @@ export function HomeView() {
                 <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-hover group">
                   <button className="flex-1 text-left truncate" onClick={() => open('collections', { collectionId: c.id })}>
                     {c.name}
-                    <span className="text-xs text-muted ml-2">{count(c.items)} requests</span>
+                    <span className="text-xs text-muted ml-2">{plural(count(c.items), 'request')}</span>
                   </button>
                   <button className="opacity-0 group-hover:opacity-100 text-muted hover:text-accent" title="Run collection" aria-label={`Run ${c.name}`} onClick={() => open('collections', { collectionId: c.id, run: true })}>
                     <Play size={13} />
