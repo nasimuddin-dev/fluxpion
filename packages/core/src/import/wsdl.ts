@@ -18,7 +18,43 @@ const ENVELOPE = { 11: 'http://schemas.xmlsoap.org/soap/envelope/', 12: 'http://
 
 export function isWsdl(text: string): boolean {
   const head = text.slice(0, 4000);
+  if (/^\s*<testpion-wsdl-bundle>/.test(head)) return true;
   return /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<([\w-]+:)?definitions[\s>]/.test(head) && /schemas\.xmlsoap\.org\/wsdl\//.test(head);
+}
+
+const IMPORT_RE = /<(?:[\w-]+:)?(?:import|include)\b[^>]*?\b(?:schemaLocation|location)\s*=\s*["']([^"']+)["']/g;
+const stripDecl = (t: string) => t.replace(/^﻿?\s*<\?xml[^>]*\?>\s*/, '').replace(/<!DOCTYPE[^>]*>/gi, '');
+
+/**
+ * A WSDL together with the documents it imports (xsd:import / xsd:include schemaLocation and
+ * wsdl:import location, followed recursively, at most `limit` files), as one text that importWsdl
+ * reads. `load` fetches or reads a location (already resolved against the importing document) and
+ * may refuse it (e.g. another origin); refused or failing imports are skipped.
+ */
+export async function bundleWsdl(text: string, base: string, load: (location: string) => Promise<string | undefined>, limit = 30): Promise<string> {
+  const isUrl = /^https?:\/\//i.test(base);
+  const resolveLoc = async (from: string, loc: string) => {
+    if (isUrl) return new URL(loc, from).toString();
+    const { dirname, resolve } = await import('node:path');
+    return resolve(dirname(from), loc);
+  };
+  const seen = new Set([base]);
+  const docs: string[] = [];
+  const queue: Array<{ text: string; base: string }> = [{ text, base }];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const m of cur.text.matchAll(IMPORT_RE)) {
+      if (seen.size > limit) break;
+      const loc = await resolveLoc(cur.base, m[1]!);
+      if (seen.has(loc)) continue;
+      seen.add(loc);
+      const t = await load(loc).catch(() => undefined);
+      if (!t) continue;
+      docs.push(stripDecl(t));
+      queue.push({ text: t, base: loc });
+    }
+  }
+  return docs.length ? `<testpion-wsdl-bundle>\n${[stripDecl(text), ...docs].join('\n')}\n</testpion-wsdl-bundle>` : text;
 }
 
 const local = (q: unknown) => String(q ?? '').split(':').pop()!;
@@ -51,7 +87,11 @@ export function importWsdl(text: string): { collection: Collection } {
     return t ? String(t).trim() : undefined;
   };
 
-  const root = kids(doc, 'definitions')[0];
+  // a bundle (bundleWsdl): the WSDL first, then the WSDLs and schemas it imports
+  const bundle = kids(doc, 'testpion-wsdl-bundle')[0];
+  const defs = bundle ? kids(bundle, 'definitions') : kids(doc, 'definitions');
+  const all = (name: string) => defs.flatMap((d) => kids(d, name));
+  const root = defs[0];
   if (!root) {
     if (kids(doc, 'description')[0]) throw new ApsError('ValidationError', 'WSDL 2.0 is not supported yet', { suggestions: ['Most services also publish a WSDL 1.1 document (often at ?wsdl).'] });
     throw new ApsError('ValidationError', 'Not a WSDL document (no <definitions>)');
@@ -59,7 +99,7 @@ export function importWsdl(text: string): { collection: Collection } {
   const targetNs = String(root['@targetNamespace'] ?? '');
 
   // XML Schema: elements, complex and simple types by name (with their schema, for the namespace)
-  const schemas = kids(kids(root, 'types')[0], 'schema');
+  const schemas = [...all('types').flatMap((t) => kids(t, 'schema')), ...(bundle ? kids(bundle, 'schema') : [])];
   const elements = new Map<string, { node: X; schema: X }>();
   const complexTypes = new Map<string, { node: X; schema: X }>();
   const simpleTypes = new Map<string, X>();
@@ -135,16 +175,16 @@ export function importWsdl(text: string): { collection: Collection } {
   };
 
   const messages = new Map<string, X[]>();
-  for (const m of kids(root, 'message')) messages.set(String(m['@name']), kids(m, 'part'));
+  for (const m of all('message')) messages.set(String(m['@name']), kids(m, 'part'));
   const portTypes = new Map<string, Map<string, X>>();
-  for (const pt of kids(root, 'portType')) portTypes.set(String(pt['@name']), new Map(kids(pt, 'operation').map((o) => [String(o['@name']), o])));
+  for (const pt of all('portType')) portTypes.set(String(pt['@name']), new Map(kids(pt, 'operation').map((o) => [String(o['@name']), o])));
 
   const items: CollectionFolder[] = [];
   const variables: KeyValue[] = [];
   const baseUrls = new Map<string, string>();
-  for (const service of kids(root, 'service')) {
+  for (const service of all('service')) {
     for (const port of kids(service, 'port')) {
-      const binding = kids(root, 'binding').find((b) => b['@name'] === local(port['@binding']));
+      const binding = all('binding').find((b) => b['@name'] === local(port['@binding']));
       if (!binding) continue;
       const soapBinding = kids(binding, 'binding', SOAP11)[0] ?? kids(binding, 'binding', SOAP12)[0];
       if (!soapBinding) continue; // an HTTP binding: not SOAP
@@ -215,8 +255,8 @@ export function importWsdl(text: string): { collection: Collection } {
   }
   if (!items.length) throw new ApsError('ValidationError', 'The WSDL has no SOAP operations', { suggestions: ['Only SOAP 1.1 and 1.2 bindings are imported (not HTTP GET/POST bindings).'] });
   // one port: no need for the folder level
-  const name = String(root['@name'] ?? kids(root, 'service')[0]?.['@name'] ?? 'SOAP service');
-  const description = docOf(root) ?? docOf(kids(root, 'service')[0]);
+  const name = String(root['@name'] ?? all('service')[0]?.['@name'] ?? 'SOAP service');
+  const description = docOf(root) ?? docOf(all('service')[0]);
   return {
     collection: {
       schemaVersion: SCHEMA_VERSION,

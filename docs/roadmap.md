@@ -11,7 +11,7 @@ Plans change with feedback. Vote or comment on [GitHub issues](https://github.co
 
 - **Signed installers:** Windows Authenticode, and macOS Developer ID with notarization (macOS in-place updates need it).
 - **Published CLI package** on npm, so `npx testpion` works without cloning the repository.
-- **WSDL 2.0** and following `xsd:import` in WSDL imports.
+- **WSDL 2.0** imports.
 
 ## Later
 

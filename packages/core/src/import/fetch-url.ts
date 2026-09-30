@@ -1,3 +1,5 @@
+import { bundleWsdl, isWsdl } from './wsdl.js';
+import { assertUrlAllowed } from '../net/policy.js';
 import { ApsError } from '../errors.js';
 
 /** Largest document fetched for an import. */
@@ -23,7 +25,7 @@ export function rawImportUrl(link: string): string {
  * GitHub file …) for import. http(s) only, at most 20 MB, through the app's proxy settings; the text
  * then goes through the normal importers. Returns the text and a file name taken from the URL.
  */
-export async function fetchImportText(link: string, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<{ text: string; url: string; fileName?: string }> {
+export async function fetchImportText(link: string, opts: { signal?: AbortSignal; timeoutMs?: number; noWsdlImports?: boolean } = {}): Promise<{ text: string; url: string; fileName?: string }> {
   let url: string;
   try {
     url = rawImportUrl(link);
@@ -67,7 +69,18 @@ export async function fetchImportText(link: string, opts: { signal?: AbortSignal
   if (/^\s*<(!doctype html|html)/i.test(text))
     throw new ApsError('ValidationError', 'The link opens a web page, not a file', { suggestions: ['Use the link of the raw file (for example the "Raw" button on GitHub).'] });
   const last = decodeURIComponent(new URL(res.url || url).pathname.split('/').pop() ?? '');
-  return { text: unwrapPostmanApi(text), url: res.url || url, fileName: last || undefined };
+  const finalUrl = res.url || url;
+  // a WSDL's imported schemas (…?xsd=1) and WSDLs: fetched from the same site only, like the WSDL itself
+  if (!opts.noWsdlImports && isWsdl(text)) {
+    const origin = new URL(finalUrl).origin;
+    const bundled = await bundleWsdl(text, finalUrl, async (loc) => {
+      if (new URL(loc).origin !== origin) return undefined;
+      await assertUrlAllowed(loc);
+      return (await fetchImportText(loc, { ...opts, noWsdlImports: true })).text;
+    });
+    return { text: bundled, url: finalUrl, fileName: last || undefined };
+  }
+  return { text: unwrapPostmanApi(text), url: finalUrl, fileName: last || undefined };
 }
 
 /** Postman's API (a collection's "share via API" link) wraps the document: {"collection": {...}} / {"environment": {...}}. */

@@ -28,6 +28,8 @@ import {
   type CollectionNode,
   fetchImportText,
   readBrunoFolder,
+  bundleWsdl,
+  isWsdl,
   importIntoWorkspace,
   diffOpenApi,
   securityLint,
@@ -224,7 +226,9 @@ export function registerDataCommands(program: Command): void {
         const link = /^https?:\/\//i.test(file) ? await fetchImportText(file) : undefined;
         // a folder is a Bruno collection (bruno.json and .bru files)
         const folder = !link && file !== '-' && existsSync(file) && statSync(file).isDirectory();
-        const text = link ? link.text : file === '-' ? readFileSync(0, 'utf8') : folder ? readBrunoFolder(file) : readFileSync(file, 'utf8');
+        let text = link ? link.text : file === '-' ? readFileSync(0, 'utf8') : folder ? readBrunoFolder(file) : readFileSync(file, 'utf8');
+        // a local WSDL's schemas and WSDLs next to it (schemaLocation="types.xsd")
+        if (!link && !folder && file !== '-' && isWsdl(text)) text = await bundleWsdl(text, resolve(file), async (loc) => (existsSync(loc) ? readFileSync(loc, 'utf8') : undefined));
         const source = link?.fileName ?? file;
         if (isRequestSnippet(text)) {
           // secrets in the command (tokens, keys, cookies) become {{variables}}; they are never written to disk
