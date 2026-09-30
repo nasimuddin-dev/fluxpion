@@ -1,4 +1,4 @@
-import { BookOpen, Bot, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
+import { AlarmClock, BookOpen, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { call, modKey } from '../api';
 import { promptText, useApp } from '../store';
@@ -64,17 +64,37 @@ const count = (nodes: CollectionNode[]): number => nodes.reduce((a, n) => a + (n
 /** Id of the examples workspace that ships with the app (examples/public-workspace). */
 const EXAMPLES_ID = 'ws-testpion-examples';
 
+interface HomeMonitor {
+  id: string;
+  name: string;
+  enabled: boolean;
+  lastResult?: { status: 'passed' | 'failed' | 'error'; passed: number; failed: number; errors: number; total: number; startedAt: string };
+}
+interface HomeRun {
+  id: string;
+  name: string;
+  startedAt: string;
+  total: number;
+  passed: number;
+  failed: number;
+  errors: number;
+}
+
 export function HomeView() {
   const ws = useApp((s) => s.workspace);
   const env = useApp((s) => s.environment);
   const [cols, setCols] = useState<Collection[]>([]);
   const [recent, setRecent] = useState<HistoryItem[]>([]);
+  const [monitors, setMonitors] = useState<HomeMonitor[]>([]);
+  const [runs, setRuns] = useState<HomeRun[]>([]);
   const open = useApp((s) => s.openIntent);
   const setView = useApp((s) => s.setView);
 
   const load = () => {
     void call<Collection[]>('col.list').then(setCols);
     void call<{ items: HistoryItem[] }>('history.list', { limit: 8 }).then((r) => setRecent(r.items));
+    void call<HomeMonitor[]>('monitor.list').then(setMonitors, () => setMonitors([]));
+    void call<{ items: HomeRun[] }>('runs.list', { limit: 6 }).then((r) => setRuns(r.items), () => setRuns([]));
   };
   useEffect(() => {
     load();
@@ -181,6 +201,41 @@ export function HomeView() {
             )}
           </Card>
         </div>
+
+        {(monitors.length > 0 || runs.length > 0) && (
+          <div className="grid lg:grid-cols-2 gap-4">
+            {monitors.length > 0 && (
+              <Card title="Monitors" icon={<AlarmClock size={15} />} action={<button className="text-xs text-accent hover:underline" onClick={() => setView('monitors')}>All monitors</button>}>
+                {monitors.slice(0, 6).map((m) => {
+                  const r = m.lastResult;
+                  return (
+                    <button key={m.id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left hover:bg-hover" onClick={() => setView('monitors')}>
+                      <span className={cx('w-2 h-2 rounded-full shrink-0', !r ? 'bg-muted/50' : r.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
+                      <span className="truncate flex-1">{m.name}</span>
+                      {!m.enabled ? <Badge>paused</Badge> : r ? <Badge tone={r.status === 'passed' ? 'ok' : 'bad'}>{r.status === 'passed' ? `${r.passed}/${r.total}` : r.status === 'failed' ? `${r.failed + r.errors} failed` : 'error'}</Badge> : <span className="text-xs text-muted">not run yet</span>}
+                      <span className="text-xs text-muted shrink-0 w-16 text-right">{r ? timeAgo(r.startedAt) : ''}</span>
+                    </button>
+                  );
+                })}
+              </Card>
+            )}
+            {runs.length > 0 && (
+              <Card title="Recent test runs" icon={<ShieldCheck size={15} />} action={<button className="text-xs text-accent hover:underline" onClick={() => setView('tests')}>Tests</button>}>
+                {runs.map((r) => {
+                  const bad = r.failed + r.errors;
+                  return (
+                    <button key={r.id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left hover:bg-hover" onClick={() => open('tests', { runId: r.id })}>
+                      <span className={cx('w-2 h-2 rounded-full shrink-0', bad ? 'bg-bad' : 'bg-ok')} />
+                      <span className="truncate flex-1">{r.name}</span>
+                      <Badge tone={bad ? 'bad' : 'ok'}>{bad ? `${bad} failed` : `${r.passed}/${r.total} passed`}</Badge>
+                      <span className="text-xs text-muted shrink-0 w-16 text-right">{timeAgo(r.startedAt)}</span>
+                    </button>
+                  );
+                })}
+              </Card>
+            )}
+          </div>
+        )}
 
         <div className="text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">
           <span>

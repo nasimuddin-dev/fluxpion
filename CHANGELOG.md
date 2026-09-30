@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Home shows what's working.** When a workspace has monitors or test runs, Home adds a **Monitors** card (last result of each, paused ones marked) and a **Recent test runs** card (passed / failed, opens the run).
 - **Compare a request across environments.** A new button next to **Send** sends the request with two environments and shows what differs: status, time, headers and every changed JSON field. From the terminal, `testpion env diff <a> <b> --request <name>`; for AI agents, `compare_request_across_environments`.
 - **Checks from the response.** Click a key in a JSON response to copy its JSONPath or add a check on it to the request's Tests: equals its current value, exists, has its type, or (for arrays) its length / not empty. Works in the REST and GraphQL views.
 - **Recently deleted.** Deleted collections and environments stay restorable for 30 days (a git-ignored `trash/` folder in the workspace): **Recently deleted** in the Collections and Envs lists, or `testpion trash list|restore|empty`. A restored environment keeps its secret values; a restored item never replaces one with the same name.
