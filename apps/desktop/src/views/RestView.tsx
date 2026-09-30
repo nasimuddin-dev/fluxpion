@@ -9,6 +9,7 @@ import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { SidebarShell } from '../components/SidebarShell';
+import { useEditorTabs } from '../components/EditorTabs';
 import { uid } from '../lib/format';
 
 /** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
@@ -515,6 +516,24 @@ export function RestView() {
         })
     : undefined;
 
+  // REST's tabs are shown in the shared tab strip above every request editor (with the other editors' tabs)
+  useEditorTabs(
+    'rest',
+    ordered.map((t) => ({
+      key: `rest:${t.id}`,
+      view: 'rest' as const,
+      title: t.name,
+      badge: t.request.method,
+      badgeClass: `method-${t.request.method}`,
+      dirty: t.dirty,
+      pinned: t.pinned,
+      onSelect: () => setActive(t.id),
+      onClose: () => void closeTab(t.id),
+      onRename: () => void renameTab(t),
+      menu: () => tabMenu(t),
+    })),
+    noTabs ? undefined : `rest:${tab.id}`,
+  );
   return (
     <>
     <Split id="rest-sidebar" sidebar collapsed initial={20} min={12}>
@@ -620,53 +639,6 @@ export function RestView() {
         ]}
       />
       <div className="h-full flex flex-col min-w-0">
-        <div ref={stripRef} className="flex items-end h-9 border-b border-line bg-panel/40 overflow-hidden shrink-0" role="tablist">
-          {shown.map((t) => (
-            <RequestTabItem key={t.id} tab={t} active={!noTabs && t.id === tab.id} menu={tabMenu(t)} onSelect={() => setActive(t.id)} onClose={() => closeTab(t.id)} onRename={() => void renameTab(t)} />
-          ))}
-          <IconButton label="New request tab" className="mx-1 mb-0.5 shrink-0" onClick={newTab}>
-            <Plus size={14} />
-          </IconButton>
-          <Menu
-            align="end"
-            width={230}
-            items={[
-              { label: 'New request tab', icon: <Plus size={13} />, shortcut: 'Ctrl+T', onSelect: newTab },
-              { label: 'Close tab', icon: <X size={13} />, shortcut: 'Ctrl+W', separator: true, disabled: noTabs || !!tabs.find((x) => x.id === active)?.pinned, onSelect: () => runTabCommand('close') },
-              { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: ordered.filter((x) => !x.pinned && x.id !== active).length === 0, onSelect: () => runTabCommand('closeOthers') },
-              { label: 'Close all tabs', icon: <ListX size={13} />, shortcut: 'Ctrl+Shift+W', disabled: !ordered.some((x) => !x.pinned), onSelect: () => runTabCommand('closeAll') },
-            ]}
-            trigger={
-              <button aria-label="Tab actions" title="Tab actions: close tab, close other tabs, close all tabs" className={cx('ml-auto mb-1 shrink-0 grid place-items-center h-7 w-7 rounded-md text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover', hidden.length ? 'mr-1' : 'mr-1.5')}>
-                <MoreHorizontal size={15} />
-              </button>
-            }
-          />
-          {hidden.length > 0 && (
-            <Menu
-              align="end"
-              width={300}
-              items={[
-                ...hidden.map((t) => ({
-                  label: `${t.name}${t.dirty ? ' •' : ''}`,
-                  icon: <span className={cx('mono method-badge text-[0.6rem] font-bold w-11', `method-${t.request.method}`)}>{t.request.method.slice(0, 6)}</span>,
-                  onSelect: () => setActive(t.id),
-                })),
-                { label: `Close ${hidden.length} hidden tab${hidden.length === 1 ? '' : 's'}`, icon: <ListX size={13} />, separator: true, onSelect: () => closeTabs(hidden.map((t) => t.id)) },
-              ]}
-              trigger={
-                <button
-                  aria-label={`${hidden.length} more tabs`}
-                  title={`${hidden.length} more tab${hidden.length === 1 ? '' : 's'}`}
-                  className="mr-1.5 mb-1 shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted border border-line bg-bg hover:text-fg hover:bg-hover data-[state=open]:text-fg data-[state=open]:bg-hover"
-                >
-                  +{hidden.length}
-                  <ChevronDown size={13} />
-                </button>
-              }
-            />
-          )}
-        </div>
         {noTabs ? (
           <Empty
             icon={<Send size={28} />}

@@ -4,6 +4,7 @@ import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
+import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useIntent } from '../hooks';
@@ -212,6 +213,8 @@ export function GrpcView() {
   const statusTone = result ? (result.code === 0 ? 'ok' : result.streamStopped ? 'warn' : 'bad') : 'default';
   const example = useMemo(() => (current ? JSON.stringify(current.example) : ''), [current]);
 
+  // this editor's tab in the shared tab strip
+  useSingleEditorTab('grpc', { title: currentSaved?.name ?? (d.method ? d.method.split('/').pop()! : 'gRPC request'), badge: 'gRPC', badgeClass: 'text-[#2ea99e]' });
   return (
     <Split id="grpc-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell

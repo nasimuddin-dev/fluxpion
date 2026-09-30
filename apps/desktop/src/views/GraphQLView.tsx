@@ -15,6 +15,7 @@ import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/C
 import { SaveModal } from './rest/dialogs';
 import { useSticky } from '../lib/sticky';
 import { SidebarShell } from '../components/SidebarShell';
+import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
@@ -320,6 +321,8 @@ export function GraphQLView() {
     }
   };
 
+  // this editor's tab in the shared tab strip
+  useSingleEditorTab('graphql', { title: d.name || 'GraphQL query', badge: 'GQL', badgeClass: 'text-[#e535ab]' });
   return (
     <div className="h-full flex flex-col">
       {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}

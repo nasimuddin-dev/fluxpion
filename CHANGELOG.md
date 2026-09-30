@@ -7,6 +7,7 @@
   - Tests, Monitors, Load, AI Lab, Evaluations, Environments and History keep their own single sidebar.
   - The explorer's **New** menu creates every kind of request, and it highlights the open request.
   - GraphQL's schema explorer is a **Schema** toggle on the right of the editor, and its toolbar shrinks to icons on narrow windows.
+  - **One tab strip for every request type**, as in Postman. REST's tabs and a tab for each GraphQL, gRPC, WebSocket or MCP document sit side by side. Pin, rename, unsaved dot, middle-click to close and right-click menus all work. **+** opens any kind of request, and a list shows every open tab. Open tabs come back after a restart, and editors with a tab stay loaded, so live connections stay open.
 
 ## 0.10.1 — 2026-09-30
 

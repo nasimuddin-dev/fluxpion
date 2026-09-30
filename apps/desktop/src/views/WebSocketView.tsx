@@ -4,6 +4,7 @@ import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
+import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
@@ -195,6 +196,8 @@ export function WebSocketView() {
   } catch {
     parsed = undefined;
   }
+  // this editor's tab in the shared tab strip
+  useSingleEditorTab('websocket', { title: current?.name ?? (d.url || 'WebSocket'), badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]' });
   return (
     <Split id="ws-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell

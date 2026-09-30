@@ -16,6 +16,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { FolderList, type FolderListOps } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
+import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Modal, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
 
@@ -165,6 +166,8 @@ export function McpView() {
     await load();
   };
 
+  // this editor's tab in the shared tab strip (while a server is selected)
+  useSingleEditorTab('mcp', server ? { title: server.name, badge: 'MCP', badgeClass: 'text-accent' } : undefined);
   return (
     <>
     <Split id="mcp-servers" sidebar collapsed initial={20} min={14}>

@@ -7,6 +7,7 @@ import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { ViewBoundary } from './components/ViewBoundary';
 import { isRequestView } from './store';
 import { Explorer } from './components/Explorer';
+import { EditorTabStrip, useEditorTabsStore } from './components/EditorTabs';
 import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
@@ -161,6 +162,9 @@ export default function App() {
     };
   }, []);
 
+  // editors with an open tab stay mounted (their tabs, drafts and live connections), REST always
+  const openEditors = useEditorTabsStore((s) => s.openViews);
+  const mounted = useMemo(() => [...new Set<ViewId>([...visited, 'rest', ...openEditors])], [visited, openEditors]);
   useEffect(() => {
     setVisited((cached) => {
       const next = [...cached.filter((id) => id !== view), view];
@@ -291,8 +295,9 @@ export default function App() {
           </ViewBoundary>
         )}
         <main className="flex-1 min-w-0 flex flex-col">
+          {isRequestView(view) && view !== 'collections' && <EditorTabStrip />}
           <div className="flex-1 min-h-0 relative">
-            {visited.map((id) => {
+            {mounted.map((id) => {
               const V = VIEWS[id];
               return (
                 <div key={`${workspace?.id}-${id}`} className="absolute inset-0 flex flex-col" style={{ display: id === view ? 'flex' : 'none' }}>
