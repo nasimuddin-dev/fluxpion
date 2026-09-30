@@ -27,6 +27,19 @@ Everywhere you can write a value, `{{variables}}` help you:
 
 Dynamic values (`{{$uuid}}`, `{{$timestamp}}` …) and `{{$env.NAME}}` count as defined.
 
+## Find usages and rename
+
+**Usages** in an environment's toolbar (or **Find variable usages** in the command palette, Ctrl+K) shows where a variable is used and defined: `{{name}}` in URLs, parameters, headers, bodies, auth and assertions, `pm.environment.get('name')` and the like in scripts, environments, collection, folder and workspace variables, and test files. Click a request to open it.
+
+**Rename everywhere** changes all of them at once and refuses a name that's already defined. A secret variable keeps its value: it moves to the new name in the OS secret store. Open request tabs with unsaved edits keep the old name until you reload them.
+
+```bash
+testpion vars usages accessToken -w my-workspace
+testpion vars rename token accessToken -w my-workspace
+```
+
+AI agents use the MCP tools `variable_usages` and `rename_variable`.
+
 ## Built-in variables
 
 `{{$env.NAME}}` (process environment), `{{$secret.NAME}}` (secret store) and `{{workspaceDir}}`, plus **dynamic variables** that give a new value every time they're used. Their names are Postman's, so imported Postman collections send the same kind of values. Type `{{$` to pick one; the list says what each gives.

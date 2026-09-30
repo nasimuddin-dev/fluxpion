@@ -14,6 +14,7 @@ testpion run-collection <collection>   Run a collection like Postman's Collectio
 testpion mock-graphql --schema <file>   Fake data for any query against a GraphQL schema (see GraphQL mock server)
 testpion mock <collection>    Serve a collection's saved examples on localhost
 testpion mock-mcp <file>      Serve an MCP mock (stdio, or --http) for AI agents and MCP clients
+testpion vars usages|rename -w   Where a variable is used; rename it everywhere
 testpion openapi-diff <old> <new>   List breaking changes between two OpenAPI versions (--fail-on-breaking for CI)
 testpion docs <collection>    Write Markdown (or --html) documentation for a collection
 testpion export <collection>  Export a collection as Postman v2.1 (or TestPion JSON)

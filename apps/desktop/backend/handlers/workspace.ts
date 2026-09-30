@@ -11,6 +11,8 @@ import {
   WORKSPACE_FORMATS,
   exportPostmanEnvironment,
   DYNAMIC_VARIABLES,
+  variableUsages,
+  renameVariable,
   environmentToDotenv,
   type CookieInput,
   secretKeys,
@@ -226,6 +228,10 @@ export function workspaceHandlers(be: Backend): Handlers {
 
     /** The dynamic variables ({{$guid}}, {{$randomFirstName}} …) with what each one gives. */
     'vars.dynamic': () => DYNAMIC_VARIABLES,
+    /** Where a variable is used or defined (requests, scripts, environments, collection/folder/workspace variables, test files). */
+    'vars.usages': ({ name }: { name: string }) => variableUsages(be.ws, name),
+    /** Rename a variable everywhere in the workspace; secret values move with it. */
+    'vars.rename': async ({ from, to }: { from: string; to: string }) => renameVariable(be.ws, from, to, { secrets: be.secrets }),
 
     /** Export an environment in Postman's format (secret values are never included). */
     'env.export': async ({ id, format }: { id: string; format?: 'postman' | 'dotenv' }) => {

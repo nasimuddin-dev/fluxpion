@@ -94,6 +94,10 @@ interface AppState {
   ci?: CiRequest;
   /** The "Compare OpenAPI versions" dialog. */
   openapiDiff?: boolean;
+  /** The "Variable usages" dialog, with the variable to show (true: none chosen yet). */
+  variableUsages?: string | true;
+  /** Bumped when environments change outside the Environments view (e.g. a variable renamed everywhere). */
+  envsVersion?: number;
   toasts: Toast[];
   activity: Record<string, string>;
   intent?: Intent;

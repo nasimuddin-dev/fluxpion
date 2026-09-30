@@ -1,4 +1,4 @@
-import { ArchiveRestore, ArrowLeftRight, Copy, FileJson, FileText, Download, KeyRound, Plus, Save, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Copy, Download, FileJson, FileText, KeyRound, Plus, Save, ScanSearch, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -40,9 +40,10 @@ export function EnvironmentsView() {
     setEnvs(e);
     setSel((s) => s ?? e[0]?.id);
   };
+  const envsVersion = useApp((s) => s.envsVersion);
   useEffect(() => {
     void load();
-  }, []);
+  }, [envsVersion]);
   const [dragId, setDragId] = useState<string>();
   const [dropAt, setDropAt] = useState<number>();
   /** Move an environment to position `to`; the order is saved and used by every environment picker. */
@@ -214,6 +215,9 @@ export function EnvironmentsView() {
                       }}
                     >
                       Duplicate
+                    </Button>
+                    <Button icon={<ScanSearch size={13} />} title="Where this environment's variables are used; rename one everywhere" onClick={() => useApp.getState().set({ variableUsages: draft.variables[0]?.key ?? true })}>
+                      Usages
                     </Button>
                     <Menu
                       align="end"

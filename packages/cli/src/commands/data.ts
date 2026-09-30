@@ -29,11 +29,50 @@ import {
   fetchImportText,
   importIntoWorkspace,
   diffOpenApi,
+  variableUsages,
+  renameVariable,
   historyToHar,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef } from '../shared.js';
 
 export function registerDataCommands(program: Command): void {
+  const varsCmd = program.command('vars').description('where a variable is used, and renaming it everywhere in a workspace');
+  varsCmd
+    .command('usages')
+    .description('list where a variable is used or defined (requests, scripts, environments, collection/folder/workspace variables, test files)')
+    .argument('<name>', 'variable name, without {{ }}')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print as JSON')
+    .action((name: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const uses = variableUsages(store, name);
+        if (o.json) console.log(JSON.stringify(uses, null, 2));
+        else if (!uses.length) console.log(yellow(`{{${name}}} isn't used or defined in this workspace.`));
+        else for (const u of uses) console.log(`${u.where}  ${dim(u.field)}`);
+      } finally {
+        store.close();
+      }
+    });
+  varsCmd
+    .command('rename')
+    .description('rename a variable everywhere in the workspace (secret values stored by the app move with it)')
+    .argument('<from>', 'current name')
+    .argument('<to>', 'new name')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print as JSON')
+    .action(async (from: string, to: string, o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const r = await renameVariable(store, from, to, { secrets: new ChainSecretStore([new EnvSecretStore()]) });
+        if (o.json) console.log(JSON.stringify({ from, to, files: r.files, changed: r.changed }, null, 2));
+        else console.log(green(`Renamed {{${from}}} to {{${to}}} in ${r.changed.length} places (${r.files} files).`));
+      } catch (e) {
+        throw new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+      } finally {
+        store.close();
+      }
+    });
   program
     .command('openapi-diff')
     .description('compare two versions of an OpenAPI / Swagger document and list breaking changes (for CI: --fail-on-breaking)')

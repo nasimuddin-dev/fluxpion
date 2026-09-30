@@ -13,6 +13,7 @@ Key facts for agents:
 - Deleting a collection or environment moves it to the workspace trash for 30 days: `testpion trash list|restore <id>|empty --yes -w <ws>`.
 - AI: the user's own Anthropic key (app Settings ▸ AI assistant, kept in the OS secret store; CLI/CI: TESTPION_SECRET_APP_ANTHROPIC_APIKEY) adds the provider `claude-app` (Claude Opus 5.5 / Sonnet 5.5 / Haiku 4.5) to every workspace.
 - `testpion load --collection <name> -w <ws> [--folder <f>] [--warm-up]` load-tests a collection (each virtual user runs its requests in order; per-request latency in the results). MCP `load_test` does the same for local hosts (≤ 50 users, ≤ 60 s).
+- `testpion vars usages <name> -w <ws> --json` and `testpion vars rename <from> <to> -w <ws>` find and rename a variable everywhere (MCP `variable_usages`, `rename_variable`).
 - Newman command lines work with `newman run` replaced by `testpion run-collection` (same -e, -g, -d, -n, --folder, --env-var, --global-var, --export-environment, --export-globals, -k, --suppress-exit-code, --reporters, --reporter-junit-export). Scripts have lodash (`_`), `moment`, `tv4` and real `jsonSchema` checks, as in Postman.
 - Dynamic variables use Postman's names: `{{$guid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt(1,10)}}`, `{{$randomFirstName}}`, `{{$randomEmail}}` (example.test) and ~70 more `{{$random…}}` values; each use gives a new value.
 - `testpion openapi-diff <old> <new> [--json] [--fail-on-breaking]` lists breaking changes between two OpenAPI versions (files or links); MCP `openapi_diff` does the same.

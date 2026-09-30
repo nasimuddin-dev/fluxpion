@@ -22,6 +22,7 @@ import { addRequestToCollection, externalizeSecrets } from '../import/save-reque
 import { importIntoWorkspace } from '../import/workspace-import.js';
 import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
+import { renameVariable, variableUsages } from '../storage/variable-refactor.js';
 import { runLoadTest, type LoadTarget } from '../load/load.js';
 import { collectionLoadTarget } from '../load/collection-load.js';
 import { compareHistory } from '../storage/history-compare.js';
@@ -390,6 +391,22 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             ? `Ask the user to add ${placeholders.map((p) => p.variable).join(', ')} as secret variables of an environment (Environments view, or they stay unresolved).`
             : undefined,
         };
+      },
+    },
+    {
+      name: 'variable_usages',
+      description: 'Where a variable is used or defined in the workspace: {{name}} in requests (URL, headers, bodies, auth …), pm.environment.get("name") & co. in scripts, environments, collection / folder / workspace variables and test files.',
+      inputSchema: { type: 'object', properties: { name: str('Variable name, without {{ }}') }, required: ['name'] },
+      run: (a) => variableUsages(store, String(a.name ?? '')),
+    },
+    {
+      name: 'rename_variable',
+      write: true,
+      description: 'Rename a variable everywhere in the workspace (requests, scripts, environments, collection / folder / workspace variables, test files); refuses when the new name is already defined. Secret values move with it.',
+      inputSchema: { type: 'object', properties: { from: str('Current name'), to: str('New name') }, required: ['from', 'to'] },
+      run: async (a) => {
+        const r = await renameVariable(store, String(a.from ?? ''), String(a.to ?? ''), { secrets });
+        return { files: r.files, places: r.changed.length, changed: r.changed };
       },
     },
     {
