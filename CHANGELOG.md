@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **More modules for scripts**: `require('ajv')` (JSON Schema validation, as in many Postman tests), `chai`, `xml2js`, `csv-parse/lib/sync`, `atob` and `btoa`, like Postman's sandbox.
 - **gRPC load tests**: load-test a unary or server-streaming gRPC method (the Load view's **gRPC method** target, `testpion load <server> --grpc <method>`, and `grpc` in the `load_test` MCP tool): one connection per test, methods from server reflection or proto files, results by gRPC status.
 - **Re-run failed tests**: **Re-run failed** on a finished test or collection run (for collections, the failed requests once), and `testpion test --rerun-failed [runId]` (default: the last run), run only the tests that failed or errored.
 - **Paste an HTTPie command**: `http` / `https` / `xh` commands paste into the REST view (and import with `testpion import -`) like cURL: JSON fields, raw JSON, query parameters, headers, files, forms and auth.

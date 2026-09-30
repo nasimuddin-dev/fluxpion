@@ -1,7 +1,7 @@
 import type { Collection, CollectionNode } from '../model/types.js';
 
 /** Modules scripts can require (see prelude.ts). */
-export const SCRIPT_MODULES = ['cheerio', 'crypto-js', 'uuid', 'tv4', 'lodash', 'moment'];
+export const SCRIPT_MODULES = ['ajv', 'atob', 'btoa', 'chai', 'cheerio', 'crypto-js', 'csv-parse/lib/sync', 'csv-parse/sync', 'lodash', 'moment', 'tv4', 'uuid', 'xml2js'];
 
 const UNSUPPORTED: Array<{ re: RegExp; api: string; hint: string }> = [
 ];

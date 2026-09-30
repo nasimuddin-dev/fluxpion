@@ -14,7 +14,7 @@ const collection = {
         {
           name: 'Home',
           request: { method: 'GET', url: 'https://example.test/' },
-          event: [{ listen: 'test', script: { exec: ["const $ = cheerio.load(pm.response.text());", "const csv = require('csv-parse/lib/sync');", "const _ = require('lodash');", "const m = require('moment');"] } }],
+          event: [{ listen: 'test', script: { exec: ["const $ = cheerio.load(pm.response.text());", "const f = require('node-fetch');", "const _ = require('lodash');", "const m = require('moment');"] } }],
         },
       ],
     },
@@ -29,7 +29,7 @@ describe('script compatibility on import', () => {
     try {
       const r = importIntoWorkspace(store, JSON.stringify(collection));
       // pm.vault and cheerio work, so only the unknown module is listed
-      expect(r.scriptWarnings?.map((w) => [w.where, w.script, w.api])).toEqual([['Pages / Home', 'test', "require('csv-parse/lib/sync')"]]);
+      expect(r.scriptWarnings?.map((w) => [w.where, w.script, w.api])).toEqual([['Pages / Home', 'test', "require('node-fetch')"]]);
       expect(r.scriptWarnings![0]!.hint).toContain('lodash');
       // a collection without problems has no warnings
       const clean = importIntoWorkspace(store, JSON.stringify({ ...collection, event: [], item: [collection.item[1]] }));

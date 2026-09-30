@@ -494,7 +494,7 @@ function __requirePackage(name) {
   const module = { exports: {} };
   __packages[name] = module;
   const run = new Function('module', 'exports', 'pm', 'require', src + '\n//# sourceURL=package:' + name);
-  run(module, module.exports, pm, (n) => (['cheerio', 'crypto-js', 'uuid', 'tv4', 'lodash', 'moment'].includes(n) ? require(n) : __requirePackage(n)));
+  run(module, module.exports, pm, (n) => (['ajv', 'atob', 'btoa', 'chai', 'cheerio', 'crypto-js', 'csv-parse/lib/sync', 'csv-parse/sync', 'lodash', 'moment', 'tv4', 'uuid', 'xml2js'].includes(n) ? require(n) : __requirePackage(n)));
   return module.exports;
 }
 // cheerio (as in Postman): $ = cheerio.load(html); $('title').text(), $('a').attr('href'), $('li').each(…)
@@ -537,14 +537,80 @@ const cheerio = {
     return $;
   },
 };
+// More of the modules Postman's sandbox offers to require()
+// ajv: new Ajv().compile(schema) → validate(data), with validate.errors (JSON Schema checked on the host)
+function __Ajv() {}
+__Ajv.prototype.compile = function (schema) {
+  const validate = function (data) {
+    const r = __schemaCheck(data, schema);
+    validate.errors = r.valid ? null : r.errors.map((e) => ({ message: String(e), instancePath: '' }));
+    return r.valid;
+  };
+  validate.errors = null;
+  return validate;
+};
+__Ajv.prototype.validate = function (schema, data) {
+  const v = this.compile(schema);
+  const ok = v(data);
+  this.errors = v.errors;
+  return ok;
+};
+__Ajv.prototype.addFormat = function () { return this; };
+__Ajv.prototype.addSchema = function () { return this; };
+__Ajv.prototype.errorsText = function (errors) { return (errors || this.errors || []).map((e) => e.message).join(', ') || 'No errors'; };
+// xml2js: parseString(xml, [options], callback) with the xml2Json object
+const __xml2js = {
+  parseString: (xml, opts, cb) => {
+    const done = typeof opts === 'function' ? opts : cb;
+    let out;
+    try { out = xml2Json(xml); } catch (e) { return done(e, null); }
+    done(null, out);
+  },
+  parseStringPromise: (xml) => Promise.resolve(xml2Json(xml)),
+};
+// csv-parse/lib/sync: parse(text, { columns, skip_empty_lines, delimiter }) → rows
+function __csvParse(input, options) {
+  const o = options || {};
+  const d = o.delimiter || ',';
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let q = false;
+  const s = String(input);
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '"' && s[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === d) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && s[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  const kept = o.skip_empty_lines || o.skipEmptyLines ? rows.filter((r) => r.some((x) => x !== '')) : rows;
+  const trimmed = o.trim ? kept.map((r) => r.map((x) => x.trim())) : kept;
+  if (!o.columns) return trimmed;
+  const head = Array.isArray(o.columns) ? o.columns : trimmed.shift() || [];
+  return trimmed.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])));
+}
 const require = (name) => {
+  if (name === 'ajv') return __Ajv;
+  if (name === 'chai') return { expect: expect, assert: (v, m) => { if (!v) throw new Error(m || 'assertion failed'); } };
+  if (name === 'atob') return atob;
+  if (name === 'btoa') return btoa;
+  if (name === 'xml2js') return __xml2js;
+  if (name === 'csv-parse/lib/sync' || name === 'csv-parse/sync') return name === 'csv-parse/sync' ? { parse: __csvParse } : __csvParse;
   if (name === 'cheerio') return cheerio;
   if (name === 'crypto-js') return CryptoJS;
   if (name === 'uuid') return { v4: () => __host_uuid() };
   if (name === 'tv4') return tv4;
   if (name === 'lodash' && typeof _ === 'function') return _;
   if (name === 'moment' && typeof moment === 'function') return moment;
-  throw new Error('require("' + name + '") is not available in the sandbox (supported: cheerio, crypto-js, uuid, tv4, lodash, moment)');
+  throw new Error('require("' + name + '") is not available in the sandbox (supported: ajv, atob, btoa, chai, cheerio, crypto-js, csv-parse/lib/sync, lodash, moment, tv4, uuid, xml2js)');
 };
 
 /* ---------------- pm / aps ---------------- */

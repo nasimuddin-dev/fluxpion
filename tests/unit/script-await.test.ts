@@ -65,6 +65,25 @@ describe('async scripts', () => {
     expect(by['not yet']).toMatchObject({ passed: true, skipped: true });
   });
 
+  it("more of Postman's modules: ajv, chai, xml2js, csv-parse, atob / btoa", async () => {
+    const out = await runScript(
+      `const Ajv = require('ajv');
+       const validate = new Ajv({ allErrors: true }).compile({ type: 'object', required: ['id'], properties: { id: { type: 'number' } } });
+       pm.test('ajv valid', () => pm.expect(validate({ id: 7 })).to.equal(true));
+       pm.test('ajv invalid', () => { pm.expect(validate({ id: 'x' })).to.equal(false); pm.expect(validate.errors.length).to.be.above(0); });
+       const { expect: e } = require('chai');
+       pm.test('chai', () => e([1, 2]).to.have.lengthOf(2));
+       require('xml2js').parseString('<a><b>1</b></a>', (err, res) => pm.test('xml2js', () => pm.expect(err).to.equal(null)));
+       const parse = require('csv-parse/lib/sync');
+       pm.test('csv', () => pm.expect(parse('id,name\\n1,"Rex, the dog"\\n2,Fido\\n', { columns: true, skip_empty_lines: true })).to.eql([{ id: '1', name: 'Rex, the dog' }, { id: '2', name: 'Fido' }]));
+       pm.test('base64', () => pm.expect(require('atob')(require('btoa')('vet'))).to.equal('vet'));`,
+      input(),
+    );
+    expect(out.error).toBeUndefined();
+    expect(out.tests.filter((t) => !t.passed)).toEqual([]);
+    expect(out.tests).toHaveLength(6);
+  });
+
   it('plain synchronous scripts behave as before (timers after the script)', async () => {
     const out = await runScript("const order = []; setTimeout(() => { order.push('t'); pm.environment.set('order', order.join()); }, 5); order.push('s');", input());
     expect(out.scopeSets.environment).toEqual({ order: 's,t' });
