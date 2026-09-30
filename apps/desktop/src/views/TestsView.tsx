@@ -63,6 +63,18 @@ assertions:
     path: $.received[0]
     expected: hello
 `,
+  mqtt: `name: A command is acknowledged
+type: mqtt
+url: "{{mqttBroker}}"            # mqtt://, mqtts://, ws:// or wss://
+subscribe: [clinic/7/acks]
+send:
+  - { topic: clinic/7/commands, payload: { action: recheck }, qos: 1 }
+waitMs: 1500
+assertions:
+  - type: equals
+    path: $.received[0].topic
+    expected: clinic/7/acks
+`,
   mcp: `name: Search customer tool
 type: mcp
 server: customer-mcp
@@ -161,7 +173,7 @@ export function TestsView() {
     }
   };
   const newFile = async (kind: string) => {
-    const name = await promptText('New test file', { message: 'File path inside tests/ (e.g. rest/health.yaml)', okLabel: 'Create', value: kind === 'suite' ? 'regression.suite.yaml' : `${kind === 'http' ? 'rest' : kind === 'llm' ? 'ai' : kind}/new-test.yaml` });
+    const name = await promptText('New test file', { message: 'File path inside tests/ (e.g. rest/health.yaml)', okLabel: 'Create', value: kind === 'suite' ? 'regression.suite.yaml' : `${kind === 'http' ? 'rest' : kind === 'llm' ? 'ai' : kind === 'mqtt' ? 'websocket' : kind}/new-test.yaml` });
     if (!name) return;
     await call('tests.write', { path: name, content: TEMPLATES[kind] });
     await loadTree();
@@ -237,6 +249,7 @@ export function TestsView() {
                 <option value="graphql">New GraphQL test</option>
                 <option value="grpc">New gRPC test</option>
                 <option value="websocket">New WebSocket test</option>
+                <option value="mqtt">New MQTT test</option>
                 <option value="mcp">New MCP test</option>
                 <option value="llm">New AI test</option>
                 <option value="suite">New suite</option>
