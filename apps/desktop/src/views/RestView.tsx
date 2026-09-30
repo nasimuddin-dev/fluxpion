@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ArrowRightToLine, ChevronDown, Code2, ListX, MoreHorizontal, Pencil, SquareX, Cookie, Copy, Download, FolderPlus, FolderTree, History, KeyRound, Pin, PinOff, Sparkles, Plus, Save, Send, Square, Star, Upload, X, FileCheck2 } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Copy, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
@@ -399,27 +399,9 @@ export function RestView() {
     }
   };
 
-  const tabMenu = (t: RestTab) => {
-    const i = ordered.findIndex((x) => x.id === t.id);
-    const others = ordered.filter((x) => x.id !== t.id && !x.pinned).map((x) => x.id);
-    const right = ordered.slice(i + 1).filter((x) => !x.pinned).map((x) => x.id);
-    const unpinned = ordered.filter((x) => !x.pinned).map((x) => x.id);
-    return [
-      { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, onSelect: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))) },
-      { label: 'Rename…', icon: <Pencil size={13} />, shortcut: 'Double-click', onSelect: () => void renameTab(t) },
-      { label: 'Duplicate tab', icon: <Copy size={13} />, onSelect: () => duplicateTab(t) },
-      {
-        label: 'Save as test file…',
-        icon: <FileCheck2 size={13} />,
-        onSelect: () =>
-          void saveAsTestFile(t.name, { kind: 'http', request: toEngineRequest(t.request), preRequestScript: t.preRequestScript, testScript: t.testScript, status: results[t.id]?.response?.status }, t.assertions),
-      },
-      { label: 'Close tab', icon: <X size={13} />, separator: true, onSelect: () => closeTab(t.id), shortcut: 'Middle-click' },
-      { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: !others.length, onSelect: () => closeTabs(others) },
-      { label: 'Close tabs to the right', icon: <ArrowRightToLine size={13} />, disabled: !right.length, onSelect: () => closeTabs(right) },
-      { label: 'Close all tabs', icon: <ListX size={13} />, disabled: !unpinned.length, onSelect: () => closeTabs(unpinned) },
-    ];
-  };
+  /** Save a tab's request as a YAML test file (tab menu). */
+  const saveTabAsTest = (t: RestTab) =>
+    void saveAsTestFile(t.name, { kind: 'http', request: toEngineRequest(t.request), preRequestScript: t.preRequestScript, testScript: t.testScript, status: results[t.id]?.response?.status }, t.assertions);
 
   const result = results[tab.id];
   const saveExample = async () => {
@@ -531,8 +513,11 @@ export function RestView() {
       onSelect: () => setActive(t.id),
       onClose: () => void closeTab(t.id),
       closeMany: (keys: string[]) => void closeTabs(keys.map((k) => k.replace(/^rest:/, ''))),
+      // the tab menu itself is the shared one (EditorTabs), the same on every request tab
       onRename: () => void renameTab(t),
-      menu: () => tabMenu(t),
+      onDuplicate: () => duplicateTab(t),
+      onSaveAsTest: () => saveTabAsTest(t),
+      onTogglePin: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))),
     })),
     noTabs ? undefined : `rest:${tab.id}`,
   );

@@ -33,7 +33,6 @@ export interface EditorTab {
   onSaveAsTest?(): void;
   /** Pin or unpin the tab (pinned tabs come first and stay open on "close other / all"). */
   onTogglePin?(): void;
-  menu?(): MenuItem[];
 }
 
 interface EditorTabsState {
@@ -225,7 +224,7 @@ export function newRequestItems(): MenuItem[] {
   ];
 }
 
-/** Right-click menu of a tab without its own (GraphQL, gRPC, WebSocket, MCP): closing, across every tab in the strip. */
+/** The right-click menu of every tab: pin, rename, duplicate, save as test, and closing across every tab in the strip. */
 function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
   const i = all.indexOf(t);
   // per editor: one batch close where the editor offers it (REST), else tab by tab
@@ -239,7 +238,7 @@ function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
   };
   const others = all.filter((x) => x !== t && !x.pinned);
   const right = all.slice(i + 1).filter((x) => !x.pinned);
-  // the same items as a REST tab; what an editor can't do is shown disabled, so every menu reads the same
+  // one menu for every tab; what an editor can't do is shown disabled, so every menu reads the same
   return [
     { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, disabled: !t.onTogglePin, onSelect: () => t.onTogglePin?.() },
     { label: 'Rename…', icon: <Pencil size={13} />, shortcut: 'Double-click', disabled: !t.onRename, onSelect: () => t.onRename?.() },
@@ -252,16 +251,8 @@ function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
   ];
 }
 
-/** A tab's menu: its own items, with closing (other / to the right / all) working across every tab in the strip. */
-function tabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
-  const shared = defaultTabMenu(t, all);
-  if (!t.menu) return shared;
-  const byLabel = new Map(shared.map((i) => [i.label, i]));
-  return t.menu().map((i) => {
-    const s = byLabel.get(i.label);
-    return s && i.label !== 'Close tab' ? { ...i, onSelect: s.onSelect, disabled: s.disabled } : i;
-  });
-}
+/** Every tab's menu, the same for every kind of request. */
+const tabMenu = defaultTabMenu;
 
 const ORDER: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp'];
 const TAB_W = 190;
