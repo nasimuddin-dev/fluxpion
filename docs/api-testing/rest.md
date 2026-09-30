@@ -13,7 +13,7 @@ description: "Build and test HTTP requests: methods, bodies, cookies, streaming,
 - **Params, headers and cookies** use key/value tables, each row with its own toggle.
 - **Cookie jar:** cookies set by responses are kept per workspace and sent with later matching requests. Open the **Cookies** dialog with the cookie button next to Send. See [Cookies](/api-testing/cookies).
 - **Body types:** JSON, XML, text, HTML, form URL-encoded, multipart (text and file fields), and binary file. Files are streamed from disk.
-- **Settings:** timeout, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS).
+- **Settings:** timeout, **retries**, redirects, proxy, disabling TLS verification (development only), and client certificates (mTLS). Retries (up to 5) repeat a request after a network error, a timeout, `429` or a `5xx`, waiting 500 ms, then twice as long each time (at most 10 s, or what `Retry-After` says). POST and PATCH are repeated only when the connection failed, because the server may already have acted on them. They apply everywhere the request runs: sends, collection runs, monitors and the CLI; the response shows **N attempts** when it took more than one.
 
 ## Proxy
 

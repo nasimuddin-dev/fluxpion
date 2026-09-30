@@ -95,6 +95,12 @@ export function RequestEditor({
             <Field label="Timeout (ms)">
               <Input type="number" value={r.settings?.timeoutMs ?? ''} placeholder="default from Settings" onChange={(e) => setReq({ settings: { ...r.settings, timeoutMs: e.target.value ? Number(e.target.value) : undefined } })} />
             </Field>
+            <Field label="Retries" hint="On network errors, timeouts, 429 and 5xx; POST and PATCH only when the connection failed">
+              <Input type="number" min={0} max={5} value={r.settings?.retries ?? ''} placeholder="0" onChange={(e) => setReq({ settings: { ...r.settings, retries: e.target.value ? Math.min(5, Math.max(0, Number(e.target.value))) : undefined } })} />
+            </Field>
+            <Field label="First retry after (ms)" hint="Doubles each time, at most 10 s; a Retry-After header wins">
+              <Input type="number" min={0} value={r.settings?.retryDelayMs ?? ''} placeholder="500" onChange={(e) => setReq({ settings: { ...r.settings, retryDelayMs: e.target.value ? Number(e.target.value) : undefined } })} />
+            </Field>
             <Field label="Proxy URL">
               <Input value={r.settings?.proxy ?? ''} placeholder="http://proxy:8080" onChange={(e) => setReq({ settings: { ...r.settings, proxy: e.target.value || undefined } })} />
             </Field>

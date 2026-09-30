@@ -5,7 +5,7 @@ import { basename, join } from 'node:path';
 import { endAndClose } from '../../storage/fsutil.js';
 import { fetch as undiciFetch, FormData as UndiciFormData, type Dispatcher } from 'undici';
 import type { BodyConfig, HttpRequestSpec, HttpResponseData, KeyValue, TimelinePhase } from '../../model/types.js';
-import { ApsError } from '../../errors.js';
+import { ApsError, normalizeError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
 import { digestAuthorization, parseDigestChallenge, signAwsV4, signOAuth1 } from './signing.js';
 import { isEventStream, SseParser, type SseEvent } from './sse.js';
@@ -203,6 +203,41 @@ const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
 
 /** Execute an HTTP request, streaming the response with bounded memory. */
 export async function executeHttp(spec: HttpRequestSpec, opts: HttpExecOptions = {}): Promise<{ response: HttpResponseData; prepared: PreparedRequest }> {
+  const retries = Math.max(0, Math.min(5, Math.floor(spec.settings?.retries ?? 0)));
+  if (!retries) return executeHttpOnce(spec, opts);
+  const method = (spec.method || 'GET').toUpperCase();
+  const safe = !['POST', 'PATCH'].includes(method);
+  const base = Math.max(0, spec.settings?.retryDelayMs ?? 500);
+  const wait = (attempt: number, retryAfter?: string | null) => {
+    const ra = retryAfter ? (/^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now()) : NaN;
+    const ms = Math.min(10_000, Number.isFinite(ra) && ra >= 0 ? ra : base * 2 ** attempt);
+    return new Promise<void>((resolve, reject) => {
+      const t = setTimeout(resolve, ms);
+      opts.signal?.addEventListener('abort', () => (clearTimeout(t), reject(new ApsError('CancelledError', 'Request cancelled'))), { once: true });
+    });
+  };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await executeHttpOnce(spec, opts);
+      const retryable = safe && (r.response.status === 429 || r.response.status >= 500);
+      if (retryable && attempt < retries) {
+        await wait(attempt, r.response.headers.find(([k]) => k.toLowerCase() === 'retry-after')?.[1]);
+        continue;
+      }
+      r.response.attempts = attempt + 1;
+      return r;
+    } catch (e) {
+      const kind = normalizeError(e).kind;
+      if (opts.signal?.aborted || attempt >= retries) throw e;
+      // a refused / reset connection never reached the server; a timeout might have, so only safe methods retry it
+      const retryable = kind === 'NetworkError' || (safe && kind === 'TimeoutError');
+      if (!retryable) throw e;
+      await wait(attempt);
+    }
+  }
+}
+
+async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}): Promise<{ response: HttpResponseData; prepared: PreparedRequest }> {
   const t0 = performance.now();
   const timeline: TimelinePhase[] = [];
   const mark = (name: string, start: number) => timeline.push({ name, startMs: round(start - t0), durationMs: round(performance.now() - start) });

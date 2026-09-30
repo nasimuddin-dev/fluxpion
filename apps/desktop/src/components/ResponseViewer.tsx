@@ -84,6 +84,11 @@ export function ResponseViewer({
         <span className="text-muted">
           Size <span className="text-fg tabular-nums">{formatBytes(response.size)}</span>
         </span>
+        {!!response.attempts && response.attempts > 1 && (
+          <Badge tone="warn" title="Earlier attempts failed and were retried (request Settings ▸ Retries)">
+            {response.attempts} attempts
+          </Badge>
+        )}
         {response.truncated && (
           <Badge tone="warn" title="Only the first part of the body is shown. The full payload was streamed to disk.">
             preview truncated

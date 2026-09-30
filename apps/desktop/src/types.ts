@@ -51,6 +51,8 @@ export interface HttpSettings {
   insecure?: boolean;
   proxy?: string;
   clientCert?: { certPath: string; keyPath: string; caPath?: string; passphrase?: string };
+  retries?: number;
+  retryDelayMs?: number;
 }
 
 export interface HttpRequestSpec {
@@ -90,6 +92,8 @@ export interface CheckResult {
 export interface HttpResponseData {
   status: number;
   statusText: string;
+  /** How many attempts it took (requests with retries). */
+  attempts?: number;
   headers: Array<[string, string]>;
   cookies: Array<{ name: string; value: string; attributes: Record<string, string> }>;
   bodyPreview: string;

@@ -76,6 +76,13 @@ export interface HttpSettings {
   clientCert?: { certPath: string; keyPath: string; caPath?: string; passphrase?: string };
   /** Maximum number of body bytes kept in memory for preview. The full body is streamed to disk. */
   maxPreviewBytes?: number;
+  /**
+   * Retry a failed attempt this many times (0–5): network errors, timeouts, 429 and 5xx for safe methods;
+   * POST and PATCH only when the connection failed (the server may have acted otherwise).
+   */
+  retries?: number;
+  /** First wait between attempts in ms (doubles each time, max 10 s; Retry-After wins). Default 500. */
+  retryDelayMs?: number;
 }
 
 export interface HttpRequestSpec {
@@ -102,6 +109,8 @@ export interface TimelinePhase {
 export interface HttpResponseData {
   status: number;
   statusText: string;
+  /** How many attempts it took (when the request has retries). */
+  attempts?: number;
   headers: Array<[string, string]>;
   cookies: Array<{ name: string; value: string; attributes: Record<string, string> }>;
   /** Body preview (UTF-8 decoded, possibly truncated). */
