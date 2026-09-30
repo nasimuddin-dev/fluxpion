@@ -32,6 +32,7 @@ import { ResponseViewer } from '../components/ResponseViewer';
 import { EnvCompareDialog } from './rest/EnvCompareDialog';
 import { toastAiError } from '../lib/ai-errors';
 import type { TreeAssertion, TreeVariable } from '../components/JsonView';
+import { saveResponseVariable } from '../lib/save-variable';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
@@ -465,20 +466,8 @@ export function RestView() {
 
   // a response field kept in a variable: the test script sets it after every send, and it is set now too
   const saveVariable = async (v: TreeVariable) => {
-    const scope = env ? 'environment' : 'globals';
-    const name = (
-      await promptText('Save to variable', {
-        message: `After every send, this request's test script stores the field in ${env ? `the ${env} environment` : 'the globals'}, so later requests can use {{name}}.`,
-        value: v.name,
-        okLabel: 'Save',
-      })
-    )?.trim();
-    if (!name) return;
-    if (!/^[\w.-]+$/.test(name)) return useApp.getState().toast('Use letters, digits, _ . or - in a variable name', 'error');
-    const line = `pm.${scope}.set('${name}', pm.response.json()${v.access});`;
-    update({ testScript: tab.testScript?.trim() ? `${tab.testScript.trimEnd()}\n${line}` : line });
-    await call('currentValues.set', { scope, owner: env ?? '', key: name, value: v.value }).catch(() => undefined);
-    useApp.getState().toast(`{{${name}}} is set, and the Scripts tab keeps it up to date after each send. Save the request to keep the script.`, 'success');
+    const testScript = await saveResponseVariable(v, env, tab.testScript);
+    if (testScript !== undefined) update({ testScript });
   };
 
   const suggest = result?.response

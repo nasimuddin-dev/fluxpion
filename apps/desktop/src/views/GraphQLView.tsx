@@ -13,6 +13,7 @@ import { CodeEditor } from '../components/CodeEditor';
 import { addToFolder, findNode, mapNodes } from '../components/CollectionTree';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
+import { saveResponseVariable } from '../lib/save-variable';
 import { JsonTree, RawView } from '../components/JsonView';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
@@ -303,7 +304,7 @@ export function GraphQLView() {
                     ]}
                   />
                   <div className="flex-1 min-h-0">
-                    {resTab === 'response' && (result.response.json !== undefined ? <JsonTree data={result.response.json} onAssert={(a) => (set({ assertions: [...d.assertions, a as never] }), useApp.getState().toast(`Added a check on ${a.path} (Tests tab)`, 'success'))} /> : <RawView text={result.response.bodyPreview} />)}
+                    {resTab === 'response' && (result.response.json !== undefined ? <JsonTree data={result.response.json} onAssert={(a) => (set({ assertions: [...d.assertions, a as never] }), useApp.getState().toast(`Added a check on ${a.path} (Tests tab)`, 'success'))} onSaveVariable={(v) => void saveResponseVariable(v, env, d.testScript).then((testScript) => testScript !== undefined && set({ testScript }))} /> : <RawView text={result.response.bodyPreview} />)}
                     {resTab === 'raw' && <RawView text={result.response.bodyPreview} />}
                     {resTab === 'tests' && (
                       <div className="h-full overflow-auto">
