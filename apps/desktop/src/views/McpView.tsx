@@ -527,7 +527,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
             <div className="flex-1 min-h-0 overflow-auto">
               {sub === 'form' &&
                 (raw ? (
-                  <CodeEditor value={rawText} onChange={setRawText} />
+                  <CodeEditor value={rawText} onChange={setRawText} path={`mcp-args/${serverId}/${tool.name}.json`} jsonSchema={tool.inputSchema} />
                 ) : (
                   <>
                     {tool.description && <p className="px-3 pt-3 text-sm text-muted">{tool.description}</p>}

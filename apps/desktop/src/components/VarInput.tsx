@@ -32,6 +32,8 @@ export function VarInput({
   collectionId,
   ariaLabel,
   onPasteText,
+  cell,
+  list,
 }: {
   value: string;
   onChange(v: string): void;
@@ -42,6 +44,10 @@ export function VarInput({
   ariaLabel?: string;
   /** Return true to consume the pasted text (e.g. to import a cURL command). */
   onPasteText?(text: string): boolean;
+  /** Borderless, for table cells (headers, params, form fields). */
+  cell?: boolean;
+  /** id of a <datalist> with value suggestions. */
+  list?: string;
 }) {
   const env = useApp((s) => s.environment);
   const [vars, setVars] = useState<Record<string, VarInfo>>({});
@@ -98,15 +104,19 @@ export function VarInput({
     .join('\n');
 
   return (
-    <div className={cx('relative field p-0 flex items-center', className)} title={suggest ? undefined : tooltip || undefined}>
-      <div ref={overlay} aria-hidden className="absolute inset-0 px-2 flex items-center whitespace-pre overflow-hidden mono pointer-events-none">
+    <div
+      className={cx(cell ? 'relative flex items-center min-h-[26px] rounded focus-within:bg-field focus-within:shadow-[inset_0_0_0_1.5px_var(--accent)]' : 'relative field p-0 flex items-center', className)}
+      title={suggest ? undefined : tooltip || undefined}
+    >
+      <div ref={overlay} aria-hidden className={cx('absolute inset-0 flex items-center whitespace-pre overflow-hidden mono pointer-events-none', cell ? 'px-1.5' : 'px-2')}>
         <span>{parts}</span>
       </div>
       <input
         ref={input}
         aria-label={ariaLabel}
         aria-autocomplete="list"
-        className="relative w-full h-full bg-transparent outline-none px-2 mono"
+        className={cx('relative w-full h-full bg-transparent outline-none mono', cell ? 'px-1.5 py-[3px]' : 'px-2')}
+        list={list}
         style={{ color: 'transparent', caretColor: 'var(--caret)' }}
         placeholder={placeholder}
         value={value}

@@ -2,6 +2,7 @@ import { Eye, EyeOff, Lock, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { KeyValue } from '../types';
 import { cx } from './ui';
+import { VarInput } from './VarInput';
 
 /**
  * Table editor for headers, params, variables and form fields.
@@ -18,6 +19,7 @@ export function KeyValueEditor({
   secretStatus,
   bulkEdit,
   fixedKeys,
+  valueSuggestions,
 }: {
   rows: KeyValue[];
   onChange(rows: KeyValue[]): void;
@@ -31,6 +33,8 @@ export function KeyValueEditor({
   bulkEdit?: boolean;
   /** Keys are managed elsewhere (e.g. path variables): no new rows, keys read-only. */
   fixedKeys?: boolean;
+  /** Suggested values by key (case-insensitive), e.g. Content-Type → application/json. */
+  valueSuggestions?: Record<string, string[]>;
 }) {
   const [reveal, setReveal] = useState<Record<number, boolean>>({});
   const [bulk, setBulk] = useState(false);
@@ -41,6 +45,7 @@ export function KeyValueEditor({
     onChange(next);
   };
   const listId = suggestions ? `kv-suggest-${suggestions.length}` : undefined;
+  const valueLists = Object.fromEntries(Object.entries(valueSuggestions ?? {}).map(([k, v]) => [k.toLowerCase(), { id: `kv-values-${k.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, values: v }]));
   return (
     <div className="text-sm">
       {suggestions && (
@@ -50,6 +55,13 @@ export function KeyValueEditor({
           ))}
         </datalist>
       )}
+      {Object.values(valueLists).map((l) => (
+        <datalist key={l.id} id={l.id}>
+          {l.values.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+      ))}
       <table className="w-full border-collapse table-fixed">
         <thead>
           <tr className="text-[0.72rem] text-muted text-left">
@@ -75,13 +87,18 @@ export function KeyValueEditor({
                 </td>
                 <td className="border-l border-line">
                   <div className="flex items-center">
-                    <input
-                      className="cell-input mono"
-                      type={masked ? 'password' : 'text'}
-                      placeholder={r.secret && secretStatus?.[r.key] ? '•••••• stored in OS keychain (type to replace)' : isNew ? valuePlaceholder : r.kind === 'file' ? 'File path' : ''}
-                      value={r.value}
-                      onChange={(e) => update(i, { value: e.target.value })}
-                    />
+                    {masked || r.kind === 'file' ? (
+                      <input
+                        className="cell-input mono"
+                        type={masked ? 'password' : 'text'}
+                        placeholder={r.secret && secretStatus?.[r.key] ? '•••••• stored in OS keychain (type to replace)' : r.kind === 'file' ? 'File path' : ''}
+                        value={r.value}
+                        onChange={(e) => update(i, { value: e.target.value })}
+                      />
+                    ) : (
+                      // {{variables}} are highlighted (red when not defined) and autocompleted after typing {{
+                      <VarInput cell className="flex-1 min-w-0" ariaLabel={r.key ? `Value of ${r.key}` : valuePlaceholder} placeholder={isNew ? valuePlaceholder : ''} value={r.value} list={valueLists[r.key.toLowerCase()]?.id} onChange={(value) => update(i, { value })} />
+                    )}
                     {r.secret && (
                       <button className="px-1 text-muted hover:text-fg" aria-label={masked ? 'Reveal' : 'Hide'} onClick={() => setReveal({ ...reveal, [i]: !reveal[i] })}>
                         {masked ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -188,3 +205,16 @@ export const COMMON_HEADERS = [
   'X-Api-Key',
   'X-Correlation-Id',
 ];
+
+/** Typical values of common request headers (suggested while typing a header's value). */
+export const HEADER_VALUES: Record<string, string[]> = {
+  Accept: ['application/json', 'application/xml', 'text/html', 'text/plain', 'text/event-stream', '*/*'],
+  'Accept-Encoding': ['gzip, deflate, br', 'identity'],
+  'Accept-Language': ['en-US,en;q=0.9', 'en', 'de', 'fr', 'es'],
+  Authorization: ['Bearer {{accessToken}}', 'Basic {{basicAuth}}'],
+  'Cache-Control': ['no-cache', 'no-store', 'max-age=0'],
+  'Content-Type': ['application/json', 'application/x-www-form-urlencoded', 'multipart/form-data', 'application/xml', 'text/plain', 'application/graphql'],
+  'X-Request-Id': ['{{$uuid}}'],
+  'X-Correlation-Id': ['{{$uuid}}'],
+  'X-Api-Key': ['{{apiKey}}'],
+};

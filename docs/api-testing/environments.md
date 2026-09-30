@@ -15,6 +15,17 @@ description: "Variable scopes and precedence, secret variables, dynamic variable
 
 In the **Environments** view, drag an environment up or down the list (or focus it and press **Alt+↑** / **Alt+↓**) to change its position. The order is saved in the workspace (an `order` field in each environment file) and used everywhere environments are listed: the environment picker in the top bar, the Home view, the REST sidebar and the collection runner. Environments without a position, such as newly created ones, come last.
 
+## Typing variables
+
+Everywhere you can write a value, `{{variables}}` help you:
+
+- **Autocomplete:** type `{{` in the URL bar, a header, param or form value, a body, a script, a message or a prompt to pick a variable. The list shows each one's value and where it comes from (environment, collection, workspace, global); secret values stay hidden.
+- **Colour:** a variable that resolves is **blue**; one that isn't defined anywhere is **red** (with a wavy underline in code editors), so a typo shows before you send.
+- **Hover** a variable to see its value and scope, or that it isn't defined.
+- Header values also suggest common values (e.g. `Content-Type: application/json`, `Authorization: Bearer {{accessToken}}`).
+
+Dynamic values (`{{$uuid}}`, `{{$timestamp}}` …) and `{{$env.NAME}}` count as defined.
+
 ## Built-in variables
 
 `{{$uuid}}`, `{{$timestamp}}`, `{{$timestampMs}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, `{{$randomInt(1,10)}}`, `{{$randomEmail}}`, `{{$env.NAME}}` (process environment), `{{$secret.NAME}}` (secret store), and `{{workspaceDir}}`.

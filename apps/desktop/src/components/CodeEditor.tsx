@@ -2,6 +2,7 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEffect, useState } from 'react';
 import { useApp } from '../store';
 import { Spinner } from './ui';
+import { setEditorJsonSchema } from '../editor-intel';
 
 /**
  * Monaco (several MB with its language workers) loads the first time an editor is shown, not at
@@ -35,6 +36,7 @@ export function CodeEditor({
   path,
   minimal,
   placeholder,
+  jsonSchema,
 }: {
   value: string;
   onChange?(v: string): void;
@@ -45,10 +47,17 @@ export function CodeEditor({
   path?: string;
   minimal?: boolean;
   placeholder?: string;
+  /** JSON Schema for a JSON editor (needs `path`): completion of keys and values, hover and validation. */
+  jsonSchema?: unknown;
 }) {
   const theme = useEditorTheme();
   const fontSize = useApp((s) => s.settings?.fontSize ?? 14);
   const ready = useMonaco();
+  useEffect(() => {
+    if (!path || !jsonSchema) return;
+    setEditorJsonSchema(path, jsonSchema);
+    return () => setEditorJsonSchema(path, undefined);
+  }, [path, jsonSchema]);
   if (!ready) return <div className="h-full w-full grid place-items-center"><Spinner /></div>;
   return (
     <div className="h-full w-full min-h-0 relative">

@@ -202,6 +202,10 @@ With an assistant model set in **Settings → AI Assistant** (a local model work
 
 Context sent to the model is redacted first (sensitive headers, fields and secret values are masked) and trimmed to the first few thousand characters of the body.
 
+## Editor help
+
+The code editors (bodies, scripts, GraphQL, messages, prompts) complete `{{variables}}` and highlight unknown ones in red (see [Typing variables](./environments.md#typing-variables)). In scripts, type `pm.` or `tp.` for the API with its documentation, and pick a ready-made snippet (`pm.test` status, JSON field, header, body text, JSON Schema, response time; `pm.environment.set`; `pm.sendRequest` …). JSON editors that have a schema, such as MCP tool arguments in raw JSON and gRPC messages, complete field names and values and flag mistakes as you type.
+
 ## Console
 
 The **Console** is Postman's console: a log of every request with its script output. Open it with **Console** in the status bar or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (<kbd>⌘</kbd>+<kbd>⌥</kbd>+<kbd>C</kbd> on macOS). It shares the bottom panel with the application **Logs**.

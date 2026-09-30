@@ -153,6 +153,16 @@ textarea,
 [contenteditable='true'] {
   caret-color: var(--caret);
 }
+/* {{variables}} in code editors (Monaco decorations) */
+.editor-var {
+  color: var(--accent) !important;
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+  border-radius: 3px;
+}
+.editor-var-missing {
+  color: var(--bad) !important;
+  text-decoration: wavy underline color-mix(in oklch, var(--bad) 60%, transparent);
+}
 ::selection {
   background: color-mix(in srgb, var(--accent) 28%, transparent);
 }

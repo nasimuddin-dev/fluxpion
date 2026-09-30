@@ -24,6 +24,7 @@ interface MethodInfo {
   clientStreaming: boolean;
   serverStreaming: boolean;
   example: unknown;
+  requestSchema?: Record<string, unknown>;
 }
 interface GrpcResult {
   code: number;
@@ -214,7 +215,7 @@ export function GrpcView() {
                   </Button>
                 </div>
                 <div className="flex-1 min-h-0">
-                  <CodeEditor language="json" value={d.message} onChange={(message) => set({ message })} />
+                  <CodeEditor language="json" value={d.message} onChange={(message) => set({ message })} path={`grpc-message/${d.method || 'none'}.json`} jsonSchema={current?.requestSchema} />
                 </div>
               </>
             )}

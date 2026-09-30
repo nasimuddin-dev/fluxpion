@@ -4,6 +4,7 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import JsonWorker from 'monaco-editor/language/json/json.worker?worker';
 import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker';
 import { PM_TYPES } from './lib/snippets';
+import { installEditorIntel } from './editor-intel';
 import { buildSchema, type GraphQLSchema } from 'graphql';
 import { getAutocompleteSuggestions, getDiagnostics, Position } from 'graphql-language-service';
 
@@ -198,5 +199,7 @@ monaco.editor.onDidCreateModel((m) => {
   });
   validateGraphQLModel(m);
 });
+
+installEditorIntel(monaco);
 
 export { monaco };

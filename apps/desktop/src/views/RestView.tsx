@@ -34,7 +34,7 @@ import { AssertionEditor } from '../components/AssertionEditor';
 import { AuthEditor } from '../components/AuthEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { addToFolder, CollectionTree, findNode, mapNodes } from '../components/CollectionTree';
-import { COMMON_HEADERS, KeyValueEditor } from '../components/KeyValueEditor';
+import { COMMON_HEADERS, HEADER_VALUES, KeyValueEditor } from '../components/KeyValueEditor';
 import { ResponseViewer } from '../components/ResponseViewer';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
@@ -820,7 +820,7 @@ function RequestEditor({
         {sub === 'auth' && <AuthEditor auth={r.auth} onChange={(auth) => setReq({ auth })} />}
         {sub === 'headers' && (
           <div className="p-2">
-            <KeyValueEditor rows={r.headers ?? []} onChange={(headers) => setReq({ headers })} keyPlaceholder="Header" suggestions={COMMON_HEADERS} />
+            <KeyValueEditor rows={r.headers ?? []} onChange={(headers) => setReq({ headers })} keyPlaceholder="Header" suggestions={COMMON_HEADERS} valueSuggestions={HEADER_VALUES} />
           </div>
         )}
         {sub === 'body' && <BodyEditor body={r.body ?? { type: 'none' }} onChange={(body) => setReq({ body })} />}

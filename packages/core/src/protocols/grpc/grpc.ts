@@ -32,6 +32,8 @@ export interface GrpcMethodInfo {
   serverStreaming: boolean;
   /** An example request message with every field (for the editor). */
   example: unknown;
+  /** JSON Schema of the request message (editor completion and validation; a list for client streaming). */
+  requestSchema: Record<string, unknown>;
 }
 
 const LOADER_OPTIONS: protoLoader.Options = { keepCase: true, longs: String, enums: String, defaults: true, oneofs: true };
@@ -103,6 +105,7 @@ export function describeRoot(root: protobuf.Root): GrpcMethodInfo[] {
             clientStreaming: !!m.requestStream,
             serverStreaming: !!m.responseStream,
             example: exampleMessage(m.resolvedRequestType!),
+            requestSchema: m.requestStream ? { type: 'array', items: messageSchema(m.resolvedRequestType!) } : messageSchema(m.resolvedRequestType!),
           });
         }
       } else if (obj instanceof protobuf.Namespace) walk(obj);
@@ -126,6 +129,34 @@ export function exampleMessage(type: protobuf.Type, depth = 0): Record<string, u
     out[f.name] = f.map ? {} : f.repeated ? (v === undefined ? [] : [v]) : v;
   }
   return out;
+}
+
+/** JSON Schema of a message in the JSON form used here (64-bit integers as strings, enums as names). */
+export function messageSchema(type: protobuf.Type, depth = 0): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  for (const f of type.fieldsArray) {
+    f.resolve();
+    const one = fieldSchema(f, depth);
+    properties[f.name] = f.map ? { type: 'object', additionalProperties: one } : f.repeated ? { type: 'array', items: one } : one;
+    if (f.comment) (properties[f.name] as Record<string, unknown>).description = f.comment;
+  }
+  return { type: 'object', title: type.name, properties, additionalProperties: false, ...(type.comment ? { description: type.comment } : {}) };
+}
+
+function fieldSchema(f: protobuf.Field, depth: number): Record<string, unknown> {
+  if (f.resolvedType instanceof protobuf.Enum) return { enum: [...Object.keys(f.resolvedType.values), ...Object.values(f.resolvedType.values)] };
+  if (f.resolvedType instanceof protobuf.Type) {
+    const t = f.resolvedType.fullName;
+    if (t === '.google.protobuf.Timestamp' || t === '.google.protobuf.Duration') return { type: 'object', properties: { seconds: { type: ['string', 'number'] }, nanos: { type: 'integer' } } };
+    if (t === '.google.protobuf.Struct' || t === '.google.protobuf.Value' || t === '.google.protobuf.Any') return {};
+    return depth >= 4 ? { type: 'object' } : messageSchema(f.resolvedType, depth + 1);
+  }
+  if (f.type === 'string') return { type: 'string' };
+  if (f.type === 'bool') return { type: 'boolean' };
+  if (f.type === 'bytes') return { type: 'string', description: 'base64' };
+  if (/64/.test(f.type)) return { type: ['string', 'integer'], description: '64-bit integer (a string keeps large values exact)' };
+  if (f.type === 'double' || f.type === 'float') return { type: 'number' };
+  return { type: 'integer' };
 }
 
 function exampleValue(f: protobuf.Field, depth: number): unknown {
