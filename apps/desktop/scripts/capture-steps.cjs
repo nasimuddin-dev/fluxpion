@@ -162,4 +162,22 @@ module.exports = async function run(win) {
   await js(`__cap.nav('Monitors'); true`);
   await sleep(1500);
   await shot('monitors');
+
+  // Home again, now with the activity of all of the above: the dashboard
+  await js(`__cap.nav('Home'); true`);
+  await sleep(1500);
+  await js(`document.querySelector('section[aria-label=Activity]')?.scrollIntoView({ block: 'start' }); true`);
+  await sleep(800);
+  await shot('home-activity');
+
+  // a run's Charts tab (the test run from above)
+  await js(`__cap.nav('Tests'); true`);
+  await sleep(1200);
+  await js(`(() => { const t = [...document.querySelectorAll('[role=tab]')].filter((x) => x.textContent.trim().startsWith('Runs')).pop(); t?.click(); return true; })()`);
+  await sleep(1200);
+  await js(`(() => { const r = [...document.querySelectorAll('main button')].find((b) => b.textContent.includes('All tests') && b.querySelector('.bg-ok, .bg-bad')); r?.click(); return true; })()`);
+  await sleep(1500);
+  await js(`(() => { const c = [...document.querySelectorAll('[role=tab]')].find((x) => x.textContent.trim() === 'Charts'); c?.click(); return true; })()`);
+  await sleep(1500);
+  await shot('run-charts');
 };

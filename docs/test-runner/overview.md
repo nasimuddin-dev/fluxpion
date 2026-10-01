@@ -36,4 +36,8 @@ Every run writes `junit.xml`, `report.json`, `report.html` and `report.md`, cont
 
 In the app, a finished run has a **Charts** tab next to its results: how many tests fell in each response-time range (passed and failed), results per test type, the five slowest tests (click one to find it in the results), flaky tests (passed only after a retry), the checks that failed most and, for AI evaluations, how the scores of each evaluator spread from 0 to 1 with their mean.
 
+<figure class="aps-screenshot">
+  <img src="/images/run-charts.jpg" alt="The Charts tab of a test run: response-time histogram, results by type, evaluator score distributions and the slowest tests" width="1440" height="900" loading="lazy">
+</figure>
+
 :::

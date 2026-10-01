@@ -135,3 +135,7 @@ Every request, GraphQL operation, MCP call, LLM call, tool call and evaluation b
 </figure>
 
 A Home view with quick actions, an activity dashboard (requests sent and failed, median response time and tests passed per day over 7, 14 or 30 days, requests by type and the slowest requests; **Share report** saves it with each collection's health, the monitors and the latest runs as one HTML file), recent work, collections, environments with variable precedence and a quick look, secret variables, searchable history grouped by day, global search, a command palette (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd>), an AI assistant that turns plain words into requests, writes pm tests and explains errors (always labelled as AI-generated), and dark and light themes. Import from OpenAPI, Postman, Insomnia, Bruno (collection folders too), Hoppscotch, WSDL (SOAP services) or HAR, and export collections and environments to Postman v2.1.
+
+<figure class="aps-screenshot">
+  <img src="/images/home-activity.jpg" alt="The Home activity dashboard: requests sent, success rate, median response and tests passed, with daily charts, requests by type and the slowest requests" width="1440" height="900" loading="lazy">
+</figure>
