@@ -720,9 +720,16 @@ export class WorkspaceManager {
   importBundle(bundle: WorkspaceBundle, name?: string): WorkspaceStore {
     if (!WORKSPACE_FORMATS.has(bundle?.format)) throw new ApsError('ValidationError', 'Not a TestPion workspace export');
     const { ws } = migrateWorkspace({ ...(bundle.workspace as unknown as Record<string, unknown>), schemaVersion: bundle.schemaVersion });
-    const store = this.create(name ?? `${(ws as unknown as Workspace).name} (imported)`);
+    // the same export imported twice gets a numbered name, so the switcher can tell them apart
+    const base = name ?? `${(ws as unknown as Workspace).name} (imported)`;
+    const taken = new Set(this.list().map((w) => w.name));
+    let unique = base;
+    for (let i = 2; !name && taken.has(unique); i++) unique = `${base} ${i}`;
+    const store = this.create(unique);
     store.updateWorkspace({ variables: (ws as unknown as Workspace).variables, description: (ws as unknown as Workspace).description });
     for (const c of bundle.collections ?? []) store.saveCollection(c);
+    // the export's environments replace the default one a new workspace starts with (unless it has one by that id)
+    if (bundle.environments?.length && !bundle.environments.some((e) => e.id === 'development')) store.deleteEnvironment('development');
     for (const e of bundle.environments ?? []) store.saveEnvironment(e);
     store.saveProviders(bundle.providers ?? []);
     store.saveMcpServers(bundle.mcpServers ?? []);

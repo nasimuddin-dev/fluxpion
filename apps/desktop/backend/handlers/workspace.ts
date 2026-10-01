@@ -1,6 +1,6 @@
 /** RPC handlers: Workspaces, environments, current values, cookies and variables. */
-import { existsSync, writeFileSync } from 'node:fs';
-import { join, resolve as resolvePath } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join, resolve as resolvePath } from 'node:path';
 import {
   ApsError,
   listTrash,
@@ -123,9 +123,13 @@ export function workspaceHandlers(be: Backend): Handlers {
       try {
         const store = other ?? be.ws;
         const bundle = store.exportBundle();
-        const dest = await be.host.saveDialog?.({ defaultPath: `${store.workspace.name}.apsworkspace.json`, filters: [{ name: 'Workspace', extensions: ['json'] }] });
-        if (dest) writeFileSync(dest, JSON.stringify(bundle, null, 2));
-        return { path: dest, bundle: dest ? undefined : bundle };
+        const counts = { collections: bundle.collections?.length ?? 0, environments: bundle.environments?.length ?? 0 };
+        // no save dialog (browser / cloud): the caller downloads the bundle
+        if (!be.host.saveDialog) return { bundle, name: store.workspace.name, ...counts };
+        const dest = await be.host.saveDialog({ defaultPath: `${store.workspace.name}.apsworkspace.json`, filters: [{ name: 'Workspace', extensions: ['json'] }] });
+        if (!dest) return { cancelled: true };
+        writeFileSync(dest, JSON.stringify(bundle, null, 2));
+        return { path: dest, name: store.workspace.name, ...counts };
       } finally {
         other?.close();
       }
@@ -141,7 +145,13 @@ export function workspaceHandlers(be: Backend): Handlers {
      * "Import…" from the workspace menu: a TestPion workspace export becomes a new workspace; anything the
      * collection importer understands (Postman, OpenAPI, HAR, TestPion collections) is added to the open one.
      */
-    'ws.importFile': ({ text }: { text: string }) => {
+    /** Import… with the native file dialog: a workspace export, or a collection / definition / .env added to this workspace. */
+    'ws.importPick': async () => {
+      const f = await be.host.openDialog?.({ filters: [{ name: 'Workspace exports, collections, API definitions, .env', extensions: ['json', 'yaml', 'yml', 'har', 'env', 'wsdl', 'xml'] }, { name: 'All files', extensions: ['*'] }] });
+      if (!f) return null;
+      return be.handlers['ws.importFile']!({ text: readFileSync(f, 'utf8'), fileName: basename(f) });
+    },
+    'ws.importFile': ({ text, fileName }: { text: string; fileName?: string }) => {
       let data: { format?: string } | undefined;
       try {
         data = JSON.parse(text);
@@ -155,7 +165,7 @@ export function workspaceHandlers(be: Backend): Handlers {
         be.openStore(root);
         return { kind: 'workspace', name: be.ws.workspace.name };
       }
-      const r = be.handlers['col.import']!({ text }) as { format: string; collection?: string; environment?: string };
+      const r = be.handlers['col.import']!({ text, fileName }) as { format: string; collection?: string; environment?: string };
       return { kind: 'collection', ...r, workspace: be.ws.workspace.name };
     },
     'ws.search': ({ query }: { query: string }) => be.search?.search(query, 60) ?? [],

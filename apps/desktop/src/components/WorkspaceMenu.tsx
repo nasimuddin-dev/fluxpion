@@ -65,25 +65,44 @@ export function WorkspaceMenu() {
     setOpen(false);
     if (!isCurrent(w)) void act(() => call('ws.open', { ref: w.path }), `Switched to "${w.name}"`);
   };
+  type ImportResult = { kind: string; name?: string; format?: string; collection?: string; environment?: string; workspace?: string } | null;
+  const imported = (r: ImportResult) => {
+    if (r?.kind === 'workspace') toast(`Workspace "${r.name}" imported and opened`, 'success');
+    else if (r) {
+      const what = [r.collection && `collection "${r.collection}"`, r.environment && `environment "${r.environment}"`].filter(Boolean).join(' and ');
+      toast(`Imported ${what || r.format} (${r.format}) into "${r.workspace}"`, 'success');
+      useApp.getState().openIntent('collections', {});
+    }
+  };
   const importFile = () => {
-    // a workspace export opens as a new workspace; Postman / Insomnia / Bruno / OpenAPI / HAR files are added to this one
+    // a workspace export opens as a new workspace; Postman / Insomnia / Bruno / OpenAPI / HAR / .env files are added to this one
+    if (hasNativeDialogs()) {
+      let r: ImportResult = null;
+      return void act(async () => (r = await call<ImportResult>('ws.importPick'))).then(() => imported(r));
+    }
+    // browser / cloud: pick the file in the page
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.yaml,.yml,.har';
+    input.accept = '.json,.yaml,.yml,.har,.env,.wsdl,.xml';
     input.onchange = async () => {
       const f = input.files?.[0];
       if (!f) return;
-      let r: { kind: string; name?: string; format?: string; collection?: string; environment?: string; workspace?: string } | undefined;
-      await act(async () => (r = await call('ws.importFile', { text: await f.text() })));
-      if (r?.kind === 'workspace') toast(`Workspace "${r.name}" imported and opened`, 'success');
-      else if (r) {
-        const what = [r.collection && `collection "${r.collection}"`, r.environment && `environment "${r.environment}"`].filter(Boolean).join(' and ');
-        toast(`Imported ${what || r.format} (${r.format}) into "${r.workspace}"`, 'success');
-        useApp.getState().openIntent('collections', {});
-      }
+      let r: ImportResult = null;
+      await act(async () => (r = await call<ImportResult>('ws.importFile', { text: await f.text(), fileName: f.name })));
+      imported(r);
     };
     input.click();
   };
+  /** Export a workspace to one .json file (asks where; in the browser it downloads). Secret values are never exported. */
+  const exportWorkspace = (w: { name: string; path: string }) =>
+    void call<{ path?: string; bundle?: unknown; cancelled?: boolean; collections?: number; environments?: number }>('ws.export', { ref: w.path }).then(
+      (r) => {
+        if (r.cancelled) return;
+        if (r.bundle) downloadContent(`${w.name}.apsworkspace.json`, JSON.stringify(r.bundle, null, 2), { type: 'application/json' });
+        toast(`Exported "${w.name}" (${plural(r.collections ?? 0, 'collection')}, ${plural(r.environments ?? 0, 'environment')})${r.path ? ` to ${r.path}` : ''}. Secret values are never exported.`, 'success');
+      },
+      (e) => toast(asError(e).message, 'error'),
+    );
   const rowMenu = (w: WorkspaceInfo): MenuItem[] => [
     { label: isCurrent(w) ? 'Open (current)' : 'Open', icon: <Check size={14} />, disabled: isCurrent(w), onSelect: () => switchTo(w) },
     { label: 'Rename…', icon: <Pencil size={14} />, onSelect: () => setNameDialog({ mode: 'rename', target: w, value: w.name }) },
@@ -92,12 +111,7 @@ export function WorkspaceMenu() {
     {
       label: 'Export…',
       icon: <Download size={14} />,
-      onSelect: () =>
-        void act(async () => {
-          const r = await call<{ path?: string; bundle?: unknown }>('ws.export', { ref: w.path });
-          // no native save dialog (browser / cloud): download the export instead
-          if (r.bundle) downloadContent(`${w.name}.apsworkspace.json`, JSON.stringify(r.bundle, null, 2), { type: 'application/json' });
-        }, 'Workspace exported (secret values are never exported)'),
+      onSelect: () => exportWorkspace(w),
     },
     { label: 'Delete…', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => (setOpen(false), setDeleting(w)) },
   ];
@@ -125,7 +139,7 @@ export function WorkspaceMenu() {
           <div
             role="dialog"
             aria-label="Workspaces"
-            className="absolute left-0 top-9 z-40 w-[360px] rounded-xl border border-line bg-popover shadow-lg text-sm animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
+            className="absolute left-0 top-9 z-40 w-[420px] rounded-xl border border-line bg-popover shadow-lg text-sm animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
             onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
           >
             <div className="flex items-center gap-2 p-2 border-b border-line">
@@ -178,7 +192,7 @@ export function WorkspaceMenu() {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-1 p-2 border-t border-line">
+            <div className="grid grid-cols-4 gap-1 p-2 border-t border-line">
               <Button size="sm" variant="ghost" icon={<FolderPlus size={13} />} onClick={() => setNameDialog({ mode: 'create', value: '' })}>
                 New
               </Button>
@@ -191,8 +205,27 @@ export function WorkspaceMenu() {
                 }}>
                 Open folder
               </Button>
-              <Button size="sm" variant="ghost" icon={<Upload size={13} />} onClick={() => (setOpen(false), importFile())}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Upload size={13} />}
+                title="Import a workspace export (opens as a new workspace), or a Postman / Insomnia / Bruno collection, OpenAPI, HAR or .env file into this workspace"
+                onClick={() => (setOpen(false), importFile())}
+              >
                 Import
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Download size={13} />}
+                disabled={!ws}
+                title="Export the open workspace (collections, environments, tests, providers, MCP servers) to one .json file; secret values are never exported"
+                onClick={() => {
+                  setOpen(false);
+                  if (ws) exportWorkspace(ws);
+                }}
+              >
+                Export
               </Button>
             </div>
           </div>
