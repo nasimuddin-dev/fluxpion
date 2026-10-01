@@ -106,7 +106,7 @@ export function AvailabilityStrip({ runs }: { runs: RunPoint[] }) {
         <>
           <Swatch color="var(--ok)" label="Passed" />
           <Swatch color="var(--bad)" label="Failed or could not run" />
-          <span className="ml-auto">{ordered.length ? `last ${ordered.length} runs, oldest left` : ''}</span>
+          <span className="ml-auto">{ordered.length === 1 ? 'the last run' : ordered.length ? `last ${ordered.length} runs, oldest left` : ''}</span>
         </>
       }
     >

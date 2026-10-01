@@ -369,7 +369,7 @@ function MonitorDetail(p: {
 
       <MetricGrid compact>
         <Metric label="Last result" value={statusLabel(last)} tone={last ? (last.status === 'passed' ? 'ok' : 'bad') : undefined} sub={last ? timeAgo(last.startedAt) : undefined} />
-        <Metric label="Success rate" value={stats.uptime === undefined ? '—' : `${stats.uptime}%`} tone={stats.uptime === undefined ? undefined : stats.uptime === 100 ? 'ok' : stats.uptime >= 90 ? 'warn' : 'bad'} sub={`last ${results.length} runs`} />
+        <Metric label="Success rate" value={stats.uptime === undefined ? '—' : `${stats.uptime}%`} tone={stats.uptime === undefined ? undefined : stats.uptime === 100 ? 'ok' : stats.uptime >= 90 ? 'warn' : 'bad'} sub={results.length === 1 ? 'the last run' : `last ${results.length} runs`} />
         <Metric label="Median run time" value={stats.median === undefined ? '—' : formatMs(stats.median)} />
         <Metric label="Median response" value={!last?.p50Ms || !last.passed ? '—' : formatMs(last.p50Ms)} sub="last run's requests" />
         <Metric label="Next run" value={!m.enabled ? 'Paused' : next === undefined ? '—' : next <= 0 ? 'Due now' : `in ${formatWait(next)}`} sub={m.enabled ? 'while TestPion is open' : undefined} />
