@@ -150,7 +150,7 @@ export function TracesView() {
           </Empty>
         )}
       </div>
-      <div className="h-full min-h-0">{trace ? <TraceView trace={trace} /> : sel ? <Empty title={trace === null ? 'Trace not found' : 'Loading…'} /> : <Empty title="Select a trace" />}</div>
+      <div className="h-full min-h-0">{trace ? <TraceView trace={trace} /> : sel ? <Empty title={trace === null ? 'Trace not found' : 'Loading…'} /> : <Empty icon={<Activity size={24} />} title="Select a trace">See its spans as a waterfall: timing phases, checks, errors and attributes.</Empty>}</div>
     </Split>
   );
 }

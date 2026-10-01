@@ -292,7 +292,9 @@ export function HistoryView() {
             <p className="text-xs text-muted p-2 border-t border-line">History stores redacted request metadata; response bodies are kept on disk under payloads/.</p>
           </>
         ) : (
-          <Empty title="Select an entry" />
+          <Empty icon={<History size={24} />} title="Select an entry">
+            See its request and response here. Double-click to open it in a tab; Ctrl+click a second one to compare the two.
+          </Empty>
         )}
       </div>
     </Split>
