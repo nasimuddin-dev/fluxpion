@@ -32,3 +32,12 @@ describe('runBreakdown', () => {
     expect(h[7]).toEqual({ fromMs: 5000, toMs: undefined, passed: 1, failed: 0 });
   });
 });
+
+describe('runBreakdown scores', () => {
+  it('buckets evaluator scores in fifths with their mean', () => {
+    const b = runBreakdown();
+    const scored = (score: number) => ({ id: String(score), name: 'x', type: 'llm', status: 'passed', startedAt: '', durationMs: 1, attempts: 1, checks: [{ type: 'similarity', name: 'answer looks right', passed: score >= 0.5, source: 'heuristic', message: '', score }] }) as unknown as TestResult;
+    for (const s of [0.1, 0.5, 0.9, 1, 0.95]) b.add(scored(s));
+    expect(b.result().scores).toEqual([{ name: 'similarity', buckets: [1, 0, 1, 0, 3], mean: 0.69, count: 5 }]);
+  });
+});

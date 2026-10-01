@@ -23,6 +23,8 @@ export interface RunBreakdown {
   byType: Record<string, { passed: number; failed: number; skipped: number }>;
   /** Checks that failed most often, by name. */
   failingChecks: Array<{ name: string; count: number }>;
+  /** Scored checks by evaluator (check type): how many scores fell in 0–0.2, 0.2–0.4, … 0.8–1, and their mean. */
+  scores: Array<{ name: string; buckets: number[]; mean: number; count: number }>;
 }
 
 /**
@@ -35,6 +37,7 @@ export function runBreakdown() {
   let slowest: RunBreakdown['slowest'] = [];
   const byType: RunBreakdown['byType'] = {};
   const checks = new Map<string, number>();
+  const scores = new Map<string, { buckets: number[]; sum: number; count: number }>();
   let timed = 0;
   return {
     add(r: TestResult) {
@@ -43,7 +46,18 @@ export function runBreakdown() {
       if (bad) t.failed++;
       else if (r.status === 'skipped') t.skipped++;
       else t.passed++;
-      for (const c of r.checks ?? []) if (!c.passed) checks.set(c.name, (checks.get(c.name) ?? 0) + 1);
+      for (const c of r.checks ?? []) {
+        if (!c.passed) checks.set(c.name, (checks.get(c.name) ?? 0) + 1);
+        if (typeof c.score === 'number' && Number.isFinite(c.score)) {
+          const sc = Math.min(1, Math.max(0, c.score));
+          // per evaluator (check type: similarity, groundedness, llm-judge …), not per check
+          const key = c.type || c.name;
+          const e = scores.get(key) ?? scores.set(key, { buckets: [0, 0, 0, 0, 0], sum: 0, count: 0 }).get(key)!;
+          e.buckets[Math.min(4, Math.floor(sc * 5))]!++;
+          e.sum += sc;
+          e.count++;
+        }
+      }
       if (r.status === 'skipped') return;
       const ms = r.latencyMs ?? r.durationMs;
       if (typeof ms !== 'number' || !(ms >= 0)) return;
@@ -63,7 +77,8 @@ export function runBreakdown() {
       let last = histogram.length - 1;
       while (last > 0 && histogram[last]!.passed + histogram[last]!.failed === 0) last--;
       const failingChecks = [...checks].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
-      return { timed, histogram: histogram.slice(0, last + 1), slowest, byType, failingChecks };
+      const scored = [...scores].map(([name, e]) => ({ name, buckets: e.buckets, mean: Math.round((e.sum / e.count) * 1000) / 1000, count: e.count })).slice(0, 12);
+      return { timed, histogram: histogram.slice(0, last + 1), slowest, byType, failingChecks, scores: scored };
     },
   };
 }

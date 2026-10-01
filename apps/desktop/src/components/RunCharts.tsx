@@ -23,6 +23,39 @@ interface Breakdown {
   }>;
   byType: Record<string, { passed: number; failed: number; skipped: number }>;
   failingChecks: Array<{ name: string; count: number }>;
+  scores?: Array<{ name: string; buckets: number[]; mean: number; count: number }>;
+}
+
+/** Scores of one evaluator in five ranges (one hue: magnitude), its mean marked, low ranges read as weak. */
+function ScoreBars({ s }: { s: NonNullable<Breakdown['scores']>[number] }) {
+  const max = Math.max(1, ...s.buckets);
+  const labels = ['0–.2', '.2–.4', '.4–.6', '.6–.8', '.8–1'];
+  return (
+    <div className="min-w-0">
+      <div className="flex items-baseline gap-2 text-xs mb-1">
+        <span className="truncate text-fg font-medium" title={s.name}>
+          {s.name}
+        </span>
+        <span className="ml-auto text-muted shrink-0">
+          mean <b className={s.mean >= 0.7 ? 'text-ok' : 'text-warn'}>{s.mean.toFixed(2)}</b> · {s.count}
+        </span>
+      </div>
+      <div className="flex items-end gap-1 h-12" role="img" aria-label={`${s.name}: ${s.buckets.map((n, i) => `${n} in ${labels[i]}`).join(', ')}, mean ${s.mean}`}>
+        {s.buckets.map((n, i) => (
+          <span key={i} className="flex-1 flex flex-col items-center justify-end h-full" title={`${labels[i]}: ${n}`}>
+            <span className="w-full rounded-sm bg-accent" style={{ height: `${n ? Math.max(6, (n / max) * 100) : 0}%`, opacity: 0.45 + i * 0.13 }} />
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1 text-[0.65rem] text-muted mt-0.5">
+        {labels.map((l) => (
+          <span key={l} className="flex-1 text-center">
+            {l}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -34,6 +67,8 @@ const TYPE_LABEL: Record<string, string> = {
   websocket: 'WebSocket',
   script: 'Script',
   evaluation: 'Evaluation',
+  rag: 'RAG',
+  agent: 'Agent',
 };
 /** Round bounds read better short: 250 ms, 1 s, 2.5 s. */
 const bound = (ms: number) => (ms < 1000 ? `${ms} ms` : `${ms / 1000} s`);
@@ -154,6 +189,15 @@ export function RunCharts({ runId, onPick }: { runId: string; onPick?(name: stri
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         {data.timed > 0 && <LatencyHistogram data={data.histogram} />}
         <ByType byType={data.byType} />
+        {!!data.scores?.length && (
+          <ChartCard title="Scores" aside="per evaluator, 0 to 1">
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+              {data.scores.map((s) => (
+                <ScoreBars key={s.name} s={s} />
+              ))}
+            </div>
+          </ChartCard>
+        )}
         {data.slowest.length > 0 && (
           <ChartCard title="Slowest tests">
             <div className="flex flex-col">
