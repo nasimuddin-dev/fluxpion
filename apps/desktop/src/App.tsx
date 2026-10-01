@@ -1,4 +1,4 @@
-import { AlarmClock, Bot, Keyboard, Columns2, CopyX, Disc, GitCompare, ScanSearch, TerminalSquare, Variable, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
+import { AlarmClock, BarChart3, Bot, Keyboard, Columns2, CopyX, Disc, GitCompare, ScanSearch, TerminalSquare, Variable, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
 import { createElement, lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
@@ -94,6 +94,8 @@ const PALETTE_ICONS: Record<string, LucideIcon> = {
   assistant: Bot,
   load: Gauge,
   compare: Columns2,
+  'ai-usage': BarChart3,
+  'mcp-usage': BarChart3,
   eval: FlaskConical,
   update: RefreshCw,
   shortcuts: Keyboard,
@@ -261,6 +263,8 @@ export default function App() {
       { id: 'assistant', label: 'Ask AI Assistant', run: () => s.set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } }) },
       { id: 'load', label: 'New Load Test', run: () => s.setView('load') },
       { id: 'compare', label: 'Compare Models', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'compare' }) },
+      { id: 'ai-usage', label: 'AI Usage: tokens and cost per model', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'usage' }) },
+      { id: 'mcp-usage', label: 'MCP Tool Usage: calls, failures and time per tool', hint: 'MCP', run: () => s.openIntent('mcp', { tab: 'usage' }) },
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
       { id: 'shortcuts', label: 'Keyboard Shortcuts', hint: '?', run: () => s.set({ shortcutsOpen: true }) },
       { id: 'update', label: 'Check for Updates', hint: 'Help', run: () => void checkForUpdates({ manual: true }) },
