@@ -23,6 +23,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
 import { saveResponseVariable } from '../lib/save-variable';
 import { JsonTree, RawView } from '../components/JsonView';
+import { JsonTable, tableRowsOf } from '../components/JsonTable';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, IconButton, Input, Select, Split, statusTone, Tabs, Tooltip } from '../components/ui';
@@ -126,7 +127,7 @@ export function GraphQLView() {
   const [subscription, setSubscription] = useState<{ id: string; protocol: string }>();
   const [events, setEvents] = useState<SubEvent[]>();
   const [eventSel, setEventSel] = useState<number>();
-  const [resTab, setResTab] = useState<'response' | 'raw' | 'tests'>('response');
+  const [resTab, setResTab] = useState<'response' | 'table' | 'raw' | 'tests'>('response');
   const env = useApp((s) => s.environment);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
   useEffect(() => docDrafts.save(d), [d, docDrafts]);
@@ -571,6 +572,7 @@ export function GraphQLView() {
                       onChange={setResTab}
                       tabs={[
                         { id: 'response', label: 'Response' },
+                        ...(tableRowsOf(result.response.json) ? [{ id: 'table' as const, label: 'Table' }] : []),
                         { id: 'raw', label: 'Raw' },
                         { id: 'tests', label: 'Tests', badge: result.checks?.length },
                       ]}
@@ -578,6 +580,10 @@ export function GraphQLView() {
                     <div className="flex-1 min-h-0">
                       {resTab === 'response' && (result.response.json !== undefined ? <JsonTree data={result.response.json} onAssert={(a) => (set({ assertions: [...d.assertions, a as never] }), useApp.getState().toast(`Added a check on ${a.path} (Tests tab)`, 'success'))} onSaveVariable={(v) => void saveResponseVariable(v, env, d.testScript).then((testScript) => testScript !== undefined && set({ testScript }))} /> : <RawView text={result.response.bodyPreview} />)}
                       {resTab === 'raw' && <RawView text={result.response.bodyPreview} />}
+                      {resTab === 'table' && (() => {
+                        const t = tableRowsOf(result.response.json);
+                        return t ? <JsonTable rows={t.rows} path={t.path} /> : <Empty title="No list of objects in this response" />;
+                      })()}
                       {resTab === 'tests' && (
                         <div className="h-full overflow-auto">
                           <CheckList checks={result.checks ?? []} />

@@ -7,15 +7,27 @@ type Row = Record<string, unknown>;
 const isRow = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /**
- * The array of objects to show as a table: the body itself, or its largest top-level array of objects
- * (e.g. `data`, `items`, `results`), with the path it was found at. Undefined when there is none.
+ * The array of objects to show as a table: the body itself, or the largest array of objects inside it
+ * up to three objects deep (`items`, `data.users`, GraphQL's `data.continent.countries`), with its path.
+ * Undefined when there is none.
  */
 export function tableRowsOf(json: unknown): { rows: Row[]; path: string } | undefined {
   const ok = (a: unknown): a is Row[] => Array.isArray(a) && a.length > 0 && a.slice(0, 20).filter(isRow).length >= Math.min(a.length, 20) * 0.8;
   if (ok(json)) return { rows: json.filter(isRow), path: '$' };
   if (!isRow(json)) return undefined;
   let best: { rows: Row[]; path: string } | undefined;
-  for (const [k, v] of Object.entries(json)) if (ok(v) && (!best || v.length > best.rows.length)) best = { rows: v.filter(isRow), path: `$.${k}` };
+  // breadth first, so on equal sizes the shallower list wins
+  let level: Array<[Row, string]> = [[json, '$']];
+  for (let depth = 0; depth < 3 && level.length; depth++) {
+    const next: Array<[Row, string]> = [];
+    for (const [obj, prefix] of level)
+      for (const [k, v] of Object.entries(obj)) {
+        if (ok(v)) {
+          if (!best || v.length > best.rows.length) best = { rows: v.filter(isRow), path: `${prefix}.${k}` };
+        } else if (isRow(v)) next.push([v, `${prefix}.${k}`]);
+      }
+    level = next.slice(0, 50);
+  }
   return best;
 }
 
