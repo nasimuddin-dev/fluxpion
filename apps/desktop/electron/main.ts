@@ -52,6 +52,8 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 600,
     title: 'TestPion',
+    // the window and taskbar icon (the packaged Windows app also has it in its .exe)
+    icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(__dirname, '..', 'build', 'icons', '256x256.png'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     show: false,
     webPreferences: {

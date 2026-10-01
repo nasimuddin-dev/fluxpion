@@ -37,6 +37,7 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
 import wordmarkUrl from '../../build/wordmark-nav.png';
+import markUrl from '../../build/icons/64x64.png';
 import { ConsolePanel } from './ConsolePanel';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
@@ -176,7 +177,8 @@ export function TopBar() {
     <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-chrome" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
       <div className="flex items-center gap-2 pr-1" style={noDrag}>
         {/* the TestPion wordmark; on the light theme it sits on a navy badge so the white "Pion" stays visible */}
-        <span className="inline-flex items-center rounded-lg bg-[#0c1440] px-2 py-1 dark:bg-transparent dark:px-0 dark:py-0">
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#0c1440] px-2 py-1 dark:bg-transparent dark:px-0 dark:py-0">
+          <img src={markUrl} alt="" aria-hidden className="h-7 w-7 select-none" draggable={false} />
           <img src={wordmarkUrl} alt="TestPion" className="h-6 w-auto select-none" draggable={false} />
         </span>
       </div>

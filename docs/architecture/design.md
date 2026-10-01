@@ -60,7 +60,7 @@ This page shows how TestPion is designed, from the brand and the interface down 
   </div>
 </div>
 
-Sources: `apps/desktop/build/logo.svg` (square app icon), `apps/desktop/build/wordmark.svg` (wordmark with tagline) and `apps/desktop/build/wordmark-nav.svg` (wordmark without tagline).
+Sources: `apps/desktop/build/logo/testpion-NxN.png` (the square app icon, the TP test-tube mark, drawn at 32–1024 px; the original is `testpion-logo-original.png`), `apps/desktop/build/wordmark.svg` (wordmark with tagline) and `apps/desktop/build/wordmark-nav.svg` (wordmark without tagline).
 
 ## Colour
 

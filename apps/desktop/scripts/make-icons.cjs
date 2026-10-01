@@ -1,6 +1,7 @@
 // Generates every TestPion icon and logo size from two sources, using Chromium's renderer:
-//   build/logo.svg       the square app icon ("Test" over "Pion" + sparkle)
-//   build/wordmark.svg   the TestPion wordmark ("Connect every protocol")
+//   build/logo/testpion-NxN.png  the app icon, the "TP" test-tube mark (transparent), drawn at 32–1024 px;
+//                                those sizes are used as they are, other sizes are scaled from the 1024 one
+//   build/wordmark.svg     the TestPion wordmark ("Connect every protocol")
 //
 // Desktop (apps/desktop/build):
 //   icon.png             1024×1024  electron-builder source (macOS .icns is derived from it)
@@ -16,26 +17,22 @@
 //
 // Run: npm run icons -w @testpion/desktop
 const { app, BrowserWindow } = require('electron');
-const { copyFileSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs');
+const { existsSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 
 const build = join(__dirname, '..', 'build');
 const site = join(__dirname, '..', '..', '..', 'docs', 'public');
 
-/** Small sizes drop the glow filters and the border so the mark stays crisp. */
-const markSvg = (size) => {
-  let svg = readFileSync(join(build, 'logo.svg'), 'utf8');
-  if (size <= 48) svg = svg.replace(/ filter="url\(#[a-z]+\)"/g, '').replace(/<rect x="6"[^>]*\/>/, '');
-  return 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
-};
+const markFile = (size) => join(build, 'logo', `testpion-${size}x${size}.png`);
+const markSrc = 'data:image/png;base64,' + readFileSync(markFile(1024)).toString('base64');
 const wordmark = 'data:image/svg+xml;base64,' + readFileSync(join(build, 'wordmark.svg')).toString('base64');
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false });
   await win.loadURL('data:text/html,<html></html>');
 
-  /** Draw an image (data URL) into a w×h canvas; `fit` letterboxes it on the image's own edge colour. */
-  const render = (src, w, h, { fit = false, type = 'image/png' } = {}) =>
+  /** Draw an image (data URL) into a w×h canvas; `fit` letterboxes it on the image's own edge colour, `contain` centres it (transparent around, `pad` of the size). */
+  const render = (src, w, h, { fit = false, contain = false, pad = 0, type = 'image/png' } = {}) =>
     win.webContents
       .executeJavaScript(
         `new Promise((resolve, reject) => {
@@ -69,6 +66,27 @@ app.whenReady().then(async () => {
               hz.addColorStop(0, 'rgba(0,0,0,0)'); hz.addColorStop(feather / 2, '#000'); hz.addColorStop(1 - feather / 2, '#000'); hz.addColorStop(1, 'rgba(0,0,0,0)');
               fg.fillStyle = hz; fg.fillRect(0, 0, dw, dh);
               g.drawImage(f, (${w} - dw) / 2, (${h} - dh) / 2);
+            } else if (${contain}) {
+              // trim the transparent margin first, so the mark fills the square
+              const t0 = document.createElement('canvas'); t0.width = img.naturalWidth; t0.height = img.naturalHeight;
+              const t0g = t0.getContext('2d'); t0g.drawImage(img, 0, 0);
+              const a = t0g.getImageData(0, 0, t0.width, t0.height).data;
+              let x0 = t0.width, y0 = t0.height, x1 = 0, y1 = 0;
+              for (let y = 0; y < t0.height; y++) for (let x = 0; x < t0.width; x++) if (a[(y * t0.width + x) * 4 + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+              const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+              const crop = document.createElement('canvas'); crop.width = cw; crop.height = ch;
+              crop.getContext('2d').drawImage(t0, x0, y0, cw, ch, 0, 0, cw, ch);
+              const box = Math.min(${w}, ${h}) * (1 - 2 * ${pad});
+              const scale = Math.min(box / cw, box / ch);
+              const dw = cw * scale, dh = ch * scale;
+              // big downscales in steps, so small icons stay sharp
+              let src = crop, sw = cw, sh = ch;
+              while (sw / 2 > dw) {
+                const t = document.createElement('canvas'); t.width = Math.round(sw / 2); t.height = Math.round(sh / 2);
+                const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, t.width, t.height);
+                src = t; sw = t.width; sh = t.height;
+              }
+              g.drawImage(src, (${w} - dw) / 2, (${h} - dh) / 2, dw, dh);
             } else g.drawImage(img, 0, 0, ${w}, ${h});
             resolve(c.toDataURL('${type}', 0.9));
           };
@@ -78,7 +96,9 @@ app.whenReady().then(async () => {
       )
       .then((url) => Buffer.from(url.split(',')[1], 'base64'));
 
-  const mark = (size) => render(markSvg(size), size, size);
+  // 64 px and up: the drawn size when there is one; smaller (taskbar, title bar, favicon) and missing sizes are
+  // scaled from the 1024 px mark with its transparent margin trimmed, so the mark fills the square
+  const mark = (size) => (size >= 64 && existsSync(markFile(size)) ? Promise.resolve(readFileSync(markFile(size))) : render(markSrc, size, size, { contain: true, pad: size <= 48 ? 0.01 : 0.04 }));
 
   /** Render an image to a 24-bit BMP (what the NSIS installer's header and side images must be). */
   const bmp = async (src, w, h) => {
@@ -151,7 +171,9 @@ app.whenReady().then(async () => {
   for (const s of [16, 24, 32, 48, 64, 128, 256, 512]) write(join(build, 'icons', `${s}x${s}.png`), await mark(s));
 
   // website
-  copyFileSync(join(build, 'logo.svg'), join(site, 'logo.svg'));
+  // the site's logo.svg wraps the mark (nav logo, hero image, SVG favicon)
+  const siteMark = 'data:image/png;base64,' + (await mark(256)).toString('base64');
+  write(join(site, 'logo.svg'), Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="256" viewBox="0 0 256 256"><image width="256" height="256" xlink:href="${siteMark}" href="${siteMark}"/></svg>`));
   write(join(site, 'favicon.ico'), ico(await Promise.all([16, 32, 48].map(async (s) => [s, await mark(s)]))));
   write(join(site, 'apple-touch-icon.png'), await mark(180));
   write(join(site, 'icon-192.png'), await mark(192));
