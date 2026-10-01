@@ -48,6 +48,7 @@ import {
   collectionSavedItems,
   listWorkspaceDatasets,
   workspaceReportHtml,
+  collectionVariableFlow,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -236,6 +237,33 @@ export function registerDataCommands(program: Command): void {
         if (o.json) return console.log(JSON.stringify(rows, null, 2));
         if (!rows.length) return console.log(dim('No collections. Create one in the app, or import one: testpion import <file>'));
         for (const r of rows) console.log(`${r.name}  ${dim(r.id)}  ${[`${r.requests} request${r.requests === 1 ? '' : 's'}`, r.grpcCalls ? `${r.grpcCalls} gRPC` : '', r.connections ? `${r.connections} connection${r.connections === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('variable-flow')
+    .description('how variables flow through a collection run: which requests set each variable in scripts and which use it, in run order; flags used-before-set, never-set and unused')
+    .argument('<collection>', 'collection name or id')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--json', 'print as JSON')
+    .action((ref: string, o: { workspace?: string; json?: boolean }) => {
+      const mgr = new WorkspaceManager();
+      const { store } = openWorkspace(o.workspace, undefined, mgr);
+      try {
+        const cols = store.listCollections().filter((c) => !c.problem);
+        const c = cols.find((x) => x.id === ref) ?? cols.find((x) => x.name.toLowerCase() === ref.toLowerCase());
+        if (!c) throw new CliError(`No collection "${ref}". Collections: ${cols.map((x) => x.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+        const defined = [...store.listEnvironments().flatMap((e) => e.variables.map((v) => v.key)), ...(store.workspace.variables ?? []).map((v) => v.key), ...(mgr.loadSettings().globalVariables ?? []).map((v) => v.key)];
+        const flows = collectionVariableFlow(store.getCollection(c.id), defined);
+        if (o.json) return console.log(JSON.stringify(flows, null, 2));
+        const shown = flows.filter((f) => f.setBy.length || f.issue);
+        if (!shown.length) return console.log(dim('No variables set by scripts, and no problems found.'));
+        for (const f of shown) {
+          const issue = f.issue === 'unused' ? yellow(' (set, never used)') : f.issue ? red(f.issue === 'never-set' ? ' (never set)' : ' (used before it is set)') : '';
+          console.log(`{{${f.name}}}  ${f.setBy.map((p) => p.name).join(', ') || dim(f.defined ? 'environment / collection' : 'nothing sets it')} → ${f.usedBy.length} use${f.usedBy.length === 1 ? '' : 's'}${issue}`);
+        }
+        if (shown.some((f) => f.issue && f.issue !== 'unused')) process.exitCode = EXIT.TEST_FAILURE;
       } finally {
         store.close();
       }
