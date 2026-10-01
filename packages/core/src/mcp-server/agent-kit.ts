@@ -252,7 +252,7 @@ This folder is a TestPion workspace: collections/ (saved requests), environments
 
 ## Use it
 
-- **MCP** (best for agents): ${o.connect ? `\`${o.connect}\`` : '`testpion mcp-server -w .`'} serves this workspace as MCP tools, resources and prompts. Start with \`what_needs_attention\` or the \`testpion_guide\` tool.
+- **MCP** (best for agents): \`${o.connect ?? 'testpion mcp-server -w .'}\` serves this workspace as MCP tools, resources and prompts (in the TestPion app: Settings ▸ AI agents has the setup for Claude, Cursor, VS Code and Codex). Start with \`what_needs_attention\` or the \`testpion_guide\` tool.
 - **CLI**: \`testpion test tests/\` runs the test files and \`testpion run-collection "<name>"\` a collection (\`-r json\` writes report.json); \`testpion send <url> --json\` sends one request; listing commands (\`collections\`, \`requests\`, \`history\` …) take \`--json\`.
 ${guide}${AGENTS_END}
 `;

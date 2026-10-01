@@ -46,11 +46,11 @@ export function agentHandlers(be: Backend): Handlers {
       }
     },
     /** Write (or refresh) the TestPion part of AGENTS.md in the workspace folder, for coding agents that open it. */
-    'agents.writeAgentsMd': (o: AgentConnectOptions = {}) => {
+    'agents.writeAgentsMd': () => {
       const path = join(be.ws.root, 'AGENTS.md');
       const before = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
-      const c = command(o);
-      writeFileSync(path, upsertAgentsMarkdown(before, agentsMarkdown({ workspace: be.ws.workspace.name, checkTypes: checkTypes(), connect: [c.command, ...c.args].map(shellArg).join(' ') })));
+      // the file may be committed with the workspace: no paths of this machine in it
+      writeFileSync(path, upsertAgentsMarkdown(before, agentsMarkdown({ workspace: be.ws.workspace.name, checkTypes: checkTypes() })));
       return { path, updated: before !== undefined };
     },
   };

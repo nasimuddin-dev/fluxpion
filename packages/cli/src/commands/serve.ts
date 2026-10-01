@@ -1,5 +1,6 @@
 /** Servers and inspectors: the workspace MCP server, mock servers (REST, MCP, GraphQL) and the MCP inspector. */
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Command } from 'commander';
 import {
   ChainSecretStore,
@@ -27,6 +28,9 @@ import {
   reflectServer,
   runRealtimeExchange,
   Redactor,
+  agentsMarkdown,
+  upsertAgentsMarkdown,
+  checkTypes,
 } from '@testpion/core';
 import { EXIT, dim, bold, cyan, green, red, yellow, CliError, openWorkspace } from '../shared.js';
 import { executeMock } from '../run.js';
@@ -55,6 +59,26 @@ export function registerServeCommands(program: Command): void {
         await serveTestPionMcp({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: mgr.loadSettings(), readOnly: o.readOnly, allowProduction: o.allowProduction, version: ENGINE_VERSION });
       } finally {
         store.close();
+      }
+    });
+  program
+    .command('agents-md')
+    .description('write (or refresh) the TestPion part of AGENTS.md in the workspace folder: how coding agents (Claude Code, Codex, Cursor, Copilot) use it over MCP and the CLI, the check types and the test file format')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--stdout', 'print it instead of writing the file')
+    .action((o: { workspace?: string; stdout?: boolean }) => {
+      const { store, ephemeral } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        if (ephemeral) throw new CliError('No workspace found: run inside a workspace folder or pass -w <name|path>', EXIT.CONFIG_ERROR);
+        const block = agentsMarkdown({ workspace: store.workspace.name, checkTypes: checkTypes() });
+        if (o.stdout) return void process.stdout.write(block);
+        const path = join(store.root, 'AGENTS.md');
+        const before = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
+        writeFileSync(path, upsertAgentsMarkdown(before, block));
+        console.log(`${before === undefined ? 'Wrote' : 'Updated the TestPion part of'} ${path}`);
+      } finally {
+        store.close();
+        if (ephemeral) rmSync(ephemeral, { recursive: true, force: true });
       }
     });
   program
