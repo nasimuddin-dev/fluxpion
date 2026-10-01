@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.19.0 — 2026-09-30
+
+Highlights: a breadcrumb above every editor, faster editors with large collections, Collapse all, and folder menus with Duplicate.
 
 - **Folders**: right-click a folder for its menu (it only opened from **⋯**), and **Duplicate** copies a folder with everything in it (new ids throughout).
 - **Collapse all** button beside the sidebar's filter folds every collection and folder.
