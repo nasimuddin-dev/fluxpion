@@ -191,6 +191,17 @@ export function breakdownHtml(b: RunBreakdown): string {
       `<section class="chart"><h3>Response time <span class="muted" style="text-transform:none;font-weight:400;margin-left:6px">tests per range</span></h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tests per response-time range">${grid}${bars}</svg><div class="legend"><span><i style="background:var(--ok)"></i>Passed</span><span><i style="background:var(--bad)"></i>Failed</span></div></section>`,
     );
   }
+  if (b.scores.length) {
+    // per evaluator: five columns for 0–0.2 … 0.8–1, as small inline bars
+    const rows = b.scores
+      .map((s) => {
+        const max = Math.max(1, ...s.buckets);
+        const bars = s.buckets.map((n, i) => `<span title="${['0–0.2', '0.2–0.4', '0.4–0.6', '0.6–0.8', '0.8–1'][i]}: ${n}" style="display:inline-block;width:12px;margin-right:2px;vertical-align:bottom;border-radius:2px;background:var(--ok);opacity:${0.45 + i * 0.13};height:${n ? Math.max(3, Math.round((n / max) * 24)) : 0}px"></span>`).join('');
+        return `<tr><td>${html(s.name)}</td><td style="text-align:right" class="${s.mean >= 0.7 ? 'passed' : 'skipped'}">${s.mean.toFixed(2)}</td><td style="text-align:right">${s.count}</td><td style="height:28px">${bars}</td></tr>`;
+      })
+      .join('');
+    out.push(`<section class="chart"><h3>Scores <span class="muted" style="text-transform:none;font-weight:400;margin-left:6px">per evaluator, 0 to 1</span></h3><table><tr><th>Evaluator</th><th>Mean</th><th>Scores</th><th>0 → 1</th></tr>${rows}</table></section>`);
+  }
   if (b.slowest.length)
     out.push(`<section class="chart"><h3>Slowest tests</h3><table>${b.slowest.map((r) => `<tr><td class="${r.status}">${r.status}</td><td>${html(r.name)}</td><td style="text-align:right">${r.latencyMs} ms</td></tr>`).join('')}</table></section>`);
   if (b.failingChecks.length)
@@ -222,7 +233,7 @@ input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:
 <div class="muted">Run ${html(summary.runId)} · ${html(summary.startedAt)}${summary.environment ? ' · env ' + html(summary.environment) : ''}</div>
 <div class="cards">`);
     for (const [k, v] of summaryLines(summary)) await w(`<div class="card"><span class="muted">${html(k)}</span><b>${html(v)}</b></div>`);
-    for (const [k, v] of Object.entries(summary.scores)) await w(`<div class="card"><span class="muted">score: ${html(k)}</span><b>${v.mean}</b><span class="muted">${v.count} checks</span></div>`);
+    for (const [k, v] of Object.entries(summary.scores)) await w(`<div class="card"><span class="muted">score: ${html(k)}</span><b>${v.mean}</b><span class="muted">${v.count} check${v.count === 1 ? '' : 's'}</span></div>`);
     await w(`</div>
 ${resultBarHtml(summary)}
 <div id="charts-slot"></div>
