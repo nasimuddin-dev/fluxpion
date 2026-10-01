@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call, on } from '../api';
 import { Button, cx, IconButton, Menu, menuKeys, rowActionClass, type MenuItem } from './ui';
+import { CountPill } from './TreeParts';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
 import { closeTabsFor } from './EditorTabs';
@@ -76,6 +77,9 @@ export const CATEGORY_META: Record<RequestCategory, { label: string; badge: stri
   grpc: { label: 'gRPC', badge: 'gRPC', cls: 'text-[#2ea99e]' },
   websocket: { label: 'WebSocket & MQTT', badge: 'WS', cls: 'text-[#d97706]' },
 };
+
+/** Requests in a folder, with its sub-folders. */
+const requestCount = (nodes: CollectionNode[]): number => nodes.reduce((a, n) => a + (n.kind === 'folder' ? requestCount(n.items) : 1), 0);
 
 /** The one name of "new request of this kind" in every menu and button: New HTTP request, New GraphQL request … */
 export const newRequestOf = (cat: RequestCategory) => (cat === 'rest' ? 'New HTTP request' : `New ${CATEGORY_META[cat].label} request`);
@@ -428,6 +432,9 @@ export function CollectionTree({
                 <Folder size={13} className="text-muted shrink-0" />
                 <span className="truncate">{n.name}</span>
                 {(n.preRequestScript || n.testScript || n.variables?.length) && <span className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0" title="Has folder scripts or variables" />}
+                <span className="ml-auto pl-1">
+                  <CountPill n={requestCount(n.items)} />
+                </span>
               </button>
               <NodeMenu
                 open={menuFor === n.id}
