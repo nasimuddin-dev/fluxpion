@@ -1,9 +1,10 @@
-import { FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Sparkles, Square, Trash2, WifiOff, Bookmark, History } from 'lucide-react';
+import { CopyPlus, FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Settings2, Sparkles, Square, Trash2, WifiOff, Bookmark, History } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSticky } from '../lib/sticky';
 import { useLibrary } from '../lib/library';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
+import { RowMenu, TreeHeader } from '../components/TreeParts';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { AiUsage } from '../components/AiUsage';
 import { stringifyYaml } from '../lib/yaml';
@@ -16,7 +17,7 @@ import { AssertionEditor } from '../components/AssertionEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { JsonTree } from '../components/JsonView';
 import { CheckList, ErrorPanel } from '../components/Results';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, Select, Split, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, PageHeader, Select, Split, Tabs, type MenuItem } from '../components/ui';
 
 interface ChatResult {
   id: string;
@@ -627,9 +628,9 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
   useEffect(() => setList(providers), [providers]);
   const p = list.find((x) => x.id === sel);
   const upd = (patch: Partial<ProviderConfig>) => setList(list.map((x) => (x.id === sel ? { ...x, ...patch } : x)));
-  const save = async () => {
+  const save = async (next = list) => {
     try {
-      await call('ai.saveProviders', { providers: list.map(({ hasKey: _h, ...x }) => x), keys });
+      await call('ai.saveProviders', { providers: next.map(({ hasKey: _h, ...x }) => x), keys });
       setKeys({});
       onSaved();
       useApp.getState().toast('Providers saved. API keys are stored in the OS credential store.', 'success');
@@ -637,6 +638,34 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
+  const addProvider = () => {
+    const id = uid('prov-');
+    setList([...list, { id, name: 'New provider', kind: 'openai-compatible', baseUrl: KINDS[0]![2] }]);
+    setSel(id);
+  };
+  const duplicateProvider = (x: ProviderConfig) => {
+    const id = uid('prov-');
+    // the copy has no stored API key: type one, or it uses the key reference
+    const { hasKey: _h, ...rest } = x;
+    setList([...list, { ...rest, id, name: `${x.name} copy` }]);
+    setSel(id);
+  };
+  /** Remove a provider and save the list at once. */
+  const removeProvider = async (x: ProviderConfig) => {
+    if (!(await confirmAction({ title: 'Remove provider', message: `Remove the provider "${x.name}"?`, detail: 'Tests and prompts that use it will fail until you choose another provider.', confirmLabel: 'Remove provider', danger: true }))) return;
+    const next = list.filter((y) => y.id !== x.id);
+    setList(next);
+    if (sel === x.id) setSel(next[0]?.id);
+    await save(next);
+  };
+  const [menuFor, setMenuFor] = useState<string>();
+  const providerMenu = (x: ProviderConfig): MenuItem[] =>
+    (x as { builtIn?: boolean }).builtIn
+      ? [{ label: 'Open Settings', icon: <Settings2 size={14} />, onSelect: () => useApp.getState().setView('settings') }]
+      : [
+          { label: 'Duplicate', icon: <CopyPlus size={14} />, onSelect: () => duplicateProvider(x) },
+          { label: 'Remove provider', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void removeProvider(x) },
+        ];
   const test = async () => {
     if (!p) return;
     setTesting(true);
@@ -652,37 +681,36 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
   };
   return (
     <Split id="ai-providers" sidebar initial={26}>
-      <div className="h-full flex flex-col">
-        <div className="flex-1 overflow-auto">
+      <div className="h-full flex flex-col bg-panel/50">
+        <TreeHeader title="Providers" count={list.length} addLabel="Add provider" onAdd={addProvider} />
+        <div className="flex-1 overflow-auto pb-2">
           {list.map((x) => (
-            <button key={x.id} onClick={() => setSel(x.id)} className={cx('w-full text-left px-3 py-2 border-b border-line/60', sel === x.id ? 'bg-accent/10' : 'hover:bg-hover')}>
-              <div className="text-sm font-medium flex items-center gap-2">
-                {x.name}
-                {x.hasKey && <KeyRound size={11} className="text-warn" />}
-                {(x as { builtIn?: boolean }).builtIn && <Badge>Settings</Badge>}
-              </div>
-              <div className="text-xs text-muted">{KINDS.find((k) => k[0] === x.kind)?.[1]}</div>
-            </button>
+            <div
+              key={x.id}
+              className={cx('group flex items-center gap-1 mx-1 pl-3 pr-1 rounded-md cursor-pointer transition-colors', sel === x.id ? 'bg-accent-soft' : 'hover:bg-hover', menuFor === x.id && sel !== x.id && 'bg-hover')}
+              onClick={() => setSel(x.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenuFor(x.id);
+              }}
+            >
+              <button className="flex-1 min-w-0 py-1.5 text-left" data-tree-row>
+                <div className="text-sm flex items-center gap-2">
+                  <span className="truncate">{x.name}</span>
+                  {x.hasKey && <KeyRound size={11} className="text-warn shrink-0" aria-label="API key stored" />}
+                  {(x as { builtIn?: boolean }).builtIn && <Badge>Settings</Badge>}
+                </div>
+                <div className="text-xs text-muted truncate">{KINDS.find((k) => k[0] === x.kind)?.[1]}</div>
+              </button>
+              <RowMenu label={x.name} items={providerMenu(x)} open={menuFor === x.id} onOpenChange={(o) => setMenuFor(o ? x.id : undefined)} />
+            </div>
           ))}
-        </div>
-        <div className="p-2 border-t border-line">
-          <Button
-            size="sm"
-            icon={<Plus size={12} />}
-            onClick={() => {
-              const id = uid('prov-');
-              setList([...list, { id, name: 'New provider', kind: 'openai-compatible', baseUrl: KINDS[0]![2] }]);
-              setSel(id);
-            }}
-          >
-            Add provider
-          </Button>
         </div>
       </div>
       <div className="h-full overflow-auto">
         {p && (p as { builtIn?: boolean }).builtIn ? (
           <div className="p-4 flex flex-col gap-3 max-w-2xl">
-            <div className="text-lg font-semibold">{p.name}</div>
+            <PageHeader icon={<Sparkles size={18} />} title={p.name} subtitle="Built in: the assistant's Claude key from Settings" />
             <p className="text-sm text-muted">
               This provider uses the Anthropic API key saved in <b>Settings ▸ AI assistant</b> (kept in the OS secret store). It is available in every workspace; tests and prompts refer to it as <code>claude-app</code>.
             </p>
@@ -698,6 +726,23 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
           </div>
         ) : p ? (
           <div className="p-4 flex flex-col gap-3 max-w-2xl">
+            <PageHeader
+              icon={<Sparkles size={18} />}
+              title={p.name}
+              subtitle={`${KINDS.find((k) => k[0] === p.kind)?.[1] ?? p.kind}${p.hasKey ? ' · API key stored' : ''}`}
+              actions={
+                <>
+                  <Button size="sm" onClick={() => void test()} loading={testing}>
+                    Test connection
+                  </Button>
+                  <Button size="sm" variant="primary" icon={<Save size={13} />} onClick={() => void save()}>
+                    Save
+                  </Button>
+                </>
+              }
+              menuLabel="More provider actions"
+              menu={providerMenu(p)}
+            />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Name">
                 <Input value={p.name} onChange={(e) => upd({ name: e.target.value })} />
@@ -751,18 +796,7 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
                 </Field>
               ))}
             </div>
-            <div className="flex gap-2 mt-2">
-              <Button variant="primary" onClick={save}>
-                Save
-              </Button>
-              <Button onClick={test} loading={testing}>
-                Test connection
-              </Button>
-              <Button variant="ghost" className="ml-auto text-bad" icon={<Trash2 size={13} />} onClick={async () => (await confirmAction({ title: 'Remove provider', message: `Remove the provider "${p.name}"?`, detail: 'Tests and prompts that use it will fail until you choose another provider.', confirmLabel: 'Remove provider', danger: true })) && setList(list.filter((x) => x.id !== p.id))}>
-                Remove
-              </Button>
-            </div>
-            <Badge>Cloud providers require network access; prompts are only sent to the provider you select.</Badge>
+            <p className="text-xs text-muted">Cloud providers need network access; prompts are only sent to the provider you select.</p>
           </div>
         ) : (
           <Empty title="Select a provider" />
