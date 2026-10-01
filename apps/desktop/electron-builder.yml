@@ -37,6 +37,15 @@ extraResources:
       - "!database.sqlite*"
       - "!metadata.jsonl"
 npmRebuild: false
+# Electron fuses, set in the packaged binary: the installed app can't be turned into a general Node.js
+# runtime or a debug target by whoever can start it with an environment variable or a flag.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  # macOS builds are ad-hoc signed: the signature is redone after the fuses change the binary
+  resetAdHocDarwinSignature: true
 # Auto-update source (electron-updater). Builds use --publish never; the release workflow uploads
 # the installers plus latest.yml / latest-linux.yml and the .blockmap files to the GitHub Release.
 publish:
