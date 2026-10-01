@@ -42,6 +42,18 @@ features:
     details: YAML test suites with parallel workers, retries, dependencies and resumable runs. JUnit, JSON, HTML and Markdown reports, and an testpion CLI for any CI system.
     link: /test-runner/overview
     linkText: Test runner
+  - title: Monitors & certificates
+    details: Run collections on a schedule with alerts, response-time limits, uptime by day and per-request numbers. Every HTTPS response records its certificate, so an expiring one never surprises you.
+    link: /test-runner/monitors
+    linkText: Monitors
+  - title: Charts that explain
+    details: A Home dashboard with what needs attention, run charts down to DNS, TCP, TLS and server time, each test's history and the flaky ones, load and monitor trends, and usage of MCP tools and AI models.
+    link: /features
+    linkText: All features
+  - title: Built for AI agents
+    details: testpion mcp-server gives agents 58 tools, from sending requests and running tests to what needs attention, with secrets redacted. Every CLI command has --json and the docs publish llms.txt.
+    link: /ai-testing/mcp-server
+    linkText: MCP server
   - title: Local-first and private
     details: No account and no telemetry. Secrets are encrypted with your OS keychain and redacted from logs, traces and reports. Scripts run in a WebAssembly sandbox.
     link: /security/privacy
