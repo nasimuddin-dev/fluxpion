@@ -185,6 +185,19 @@ export default function App() {
   useEffect(() => {
     if (isDocView(view)) useDocs.getState().ensure(view);
   }, [view]);
+  // the last tab of a GraphQL / gRPC / WebSocket / MCP editor closed while other tabs are open: show the nearest
+  // one (like closing a tab anywhere else); "No open requests" is only for when nothing is open
+  const viewDocs = (docs[view] ?? []).length;
+  useEffect(() => {
+    if (!isDocView(view) || viewDocs) return;
+    const open = Object.entries(useEditorTabsStore.getState().byView)
+      .filter(([group]) => group !== view && !group.startsWith(`${view}:`))
+      .flatMap(([, tabs]) => tabs);
+    const next = open[open.length - 1];
+    if (!next) return;
+    useApp.getState().setView(next.view);
+    next.onSelect?.();
+  }, [view, viewDocs]);
   useEffect(() => {
     setVisited((cached) => {
       const next = [...cached.filter((id) => id !== view), view];
