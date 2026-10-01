@@ -41,6 +41,13 @@ export function insertBefore(nodes: CollectionNode[], beforeId: string, node: Co
   return nodes.flatMap((n) => (n.id === beforeId ? [node, n] : n.kind === 'folder' ? [{ ...n, items: insertBefore(n.items, beforeId, node) }] : [n]));
 }
 
+/** A deep copy of a request or folder with new ids throughout (a copied folder's requests are new requests). */
+export function withNewIds(n: CollectionNode): CollectionNode {
+  const copy = structuredClone(n);
+  const renumber = (x: CollectionNode): CollectionNode => (x.kind === 'folder' ? { ...x, id: uid('fld-'), items: x.items.map(renumber) } : { ...x, id: uid('req-') });
+  return renumber(copy);
+}
+
 /** Insert a copy right after the node with this id, wherever it is in the tree. */
 export function duplicateNode(nodes: CollectionNode[], id: string, copy: (n: CollectionNode) => CollectionNode): CollectionNode[] {
   return nodes.flatMap((n) => (n.id === id ? [n, copy(n)] : n.kind === 'folder' ? [{ ...n, items: duplicateNode(n.items, id, copy) }] : [n]));
@@ -357,7 +364,7 @@ export function CollectionTree({
         const isOpen = open[n.id] ?? !!f;
         return (
           <div key={n.id}>
-            <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })}>
+            <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', menuFor === n.id && 'bg-hover', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })} onContextMenu={(e) => (e.preventDefault(), setMenuFor(n.id))}>
               <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id, isOpen)} onKeyDown={rowKeys(c, n)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
@@ -365,9 +372,12 @@ export function CollectionTree({
                 {(n.preRequestScript || n.testScript || n.variables?.length) && <span className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0" title="Has folder scripts or variables" />}
               </button>
               <NodeMenu
+                open={menuFor === n.id}
+                onOpenChange={(o) => setMenuFor(o ? n.id : undefined)}
                 onEdit={() => setEditing({ c, folder: n })}
                 onMove={() => setMoving({ c, n })}
                 onRename={() => void renameNode(c, n)}
+                onDuplicate={() => onChange({ ...c, items: duplicateNode(c.items, n.id, (x) => ({ ...withNewIds(x), name: `${x.name} copy` })) })}
                 onDelete={() => void deleteNode(c, n)}
                 onNewRequest={() => onNewRequest(c, n.id)}
                 newRequestLabel={newRequestLabel}

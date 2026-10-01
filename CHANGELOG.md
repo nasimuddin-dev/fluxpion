@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Folders**: right-click a folder for its menu (it only opened from **⋯**), and **Duplicate** copies a folder with everything in it (new ids throughout).
 - **Collapse all** button beside the sidebar's filter folds every collection and folder.
 - **Faster editors with large collections**: the request editors no longer render their old built-in sidebars, which the Collections sidebar replaced but which were still built, hidden, with a whole collection tree that re-rendered on every change.
 - **Breadcrumb above the request, in every editor**: *Collection › Folder › Request* shows where the open REST or GraphQL request, gRPC call or connection is saved (click the collection for its settings, runner and docs), with *unsaved changes* when there are any; a request that isn't in a collection says so, with **Save**. It follows renames and moves made in the sidebar.
