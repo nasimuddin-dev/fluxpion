@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -402,7 +402,7 @@ export function TestsView() {
             )
           ) : runId ? (
             <Split id="tests-runs" initial={22} min={12}>
-              <RunList runs={runs} active={runId} onSelect={setRunId} />
+              <RunList runs={runs} active={runId} onSelect={setRunId} onOverview={() => setRunId(undefined)} />
               <RunPanel
                 key={runId}
                 runId={runId}
@@ -429,7 +429,7 @@ export function TestsView() {
   );
 }
 
-function RunList({ runs, active, onSelect }: { runs: RunRow[]; active?: string; onSelect(id: string): void }) {
+function RunList({ runs, active, onSelect, onOverview }: { runs: RunRow[]; active?: string; onSelect(id: string): void; onOverview?(): void }) {
   // filter by name / environment, and only the runs where something failed
   const [query, setQuery] = useState('');
   const [failedOnly, setFailedOnly] = useState(false);
@@ -437,6 +437,11 @@ function RunList({ runs, active, onSelect }: { runs: RunRow[]; active?: string; 
   const shown = runs.filter((r) => (!failedOnly || r.failed + r.errors > 0) && (!q || `${r.name} ${r.environment ?? ''}`.toLowerCase().includes(q)));
   return (
     <div className="h-full flex flex-col min-h-0">
+      {onOverview && (
+        <button className="flex items-center gap-1.5 px-3 py-1.5 border-b border-line text-xs text-accent hover:bg-hover text-left" onClick={onOverview}>
+          <BarChart3 size={12} /> Overview of all runs
+        </button>
+      )}
       {runs.length > 3 && (
         <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
           <Input className="h-7 min-h-7 text-sm flex-1 min-w-0" placeholder="Filter runs" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Filter runs" />

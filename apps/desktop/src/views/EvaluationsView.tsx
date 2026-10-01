@@ -1,9 +1,9 @@
 import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
-import { Bookmark, FlaskConical, History, KeyRound, Play, Save } from 'lucide-react';
+import { BarChart3, Bookmark, FlaskConical, History, KeyRound, Play, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSticky } from '../lib/sticky';
 import { useIntent } from '../hooks';
-import { asError, call } from '../api';
+import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import type { CheckConfig, ProviderConfig } from '../types';
 import { templateVars, timeAgo } from '../lib/format';
@@ -123,7 +123,11 @@ export function EvaluationsView() {
       setProviders(p);
       if (!d.provider && p[0]) set({ provider: p[0].id, model: p[0].defaultModel ?? '' });
     });
-    void call('runs.list', { limit: 30 }).then((r) => setRuns(r.items));
+    const loadRuns = () => void call('runs.list', { limit: 30 }).then((r) => setRuns(r.items));
+    loadRuns();
+    // a finished run replaces its placeholder row (passed / total, duration) in the list and the overview
+    const off = on<{ runId: string }>('run.finished', () => loadRuns());
+    return off;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const saved = useLibrary<Draft>('evaluations');
@@ -219,6 +223,11 @@ export function EvaluationsView() {
             icon: <History size={13} />,
             render: () => (
               <div className="flex-1 overflow-auto">
+                {runId && evalRuns.length > 0 && (
+                  <button className="w-full flex items-center gap-1.5 px-3 py-1.5 border-b border-line text-xs text-accent hover:bg-hover text-left" onClick={() => setRunId(undefined)}>
+                    <BarChart3 size={12} /> Overview of all runs
+                  </button>
+                )}
                 {evalRuns.map((r) => (
                   <button key={r.id} className={cx('w-full text-left px-3 py-2 border-b border-line/60 text-sm', runId === r.id ? 'bg-accent/10' : 'hover:bg-hover')} onClick={() => setRunId(r.id)}>
                     <div className="truncate">{r.name}</div>
@@ -418,7 +427,7 @@ export function EvaluationsView() {
           <div className="h-full flex flex-col">
             {evalRuns.length ? (
               // earlier runs of these evaluations: pass rate and duration, click one to open it
-              <RunsOverview runs={evalRuns} onSelect={setRunId} />
+              <RunsOverview scores runs={evalRuns} onSelect={setRunId} />
             ) : (
               <Empty icon={<FlaskConical size={28} />} title="Run an evaluation">
                 Datasets are streamed record-by-record with bounded concurrency, retries and rate limiting. Results are written to disk and can be compared against a baseline.

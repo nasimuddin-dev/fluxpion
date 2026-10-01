@@ -49,6 +49,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `parse_request_snippet` | Turn a request copied from browser devtools or docs (cURL for bash or cmd, fetch, fetch (Node.js), PowerShell `Invoke-WebRequest` / `Invoke-RestMethod`) into a structured request: method, URL, params, headers, cookies, body and auth. Nothing is sent or saved. Tokens, keys, cookies and passwords come back as `{{variables}}`, listed in `placeholders`. |
 | `save_request` | Save a request into a collection and folder path (`"Auth / Tokens"`, created as needed; `create: true` makes a new collection). Give a `snippet` or `method` + `url` (+ `headers`, `body`). Secret values are **not** written to the workspace: they become `{{variables}}`, and the result's `placeholders` lists them so the user can add them as secret environment variables. |
 | `request_history` | Earlier responses of a saved request (sent in the app), newest first: id, time, status, duration, size. |
+| `score_trend` | Each evaluator's mean score run by run (evaluations, AI and RAG tests). |
 | `flaky_tests` | Tests whose result keeps changing across the latest runs, or that passed only after a retry. |
 | `test_history` | One test across the latest runs (status, latency, failed checks) with how often its result flipped. |
 | `recent_failures` | The latest failed responses across the workspace (4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors): time, kind, name, URL, status and duration. |

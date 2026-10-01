@@ -2,6 +2,7 @@ import { readResultsFile, runTests } from '../runner/runner.js';
 import { compareToBaseline, createBaseline } from '../report/regression.js';
 import { runBreakdown } from '../runner/breakdown.js';
 import { flakyTests, summarizeTestHistory, testHistory } from '../runner/test-history.js';
+import { scoreTrend } from '../runner/score-trend.js';
 import { monitorRequestStats } from '../runner/monitor-requests.js';
 import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
@@ -471,6 +472,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           .listHistory({ requestId: node.id, kind: 'http', limit })
           .items.map((h) => ({ id: h.id, timestamp: h.timestamp, status: h.status, durationMs: h.durationMs, size: h.size, url: h.url && redactor.redactUrl(h.url) }));
       },
+    },
+    {
+      name: 'score_trend',
+      description: "Each evaluator's mean score (0 to 1) run by run, oldest first, for runs that have scores (evaluations, AI and RAG tests): is a model, prompt or pipeline getting better or worse? Filter by run name.",
+      inputSchema: { type: 'object', properties: { name: str('Only runs whose name contains this'), limit: { type: 'number', description: 'How many runs (default 40, max 300)' } } },
+      run: (a) => scoreTrend(store, { name: a.name ? String(a.name) : undefined, limit: Number(a.limit) || 40 }),
     },
     {
       name: 'flaky_tests',

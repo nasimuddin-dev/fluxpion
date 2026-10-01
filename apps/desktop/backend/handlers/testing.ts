@@ -23,6 +23,7 @@ import {
   parseThreshold,
   testHistory,
   flakyTests,
+  scoreTrend,
 } from '@testpion/core';
 import type { Backend, Handlers, EvalRunParams } from '../backend.js';
 
@@ -73,6 +74,8 @@ export function testingHandlers(be: Backend): Handlers {
     'runs.breakdown': ({ runId }: { runId: string }) => be.runBreakdown(runId),
     // one test across the latest runs (by id, or by name), newest first
     // tests whose result keeps changing across the latest runs (or pass only after retries)
+    // each evaluator's mean score run by run (oldest first)
+    'runs.scoreTrend': ({ runIds, name, limit }: { runIds?: string[]; name?: string; limit?: number } = {}) => scoreTrend(be.ws, { runIds, name, limit }),
     'runs.flaky': ({ runs }: { runs?: number } = {}) => flakyTests(be.ws, { runs }),
     'runs.testHistory': ({ id, name, limit }: { id?: string; name?: string; limit?: number }) => testHistory(be.ws, { id, name }, { limit }),
     'runs.summary': ({ runId }: { runId: string }) => {

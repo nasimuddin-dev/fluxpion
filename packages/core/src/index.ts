@@ -61,6 +61,7 @@ export * from './runner/collection-run.js';
 export * from './runner/breakdown.js';
 export * from './runner/test-history.js';
 export * from './runner/monitor-requests.js';
+export * from './runner/score-trend.js';
 export * from './runner/variable-flow.js';
 export * from './runner/collection-realtime.js';
 export * from './runner/saved-evaluations.js';

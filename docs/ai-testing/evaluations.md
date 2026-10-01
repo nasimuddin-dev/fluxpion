@@ -52,6 +52,8 @@ Each record's fields are available as variables in both the prompt and the evalu
 
 ## Regression
 
+With no run open (or after **Overview of all runs** in the Runs list), the Evaluations view shows the earlier runs: pass rate and duration by run, and **Scores by run**, one small chart per evaluator with its mean score in each run (green from 0.7), to see whether a model, prompt or pipeline is getting better or worse. `testpion history scores` prints the same and agents use the `score_trend` MCP tool.
+
 Save a run as a **baseline**, then compare later runs against it using thresholds for latency (+%), tokens (+%) and score drop. New failures, score drops and metric regressions are highlighted. In the app (**Baselines** on a finished run), *Compare with* also lists earlier runs, to see what changed since then without saving a baseline; AI agents do the same with the `compare_runs` MCP tool. In CI:
 
 ```bash

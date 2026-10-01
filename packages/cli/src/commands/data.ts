@@ -63,6 +63,7 @@ import {
   testHistory,
   summarizeTestHistory,
   flakyTests,
+  scoreTrend,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -756,6 +757,29 @@ export function registerDataCommands(program: Command): void {
           const kinds = Object.entries(a.byKind).map(([k, n]) => `${k} ${n}`).join(', ');
           if (kinds) console.log(dim(`By kind: ${kinds}`));
         }
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('scores')
+    .description("each evaluator's mean score run by run (evaluations, AI and RAG tests), oldest first")
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-q, --query <text>', 'only runs whose name contains this')
+    .option('-n, --limit <n>', 'how many runs', '20')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace: string; query?: string; limit: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const points = scoreTrend(store, { name: o.query, limit: Number(o.limit) || 20 });
+        if (o.json) return console.log(JSON.stringify(points, null, 2));
+        if (!points.length) return console.log(dim('No runs with scores.'));
+        const evaluators = [...new Set(points.flatMap((p) => Object.keys(p.scores)))].sort();
+        const w = Math.max(...evaluators.map((e) => e.length));
+        // one row per evaluator: its score in each run, oldest to newest
+        for (const e of evaluators)
+          console.log(`${e.padEnd(w)}  ${points.map((p) => (p.scores[e] === undefined ? dim('  -  ') : p.scores[e]! >= 0.7 ? green(p.scores[e]!.toFixed(2)) : yellow(p.scores[e]!.toFixed(2)))).join(' ')}`);
+        console.log(dim(`${points.length} runs, oldest left: ${points[0]!.startedAt.slice(0, 16)} → ${points[points.length - 1]!.startedAt.slice(0, 16)}`));
       } finally {
         store.close();
       }

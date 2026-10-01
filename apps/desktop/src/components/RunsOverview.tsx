@@ -170,8 +170,62 @@ function FlakyTests({ refresh }: { refresh?: string }) {
   );
 }
 
+interface ScorePoint {
+  runId: string;
+  name: string;
+  startedAt: string;
+  scores: Record<string, number>;
+}
+
+/** One small chart per evaluator: its mean score in each run (oldest left), green at 0.7 and above. */
+function ScoreTrends({ runIds, onSelect }: { runIds: string[]; onSelect?(id: string): void }) {
+  const [points, setPoints] = useState<ScorePoint[]>([]);
+  const key = runIds.join(',');
+  useEffect(() => {
+    void call<ScorePoint[]>('runs.scoreTrend', { runIds, limit: runIds.length }).then(setPoints, () => setPoints([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const evaluators = [...new Set(points.flatMap((p) => Object.keys(p.scores)))].sort();
+  if (points.length < 2 || !evaluators.length) return null;
+  return (
+    <div className="mt-3">
+      <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Scores by run</div>
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+        {evaluators.map((e) => {
+          const series = points.filter((p) => p.scores[e] !== undefined);
+          const last = series[series.length - 1]?.scores[e] ?? 0;
+          return (
+            <ChartCard key={e} title={e} aside={<span>latest <b className={last >= 0.7 ? 'text-ok' : 'text-warn'}>{last.toFixed(2)}</b></span>}>
+              <PointLine
+                items={series}
+                value={(p) => p.scores[e]!}
+                color={(p) => (p.scores[e]! >= 0.7 ? 'var(--ok)' : 'var(--warn)')}
+                keyOf={(p) => p.runId}
+                axis={(v) => v.toFixed(1)}
+                reference={0.7}
+                height={110}
+                ends={(p) => new Date(p.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                tip={(p) => (
+                  <>
+                    <div className="font-medium text-fg">
+                      {e} {p.scores[e]!.toFixed(3)}
+                    </div>
+                    <div className="text-muted">{p.name} · {new Date(p.startedAt).toLocaleString()}</div>
+                  </>
+                )}
+                label={`${e} mean score in the last ${series.length} runs, latest ${last.toFixed(2)}`}
+                onPick={onSelect ? (p) => onSelect(p.runId) : undefined}
+              />
+            </ChartCard>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** The runs at a glance (shown when no run is selected): pass rate and duration of the last 40 runs. */
-export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or a run in the list, to see its results.', flaky }: { runs: RunRow[]; onSelect?(id: string): void; hint?: string; flaky?: boolean }) {
+export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or a run in the list, to see its results.', flaky, scores }: { runs: RunRow[]; onSelect?(id: string): void; hint?: string; flaky?: boolean; scores?: boolean }) {
   const last = runs.slice(0, 40).reverse();
   if (!last.length) return <Empty title="No runs yet">Run tests, a suite or a collection; each run is listed here with its results and charts.</Empty>;
   return (
@@ -181,6 +235,7 @@ export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or 
         <RunDurations runs={last} onSelect={onSelect} />
         {flaky && <FlakyTests refresh={runs[0]?.id} />}
       </div>
+      {scores && <ScoreTrends runIds={last.map((r) => r.id)} onSelect={onSelect} />}
       <p className="text-xs text-muted mt-3">{hint}</p>
     </div>
   );
