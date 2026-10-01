@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from 'react';
-import { RotateCcw, TriangleAlert } from 'lucide-react';
+import { MessageSquareWarning, RotateCcw, TriangleAlert } from 'lucide-react';
+import { useApp } from '../store';
+import { reportClientError } from '../lib/error-capture';
 import { Button } from './ui';
 import { dropDraft } from '../lib/draft-store';
 
@@ -31,6 +33,7 @@ export class ViewBoundary extends Component<{ view: string; children: ReactNode 
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     console.error(`View "${this.props.view}" failed:`, error, info.componentStack);
+    reportClientError(error, `view ${this.props.view}`);
   }
 
   private reset = (clearDraft: boolean) => {
@@ -52,6 +55,17 @@ export class ViewBoundary extends Component<{ view: string; children: ReactNode 
           <p className="text-sm text-muted">The rest of TestPion still works. Try again, or reset this view to start from a clean draft (saved collections, requests and environments are not affected).</p>
           <pre className="text-xs mono bg-bg border border-line rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap">{error.message}</pre>
           <div className="flex gap-2 justify-end">
+            <Button
+              className="mr-auto"
+              icon={<MessageSquareWarning size={13} />}
+              onClick={() =>
+                useApp.getState().set({
+                  feedback: { kind: 'bug', title: `The ${this.props.view} view stopped with an error`, where: this.props.view, error: `${error.message}\n${(error.stack ?? '').split('\n').slice(1, 6).join('\n')}` },
+                })
+              }
+            >
+              Report this problem
+            </Button>
             <Button icon={<RotateCcw size={13} />} onClick={() => this.reset(false)}>
               Try again
             </Button>

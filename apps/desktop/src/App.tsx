@@ -24,6 +24,7 @@ import { McpClientRequests } from './components/McpClientRequests';
 const ShortcutsDialog = lazy(async () => ({ default: (await import('./components/ShortcutsDialog')).ShortcutsDialog }));
 const CiDialog = lazy(async () => ({ default: (await import('./components/CiDialog')).CiDialog }));
 const RecordDialog = lazy(async () => ({ default: (await import('./components/RecordDialog')).RecordDialog }));
+const FeedbackDialog = lazy(async () => ({ default: (await import('./components/FeedbackDialog')).FeedbackDialog }));
 const VariableUsagesDialog = lazy(async () => ({ default: (await import('./components/VariableUsagesDialog')).VariableUsagesDialog }));
 const OpenApiDiffDialog = lazy(async () => ({ default: (await import('./components/OpenApiDiffDialog')).OpenApiDiffDialog }));
 const ApiCoverageDialog = lazy(async () => ({ default: (await import('./components/ApiCoverageDialog')).ApiCoverageDialog }));
@@ -131,6 +132,7 @@ export default function App() {
   const explorerOpen = useApp((s) => s.explorerOpen);
   const variableUsages = useApp((s) => s.variableUsages);
   const recordOpen = useApp((s) => s.recordOpen);
+  const feedback = useApp((s) => s.feedback);
   const shortcutsOpen = useApp((s) => s.shortcutsOpen);
   const logsOpen = useApp((s) => s.logsOpen);
   const workspace = useApp((s) => s.workspace);
@@ -286,6 +288,7 @@ export default function App() {
       { id: 'toggle-console', label: 'Show Console', hint: 'Ctrl+Alt+C', run: () => s.set({ logsOpen: true, bottomTab: 'console' }) },
       { id: 'toggle-logs', label: 'Show Application Logs', run: () => s.set({ logsOpen: true, bottomTab: 'logs' }) },
       { id: 'assistant', label: 'Ask AI Assistant', run: () => s.set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } }) },
+      { id: 'feedback', label: 'Send Feedback or Report a Problem…', hint: 'Help', run: () => s.set({ feedback: {} }) },
       { id: 'agents', label: 'Connect an AI Agent (Claude, Cursor, VS Code, Codex) over MCP…', hint: 'Settings', run: () => s.openIntent('settings', { tab: 'agents' }) },
       { id: 'load', label: 'New Load Test', run: () => s.setView('load') },
       { id: 'compare', label: 'Compare Models', hint: 'AI Lab', run: () => s.openIntent('ai', { tab: 'compare' }) },
@@ -397,6 +400,11 @@ export default function App() {
         </Suspense>
       )}
       <McpClientRequests />
+      {feedback && (
+        <Suspense fallback={null}>
+          <FeedbackDialog request={feedback} onClose={() => useApp.getState().set({ feedback: undefined })} />
+        </Suspense>
+      )}
       {recordOpen && (
         <Suspense fallback={null}>
           <RecordDialog onClose={() => useApp.getState().set({ recordOpen: false })} />

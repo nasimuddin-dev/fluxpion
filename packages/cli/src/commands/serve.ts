@@ -29,6 +29,8 @@ import {
   runRealtimeExchange,
   Redactor,
   agentsMarkdown,
+  composeFeedback,
+  type FeedbackKind,
   upsertAgentsMarkdown,
   checkTypes,
 } from '@testpion/core';
@@ -60,6 +62,35 @@ export function registerServeCommands(program: Command): void {
       } finally {
         store.close();
       }
+    });
+  program
+    .command('feedback')
+    .description('build a feedback or problem report (bug, idea, ui, question) as Markdown and a link to a pre-filled GitHub issue; nothing is sent')
+    .requiredOption('-t, --title <title>', 'a short title')
+    .requiredOption('-m, --message <text>', 'what happened, or what you would like')
+    .option('-k, --kind <kind>', 'bug, idea, ui or question', 'idea')
+    .option('--steps <text>', 'bug: steps to reproduce')
+    .option('--expected <text>', 'bug: what you expected')
+    .option('--diagnostics', 'include the TestPion version and platform')
+    .option('--json', 'print { title, body, labels, url } as JSON')
+    .action((o: { title: string; message: string; kind: string; steps?: string; expected?: string; diagnostics?: boolean; json?: boolean }) => {
+      if (!['bug', 'idea', 'ui', 'question'].includes(o.kind)) throw new CliError('--kind must be bug, idea, ui or question', EXIT.CONFIG_ERROR);
+      const r = composeFeedback({
+        kind: o.kind as FeedbackKind,
+        title: o.title,
+        description: o.message,
+        steps: o.steps,
+        expected: o.expected,
+        where: 'CLI',
+        diagnostics: o.diagnostics ? [`TestPion CLI ${ENGINE_VERSION}`, `${process.platform} ${process.arch} · Node ${process.versions.node}`] : undefined,
+      });
+      if (o.json) return void console.log(JSON.stringify(r, null, 2));
+      console.log(`${bold(r.title)}
+
+${r.body}
+
+${dim('Open this link to review and post it on GitHub:')}
+${cyan(r.url)}`);
     });
   program
     .command('agents-md')

@@ -34,6 +34,7 @@ import {
   ArrowRight,
   ChevronDown as NavChevron,
   Menu as MenuIcon,
+  MessageSquare,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
@@ -321,6 +322,9 @@ export function StatusBar() {
           {t === 'console' ? <TerminalSquare size={12} /> : <ScrollText size={12} />} {t === 'console' ? 'Console' : 'Logs'}
         </button>
       ))}
+      <button className="flex items-center gap-1 hover:text-fg" title="Send feedback or report a problem: ideas, design, bugs" onClick={() => useApp.getState().set({ feedback: {} })}>
+        <MessageSquare size={12} /> Feedback
+      </button>
     </footer>
   );
 }

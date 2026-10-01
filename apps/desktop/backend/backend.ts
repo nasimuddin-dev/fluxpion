@@ -123,6 +123,7 @@ import { testingHandlers } from './handlers/testing.js';
 import { monitorHandlers, runMonitorNow } from './handlers/monitors.js';
 import { grpcHandlers } from './handlers/grpc.js';
 import { agentHandlers } from './handlers/agents.js';
+import { feedbackHandlers } from './handlers/feedback.js';
 
 /** RPC methods that change what the workspace lists (collections, saved items, environments, monitors, MCP servers). */
 const DATA_CHANGING = /^(col\.(save|delete|import\w*|move\w*|duplicate\w*)|lib\.save|env\.(save|delete|reorder|import\w*)|vars\.setInEnvironment|monitor\.(save|delete)|mcp\.(saveServers|connect|disconnect)|trash\.restore|ws\.(open|import\w*|openExamples))$/;
@@ -580,7 +581,7 @@ export class Backend {
    */
   private buildHandlers(): Handlers {
     const all: Handlers = {};
-    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers, monitorHandlers, agentHandlers]) {
+    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers, monitorHandlers, agentHandlers, feedbackHandlers]) {
       for (const [name, fn] of Object.entries(group(this))) {
         if (name in all) throw new Error(`RPC method ${name} is defined twice`);
         all[name] = fn;

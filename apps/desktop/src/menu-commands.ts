@@ -26,7 +26,8 @@ export type MenuCommand =
   | 'export-environment'
   | 'export-workspace'
   | 'save'
-  | 'settings';
+  | 'settings'
+  | 'feedback';
 
 const toastError = (e: unknown) => useApp.getState().toast(asError(e).message, 'error');
 
@@ -36,6 +37,8 @@ export async function runMenuCommand(cmd: MenuCommand): Promise<void> {
     switch (cmd) {
       case 'new-http':
         return s.openIntent('rest', { newTab: true });
+      case 'feedback':
+        return s.set({ feedback: {} });
       case 'new-graphql':
         return s.setView('graphql');
       case 'new-grpc':

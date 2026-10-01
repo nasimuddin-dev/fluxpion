@@ -233,6 +233,9 @@ export function SettingsView() {
                 >
                   Copy diagnostics
                 </Button>
+                <Button size="sm" className="ml-2" onClick={() => useApp.getState().set({ feedback: {} })}>
+                  Send feedback or report a problem
+                </Button>
                 <span className="text-xs text-muted ml-2">From a terminal: testpion doctor</span>
               </div>
             </div>

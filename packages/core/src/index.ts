@@ -128,3 +128,4 @@ export * from './codegen/codegen.js';
 export * from './engine.js';
 
 export { ENGINE_VERSION } from './version.js';
+export * from './report/feedback.js';

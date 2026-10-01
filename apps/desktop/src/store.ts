@@ -2,6 +2,7 @@ import { toast as sonner } from 'sonner';
 import { docKey, isDocView, routeDoc, useDocs } from './lib/docs';
 import { create } from 'zustand';
 import type { AppSettings, WorkspaceCurrent } from './types';
+import type { FeedbackRequest } from './components/FeedbackDialog';
 import { call } from './api';
 import { loadDraft, saveDraft } from './lib/draft-store';
 
@@ -108,6 +109,8 @@ interface AppState {
   variableUsages?: string | true;
   /** The "Record traffic" dialog. */
   recordOpen?: boolean;
+  /** Help ▸ Send feedback, with what to start from (a crash's error, a kind). */
+  feedback?: FeedbackRequest;
   /** Bumped when environments change outside the Environments view (e.g. a variable renamed everywhere). */
   envsVersion?: number;
   toasts: Toast[];

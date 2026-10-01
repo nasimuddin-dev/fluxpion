@@ -132,7 +132,8 @@ function build(a: AppMenuActions): Menu {
         sep,
         item({ label: 'Documentation', i: 'docs', click: () => a.openExternal(DOCS) }),
         item({ label: 'Release Notes', i: 'releaseNotes', click: () => a.openExternal(`${DOCS}changelog`) }),
-        item({ label: 'Report an Issue', i: 'issue', click: () => a.openExternal('https://github.com/nasimuddin-dev/testpion/issues') }),
+        sep,
+        item({ label: 'Send Feedback or Report a Problem…', i: 'issue', click: () => a.menu('feedback') }),
       ],
     },
   ]);

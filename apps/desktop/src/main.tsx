@@ -1,5 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { installErrorCapture } from './lib/error-capture';
+
+installErrorCapture();
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
