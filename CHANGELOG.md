@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.39.2 — 2026-10-01
+
+- **Windows taskbar**: the installed app shows the TestPion icon again (it could show Electron's after TestPion had been run from source on the same computer).
+
 ## 0.39.1 — 2026-10-01
 
 - **Rename in place**: after Rename in a menu, the name field keeps the keyboard (a menu closing late could take the focus, so typing went elsewhere).
