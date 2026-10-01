@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.16.0 — 2026-09-30
+
+Highlights: click a `{{variable}}` to see, copy, edit or add its value; a faster, leaner editor after a refactoring pass.
 
 - **Faster, leaner editor** (refactoring, no change in behaviour):
   - Fields that highlight `{{variables}}` share one short-lived cache of variable lookups (also used by the code editors' completion and hover), so a request with many headers or params, or switching environment, asks the backend once per distinct question instead of once per field.
