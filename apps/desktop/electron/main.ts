@@ -43,8 +43,10 @@ if (!capture && !existsSync(join(app.getPath('appData'), 'TestPion'))) {
 
 // Single instance — a second launch focuses the existing window.
 if (!capture && !mcpMode && !app.requestSingleInstanceLock()) app.quit();
-// the installer's app id: the taskbar groups TestPion's windows under its own icon (not Electron's, when run from source)
-if (process.platform === 'win32') app.setAppUserModelId('dev.nasimuddin.protolens');
+// The taskbar identity: the installed app uses the installer's (its shortcuts carry it). Runs from source get their own,
+// or Windows ties the installed app's taskbar button to electron.exe and shows Electron's icon for it.
+const APP_ID = app.isPackaged ? 'dev.nasimuddin.protolens' : 'dev.nasimuddin.protolens.source';
+if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
 
 function osBackendName(): string {
   if (process.platform === 'win32') return 'Windows DPAPI';
@@ -94,6 +96,11 @@ function createWindow(): void {
       spellcheck: false,
     },
   });
+  // say which program and icon the taskbar button belongs to (Windows otherwise reuses what it cached for the id)
+  if (process.platform === 'win32') {
+    const icon = windowIcon() ?? process.execPath;
+    win.setAppDetails({ appId: APP_ID, appIconPath: icon, appIconIndex: 0, relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`, relaunchDisplayName: 'TestPion' });
+  }
   win.once('ready-to-show', () => {
     if (capture) return;
     if (small) win?.maximize();
