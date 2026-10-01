@@ -12,9 +12,9 @@ export interface PhaseTotals {
   downloadMs: number;
 }
 
-/** Totals over the latest `limit` HTTP responses of the collection that have timing; undefined when there are none. */
+/** Totals over the latest `limit` HTTP and GraphQL responses of the collection that have timing; undefined when there are none. */
 export function collectionTiming(store: WorkspaceStore, collectionId: string, opts: { limit?: number } = {}): PhaseTotals | undefined {
-  const rows = store.meta.listHistory({ kind: 'http', limit: Math.min(Math.max(opts.limit ?? 2000, 1), 20_000) }).items;
+  const rows = store.meta.listHistory({ limit: Math.min(Math.max(opts.limit ?? 2000, 1), 20_000) }).items;
   const t: PhaseTotals = { requests: 0, newConnections: 0, reused: 0, dnsMs: 0, tcpMs: 0, tlsMs: 0, ttfbMs: 0, downloadMs: 0 };
   for (const h of rows) {
     if (h.collectionId !== collectionId) continue;
