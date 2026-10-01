@@ -160,8 +160,69 @@ function newNode(cat: RequestCategory): CollectionNode | undefined {
   return undefined;
 }
 
+const WIDTH_KEY = 'aps.explorer.width';
+const DEFAULT_WIDTH = 272;
+const clampWidth = (w: number) => Math.round(Math.min(Math.max(w, 200), Math.min(640, window.innerWidth * 0.6)));
+
+/** The sidebar's width: dragged on its right edge, remembered; double-click the edge resets it. */
+function useExplorerWidth() {
+  const [width, setWidth] = useState(() => {
+    try {
+      const w = Number(localStorage.getItem(WIDTH_KEY));
+      return w ? clampWidth(w) : DEFAULT_WIDTH;
+    } catch {
+      return DEFAULT_WIDTH;
+    }
+  });
+  const save = (w: number) => {
+    setWidth(w);
+    try {
+      localStorage.setItem(WIDTH_KEY, String(w));
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const handle = (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the sidebar (double-click to reset)"
+      aria-valuenow={width}
+      tabIndex={0}
+      title="Drag to resize · double-click to reset"
+      className="absolute top-0 -right-1 z-20 h-full w-2 cursor-col-resize group/resize outline-none"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const start = width;
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
+        const move = (ev: PointerEvent) => setWidth(clampWidth(start + ev.clientX - startX));
+        const up = (ev: PointerEvent) => {
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          save(clampWidth(start + ev.clientX - startX));
+        };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+      }}
+      onDoubleClick={() => save(DEFAULT_WIDTH)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          save(clampWidth(width + (e.key === 'ArrowRight' ? 16 : -16)));
+        }
+      }}
+    >
+      <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-transparent transition-colors group-hover/resize:bg-accent/60 group-focus-visible/resize:bg-accent" />
+    </div>
+  );
+  return { width, handle };
+}
+
 export function Explorer() {
   const ws = useApp((s) => s.workspace);
+  const { width, handle } = useExplorerWidth();
   const sections = useOpenSections();
   const [filter, setFilter] = useState('');
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -248,6 +309,32 @@ export function Explorer() {
       .map((c, i) => ({ label: `Move to ${c.name}`, icon: <FolderInput size={14} />, separator: i === 0, onSelect: () => void moveItem(kind, item.id, c.id) })),
     ...(item.collectionId && colIds.has(item.collectionId) ? [{ label: 'Remove from the collection', icon: <FolderX size={14} />, separator: true, onSelect: () => void moveItem(kind, item.id, undefined) }] : []),
   ];
+  /** Saved before items could belong to a collection: put gRPC calls and connections in a collection each. */
+  const organizeLoose = async () => {
+    try {
+      let moved = 0;
+      for (const [kind, name] of [
+        ['grpc', 'gRPC'],
+        ['websocket', 'WebSocket & MQTT'],
+      ] as const) {
+        const items = loose(kind === 'grpc' ? grpc : sockets);
+        if (!items.length) continue;
+        let col = collections.find((c) => c.name === name);
+        if (!col) {
+          col = { schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' };
+          await call('col.save', col);
+        }
+        const ids = new Set(items.map((i) => i.id));
+        const lib = await call<Library<unknown>>('lib.get', { kind });
+        await call('lib.save', { kind, library: { folders: lib.folders, items: lib.items.map((i: LibraryItem<unknown>) => (ids.has(i.id) ? { ...i, collectionId: col!.id } : i)) } });
+        moved += items.length;
+      }
+      await load();
+      useApp.getState().toast(`Moved ${moved} item${moved === 1 ? '' : 's'} into collections`, 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
   const extraGroups = (c: Collection): ExtraGroup[] => [
     { cat: 'grpc', items: grpc.filter((i) => i.collectionId === c.id), onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
     { cat: 'websocket', items: sockets.filter((i) => i.collectionId === c.id), onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
@@ -259,7 +346,8 @@ export function Explorer() {
   };
 
   return (
-    <aside aria-label="Collections explorer" className="w-[272px] shrink-0 border-r border-line bg-panel flex flex-col min-h-0">
+    <aside aria-label="Collections explorer" style={{ width }} className="relative shrink-0 border-r border-line bg-panel flex flex-col min-h-0">
+      {handle}
       <div className="flex items-center gap-1 px-2 h-10 border-b border-line shrink-0">
         <Layers size={15} className="text-accent shrink-0" />
         <span className="font-semibold text-sm flex-1 truncate" title={ws?.name}>
@@ -322,12 +410,17 @@ export function Explorer() {
 
         {(looseGrpc.length > 0 || looseSockets.length > 0) && (
           <div className="border-b border-line/60">
-            <button className="flex items-center gap-1.5 w-full h-9 pl-1.5 pr-2 text-left" onClick={() => setLooseOpen((o) => !o)} aria-expanded={looseOpen || !!f} title="gRPC calls and connections saved outside a collection: use Move to collection in their menu">
-              {looseOpen || f ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
-              <Inbox size={14} className="text-muted shrink-0" />
-              <span className="text-[0.82rem] font-semibold truncate flex-1">Not in a collection</span>
-              <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{looseGrpc.length + looseSockets.length}</span>
-            </button>
+            <div className="group flex items-center h-9 pl-1.5 pr-1">
+              <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => setLooseOpen((o) => !o)} aria-expanded={looseOpen || !!f} title="gRPC calls and connections saved outside a collection: use Move to collection in their menu">
+                {looseOpen || f ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+                <Inbox size={14} className="text-muted shrink-0" />
+                <span className="text-[0.82rem] font-semibold truncate flex-1">Not in a collection</span>
+                <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{looseGrpc.length + looseSockets.length}</span>
+              </button>
+              <IconButton label="Put them in collections (gRPC, WebSocket & MQTT)" className="h-6 w-6 ml-1" onClick={() => void organizeLoose()}>
+                <FolderInput size={13} />
+              </IconButton>
+            </div>
             {(looseOpen || !!f) && (
               <div className="pb-2">
                 {(
