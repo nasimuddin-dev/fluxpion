@@ -16,6 +16,7 @@ import {
   isDue,
   lastMonitorResult,
   listMonitors,
+  monitorDaily,
   monitorResults,
   monitorStatus,
   parseEvery,
@@ -181,6 +182,28 @@ export function registerMonitorCommands(program: Command): void {
         const ok = rows.filter((r) => r.status === 'passed').length;
         console.log(`${bold(m.name)}  ${dim(`${ok}/${rows.length} passed`)}`);
         for (const r of rows) console.log(`  ${r.startedAt}  ${statusText(r)}  ${dim(`${formatDuration(r.durationMs)} · ${r.trigger} · ${r.runId}`)}`);
+      }),
+    );
+
+  mon
+    .command('uptime')
+    .description("a monitor's uptime per day, oldest first (like a status page)")
+    .argument('<nameOrId>')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-d, --days <n>', 'how many days', '30')
+    .option('--json', 'print as JSON')
+    .action((ref: string, o) =>
+      withStore(o.workspace, (store) => {
+        const m = findMonitor(store, ref);
+        const days = monitorDaily(store, m.id, Number(o.days) || 30);
+        const runs = days.reduce((n, d) => n + d.runs, 0);
+        const passed = days.reduce((n, d) => n + d.passed, 0);
+        const uptime = runs ? Math.round((passed / runs) * 1000) / 10 : undefined;
+        if (o.json) return console.log(JSON.stringify({ monitor: m.name, uptime, runs, passed, days }, null, 2));
+        console.log(`${bold(m.name)}  ${uptime === undefined ? dim('no runs in this period') : `${uptime === 100 ? green(`${uptime}%`) : uptime >= 90 ? yellow(`${uptime}%`) : red(`${uptime}%`)} ${dim(`of ${runs} runs over ${days.length} days`)}`}`);
+        // one block per day: █ all passed, ▓ some failed, ░ mostly failed, · no runs
+        console.log('  ' + days.map((d) => (!d.runs ? dim('·') : d.uptime === 100 ? green('█') : (d.uptime ?? 0) >= 90 ? yellow('▓') : red('░'))).join(''));
+        for (const d of days.filter((x) => x.runs && x.uptime !== 100)) console.log(`  ${d.date}  ${red(`${d.uptime}%`)}  ${dim(`${d.passed}/${d.runs} passed`)}`);
       }),
     );
 

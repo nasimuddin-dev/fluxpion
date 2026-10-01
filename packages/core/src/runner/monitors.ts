@@ -181,6 +181,44 @@ export function monitorResults(store: WorkspaceStore, id: string, limit = 50): M
   return out;
 }
 
+/** One day of a monitor's runs (see monitorDaily). */
+export interface MonitorDay {
+  /** The day, YYYY-MM-DD. */
+  date: string;
+  runs: number;
+  passed: number;
+  /** Share of the day's runs that passed, 0-100 with one decimal (absent when nothing ran). */
+  uptime?: number;
+  /** The slowest p95 response time of the day's runs. */
+  maxP95Ms?: number;
+}
+
+/**
+ * Uptime per day over the last `days` days (oldest first, today last), like a status page. Days without runs are
+ * included with `runs: 0`. Days are calendar days at `utcOffsetMinutes` east of UTC (default: this machine's zone),
+ * so a browser elsewhere sees its own days.
+ */
+export function monitorDaily(store: WorkspaceStore, id: string, days = 30, utcOffsetMinutes?: number, now = Date.now()): MonitorDay[] {
+  const n = Math.min(Math.max(Math.floor(days) || 30, 1), 366);
+  const offset = (utcOffsetMinutes ?? -new Date(now).getTimezoneOffset()) * 60_000;
+  const key = (t: number) => new Date(t + offset).toISOString().slice(0, 10);
+  const out: MonitorDay[] = [];
+  const at = new Map<string, MonitorDay>();
+  for (let i = n - 1; i >= 0; i--) {
+    const d: MonitorDay = { date: key(now - i * 864e5), runs: 0, passed: 0 };
+    if (!at.has(d.date)) (at.set(d.date, d), out.push(d));
+  }
+  for (const r of monitorResults(store, id, KEEP_RESULTS * 2)) {
+    const d = at.get(key(Date.parse(r.startedAt)));
+    if (!d) continue;
+    d.runs++;
+    if (r.status === 'passed') d.passed++;
+    if (r.p95Ms !== undefined) d.maxP95Ms = Math.max(d.maxP95Ms ?? 0, r.p95Ms);
+  }
+  for (const d of out) if (d.runs) d.uptime = Math.round((d.passed / d.runs) * 1000) / 10;
+  return out;
+}
+
 export function lastMonitorResult(store: WorkspaceStore, id: string): MonitorResult | undefined {
   return monitorResults(store, id, 1)[0];
 }

@@ -381,7 +381,7 @@ function MonitorDetail(p: {
       </MetricGrid>
 
       {/* charts: availability, run time, requests per run (hover any of them for the run) */}
-      <MonitorCharts runs={results} p95Limit={m.maxP95Ms} />
+      <MonitorCharts runs={results} p95Limit={m.maxP95Ms} monitorId={m.id} />
 
       <div>
         <div className="text-xs font-medium text-muted uppercase tracking-wide mb-1">Runs</div>

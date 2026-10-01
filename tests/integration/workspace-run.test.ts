@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_health', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'compare_runs', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_datasets', 'list_environments', 'list_evaluations', 'list_monitors', 'list_requests', 'list_tests', 'load_history', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'recent_failures', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_breakdown', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'unused_variables', 'variable_flow', 'variable_usages', 'workspace_activity']);
+      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_health', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'compare_runs', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_datasets', 'list_environments', 'list_evaluations', 'list_monitors', 'list_requests', 'list_tests', 'load_history', 'load_test', 'monitor_results', 'monitor_uptime', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'recent_failures', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_breakdown', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'unused_variables', 'variable_flow', 'variable_usages', 'workspace_activity']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -470,13 +470,15 @@ describe('example workspace (end-to-end)', () => {
       const ran = JSON.parse(await text('run_monitor', { monitor: 'diagnostics check' }));
       expect(ran).toMatchObject({ status: 'passed', trigger: 'manual', failures: [] });
       expect(JSON.parse(await text('monitor_results', { monitor: 'Diagnostics check' })).map((r: { trigger: string }) => r.trigger)).toEqual(['manual', 'schedule']);
+      expect(JSON.parse(await text('monitor_uptime', { monitor: 'Diagnostics check', days: 7 }))).toMatchObject({ uptime: 100, runs: 2, passed: 2 });
     } finally {
       await s.close();
     }
     const results = await run([cli, 'monitor', 'results', 'Diagnostics check', '-w', ws.root], env);
     expect(results.stdout).toContain('2/2 passed');
+    expect((await run([cli, 'monitor', 'uptime', 'Diagnostics check', '-w', ws.root], env)).stdout).toContain('100% of 2 runs over 30 days');
     expect((await run([cli, 'monitor', 'remove', 'Diagnostics check', '-w', ws.root], env)).status).toBe(0);
-    // eight CLI processes: slow on a loaded CI machine
+    // nine CLI processes: slow on a loaded CI machine
   }, 90_000);
 
   it('compare a saved request across two environments (CLI env diff --request, MCP)', async () => {

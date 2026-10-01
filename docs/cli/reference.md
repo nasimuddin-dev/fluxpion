@@ -31,7 +31,7 @@ testpion mcp-server           Serve a workspace to AI agents over MCP (stdio)
 testpion load <url>           Safeguarded load test (--threshold "p95<500" "errors<1%" to pass/fail; --grpc <method> for a gRPC server)
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, Insomnia, Bruno (a collection folder too), WSDL (SOAP), HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order|diff -w  List environments; set their order; compare two
-testpion monitor list|add|remove|run|results|start -w  Collections on a schedule (monitors)
+testpion monitor list|add|remove|run|results|uptime|start -w  Collections on a schedule (monitors)
 testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
 testpion trash list|restore|empty -w  Recently deleted collections and environments (30 days)
 testpion history list|stats|diff|export-har -w  Response history of saved requests; response times; compare two responses; HAR export
@@ -366,10 +366,11 @@ testpion history activity -w my-workspace --days 30 --json              # per-da
 testpion monitor add "API health" --collection "My API" --folder Smoke --every 15m -e Staging -w my-workspace
 testpion monitor add "API health" --collection "My API" --every 5m --max-p95 800 -w my-workspace   # also fail when p95 > 800 ms
 testpion monitor run --due -w my-workspace      # for cron; exit 1 if a run failed
+testpion monitor uptime "API health" -w my-workspace --days 90   # uptime per day, like a status page
 testpion monitor start -w my-workspace          # keep running them until Ctrl+C
 ```
 
-`list`, `results` and `add` take `--json`. See [Monitors](/test-runner/monitors).
+`list`, `results`, `uptime` and `add` take `--json`. See [Monitors](/test-runner/monitors).
 
 ## `ci`
 

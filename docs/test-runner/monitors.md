@@ -39,6 +39,8 @@ Give a monitor an **Alert webhook** (or `testpion monitor add … --webhook <url
 
 A **Response time limit** (or `--max-p95 <ms>`) makes a run fail when the p95 response time of its requests is over it, even when every check passes: the run shows *Too slow* with the reason (for example "p95 830 ms is over the 500 ms limit") and alerts like any other failure. The *Response p95* chart shows each run's p95 with the limit as a dashed line.
 
+**Uptime by day** shows the last 30 days like a status page: one block per day, green when every run passed, amber at 90% or more, red below that and grey when nothing ran; hover a day for its runs and its slowest p95. `testpion monitor uptime "API health" -w my-workspace [--days 90] [--json]` prints the same, and the `monitor_uptime` MCP tool returns it to agents.
+
 ```json
 { "text": "🔴 Monitor \"Checkout\" failed: 3 of 4 requests", "status": "failed", "total": 4, "passed": 1, "failed": 3 }
 ```
@@ -65,6 +67,7 @@ testpion monitor list -w my-workspace --json            # schedule, last result,
 testpion monitor run "API health" -w my-workspace       # run one now
 testpion monitor run --due -w my-workspace              # run the ones that are due (for cron)
 testpion monitor results "API health" -w my-workspace   # recent results, newest first
+testpion monitor uptime "API health" -w my-workspace    # uptime per day, last 30 days
 testpion monitor start -w my-workspace                  # keep running them until Ctrl+C
 testpion monitor remove "API health" -w my-workspace
 ```
@@ -79,4 +82,4 @@ testpion monitor remove "API health" -w my-workspace
 
 ## For AI agents
 
-The [MCP server](/ai-testing/mcp-server) has `list_monitors` (definitions with their last result and next run), `monitor_results` and `run_monitor` (which returns the details of failed requests). `run_monitor` refuses production environments unless the server was started with `--allow-production`.
+The [MCP server](/ai-testing/mcp-server) has `list_monitors` (definitions with their last result and next run), `monitor_results`, `monitor_uptime` (uptime per day) and `run_monitor` (which returns the details of failed requests). `run_monitor` refuses production environments unless the server was started with `--allow-production`.

@@ -51,7 +51,7 @@ import { responseTimeStats } from '../report/response-stats.js';
 import { ciConfig, type CiConfigOptions } from '../runner/ci-config.js';
 import { compareEnvironments } from '../storage/env-compare.js';
 import { compareRequestAcrossEnvironments } from '../runner/env-request-compare.js';
-import { executeMonitor, findMonitor, listMonitors, monitorResults, monitorStatus } from '../runner/monitors.js';
+import { executeMonitor, findMonitor, listMonitors, monitorDaily, monitorResults, monitorStatus } from '../runner/monitors.js';
 
 /**
  * `testpion mcp-server`: the TestPion engine as MCP tools, so AI agents (Claude, IDE assistants …)
@@ -818,6 +818,17 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       description: "A monitor's recent results, newest first: status, passed / failed / errors, duration, median response time, what started it and the run id. Use it to see when a check started failing.",
       inputSchema: { type: 'object', properties: { monitor: str('Monitor name or id'), limit: { type: 'number', description: 'How many (default 20, max 200)' } }, required: ['monitor'] },
       run: (a) => monitorResults(store, findMonitor(store, String(a.monitor)).id, Math.min(Math.max(Number(a.limit) || 20, 1), 200)),
+    },
+    {
+      name: 'monitor_uptime',
+      description: "A monitor's uptime per day over the last N days (oldest first): runs, passed, uptime percent and the slowest p95 response time of each day. Days without runs have runs: 0. Use it for an SLA view or to find when an API became unreliable.",
+      inputSchema: { type: 'object', properties: { monitor: str('Monitor name or id'), days: { type: 'number', description: 'How many days (default 30, max 366)' } }, required: ['monitor'] },
+      run: (a) => {
+        const days = monitorDaily(store, findMonitor(store, String(a.monitor)).id, Number(a.days) || 30);
+        const runs = days.reduce((n, d) => n + d.runs, 0);
+        const passed = days.reduce((n, d) => n + d.passed, 0);
+        return { uptime: runs ? Math.round((passed / runs) * 1000) / 10 : undefined, runs, passed, days };
+      },
     },
     {
       name: 'run_monitor',

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { formatMs, timeAgo } from '../lib/format';
+import { useEffect, useMemo, useState } from 'react';
+import { call } from '../api';
+import { formatMs, plural, timeAgo } from '../lib/format';
 import { cx } from './ui';
 import { axisMs, ChartCard as Card, chartKeys, ChartTip, PointLine, StackedColumns, Swatch, useWidth } from './charts';
 
@@ -184,11 +185,92 @@ export function ResponseP95Chart({ runs, limit }: { runs: RunPoint[]; limit?: nu
   );
 }
 
-export function MonitorCharts({ runs, p95Limit }: { runs: RunPoint[]; p95Limit?: number }) {
+/** One day of a monitor (monitor.daily). */
+interface MonitorDay {
+  date: string;
+  runs: number;
+  passed: number;
+  uptime?: number;
+  maxP95Ms?: number;
+}
+
+const dayColor = (d: MonitorDay) => (!d.runs ? 'var(--line)' : d.uptime === 100 ? 'var(--ok)' : (d.uptime ?? 0) >= 90 ? 'var(--warn)' : 'var(--bad)');
+const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+/** Uptime per day over 30 days, like a status page: one block per calendar day (in this browser's time zone). */
+export function DailyUptime({ monitorId, refresh }: { monitorId: string; refresh?: string }) {
+  const [days, setDays] = useState<MonitorDay[]>([]);
+  useEffect(() => {
+    let live = true;
+    void call<MonitorDay[]>('monitor.daily', { id: monitorId, days: 30, utcOffsetMinutes: -new Date().getTimezoneOffset() }).then(
+      (d) => live && setDays(d),
+      () => live && setDays([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [monitorId, refresh]);
+  return days.some((d) => d.runs) ? <DayStrip days={days} /> : null;
+}
+
+/** The strip itself, mounted once there is data (so its width is measured). */
+function DayStrip({ days }: { days: MonitorDay[] }) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number>();
+  const runs = days.reduce((n, d) => n + d.runs, 0);
+  const passed = days.reduce((n, d) => n + d.passed, 0);
+  const gap = 3;
+  const block = Math.max(4, (width - gap * (days.length - 1)) / days.length);
+  const h = days[hover ?? -1];
+  return (
+    <Card
+      title="Uptime by day"
+      aside={
+        <span>
+          30 days <b className="text-fg">{Math.round((passed / runs) * 1000) / 10}%</b> · {plural(runs, 'run')}
+        </span>
+      }
+      legend={
+        <>
+          <Swatch color="var(--ok)" label="All passed" />
+          <Swatch color="var(--warn)" label="90% or more" />
+          <Swatch color="var(--bad)" label="Less" />
+          <Swatch color="var(--line)" label="No runs" />
+          <span className="ml-auto">{dayLabel(days[0]!.date)} → today</span>
+        </>
+      }
+    >
+      <div ref={ref} {...chartKeys(days.length, hover, setHover)} className="relative h-8 outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded" onMouseLeave={() => setHover(undefined)}>
+        <svg width={width} height={32} role="img" aria-label={`Uptime by day: ${days.filter((d) => d.runs && d.uptime === 100).length} of ${days.filter((d) => d.runs).length} days with runs had every run pass`}>
+          {days.map((d, i) => (
+            <rect key={d.date} x={i * (block + gap)} y={0} width={block} height={32} rx={2} fill={dayColor(d)} opacity={hover === undefined || hover === i ? 0.9 : 0.45} onMouseEnter={() => setHover(i)} />
+          ))}
+        </svg>
+        {h && (
+          <div className="absolute left-0 top-9 w-full h-0">
+            <ChartTip x={(hover ?? 0) * (block + gap)} width={width}>
+              <div className="flex items-center gap-1.5 font-medium text-fg">
+                <span className="w-2 h-2 rounded-full" style={{ background: dayColor(h) }} />
+                {dayLabel(h.date)}
+              </div>
+              <div className="text-muted mt-0.5">
+                {h.runs ? `${h.uptime}% · ${h.passed}/${plural(h.runs, 'run')} passed` : 'No runs'}
+                {h.maxP95Ms !== undefined ? ` · slowest p95 ${formatMs(h.maxP95Ms)}` : ''}
+              </div>
+            </ChartTip>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+export function MonitorCharts({ runs, p95Limit, monitorId }: { runs: RunPoint[]; p95Limit?: number; monitorId?: string }) {
   if (!runs.length) return null;
   return (
     <div className="flex flex-col gap-3">
       <AvailabilityStrip runs={runs} />
+      {monitorId && <DailyUptime monitorId={monitorId} refresh={runs[0]?.runId} />}
       <div className={cx('grid gap-3', '@container')} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
         <RunTimeChart runs={runs} />
         <RequestsChart runs={runs} />

@@ -5,6 +5,7 @@ import {
   executeMonitor,
   findMonitor,
   listMonitors,
+  monitorDaily,
   monitorResults,
   monitorStatus,
   notifyMonitorWebhook,
@@ -50,6 +51,8 @@ export function monitorHandlers(be: Backend): Handlers {
       }
     },
     'monitor.results': ({ id, limit }: { id: string; limit?: number }) => monitorResults(be.ws, id, Math.min(limit ?? 50, 500)),
+    // uptime per day, in the caller's time zone (minutes east of UTC)
+    'monitor.daily': ({ id, days, utcOffsetMinutes }: { id: string; days?: number; utcOffsetMinutes?: number }) => monitorDaily(be.ws, id, days ?? 30, utcOffsetMinutes),
     'monitor.run': async ({ id }: { id: string }) => {
       if (be.runningMonitors.has(id)) throw new ApsError('ValidationError', 'This monitor is already running', { suggestions: [] });
       const m = findMonitor(be.ws, id);

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +15,7 @@ import {
   formatEvery,
   isDue,
   listMonitors,
+  monitorDaily,
   monitorResults,
   nextRunAt,
   parseEvery,
@@ -192,5 +193,36 @@ describe('monitors in a workspace', () => {
     deleteMonitor(store, 'mon-health');
     expect(listMonitors(store)).toEqual([]);
     expect(await s.tick(later + 60 * 60_000)).toBe(0);
+  });
+});
+
+describe('monitor uptime by day', () => {
+  it('counts runs per calendar day in the given zone, with empty days', () => {
+    const now = Date.parse('2026-10-01T10:00:00Z');
+    const row = (startedAt: string, status: MonitorResult['status'], p95Ms?: number) => JSON.stringify({ monitorId: 'mon-daily', runId: startedAt, startedAt, durationMs: 5, status, total: 1, passed: status === 'passed' ? 1 : 0, failed: status === 'passed' ? 0 : 1, errors: 0, trigger: 'schedule', p95Ms });
+    mkdirSync(store.path('runs', 'monitors'), { recursive: true });
+    writeFileSync(
+      store.path('runs', 'monitors', 'mon-daily.jsonl'),
+      [
+        row('2026-09-20T12:00:00Z', 'passed'), // older than the period
+        row('2026-09-29T09:00:00Z', 'passed', 40),
+        row('2026-09-29T10:00:00Z', 'failed', 900),
+        row('2026-09-30T23:30:00Z', 'passed', 20), // Oct 1 at UTC+2
+        row('2026-10-01T08:00:00Z', 'passed', 30),
+      ].join('\n') + '\n',
+    );
+    const utc = monitorDaily(store, 'mon-daily', 3, 0, now);
+    expect(utc.map((d) => [d.date, d.runs, d.passed, d.uptime, d.maxP95Ms])).toEqual([
+      ['2026-09-29', 2, 1, 50, 900],
+      ['2026-09-30', 1, 1, 100, 20],
+      ['2026-10-01', 1, 1, 100, 30],
+    ]);
+    const east = monitorDaily(store, 'mon-daily', 3, 120, now);
+    expect(east.map((d) => [d.date, d.runs])).toEqual([
+      ['2026-09-29', 2],
+      ['2026-09-30', 0],
+      ['2026-10-01', 2],
+    ]);
+    expect(east[1]!.uptime).toBeUndefined();
   });
 });
