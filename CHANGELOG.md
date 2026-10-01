@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.30.0 — 2026-10-01
+
+Highlights: certificates across the workspace, test history, server time in load tests.
+
+- **Certificates**: every HTTPS response records its host's certificate. Home lists those that expire first; `testpion certificates --warn 21` prints them (exit 1 when one expires within 21 days); agents use `list_certificates`. The security review flags hosts whose certificate expires within 30 days.
+- **Monitors**: a **Certificate warning** (or `--min-cert-days`) fails a run when a host it calls has fewer days left, and the monitor shows the days left.
+- **Test history**: a result's **History** tab shows the same test in the latest runs (pass / fail, time per run, failed checks), flagged *flaky?* when the result keeps flipping. Also `testpion history test "<name>"` and the `test_history` MCP tool.
+- **Load tests**: server time (time to first byte, p50 / p95), and connections opened vs reused with the average set-up time, in the app and `testpion load`.
+- **AI assistant**: **Explain with AI** in the Timeline (where the time went) and in a test's History (flaky or broken, and why).
+- **HAR export**: real DNS, connect, SSL, wait and receive timings.
+
 ## 0.29.0 — 2026-10-01
 
 Highlights: where request time goes (DNS, TCP, TLS, server, download), certificate expiry checks, uptime by day.
