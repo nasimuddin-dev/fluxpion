@@ -52,4 +52,16 @@ describe('runBreakdown flaky tests', () => {
       { id: 'wobbly', name: 'wobbly', attempts: 2 },
     ]);
   });
+
+  it('adds up where the time of requests went, by phase', () => {
+    const b = runBreakdown();
+    const timed = (name: string, timing: Record<string, unknown>) => ({ ...r(name, 'passed', 100), metadata: { timing } }) as TestResult;
+    b.add(timed('new', { dnsMs: 4, tcpMs: 10, tlsMs: 20.04, ttfbMs: 50, downloadMs: 6, reusedConnection: false }));
+    b.add(timed('reused', { ttfbMs: 30, downloadMs: 2, reusedConnection: true }));
+    b.add(r('no-timing', 'passed', 10, 'grpc'));
+    expect(b.result().phases).toEqual({ requests: 2, newConnections: 1, reused: 1, dnsMs: 4, tcpMs: 10, tlsMs: 20, ttfbMs: 80, downloadMs: 8 });
+    const none = runBreakdown();
+    none.add(r('a', 'passed', 5));
+    expect(none.result().phases).toBeUndefined();
+  });
 });

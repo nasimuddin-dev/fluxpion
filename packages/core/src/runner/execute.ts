@@ -305,7 +305,7 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
         readFile: svc.readFile,
       },
       partial: { input: `${prepared.method} ${prepared.url}`, output: summarize(svc.redactor.redact(response.json ?? response.bodyPreview)) },
-      metadata: { url: prepared.url, method: prepared.method, status: response.status, size: response.size, truncated: response.truncated },
+      metadata: { url: prepared.url, method: prepared.method, status: response.status, size: response.size, truncated: response.truncated, timing: timingSummary(response) },
     };
   } catch (e) {
     s.fail(e);
@@ -333,6 +333,7 @@ async function runGraphQL(test: GraphQLTest, scope: VariableScope, svc: ExecServ
         graphqlErrors: out.errors,
       },
       partial: { input: summarize(r.query, 1000), output: summarize(out.response.json ?? out.response.bodyPreview) },
+      metadata: { timing: timingSummary(out.response) },
     };
   } catch (e) {
     s.fail(e);

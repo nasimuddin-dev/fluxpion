@@ -27,7 +27,14 @@ export interface RunBreakdown {
   flaky: Array<{ id: string; name: string; attempts: number }>;
   /** Scored checks by evaluator (check type): how many scores fell in 0–0.2, 0.2–0.4, … 0.8–1, and their mean. */
   scores: Array<{ name: string; buckets: number[]; mean: number; count: number }>;
+  /**
+   * Where the time of HTTP and GraphQL requests went: total ms per phase over all of them (DNS, TCP and TLS only
+   * count on new connections), and how many requests opened a new connection or reused one.
+   */
+  phases?: { requests: number; newConnections: number; reused: number; dnsMs: number; tcpMs: number; tlsMs: number; ttfbMs: number; downloadMs: number };
 }
+
+const PHASE_KEYS = ['dnsMs', 'tcpMs', 'tlsMs', 'ttfbMs', 'downloadMs'] as const;
 
 /**
  * Summary of a run's results for charts: a latency histogram (passed and failed per bucket),
@@ -41,6 +48,7 @@ export function runBreakdown() {
   const checks = new Map<string, number>();
   const scores = new Map<string, { buckets: number[]; sum: number; count: number }>();
   const flaky: RunBreakdown['flaky'] = [];
+  const phases = { requests: 0, newConnections: 0, reused: 0, dnsMs: 0, tcpMs: 0, tlsMs: 0, ttfbMs: 0, downloadMs: 0 };
   let timed = 0;
   return {
     add(r: TestResult) {
@@ -63,6 +71,13 @@ export function runBreakdown() {
         }
       }
       if (r.status === 'skipped') return;
+      const timing = (r.metadata as { timing?: Partial<Record<(typeof PHASE_KEYS)[number], number>> & { reusedConnection?: boolean } } | undefined)?.timing;
+      if (timing && timing.ttfbMs !== undefined) {
+        phases.requests++;
+        if (timing.reusedConnection === true) phases.reused++;
+        else if (timing.reusedConnection === false) phases.newConnections++;
+        for (const k of PHASE_KEYS) phases[k] += timing[k] ?? 0;
+      }
       const ms = r.latencyMs ?? r.durationMs;
       if (typeof ms !== 'number' || !(ms >= 0)) return;
       timed++;
@@ -82,7 +97,8 @@ export function runBreakdown() {
       while (last > 0 && histogram[last]!.passed + histogram[last]!.failed === 0) last--;
       const failingChecks = [...checks].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
       const scored = [...scores].map(([name, e]) => ({ name, buckets: e.buckets, mean: Math.round((e.sum / e.count) * 1000) / 1000, count: e.count })).slice(0, 12);
-      return { timed, histogram: histogram.slice(0, last + 1), slowest, byType, failingChecks, flaky: flaky.sort((a, b) => b.attempts - a.attempts).slice(0, 20), scores: scored };
+      for (const k of PHASE_KEYS) phases[k] = Math.round(phases[k] * 10) / 10;
+      return { timed, histogram: histogram.slice(0, last + 1), slowest, byType, failingChecks, flaky: flaky.sort((a, b) => b.attempts - a.attempts).slice(0, 20), scores: scored, ...(phases.requests ? { phases } : {}) };
     },
   };
 }

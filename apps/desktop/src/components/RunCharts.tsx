@@ -25,6 +25,51 @@ interface Breakdown {
   failingChecks: Array<{ name: string; count: number }>;
   flaky?: Array<{ id: string; name: string; attempts: number }>;
   scores?: Array<{ name: string; buckets: number[]; mean: number; count: number }>;
+  phases?: { requests: number; newConnections: number; reused: number; dnsMs: number; tcpMs: number; tlsMs: number; ttfbMs: number; downloadMs: number };
+}
+
+const PHASES = [
+  ['dnsMs', 'DNS lookup', true],
+  ['tcpMs', 'TCP connect', true],
+  ['tlsMs', 'TLS handshake', true],
+  ['ttfbMs', 'Server (TTFB)', false],
+  ['downloadMs', 'Download', false],
+] as const;
+
+/** Where the time of the run's HTTP and GraphQL requests went: one bar per phase, its share of the whole. */
+function TimeByPhase({ p }: { p: NonNullable<Breakdown['phases']> }) {
+  const total = PHASES.reduce((n, [k]) => n + p[k], 0) || 1;
+  const max = Math.max(...PHASES.map(([k]) => p[k]), 1);
+  return (
+    <ChartCard
+      title="Where the time went"
+      aside={plural(p.requests, 'request')}
+      legend={
+        <>
+          <Swatch color="color-mix(in oklab, var(--accent) 50%, transparent)" label="Setting up connections" />
+          <Swatch color="var(--accent)" label="The request itself" />
+          <span className="ml-auto">
+            {p.newConnections} new connection{p.newConnections === 1 ? '' : 's'}, {p.reused} reused
+          </span>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-1.5">
+        {PHASES.map(([k, label, connect]) => (
+          <BarRow
+            key={k}
+            label={label}
+            segments={[{ value: p[k], color: connect ? 'color-mix(in oklab, var(--accent) 50%, transparent)' : 'var(--accent)' }]}
+            of={max}
+            right={`${formatMs(p[k])} · ${Math.round((p[k] / total) * 100)}%`}
+            labelClass="w-24"
+            rightClass="w-24"
+            title={`${label}: ${formatMs(p[k])} in all, ${Math.round((p[k] / total) * 100)}% of the requests' time${connect ? ' (new connections only)' : ''}`}
+          />
+        ))}
+      </div>
+    </ChartCard>
+  );
 }
 
 /** Scores of one evaluator in five ranges (one hue: magnitude), its mean marked, low ranges read as weak. */
@@ -162,6 +207,7 @@ export function RunCharts({ runId, onPick }: { runId: string; onPick?(name: stri
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         {data.timed > 0 && <LatencyHistogram data={data.histogram} />}
         <ByType byType={data.byType} />
+        {data.phases && <TimeByPhase p={data.phases} />}
         {!!data.scores?.length && (
           <ChartCard title="Scores" aside="per evaluator, 0 to 1">
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>

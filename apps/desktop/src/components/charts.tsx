@@ -295,7 +295,7 @@ export function StackedColumns<T>({
  * A labelled horizontal bar: segments (e.g. passed / failed / skipped, or one magnitude) side by side,
  * scaled to `of` (the largest row) so rows compare; the label left, a number right.
  */
-export function BarRow({ label, segments, of, right, title, labelClass = 'w-20' }: { label: ReactNode; segments: Array<{ value: number; color: string }>; of: number; right: ReactNode; title?: string; labelClass?: string }) {
+export function BarRow({ label, segments, of, right, title, labelClass = 'w-20', rightClass = 'w-16' }: { label: ReactNode; segments: Array<{ value: number; color: string }>; of: number; right: ReactNode; title?: string; labelClass?: string; rightClass?: string }) {
   const total = segments.reduce((a, s) => a + s.value, 0);
   return (
     <div className="flex items-center gap-2 text-xs" title={title}>
@@ -309,7 +309,7 @@ export function BarRow({ label, segments, of, right, title, labelClass = 'w-20' 
             ))}
         </span>
       </span>
-      <span className="w-16 text-right tabular-nums text-fg shrink-0">{right}</span>
+      <span className={'text-right tabular-nums text-fg shrink-0 ' + rightClass}>{right}</span>
     </div>
   );
 }
