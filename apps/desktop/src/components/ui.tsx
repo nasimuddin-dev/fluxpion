@@ -335,7 +335,7 @@ function MenuItems({ items }: { items: MenuItem[] }) {
 }
 
 /** Resizable two-pane split. Size is persisted per `id`. `sidebar` gives the first pane the sidebar surface. */
-export function Split({ id, direction = 'horizontal', initial = 50, min = 15, sidebar, collapsed, collapsedSecond, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; sidebar?: boolean; /** Hide the first pane (kept mounted, so its state survives). */ collapsed?: boolean; /** Hide the second pane (the first takes the room). */ collapsedSecond?: boolean; children: [ReactNode, ReactNode] }) {
+export function Split({ id, direction = 'horizontal', initial = 50, min = 15, sidebar, collapsed, collapsedSecond, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; sidebar?: boolean; /** Leave the first pane out (the request editors' old sidebars, replaced by the Collections sidebar): it isn't rendered at all. */ collapsed?: boolean; /** Hide the second pane (the first takes the room). */ collapsedSecond?: boolean; children: [ReactNode, ReactNode] }) {
   const [pct, setPct] = useState(() => Number(localStorage.getItem(`aps.split.${id}`)) || initial);
   const ref = useRef<HTMLDivElement>(null);
   const onDown = useCallback(
@@ -363,9 +363,12 @@ export function Split({ id, direction = 'horizontal', initial = 50, min = 15, si
   const h = direction === 'horizontal';
   return (
     <div ref={ref} className={cx('flex min-h-0 min-w-0 h-full w-full', h ? 'flex-row' : 'flex-col')}>
-      <div className={cx('min-h-0 min-w-0 overflow-hidden flex flex-col', sidebar && 'bg-panel')} style={{ flexBasis: collapsedSecond ? '100%' : `${pct}%`, display: collapsed ? 'none' : undefined }}>
-        {children[0]}
-      </div>
+      {/* a collapsed pane costs nothing: it held a whole collection tree, re-rendered on every change */}
+      {!collapsed && (
+        <div className={cx('min-h-0 min-w-0 overflow-hidden flex flex-col', sidebar && 'bg-panel')} style={{ flexBasis: collapsedSecond ? '100%' : `${pct}%` }}>
+          {children[0]}
+        </div>
+      )}
       <div
         role="separator"
         aria-orientation={h ? 'vertical' : 'horizontal'}
