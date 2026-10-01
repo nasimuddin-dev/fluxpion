@@ -204,6 +204,8 @@ export function breakdownHtml(b: RunBreakdown): string {
   }
   if (b.slowest.length)
     out.push(`<section class="chart"><h3>Slowest tests</h3><table>${b.slowest.map((r) => `<tr><td class="${r.status}">${r.status}</td><td>${html(r.name)}</td><td style="text-align:right">${r.latencyMs} ms</td></tr>`).join('')}</table></section>`);
+  if (b.flaky.length)
+    out.push(`<section class="chart"><h3>Flaky tests <span class="muted" style="text-transform:none;font-weight:400;margin-left:6px">passed after a retry</span></h3><table>${b.flaky.map((f) => `<tr><td>${html(f.name)}</td><td class="skipped" style="text-align:right">${f.attempts} attempts</td></tr>`).join('')}</table></section>`);
   if (b.failingChecks.length)
     out.push(`<section class="chart"><h3>Checks that failed most</h3><table>${b.failingChecks.map((c) => `<tr><td>${html(c.name)}</td><td class="failed" style="text-align:right">${c.count}×</td></tr>`).join('')}</table></section>`);
   return out.length ? `<div class="charts" id="charts">${out.join('')}</div>` : '';

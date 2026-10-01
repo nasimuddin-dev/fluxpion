@@ -23,6 +23,7 @@ interface Breakdown {
   }>;
   byType: Record<string, { passed: number; failed: number; skipped: number }>;
   failingChecks: Array<{ name: string; count: number }>;
+  flaky?: Array<{ id: string; name: string; attempts: number }>;
   scores?: Array<{ name: string; buckets: number[]; mean: number; count: number }>;
 }
 
@@ -183,6 +184,18 @@ export function RunCharts({ runId, onPick }: { runId: string; onPick?(name: stri
                   <StatusIcon status={r.status} />
                   <span className="truncate flex-1 min-w-0 text-fg">{r.name}</span>
                   <span className="w-16 text-right tabular-nums shrink-0 text-fg">{formatMs(r.latencyMs)}</span>
+                </button>
+              ))}
+            </div>
+          </ChartCard>
+        )}
+        {!!data.flaky?.length && (
+          <ChartCard title="Flaky tests" aside="passed after a retry">
+            <div className="flex flex-col">
+              {data.flaky.map((f) => (
+                <button key={f.id} className="flex items-center gap-2 py-1 px-1 -mx-1 rounded text-xs text-left min-w-0 hover:bg-hover" title={`Show ${f.name} in the results`} onClick={() => onPick?.(f.name)}>
+                  <span className="truncate flex-1 min-w-0 text-fg">{f.name}</span>
+                  <span className="text-warn tabular-nums shrink-0">{f.attempts} attempts</span>
                 </button>
               ))}
             </div>

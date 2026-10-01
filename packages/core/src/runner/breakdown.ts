@@ -23,6 +23,8 @@ export interface RunBreakdown {
   byType: Record<string, { passed: number; failed: number; skipped: number }>;
   /** Checks that failed most often, by name. */
   failingChecks: Array<{ name: string; count: number }>;
+  /** Tests that passed only after a retry (flaky), most attempts first. */
+  flaky: Array<{ id: string; name: string; attempts: number }>;
   /** Scored checks by evaluator (check type): how many scores fell in 0–0.2, 0.2–0.4, … 0.8–1, and their mean. */
   scores: Array<{ name: string; buckets: number[]; mean: number; count: number }>;
 }
@@ -38,10 +40,12 @@ export function runBreakdown() {
   const byType: RunBreakdown['byType'] = {};
   const checks = new Map<string, number>();
   const scores = new Map<string, { buckets: number[]; sum: number; count: number }>();
+  const flaky: RunBreakdown['flaky'] = [];
   let timed = 0;
   return {
     add(r: TestResult) {
       const bad = r.status === 'failed' || r.status === 'error';
+      if (r.status === 'passed' && (r.attempts ?? 1) > 1 && flaky.length < 200) flaky.push({ id: r.id, name: r.name, attempts: r.attempts });
       const t = (byType[r.type] ??= { passed: 0, failed: 0, skipped: 0 });
       if (bad) t.failed++;
       else if (r.status === 'skipped') t.skipped++;
@@ -78,7 +82,7 @@ export function runBreakdown() {
       while (last > 0 && histogram[last]!.passed + histogram[last]!.failed === 0) last--;
       const failingChecks = [...checks].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
       const scored = [...scores].map(([name, e]) => ({ name, buckets: e.buckets, mean: Math.round((e.sum / e.count) * 1000) / 1000, count: e.count })).slice(0, 12);
-      return { timed, histogram: histogram.slice(0, last + 1), slowest, byType, failingChecks, scores: scored };
+      return { timed, histogram: histogram.slice(0, last + 1), slowest, byType, failingChecks, flaky: flaky.sort((a, b) => b.attempts - a.attempts).slice(0, 20), scores: scored };
     },
   };
 }

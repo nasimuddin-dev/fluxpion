@@ -41,3 +41,15 @@ describe('runBreakdown scores', () => {
     expect(b.result().scores).toEqual([{ name: 'similarity', buckets: [1, 0, 1, 0, 3], mean: 0.69, count: 5 }]);
   });
 });
+
+describe('runBreakdown flaky tests', () => {
+  it('lists tests that passed only after a retry, most attempts first', () => {
+    const b = runBreakdown();
+    const t = (name: string, status: string, attempts: number) => ({ id: name, name, type: 'http', status, startedAt: '', durationMs: 1, attempts, checks: [] }) as unknown as TestResult;
+    for (const x of [t('steady', 'passed', 1), t('wobbly', 'passed', 2), t('shaky', 'passed', 3), t('broken', 'failed', 3)]) b.add(x);
+    expect(b.result().flaky).toEqual([
+      { id: 'shaky', name: 'shaky', attempts: 3 },
+      { id: 'wobbly', name: 'wobbly', attempts: 2 },
+    ]);
+  });
+});
