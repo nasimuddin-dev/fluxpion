@@ -1,3 +1,4 @@
+import { ArrivalSpark } from '../components/charts';
 import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2, Bookmark, History, KeyRound } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
@@ -504,7 +505,10 @@ export function GrpcView() {
               <>
                 <div className="flex items-center gap-3 px-3 h-9 border-b border-line text-sm shrink-0">
                   {sending ? (
-                    <Badge tone="accent">{live.length ? `receiving · ${live.length}` : 'calling…'}</Badge>
+                    <>
+                      <Badge tone="accent">{live.length ? `receiving · ${live.length}` : 'calling…'}</Badge>
+                      <ArrivalSpark times={live.map((m) => m.atMs)} />
+                    </>
                   ) : (
                     result && (
                       <>
@@ -515,6 +519,7 @@ export function GrpcView() {
                           Time <span className="text-fg tabular-nums">{Math.round(result.durationMs)} ms</span>
                         </span>
                         {result.messages && <span className="text-muted">{plural(result.messages.length, 'message')}</span>}
+                        {result.messages && <ArrivalSpark times={result.messages.map((m) => m.atMs)} />}
                         {result.details && <span className="text-muted truncate">{result.details}</span>}
                       </>
                     )

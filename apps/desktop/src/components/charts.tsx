@@ -324,3 +324,22 @@ export function StatTile({ label, value, sub, tone }: { label: string; value: st
     </div>
   );
 }
+
+/** When the messages of a stream arrived (ms from the start), as a tiny column sparkline, with the mean gap in its tooltip. */
+export function ArrivalSpark({ times, buckets = 30 }: { times: number[]; buckets?: number }) {
+  if (times.length < 2) return null;
+  const end = Math.max(1, ...times);
+  const counts = Array.from({ length: buckets }, () => 0);
+  for (const t of times) counts[Math.min(buckets - 1, Math.floor((t / end) * buckets))]!++;
+  const max = Math.max(1, ...counts);
+  const sorted = [...times].sort((a, b) => a - b);
+  const gap = (sorted[sorted.length - 1]! - sorted[0]!) / (sorted.length - 1);
+  const label = `${times.length} messages over ${(end / 1000).toFixed(2)} s, ${gap < 1 ? 'arriving together' : `one every ${Math.round(gap)} ms on average`}`;
+  return (
+    <span className="inline-flex items-end gap-px h-4 w-[90px] shrink-0" role="img" aria-label={label} title={label}>
+      {counts.map((c, i) => (
+        <span key={i} className="flex-1 rounded-[1px] bg-accent" style={{ height: `${c ? Math.max(12, (c / max) * 100) : 0}%`, opacity: 0.85 }} />
+      ))}
+    </span>
+  );
+}
