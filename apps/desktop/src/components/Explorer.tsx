@@ -69,7 +69,7 @@ function Section({
   return (
     <div className="border-b border-line/60">
       <div className="group flex items-center h-9 pl-1.5 pr-1 sticky top-0 bg-panel z-10">
-        <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => sections.toggle(id, def)} aria-expanded={open}>
+        <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => sections.toggle(id, def)} aria-expanded={open} data-tree-row>
           {open ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
           <span className="text-muted shrink-0">{icon}</span>
           <span className="text-[0.82rem] font-semibold truncate">{title}</span>
@@ -98,7 +98,7 @@ function Row({ icon, label, sub, onClick, title, active, menu, drag }: { icon?: 
         setMenuOpen(true);
       }}
     >
-      <button title={title ?? label} onClick={onClick} className="flex-1 min-w-0 flex items-center gap-2 h-7 pl-6 pr-1 text-sm text-left">
+      <button title={title ?? label} onClick={onClick} data-tree-row className="flex-1 min-w-0 flex items-center gap-2 h-7 pl-6 pr-1 text-sm text-left">
         {icon && <span className="text-muted shrink-0">{icon}</span>}
         <span className="truncate flex-1">{label}</span>
         {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}
@@ -326,6 +326,22 @@ export function Explorer() {
   // Import and Export open here, without leaving the request editors
   const [importing, setImporting] = useState(false);
   const [collapseAll, setCollapseAll] = useState(0);
+  const treeKeys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-tree-row]');
+    if (!row) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const rows = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-tree-row]')].filter((r) => r.offsetParent);
+      const next = rows[rows.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (next) {
+        e.preventDefault();
+        next.focus();
+        next.scrollIntoView({ block: 'nearest' });
+      }
+    } else if ((e.key === 'ArrowRight' && row.getAttribute('aria-expanded') === 'false') || (e.key === 'ArrowLeft' && row.getAttribute('aria-expanded') === 'true')) {
+      e.preventDefault();
+      row.click();
+    }
+  };
   const revealKey = useApp((s) => s.intent?.nonce);
   const [exporting, setExporting] = useState(false);
   const importDefinition = () => setImporting(true);
@@ -487,7 +503,8 @@ export function Explorer() {
           <ChevronsDownUp size={14} />
         </IconButton>
       </div>
-      <div className="flex-1 overflow-auto">
+      {/* keyboard, like a file tree: ↑ ↓ move between rows, → expands, ← collapses (Enter opens, F2 renames, Delete deletes) */}
+      <div className="flex-1 overflow-auto" onKeyDown={treeKeys}>
         {collections.length ? (
           <div className="pb-2 border-b border-line/60">
             <CollectionTree

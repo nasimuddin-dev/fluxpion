@@ -34,6 +34,8 @@ const GROUPS: Array<{ title: string; items: Array<{ keys: string[][]; text: stri
   {
     title: 'Collections sidebar',
     items: [
+      { keys: [['↑'], ['↓']], text: 'Move between rows' },
+      { keys: [['→'], ['←']], text: 'Expand or collapse a collection, category or folder' },
       { keys: [['F2']], text: 'Rename the focused request or folder' },
       { keys: [['Delete']], text: 'Delete the focused request or folder (Undo in the message)' },
       { keys: [['Enter']], text: 'Open the focused request' },

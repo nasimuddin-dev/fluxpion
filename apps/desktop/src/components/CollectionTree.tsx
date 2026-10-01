@@ -399,7 +399,7 @@ export function CollectionTree({
         return (
           <div key={n.id}>
             <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', menuFor === n.id && 'bg-hover', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })} onContextMenu={(e) => (e.preventDefault(), setMenuFor(n.id))}>
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id, isOpen)} onKeyDown={rowKeys(c, n)}>
+              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id, isOpen)} onKeyDown={rowKeys(c, n)} data-tree-row aria-expanded={isOpen}>
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
                 <span className="truncate">{n.name}</span>
@@ -450,7 +450,7 @@ export function CollectionTree({
               {examplesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
           )}
-          <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)} onKeyDown={rowKeys(c, n)} title="Enter opens · F2 renames · Delete deletes">
+          <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)} onKeyDown={rowKeys(c, n)} data-tree-row title="Enter opens · F2 renames · Delete deletes">
             <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
           </button>
@@ -514,7 +514,7 @@ export function CollectionTree({
       }}
       {...(cat === 'rest' || cat === 'soap' || cat === 'graphql' ? dropProps(c, `${c.id}:${cat}`, 'into', {}) : {})}
     >
-      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(key, isOpen)} aria-expanded={isOpen}>
+      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(key, isOpen)} aria-expanded={isOpen} data-tree-row>
         {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
         <span className={cx('mono text-[0.6rem] font-bold w-8 shrink-0', CATEGORY_META[cat].cls)}>{CATEGORY_META[cat].badge}</span>
         <span className="truncate font-medium">{CATEGORY_META[cat].label}</span>
@@ -570,7 +570,7 @@ export function CollectionTree({
                 setMenuFor(i.id);
               }}
             >
-              <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} title={i.name}>
+              <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} title={i.name} data-tree-row>
                 <span className={cx('mono text-[0.64rem] font-bold w-10 shrink-0', CATEGORY_META[g.cat].cls)}>{i.badge ?? CATEGORY_META[g.cat].badge}</span>
                 <span className="truncate">{i.name}</span>
               </button>
@@ -662,7 +662,7 @@ export function CollectionTree({
                 setMenuFor(c.id);
               }}
             >
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id, isOpen)}>
+              <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id, isOpen)} aria-expanded={isOpen} data-tree-row>
                 {isOpen ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
                   {c.name}
