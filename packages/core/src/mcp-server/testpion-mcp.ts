@@ -460,6 +460,16 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       },
     },
     {
+      name: 'recent_failures',
+      description:
+        'The latest responses that failed across the workspace (sent from the TestPion app), newest first: time, kind (http, graphql, grpc, mcp, llm), name, method, URL (secrets masked), status (4xx/5xx, a transport error such as NetworkError, a non-OK gRPC code, an MCP tool error) and duration. Use it to see what broke recently; request_history and compare_responses dig into one saved request.',
+      inputSchema: { type: 'object', properties: { kind: str('Only this kind: http, graphql, grpc, mcp or llm'), limit: { type: 'number', description: 'How many (default 20, max 200)' } } },
+      run: (a) =>
+        store.meta
+          .listHistory({ failed: true, kind: a.kind ? String(a.kind) : undefined, limit: Math.min(Math.max(Number(a.limit) || 20, 1), 200) })
+          .items.map((h) => ({ id: h.id, timestamp: h.timestamp, kind: h.kind, name: h.name, method: h.method, url: h.url && redactor.redactUrl(h.url), status: h.status, durationMs: h.durationMs })),
+    },
+    {
       name: 'response_time_stats',
       description:
         "Response-time summary of a saved request's recent responses (from requests sent in the TestPion app): count, failed (no status or 400+), fastest, mean, median (p50), p95 and slowest in ms. Use it to spot a slow or flaky endpoint; request_history lists the individual responses.",
