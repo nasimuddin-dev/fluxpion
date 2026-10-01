@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.24.0 — 2026-10-01
+
+Highlights: Amazon Bedrock, a Table and Chart view for JSON responses, load test history and more charts.
+
+- **Amazon Bedrock provider**: every Bedrock model through the Converse API (system prompt, parameters, tool use, usage), signed with AWS Signature V4 (`accessKeyId:secretAccessKey[:sessionToken]`) or a Bedrock API key; a region field; model listing; Titan and Cohere embeddings.
+- **Table view** for JSON responses that are, or hold, a list of objects (up to three levels deep, GraphQL too): sortable columns, a row filter, **Copy CSV**, a **Chart** (a bar per row for a numeric column) and **Save as dataset**, which writes `datasets/<name>.csv` in the workspace.
+- **Workspace datasets in the Collection Runner**: files in `datasets/` are listed next to *Select file*, so data-driven runs work without a native file picker (browser and cloud too).
+- **Load test history**: every finished load test is kept (`runs/load/history.jsonl`); *Earlier load tests* shows p95 and throughput trends and the runs with error rate and pass rules, per saved load test. AI agents read it with the new `load_history` MCP tool, and `load_test` runs are recorded too.
+- **Evaluation scores**: run Charts and the HTML report show how each evaluator's scores spread from 0 to 1, with the mean.
+- **API coverage by tag**: how many operations of each OpenAPI tag were called, least covered first.
+- **Fixes**: the Home dashboard keeps its chosen period when you come back; metric tiles no longer squeeze when there are only a few; "1 check" wording in reports; RAG / Agent labels in run charts.
+
 ## 0.23.0 — 2026-10-01
 
 Highlights: SQLite databases as datasets, WSDL 2.0 imports, a collection Overview and more charts.
