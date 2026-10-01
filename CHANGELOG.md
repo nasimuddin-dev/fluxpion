@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Rename, Duplicate and Delete on a collection's menu** (right-click or **⋯** in the sidebar). Duplicate copies everything the collection holds, its gRPC calls and connections included, with new ids throughout and a free name (*copy*, *copy 2* …); Delete moves it to Recently deleted and closes its tabs. Also as the `col.duplicate` RPC method.
+
 ## 0.17.0 — 2026-09-30
 
 Highlights: a collection now really holds every kind of request: running it runs its gRPC calls and connections, and exporting it shares them. Plus menus on category rows and keyboard shortcuts in the sidebar.

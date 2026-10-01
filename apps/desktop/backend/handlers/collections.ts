@@ -28,6 +28,8 @@ import {
   isRequestSnippet,
   type Collection,
   collectionSavedItems,
+  duplicateCollection,
+  shortId,
 } from '@testpion/core';
 import type { Backend, Handlers, CollectionRunParams } from '../backend.js';
 
@@ -58,6 +60,8 @@ export function collectionsHandlers(be: Backend): Handlers {
       be.mocks.delete(collectionId);
     },
     'mock.status': ({ collectionId }: { collectionId: string }) => be.mockInfo(collectionId),
+    /** Copy a collection with its folders, requests, gRPC calls and connections (new ids throughout). */
+    'col.duplicate': ({ id }: { id: string }) => duplicateCollection(be.ws, id, () => shortId('n-')),
     'col.delete': ({ id }: { id: string }) => {
       void be.mocks.get(id)?.close();
       be.mocks.delete(id);

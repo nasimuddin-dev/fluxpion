@@ -38,3 +38,19 @@ describe('sharing a collection with its gRPC calls and connections', () => {
     expect(be.ws.getLibrary('websocket').items.filter((i) => i.collectionId === copy.id)).toHaveLength(1);
   });
 });
+
+describe('duplicating a collection', () => {
+  it('copies folders, requests, gRPC calls and connections with new ids', async () => {
+    await be.invoke('col.save', { schemaVersion: '1.0', id: 'dup', name: 'Dup', version: 0, variables: [], updatedAt: '', items: [{ kind: 'folder', id: 'f1', name: 'F', items: [{ kind: 'http', id: 'r9', name: 'R', request: { method: 'GET', url: 'http://x' } }] }] });
+    const lib = be.ws.getLibrary('grpc');
+    await be.invoke('lib.save', { kind: 'grpc', library: { folders: lib.folders, items: [...lib.items, { id: 'gd', name: 'Call', collectionId: 'dup', data: { target: 'x:1', method: 'a.B/C' } }] } });
+    const copy = (await be.invoke('col.duplicate', { id: 'dup' })) as { id: string; name: string; items: Array<{ id: string; items: Array<{ id: string }> }> };
+    expect(copy.name).toBe('Dup copy');
+    expect(copy.id).not.toBe('dup');
+    expect(copy.items[0]!.id).not.toBe('f1');
+    expect(copy.items[0]!.items[0]!.id).not.toBe('r9');
+    const calls = be.ws.getLibrary('grpc').items.filter((i) => i.name === 'Call');
+    expect(calls.map((i) => i.collectionId).sort()).toEqual([copy.id, 'dup'].sort());
+    expect(((await be.invoke('col.duplicate', { id: 'dup' })) as { name: string }).name).toBe('Dup copy 2');
+  });
+});

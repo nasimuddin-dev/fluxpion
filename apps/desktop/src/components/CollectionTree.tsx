@@ -109,6 +109,26 @@ export function CollectionTree({
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
   /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
+  /** A copy of the collection with everything it holds (its gRPC calls and connections too). */
+  const duplicateCollection = async (c: Collection) => {
+    try {
+      const copy = await call<Collection>('col.duplicate', { id: c.id });
+      useApp.getState().toast(`Duplicated as "${copy.name}"`, 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+  /** Move a collection to Recently deleted (restorable for 30 days); its tabs close. */
+  const deleteCollection = async (c: Collection) => {
+    if (!(await confirmAction({ title: 'Delete collection', message: `Delete the collection "${c.name}" and all its requests?`, detail: 'You can restore it from Recently deleted for 30 days. Its gRPC calls and connections stay, under Not in a collection.', confirmLabel: 'Delete collection', danger: true }))) return;
+    try {
+      closeTabsFor(c.items.flatMap(subtreeIds));
+      await call('col.delete', { id: c.id });
+      useApp.getState().toast(`Deleted "${c.name}"`, 'info');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
   const renameNode = async (c: Collection, n: CollectionNode) => {
     const name = await promptText(n.kind === 'folder' ? 'Rename folder' : 'Rename request', { value: n.name, okLabel: 'Rename' });
     if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
@@ -543,6 +563,12 @@ export function CollectionTree({
                 <NodeMenu
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
+                  onRename={async () => {
+                    const name = (await promptText('Rename collection', { value: c.name, okLabel: 'Rename' }))?.trim();
+                    if (name) onChange({ ...c, name });
+                  }}
+                  onDuplicate={() => void duplicateCollection(c)}
+                  onDelete={() => void deleteCollection(c)}
                   extraItems={[
                     ...(onNewOfCategory
                       ? (['graphql', 'soap', 'grpc', 'websocket'] as const).map((cat) => ({ label: `New ${CATEGORY_META[cat].label} request`, icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }))

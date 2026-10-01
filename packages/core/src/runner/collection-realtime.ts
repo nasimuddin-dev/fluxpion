@@ -1,4 +1,4 @@
-import type { GrpcTest, KeyValue, LibraryItem, TestCase, WebSocketTest } from '../model/types.js';
+import type { Collection, CollectionNode, GrpcTest, KeyValue, LibraryItem, TestCase, WebSocketTest } from '../model/types.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 
 /**
@@ -119,6 +119,26 @@ export function collectionSavedItems(store: Pick<WorkspaceStore, 'getLibrary'>, 
     if (items.length) out[kind] = items;
   }
   return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * Copy a collection with everything it holds: new ids for the collection, its folders and requests (so
+ * tabs, history and monitors of the original aren't confused with the copy), and copies of its gRPC calls
+ * and connections, shown in the copy.
+ */
+export function duplicateCollection(store: Pick<WorkspaceStore, 'getCollection' | 'saveCollection' | 'getLibrary' | 'saveLibrary' | 'listCollections'>, id: string, newId: () => string): Collection {
+  const src = store.getCollection(id);
+  const taken = new Set(store.listCollections().map((c) => c.name.toLowerCase()));
+  let name = `${src.name} copy`;
+  for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${src.name} copy ${i}`;
+  const renumber = (nodes: CollectionNode[]): CollectionNode[] => nodes.map((n) => (n.kind === 'folder' ? { ...n, id: newId(), items: renumber(n.items) } : { ...n, id: newId() }));
+  const copy = store.saveCollection({ ...structuredClone(src), id: newId(), name, version: 0, items: renumber(structuredClone(src.items)) });
+  for (const kind of COLLECTION_ITEM_KINDS) {
+    const lib = store.getLibrary(kind);
+    const mine = lib.items.filter((i) => i.collectionId === id);
+    if (mine.length) store.saveLibrary(kind, { folders: lib.folders, items: [...lib.items, ...mine.map((i) => ({ ...structuredClone(i), id: newId(), collectionId: copy.id, updatedAt: new Date().toISOString() }))] });
+  }
+  return copy;
 }
 
 /**
