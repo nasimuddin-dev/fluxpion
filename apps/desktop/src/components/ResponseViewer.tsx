@@ -211,7 +211,7 @@ export function ResponseViewer({
           ) : (
             <Empty title="No cookies" />
           ))}
-        {tab === 'timeline' && <Timeline phases={response.timeline} url={response.url} />}
+        {tab === 'timeline' && <Timeline phases={response.timeline} url={response.url} connection={response.connection} />}
         {tab === 'tests' && (
           <div className="overflow-auto h-full">
             <CheckList
@@ -258,16 +258,44 @@ export function KvTable({ rows }: { rows: Array<[string, string]> }) {
   );
 }
 
-function Timeline({ phases, url }: { phases: Array<{ name: string; startMs: number; durationMs: number }>; url: string }) {
+/** Phases of setting up the connection (shown lighter than the request's own wait and download). */
+const CONNECT_PHASES = new Set(['DNS lookup', 'TCP connect', 'TLS handshake']);
+
+function Timeline({ phases, url, connection }: { phases: Array<{ name: string; startMs: number; durationMs: number }>; url: string; connection?: HttpResponseData['connection'] }) {
   const total = phases.find((p) => p.name === 'total')?.durationMs ?? 1;
+  const connect = phases.filter((p) => CONNECT_PHASES.has(p.name)).reduce((n, p) => n + p.durationMs, 0);
+  const peer = connection?.remoteAddress ? `${connection.remoteAddress.includes(':') ? `[${connection.remoteAddress}]` : connection.remoteAddress}${connection.remotePort ? `:${connection.remotePort}` : ''}` : undefined;
   return (
     <div className="p-4 text-sm flex flex-col gap-2 max-w-3xl">
       <div className="text-muted text-xs mono break-all">{url}</div>
+      {connection && (
+        <div className="text-xs text-muted flex flex-wrap gap-x-3 gap-y-1">
+          <span>
+            {connection.reused ? (
+              <>
+                <b className="text-fg font-medium">Reused connection</b>: no DNS lookup, TCP connect or TLS handshake
+              </>
+            ) : (
+              <>
+                <b className="text-fg font-medium">New connection</b>
+                {connect > 0 && ` · set up in ${formatMs(connect)}`}
+              </>
+            )}
+          </span>
+          {peer && <span className="mono">{peer}</span>}
+          {connection.tlsProtocol && (
+            <span>
+              {connection.tlsProtocol}
+              {connection.cipher && <span className="mono"> · {connection.cipher}</span>}
+            </span>
+          )}
+        </div>
+      )}
       {phases.map((p) => (
         <div key={p.name} className="grid grid-cols-[140px_1fr_80px] items-center gap-3">
           <span className={cx(p.name === 'total' && 'font-semibold')}>{p.name}</span>
           <div className="h-3 bg-panel2 rounded relative overflow-hidden">
-            <div className={cx('absolute top-0 bottom-0 rounded', p.name === 'total' ? 'bg-muted/60' : 'bg-accent')} style={{ left: `${(p.startMs / total) * 100}%`, width: `${Math.max(0.5, (p.durationMs / total) * 100)}%` }} />
+            <div className={cx('absolute top-0 bottom-0 rounded', p.name === 'total' ? 'bg-muted/60' : CONNECT_PHASES.has(p.name) ? 'bg-accent/50' : 'bg-accent')} style={{ left: `${(p.startMs / total) * 100}%`, width: `${Math.max(0.5, (p.durationMs / total) * 100)}%` }} />
           </div>
           <span className="text-right tabular-nums">{formatMs(p.durationMs)}</span>
         </div>

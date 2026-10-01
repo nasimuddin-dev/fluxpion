@@ -66,7 +66,7 @@ describe('HTTP client', () => {
     expect(j.headers['content-type']).toBe('application/json');
     expect(JSON.parse(j.body)).toEqual({ a: 1 });
     expect(response.cookies.map((c) => c.name)).toEqual(['session', 'theme']);
-    expect(response.timeline.map((t) => t.name)).toEqual(['prepare', 'waiting (TTFB)', 'download', 'total']);
+    expect(response.timeline.map((t) => t.name)).toEqual(['prepare', 'TCP connect', 'waiting (TTFB)', 'download', 'total']);
     expect(prepared.url).toContain('q=rex');
   });
 

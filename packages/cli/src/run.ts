@@ -15,6 +15,7 @@ import {
   createBaseline,
   createEngineContext,
   executeHttp,
+  timingSummary,
   formatDuration,
   CookieJar,
   cookiesFromJson,
@@ -468,7 +469,7 @@ export async function executeSend(
   const isUrl = /^(https?:\/\/|\{\{)/i.test(target);
   const { store, ephemeral } = openWorkspace(o.workspace, isUrl && !o.workspace ? tmpdir() : undefined, mgr);
   const secrets = new ChainSecretStore([new EnvSecretStore()]);
-  let response: { status: number; statusText: string; headers: Array<[string, string]>; body: string; durationMs: number; url: string } | undefined;
+  let response: { status: number; statusText: string; headers: Array<[string, string]>; body: string; durationMs: number; url: string; timing?: ReturnType<typeof timingSummary> } | undefined;
   let checks: Array<{ name: string; passed: boolean; message?: string }> = [];
   let error: string | undefined;
   try {
@@ -479,7 +480,7 @@ export async function executeSend(
         const body = o.data === undefined ? undefined : /^\s*[{[]/.test(o.data) ? { type: 'json' as const, content: o.data } : { type: 'text' as const, content: o.data };
         const spec = ctx.vars.resolveDeep({ method: o.method.toUpperCase(), url: target, headers, body });
         const { response: r, prepared } = await executeHttp({ ...spec, settings: { timeoutMs: settings.defaultTimeoutMs } }, { redactor: ctx.redactor, maxPreviewBytes: 10 * 1024 * 1024, cookieJar: ctx.services.cookieJar });
-        response = { status: r.status, statusText: r.statusText, headers: r.headers, body: r.bodyPreview, durationMs: r.durationMs, url: prepared.url };
+        response = { status: r.status, statusText: r.statusText, headers: r.headers, body: r.bodyPreview, durationMs: r.durationMs, url: prepared.url, timing: timingSummary(r) };
       } finally {
         await ctx.dispose();
       }
@@ -539,10 +540,15 @@ export async function executeSend(
     } catch {
       /* not JSON */
     }
-    console.log(JSON.stringify({ status: response.status, statusText: response.statusText, url: response.url, durationMs: response.durationMs, headers: Object.fromEntries(response.headers), body, checks }, null, 2));
+    console.log(JSON.stringify({ status: response.status, statusText: response.statusText, url: response.url, durationMs: response.durationMs, timing: response.timing, headers: Object.fromEntries(response.headers), body, checks }, null, 2));
   } else {
     if (o.include) {
       console.log(bold(`${response.status} ${response.statusText}`) + dim(`  ${response.url} · ${formatDuration(response.durationMs)}`));
+      const t = response.timing;
+      if (t) {
+        const parts = [t.dnsMs !== undefined && `DNS ${formatDuration(t.dnsMs)}`, t.tcpMs !== undefined && `TCP ${formatDuration(t.tcpMs)}`, t.tlsMs !== undefined && `TLS ${formatDuration(t.tlsMs)}`, t.reusedConnection && 'reused connection', t.ttfbMs !== undefined && `first byte ${formatDuration(t.ttfbMs)}`, t.downloadMs !== undefined && `download ${formatDuration(t.downloadMs)}`].filter(Boolean);
+        if (parts.length) console.log(dim(`timing: ${parts.join(' · ')}`));
+      }
       for (const [k, v] of response.headers) console.log(`${dim(k + ':')} ${v}`);
       console.log('');
     }

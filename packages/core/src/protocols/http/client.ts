@@ -12,6 +12,7 @@ import { ApsError, normalizeError } from '../../errors.js';
 import { applyAuth, type AuthContext } from './auth.js';
 import { digestAuthorization, parseDigestChallenge, signAwsV4, signOAuth1 } from './signing.js';
 import { isEventStream, SseParser, type SseEvent } from './sse.js';
+import { watchSend } from './socket-timing.js';
 
 /** Events kept per SSE response (the stream itself can be endless). */
 const MAX_SSE_EVENTS = 10_000;
@@ -291,6 +292,8 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
   const guarded = getNetworkPolicy().blockPrivateNetworks;
   // Postman's redirect options are applied hop by hop, so redirects are followed here when one is set
   const custom = !!(s.followOriginalMethod || s.followAuthorizationHeader || s.removeRefererOnRedirect);
+  // the connection the (first) request goes over: DNS, TCP and TLS phases when it is a new one
+  const watch = watchSend(url, method);
   for (;;) {
     await assertUrlAllowed(current);
     res = await undiciFetch(current, {
@@ -335,7 +338,22 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
     hops++;
     if (jar) setJarCookies(headers, jar, current, explicitCookie);
   }
-  mark('waiting (TTFB)', tSend);
+  const sent = watch.result();
+  watch.stop();
+  let connection: HttpResponseData['connection'];
+  if (sent) {
+    const t = sent.times;
+    // a socket opened after the request started is this request's own new connection
+    const fresh = !!t && t.created >= tSend - 1;
+    if (fresh) {
+      const phase = (name: string, from: number, to?: number) => to !== undefined && timeline.push({ name, startMs: round(from - t0), durationMs: round(to - from) });
+      phase('DNS lookup', t.created, t.lookup);
+      phase('TCP connect', t.lookup ?? t.created, t.connect);
+      if (t.connect !== undefined) phase('TLS handshake', t.connect, t.secure);
+    }
+    connection = { reused: !fresh, remoteAddress: sent.remoteAddress, remotePort: sent.remotePort, tlsProtocol: sent.tlsProtocol, cipher: sent.cipher };
+    timeline.push({ name: 'waiting (TTFB)', startMs: round(sent.sentAt - t0), durationMs: round(performance.now() - sent.sentAt) });
+  } else mark('waiting (TTFB)', tSend);
   opts.onResponseStart?.(res.status, res.headers);
 
   const tDown = performance.now();
@@ -433,6 +451,7 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
     payloadPath,
     durationMs,
     timeline,
+    connection,
     url: redact(hops ? current.toString() : res.url || url.toString()),
     redirected: hops > 0 || res.redirected,
     httpVersion: !s.http1Only && alpnByOrigin.get(new URL(res.url || current.toString()).origin) === 'h2' ? '2' : '1.1',
@@ -478,6 +497,13 @@ function round(n: number): number {
 }
 
 /** Generate a cURL command for a prepared request (secrets already redacted). */
+/** Where a response's time went, in ms per phase (DNS / TCP / TLS only on a new connection), for agents and scripts. */
+export function timingSummary(r: Pick<HttpResponseData, 'timeline' | 'connection' | 'durationMs'>): { dnsMs?: number; tcpMs?: number; tlsMs?: number; ttfbMs?: number; downloadMs?: number; totalMs: number; reusedConnection?: boolean; tlsProtocol?: string } {
+  const ms = (name: string) => r.timeline?.find((p) => p.name === name)?.durationMs;
+  const out = { dnsMs: ms('DNS lookup'), tcpMs: ms('TCP connect'), tlsMs: ms('TLS handshake'), ttfbMs: ms('waiting (TTFB)'), downloadMs: ms('download'), totalMs: r.durationMs, reusedConnection: r.connection?.reused, tlsProtocol: r.connection?.tlsProtocol };
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined)) as typeof out;
+}
+
 export function toCurl(p: PreparedRequest): string {
   const parts = [`curl -X ${p.method} '${p.url.replace(/'/g, "'\\''")}'`];
   for (const [k, v] of p.headers) parts.push(`  -H '${k}: ${v.replace(/'/g, "'\\''")}'`);

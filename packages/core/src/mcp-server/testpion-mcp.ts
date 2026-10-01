@@ -18,7 +18,7 @@ import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext } from '../engine.js';
-import { executeHttp } from '../protocols/http/client.js';
+import { executeHttp, timingSummary } from '../protocols/http/client.js';
 import { describeRoot, executeGrpc, grpcRoot, parseGrpcTarget } from '../protocols/grpc/grpc.js';
 import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
@@ -288,6 +288,8 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             status: response.status,
             statusText: response.statusText,
             durationMs: response.durationMs,
+            // DNS / TCP / TLS (on a new connection), time to first byte and download
+            timing: timingSummary(response),
             size: response.size,
             url: response.url,
             headers: Object.fromEntries(ctx.redactor.redact(response.headers)),

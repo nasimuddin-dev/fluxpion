@@ -144,6 +144,8 @@ export interface HttpResponseData {
   payloadPath?: string;
   durationMs: number;
   timeline: TimelinePhase[];
+  /** The connection the request went over: reused from the pool or new (then the timeline has DNS / TCP / TLS), its peer and TLS version. */
+  connection?: { reused: boolean; remoteAddress?: string; remotePort?: number; tlsProtocol?: string; cipher?: string };
   /** Final URL (after redirects) with secrets redacted. */
   url: string;
   redirected: boolean;

@@ -24,7 +24,7 @@ import type { VariableScope } from '../vars/variables.js';
 import type { Tracer, SpanHandle } from '../trace/tracer.js';
 import type { Redactor } from '../util/redact.js';
 import type { Logger } from '../log/logger.js';
-import { executeHttp } from '../protocols/http/client.js';
+import { executeHttp, timingSummary } from '../protocols/http/client.js';
 import { executeGraphQL } from '../protocols/graphql/graphql.js';
 import { executeGrpc, parseGrpcTarget } from '../protocols/grpc/grpc.js';
 import { reflectServer } from '../protocols/grpc/reflection.js';
@@ -61,7 +61,7 @@ export interface ExecServices {
   /** Cookie jar shared by the HTTP/GraphQL requests of a run (Postman's cookie jar). */
   cookieJar?: CookieJar;
   /** Every HTTP response of a test, in full (e.g. `testpion send` prints the body of a saved request). */
-  onHttpResponse?: (r: { testId: string; status: number; statusText: string; headers: Array<[string, string]>; body: string; durationMs: number; url: string }) => void;
+  onHttpResponse?: (r: { testId: string; status: number; statusText: string; headers: Array<[string, string]>; body: string; durationMs: number; url: string; timing?: ReturnType<typeof timingSummary> }) => void;
   /** The active environment's name (pm.environment.name). */
   environmentName?: string;
   /** Reads a workspace file by relative path (OpenAPI documents for contract checks); never outside the workspace. */
@@ -288,7 +288,7 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
   const s = span.child(`${spec.method} ${svc.redactor.redactUrl(spec.url)}`, 'http', { attributes: { method: spec.method } });
   try {
     const { response, prepared } = await executeHttp(spec, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, openExternal: svc.openExternal, cookieJar: svc.cookieJar });
-    svc.onHttpResponse?.({ testId: test.id ?? test.name, status: response.status, statusText: response.statusText ?? '', headers: response.headers, body: response.bodyPreview, durationMs: response.durationMs, url: prepared.url });
+    svc.onHttpResponse?.({ testId: test.id ?? test.name, status: response.status, statusText: response.statusText ?? '', headers: response.headers, body: response.bodyPreview, durationMs: response.durationMs, url: prepared.url, timing: timingSummary(response) });
     s.setAttributes({ url: prepared.url, status: response.status, size: response.size, durationMs: response.durationMs });
     s.span.input = { headers: prepared.headers, body: prepared.bodyPreview };
     s.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers, body: summarize(response.bodyPreview, 16_000) } });
@@ -319,7 +319,7 @@ async function runGraphQL(test: GraphQLTest, scope: VariableScope, svc: ExecServ
   const s = span.child(`graphql ${test.operationName ?? ''}`.trim(), 'graphql', { input: { query: r.query, variables: r.variables } });
   try {
     const out = await executeGraphQL({ ...r, auth }, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, cookieJar: svc.cookieJar });
-    svc.onHttpResponse?.({ testId: test.id ?? test.name, status: out.response.status, statusText: out.response.statusText ?? '', headers: out.response.headers, body: out.response.bodyPreview, durationMs: out.response.durationMs, url: out.prepared.url });
+    svc.onHttpResponse?.({ testId: test.id ?? test.name, status: out.response.status, statusText: out.response.statusText ?? '', headers: out.response.headers, body: out.response.bodyPreview, durationMs: out.response.durationMs, url: out.prepared.url, timing: timingSummary(out.response) });
     s.setAttributes({ endpoint: svc.redactor.redactUrl(r.endpoint), status: out.response.status, operationType: out.operationType, errors: out.errors?.length ?? 0 });
     s.end({ status: out.errors?.length || out.response.status >= 400 ? 'error' : 'ok', output: summarize(out.response.json ?? out.response.bodyPreview, 16_000) });
     return {
