@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.2 — 2026-09-30
+
+- **Fixed: requests said `User-Agent: TestPion/0.5`** whatever the version; they now send the running version (found by testing the installed app screen by screen).
+
 ## 0.20.1 — 2026-09-30
 
 - **F2 and Delete on every sidebar row**: MCP servers, gRPC calls and connections (in a collection or not) rename with F2 and delete with Delete, asking first, like requests and folders.
