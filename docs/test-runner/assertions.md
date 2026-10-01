@@ -40,7 +40,7 @@ assertions:
     expected: { "id": 1, "name": "Rex", "tags": ["dog"], "updatedAt": "2026-10-01" }
 ```
 
-In the app, **Snapshot** above a JSON response adds one for the whole body, and the menu of an object or array in the response tree adds one for that part (*Keeps this shape*). A failure lists the differences, for example `$.price is string, was number` or `$.owner.email is missing`.
+In the app, **Snapshot** above a JSON response adds one for the whole body, and the menu of an object or array in the response tree adds one for that part (*Keeps this shape*). A failure lists the differences, for example `$.price is string, was number` or `$.owner.email is missing`. When the API changed on purpose, **Update snapshot** next to the failed check (the response's Tests tab) keeps the new response as the snapshot.
 
 ## OpenAPI contract testing
 

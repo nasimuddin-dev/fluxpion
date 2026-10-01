@@ -1,4 +1,5 @@
 import { AlertTriangle, Bot, CheckCircle2, CircleSlash, Lightbulb, Sparkles, XCircle } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { NormalizedError } from '../api';
 import type { CheckResult } from '../types';
 import { useApp } from '../store';
@@ -56,7 +57,7 @@ export function SourceBadge({ source }: { source: CheckResult['source'] }) {
   return <Badge title={source === 'heuristic' ? 'Approximate heuristic metric' : 'Embedding-based semantic metric'}>{source}</Badge>;
 }
 
-export function CheckList({ checks, compact }: { checks: CheckResult[]; compact?: boolean }) {
+export function CheckList({ checks, compact, actions }: { checks: CheckResult[]; compact?: boolean; actions?(c: CheckResult): ReactNode }) {
   if (!checks.length) return <div className="p-4 text-sm text-muted">No assertions. Add some in the Tests tab.</div>;
   const passed = checks.filter((c) => c.passed).length;
   return (
@@ -75,6 +76,7 @@ export function CheckList({ checks, compact }: { checks: CheckResult[]; compact?
               <span className="font-medium">{c.name}</span>
               <SourceBadge source={c.source} />
               {c.score !== undefined && <Badge tone={c.passed ? 'ok' : 'bad'}>score {c.score}</Badge>}
+              {actions?.(c)}
             </div>
             <div className="text-muted break-words">{c.message}</div>
             {c.explanation && (

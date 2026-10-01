@@ -27,6 +27,7 @@ export function ResponseViewer({
   historyId,
   onSuggestAssertions,
   onAddAssertion,
+  onUpdateSnapshot,
   onSaveVariable,
   onSaveExample,
   onGenerateTests,
@@ -47,6 +48,8 @@ export function ResponseViewer({
   onSuggestAssertions?(): void;
   /** Clicking a field in the JSON tree can add a check on it to the request's Tests. */
   onAddAssertion?(a: TreeAssertion): void;
+  /** Replace a snapshot check's stored copy with this response (at the check's path). */
+  onUpdateSnapshot?(path: string): void;
   onSaveVariable?(v: TreeVariable): void;
   /** Save this response as an example of the request. */
   onSaveExample?(): void;
@@ -211,7 +214,16 @@ export function ResponseViewer({
         {tab === 'timeline' && <Timeline phases={response.timeline} url={response.url} />}
         {tab === 'tests' && (
           <div className="overflow-auto h-full">
-            <CheckList checks={checks ?? []} />
+            <CheckList
+              checks={checks ?? []}
+              actions={(c) =>
+                onUpdateSnapshot && c.type === 'snapshot' && !c.passed ? (
+                  <Button size="sm" variant="ghost" icon={<Camera size={12} />} title="The API changed on purpose: keep this response as the new snapshot" onClick={() => onUpdateSnapshot(String((c.metadata as { path?: string } | undefined)?.path ?? '$'))}>
+                    Update snapshot
+                  </Button>
+                ) : null
+              }
+            />
             {!!scriptLogs?.length && (
               <div className="border-t border-line">
                 <div className="px-3 py-1.5 text-xs text-muted font-semibold">Script console</div>

@@ -1,3 +1,4 @@
+import { JSONPath } from 'jsonpath-plus';
 import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
@@ -434,6 +435,16 @@ export function RestView() {
     : undefined;
 
   // a field clicked in the response tree becomes a check in the request's Tests tab
+  // a snapshot check whose API changed on purpose: keep the current response (at the check's path) as its copy
+  const updateSnapshot = (path: string) => {
+    const json = result?.response?.json;
+    if (json === undefined) return;
+    const value = path === '$' ? json : JSONPath({ path, json: json as object, wrap: false });
+    let n = 0;
+    update({ assertions: tab.assertions.map((a) => (a.type === 'snapshot' && ((a.path as string | undefined) || '$') === path ? (n++, { ...a, expected: value }) : a)) as never });
+    useApp.getState().toast(n ? 'Snapshot updated. Save the request to keep it.' : 'No snapshot check for that part of the response', n ? 'success' : 'error');
+  };
+
   const addAssertion = (a: TreeAssertion) => {
     update({ assertions: [...tab.assertions, a as never] });
     useApp.getState().toast(`Added a check on ${a.path} (Tests tab). Save the request to keep it.`, 'success');
@@ -692,7 +703,7 @@ export function RestView() {
                 <ErrorPanel error={result.error} context={{ request: { method: tab.request.method, url: tab.request.url } }} />
               </div>
             ) : result?.response ? (
-              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} visualizer={result.visualizer} requestId={tab.requestId} historyId={result.historyId} onSuggestAssertions={suggest} onAddAssertion={addAssertion} onSaveVariable={(v) => void saveVariable(v)} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
+              <ResponseViewer response={result.response} checks={result.checks} traceId={result.traceId} curl={result.curl} stream={result.stream} scriptLogs={result.scriptLogs} visualizer={result.visualizer} requestId={tab.requestId} historyId={result.historyId} onSuggestAssertions={suggest} onAddAssertion={addAssertion} onUpdateSnapshot={updateSnapshot} onSaveVariable={(v) => void saveVariable(v)} onSaveExample={() => void saveExample()} onGenerateTests={generateTests && (() => void generateTests())} onExplain={explain} />
             ) : (
               <Empty icon={<Send size={28} />} title="Send a request to see the response">
                 Press <b>Ctrl+Enter</b> to send. Variables like <span className="var-token mono">{'{{baseUrl}}'}</span> resolve from the active environment.
