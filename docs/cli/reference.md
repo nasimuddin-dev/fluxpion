@@ -302,6 +302,14 @@ testpion docs api.postman_collection.json > API.md
 | `-o, --out <file>` | Write to a file instead of standard output. |
 | `--no-examples` | Leave out saved examples. |
 
+## `agents-md`
+
+Write (or refresh) the TestPion section of `AGENTS.md` in the workspace folder, for coding agents (Claude Code, Codex, Cursor, Copilot): how to use the workspace over MCP and the CLI, the check types and the test file format. Text outside the section is kept. `--stdout` prints it instead. See [Use TestPion from AI agents](/ai-testing/mcp-server#agents-md).
+
+```bash
+testpion agents-md -w my-workspace
+```
+
 ## `jwt`
 
 Decode a JSON Web Token: header, claims, when it was issued and when it expires. The signature is not verified. A `Bearer ` prefix is fine; `-` reads the token from standard input.

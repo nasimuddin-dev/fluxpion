@@ -9,7 +9,21 @@ description: "Serve a workspace to Claude, IDE assistants and other AI agents ov
 
 `testpion mcp-server` makes a workspace available to AI agents as [Model Context Protocol](https://modelcontextprotocol.io) tools. An agent such as Claude Code, Claude Desktop or an IDE assistant can then find your requests, read their documentation, send them and run collections, with your environments and auth, without seeing your secrets.
 
-## Register the server
+## Connect from the app
+
+**Settings ▸ AI agents (MCP)** (or *Connect an AI agent* in the command palette) has the setup for **Claude Code**, **Claude Desktop**, **Cursor / Windsurf**, **VS Code** (Copilot agent mode) and **Codex**, filled in for the open workspace: copy it into the agent's configuration. The installed app is the server, so there is nothing else to install, and it uses the secrets you saved in the app. Two switches make the server read-only or allow production environments. **Test connection** starts the server the way your agent will and shows what it offers (tools, resources, prompts).
+
+The command it shows is the app with `--mcp-server`:
+
+| OS | Command |
+|---|---|
+| Windows | `"%LOCALAPPDATA%\Programs\TestPion\TestPion.exe" --mcp-server -w "C:\path\to\workspace"` |
+| macOS | `/Applications/TestPion.app/Contents/MacOS/TestPion --mcp-server -w /path/to/workspace` |
+| Linux | `testpion --mcp-server -w /path/to/workspace` (the .deb / .rpm install; for the AppImage, its path) |
+
+No window opens; `--read-only`, `--allow-production`, `--block-private-networks` and `--allow-host` work as below. Without `-w` it serves the workspace the app last opened. The app can stay open at the same time.
+
+## Register the server with the CLI
 
 The server speaks MCP over stdio. Point your agent at the `testpion` CLI with the workspace to serve:
 
@@ -94,8 +108,43 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `rename_variable` | Rename a variable everywhere in the workspace (secret values move with it). |
 | `openapi_diff` | Breaking and other changes between two OpenAPI versions (links, workspace paths such as `specs/…`, or text). |
 | `import_definition` | Import an OpenAPI document, Postman / Insomnia / Bruno / Hoppscotch collection, HAR or .env, from a public link (`url`) or `text`. OpenAPI imports get contract checks. |
+| `testpion_guide` | How to use the workspace: which tool for which job, how variables resolve, every check type this engine knows (with examples) and the YAML test file format. Agents read it before writing tests. |
+| `set_request_checks` | Add (`mode: append`) or replace the checks of a saved REST or GraphQL request; they then run whenever it is sent, in `run_collection` and in CI. Unknown check types are refused with the list of known ones. |
+| `write_test_file` | Write a YAML or JSON test file under `tests/`. The content is checked first (it must parse as tests or a suite and use known check types), so a broken file never lands in the workspace; an existing file is replaced only with `overwrite: true`. |
 
-`save_request`, `import_definition`, `rename_variable` and `reorder_environments` change workspace files, `load_test` generates load, and `--read-only` hides them together with the tools that send requests.
+`save_request`, `import_definition`, `rename_variable`, `reorder_environments`, `set_request_checks` and `write_test_file` change workspace files, `load_test` generates load, and `--read-only` hides them together with the tools that send requests.
+
+Every tool has a **title** and **annotations** (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), so agents can run the read-only ones without asking and ask before the ones that send requests or change files. Results come as JSON text and as **structured content** (a list is wrapped as `{ "items": [...] }`).
+
+## Resources
+
+For agents that read context (in Claude Code, type `@` to attach one):
+
+| URI | What |
+|---|---|
+| `testpion://guide` | The guide (as `testpion_guide`), Markdown. |
+| `testpion://workspace` | Collections with their counts, environments (variable names), monitors. |
+| `testpion://attention` | What needs attention (as `what_needs_attention`). |
+| `testpion://collections/{collection}` | A collection's documentation, Markdown (each collection is also listed). |
+| `testpion://collections/{collection}/requests/{request}` | A saved request (secrets masked). |
+
+## Prompts
+
+Ready-made instructions for the common jobs, which you pick in your agent (in Claude Code: `/`):
+
+| Prompt | What it does |
+|---|---|
+| `investigate_failures` | Finds what is failing (monitors, runs, certificates, requests, flaky tests), why, and what to fix. |
+| `write_tests` | Adds checks to the requests of a collection after sending them, saves them, and runs them. |
+| `debug_request` | Sends a saved request and explains the response and what to change when it fails. |
+| `api_health_report` | A short Markdown report: availability, slow requests, repeating failures, certificates. |
+| `import_and_test` | Saves a pasted cURL / fetch command (or imports an OpenAPI link), sends it and adds checks. |
+
+The read-only server offers `investigate_failures` and `api_health_report`.
+
+## AGENTS.md
+
+Coding agents (Claude Code, Codex, Cursor, Copilot) read `AGENTS.md` first when they open a folder. **Write AGENTS.md** in Settings ▸ AI agents, or `testpion agents-md -w <workspace>`, adds a section to the workspace's `AGENTS.md` (or creates it): how to reach the workspace over MCP and the CLI, the check types and the test file format. What you wrote around it stays; writing it again refreshes only the TestPion part. It holds no paths of your machine, so it can be committed with the workspace.
 
 ## What agents can and can't see
 
