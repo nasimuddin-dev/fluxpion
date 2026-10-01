@@ -50,6 +50,7 @@ import {
   workspaceReportHtml,
   collectionVariableFlow,
   referencedVariableNames,
+  loadHistory,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -258,6 +259,27 @@ export function registerDataCommands(program: Command): void {
         if (o.json) return console.log(JSON.stringify(rows, null, 2));
         if (!rows.length) return console.log(dim('No collections. Create one in the app, or import one: testpion import <file>'));
         for (const r of rows) console.log(`${r.name}  ${dim(r.id)}  ${[`${r.requests} request${r.requests === 1 ? '' : 's'}`, r.grpcCalls ? `${r.grpcCalls} gRPC` : '', r.connections ? `${r.connections} connection${r.connections === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('load-history')
+    .description('earlier load tests of the workspace (from the app, testpion load and agents), newest first: throughput, p50/p95/p99, error rate and pass rules')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-q, --query <text>', 'only load tests whose name or target contains this')
+    .option('-n, --limit <n>', 'how many', '20')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace?: string; query?: string; limit: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const rows = loadHistory(store, { query: o.query, limit: Number(o.limit) || 20 });
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        if (!rows.length) return console.log(dim('No load tests yet.'));
+        for (const r of rows)
+          console.log(
+            `${r.startedAt.slice(0, 16).replace('T', ' ')}  ${r.name}  ${dim(`${r.virtualUsers} VUs, ${r.durationSec}s`)}  ${Math.round(r.throughput)} req/s  p95 ${formatDuration(r.p95)}  ${r.errorRate > 0.01 ? red(`${(r.errorRate * 100).toFixed(1)}% errors`) : `${(r.errorRate * 100).toFixed(1)}% errors`}${r.passed === undefined ? '' : r.passed ? green('  passed') : red('  failed')}`,
+          );
       } finally {
         store.close();
       }
