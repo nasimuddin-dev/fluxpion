@@ -55,7 +55,7 @@ import { compareHistory } from '../storage/history-compare.js';
 import { redactDiff } from '../report/response-diff.js';
 import { responseTimeStats } from '../report/response-stats.js';
 import { ciConfig, type CiConfigOptions } from '../runner/ci-config.js';
-import { compareEnvironments } from '../storage/env-compare.js';
+import { compareEnvironments, environmentMatrix } from '../storage/env-compare.js';
 import { compareRequestAcrossEnvironments } from '../runner/env-request-compare.js';
 import { executeMonitor, findMonitor, listMonitors, monitorDaily, monitorResults, monitorStatus } from '../runner/monitors.js';
 
@@ -793,6 +793,15 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         };
         const d = compareEnvironments(get(a.left), get(a.right), { secrets, redactor });
         return a.includeSame ? d : { ...d, rows: d.rows.filter((r) => r.status !== 'same') };
+      },
+    },
+    {
+      name: 'environment_matrix',
+      description: 'Every variable across every environment of the workspace: for each, whether it is set, empty, missing or disabled in each environment (and whether it is a secret), incomplete variables first. Never returns values. Use it to find a variable that one environment lacks.',
+      inputSchema: { type: 'object', properties: { onlyIncomplete: { type: 'boolean', description: 'Only variables that are missing, empty or disabled somewhere' } } },
+      run: (a) => {
+        const m = environmentMatrix(store.listEnvironments().map((e) => store.getEnvironment(e.id)!).filter(Boolean), { secrets });
+        return a.onlyIncomplete ? { ...m, rows: m.rows.filter((r) => r.incompleteIn.length) } : m;
       },
     },
     {

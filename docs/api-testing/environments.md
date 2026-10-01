@@ -79,6 +79,8 @@ Use it when a request works on Staging but fails on Production. Secret and sensi
 
 From the terminal, `testpion env diff Staging Production -w my-workspace` lists the differences and exits with 1 when there are any. Add `--values` to see non-secret values, `--all` to include the variables that are the same, and `--json` for scripts. AI agents get the `compare_environments` tool, which returns statuses, never values.
 
+**Matrix** shows every variable across all environments at once: *set*, *empty*, *missing* or *off* in each, with a lock on secrets, the incomplete ones first. It catches the variable you added to Development and forgot in Staging. `testpion env matrix` prints it (exit 1 when a variable is incomplete somewhere) and agents use `environment_matrix`; neither shows values.
+
 ## Import a .env file
 
 **Import** (File menu, or Collections) also takes `.env` files: every `KEY=value` line becomes a variable of a new environment named after the file (`.env.staging` and `staging.env` become *staging*). Quotes, `export`, `#` comments and `\n` in double quotes work. Keys that look like secrets (`API_KEY`, `DB_PASSWORD`, `TOKEN` …) become secret variables: the app keeps their values in the OS secret store, never in the environment file, and the CLI (`testpion import .env.staging -w <workspace>`) lists them for you to set.

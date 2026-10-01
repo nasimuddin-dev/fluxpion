@@ -1,4 +1,4 @@
-import { ArchiveRestore, ArrowLeftRight, Copy, Download, FileJson, FileText, KeyRound, Plus, Save, ScanSearch, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Plus, Save, ScanSearch, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -7,6 +7,7 @@ import type { Environment, KeyValue } from '../types';
 import { download, uid } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { EnvCompare } from '../components/EnvCompare';
+import { EnvMatrix } from '../components/EnvMatrix';
 import { TrashDialog } from '../components/TrashDialog';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
 
@@ -15,6 +16,7 @@ export function EnvironmentsView() {
   const settings = useApp((s) => s.settings);
   const [envs, setEnvs] = useState<Environment[]>([]);
   const [comparing, setComparing] = useState(false);
+  const [matrix, setMatrix] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   /** Export the selected environment (secret values are never exported). */
   const exportEnv = async (format: 'postman' | 'dotenv') => {
@@ -211,6 +213,11 @@ export function EnvironmentsView() {
                         Compare
                       </Button>
                     )}
+                    {envs.length > 1 && (
+                      <Button icon={<Grid3x3 size={13} />} onClick={() => setMatrix(true)} title="Every variable across every environment: what is missing, empty or off where">
+                        Matrix
+                      </Button>
+                    )}
                     <Button
                       icon={<Copy size={13} />}
                       onClick={async () => {
@@ -318,6 +325,7 @@ export function EnvironmentsView() {
       </div>
       {trashOpen && <TrashDialog kind="environment" onClose={() => setTrashOpen(false)} onRestored={(r) => void load().then(() => setSel(r.id))} />}
       {comparing && sel && <EnvCompare environments={envs} initialLeft={sel} onClose={() => setComparing(false)} />}
+      {matrix && <EnvMatrix onClose={() => setMatrix(false)} />}
     </div>
   );
 }

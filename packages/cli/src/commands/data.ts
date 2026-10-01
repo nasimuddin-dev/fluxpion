@@ -10,6 +10,7 @@ import {
   responseTimeStats,
   ciConfig,
   compareEnvironments,
+  environmentMatrix,
   compareRequestAcrossEnvironments,
   collectionRequests,
   createEngineContext,
@@ -871,6 +872,30 @@ export function registerDataCommands(program: Command): void {
       }
     });
   const envCmd = program.command('env').description('list environments, set plain variables, and set their order');
+  envCmd
+    .command('matrix')
+    .description('every variable across every environment: set, empty, missing or off (never values); exit 1 when one is incomplete somewhere')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--all', 'also list variables that are set everywhere')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace?: string; all?: boolean; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const m = environmentMatrix(store.listEnvironments().map((e) => store.getEnvironment(e.id)!).filter(Boolean), { secrets: new EnvSecretStore() });
+        const rows = o.all ? m.rows : m.rows.filter((r) => r.incompleteIn.length);
+        if (o.json) console.log(JSON.stringify({ ...m, rows }, null, 2));
+        else {
+          const w = Math.min(32, Math.max(8, ...m.rows.map((r) => r.key.length)));
+          console.log(`${''.padEnd(w)}  ${m.environments.map((e) => bold(e.slice(0, 12).padEnd(12))).join(' ')}`);
+          const mark = { set: green('set'.padEnd(12)), empty: yellow('empty'.padEnd(12)), missing: red('missing'.padEnd(12)), disabled: dim('off'.padEnd(12)) };
+          for (const r of rows) console.log(`${r.key.slice(0, w).padEnd(w)}  ${r.cells.map((c) => mark[c.state]).join(' ')}`);
+          console.log(m.incomplete ? yellow(`${m.incomplete} of ${m.rows.length} variables are missing, empty or off somewhere`) : green(`All ${m.rows.length} variables are set in every environment`));
+        }
+        process.exitCode = m.incomplete ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
+      } finally {
+        store.close();
+      }
+    });
   envCmd
     .command('set')
     .description('set plain variables of an environment (key=value …); secret variables are set in the app')

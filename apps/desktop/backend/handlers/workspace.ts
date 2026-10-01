@@ -7,6 +7,7 @@ import {
   restoreFromTrash,
   purgeTrash,
   compareEnvironments,
+  environmentMatrix,
   WorkspaceStore,
   WORKSPACE_FORMATS,
   exportPostmanEnvironment,
@@ -59,6 +60,8 @@ export function workspaceHandlers(be: Backend): Handlers {
       };
       return compareEnvironments(get(left), get(right), { values: true, secrets: be.secrets, redactor: be.logger.redactor });
     },
+    /** Every variable across every environment: statuses only (set, empty, missing, off), never values. */
+    'env.matrix': () => environmentMatrix(be.ws.listEnvironments().map((e) => be.ws.getEnvironment(e.id)!).filter(Boolean), { secrets: be.secrets }),
     'ws.open': async ({ ref }: { ref?: string }) => {
       let path = ref ? be.manager.resolve(ref) : undefined;
       if (!ref && be.host.openDialog) {

@@ -90,3 +90,44 @@ export function compareEnvironments(left: Environment, right: Environment, opts:
   const count = (s: EnvDiffStatus) => rows.filter((x) => x.status === s).length;
   return { left: left.name, right: right.name, rows, summary: { same: count('same'), different: count('different'), onlyLeft: count('only-left'), onlyRight: count('only-right') } };
 }
+
+/** One variable in one environment of the matrix: set, set but empty, missing, or disabled. */
+export interface EnvMatrixCell {
+  state: 'set' | 'empty' | 'missing' | 'disabled';
+  secret?: boolean;
+}
+
+export interface EnvMatrixRow {
+  key: string;
+  /** One cell per environment, in the order of `environments`. */
+  cells: EnvMatrixCell[];
+  /** Environments where the variable is missing, empty or disabled. */
+  incompleteIn: string[];
+  /** Plain (non-secret) values differ between the environments that set it. */
+  differs: boolean;
+}
+
+/**
+ * Every variable across every environment (statuses only, never values): what is missing, empty or disabled where,
+ * incomplete variables first. Secrets count as set when the secret store has a value.
+ */
+export function environmentMatrix(envs: Environment[], opts: { secrets?: SecretStore } = {}): { environments: string[]; rows: EnvMatrixRow[]; incomplete: number } {
+  const keys = [...new Set(envs.flatMap((e) => e.variables.filter((v) => v.key).map((v) => v.key)))];
+  const rows: EnvMatrixRow[] = keys.map((key) => {
+    const values = new Set<string>();
+    const cells = envs.map((e): EnvMatrixCell => {
+      const v = e.variables.find((x) => x.key === key);
+      if (!v) return { state: 'missing' };
+      const secret = !!v.secret;
+      const value = secret ? (opts.secrets?.get(secretKeys.envVar(e.id, key)) ?? (opts.secrets ? '' : '?')) : v.value;
+      if (v.enabled === false) return { state: 'disabled', ...(secret ? { secret } : {}) };
+      if (!value) return { state: 'empty', ...(secret ? { secret } : {}) };
+      if (!secret) values.add(value);
+      return { state: 'set', ...(secret ? { secret } : {}) };
+    });
+    const incompleteIn = envs.filter((_, i) => cells[i]!.state !== 'set').map((e) => e.name);
+    return { key, cells, incompleteIn, differs: values.size > 1 };
+  });
+  rows.sort((a, b) => b.incompleteIn.length - a.incompleteIn.length || a.key.localeCompare(b.key));
+  return { environments: envs.map((e) => e.name), rows, incomplete: rows.filter((r) => r.incompleteIn.length).length };
+}
