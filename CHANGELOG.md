@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.3 — 2026-09-30
+
+- **Monitors are created and edited inline**: *New monitor* and *Edit* open in the main area with **Create monitor / Save** and **Cancel** in its header, like MCP servers and API definitions, instead of a dialog. The API definition's *Coverage* and *Compare versions* tabs get the same header.
+
 ## 0.20.2 — 2026-09-30
 
 - **Fixed: requests said `User-Agent: TestPion/0.5`** whatever the version; they now send the running version (found by testing the installed app screen by screen).
