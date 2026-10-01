@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.17.0 — 2026-09-30
+
+Highlights: a collection now really holds every kind of request: running it runs its gRPC calls and connections, and exporting it shares them. Plus menus on category rows and keyboard shortcuts in the sidebar.
 
 - **Sharing a collection shares all of it**: exporting a collection in TestPion's format (app or `testpion export -f testpion`) includes its gRPC calls and connections, and importing the file restores them in the imported collection (clashing ids get new ones; nothing is replaced). A Postman export, which can't hold them, says how many it left out.
 - **Keyboard in the sidebar**: F2 renames and Delete deletes the focused request or folder (with Undo), Enter opens it; listed in Keyboard Shortcuts.
