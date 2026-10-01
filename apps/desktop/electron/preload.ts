@@ -22,4 +22,8 @@ contextBridge.exposeInMainWorld('aps', {
     return () => set.delete(cb);
   },
   startup: () => ipcRenderer.invoke('aps:startup'),
+  /** The app draws the title bar (Windows, Linux): the top bar leaves room for the window buttons and has a ☰ menu. */
+  titleBar: ipcRenderer.sendSync('aps:titlebar') === true,
+  titleBarColors: (color: string, symbolColor: string, height?: number) => ipcRenderer.send('aps:titlebar-colors', { color, symbolColor, height }),
+  appMenu: (x: number, y: number) => ipcRenderer.send('aps:app-menu', { x, y }),
 });

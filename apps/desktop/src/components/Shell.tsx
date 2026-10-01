@@ -33,6 +33,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronDown as NavChevron,
+  Menu as MenuIcon,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, asError, modKey, on } from '../api';
@@ -170,11 +171,67 @@ export function EnvironmentPicker() {
   );
 }
 
+/** Any CSS colour (oklch …) as #rrggbb, which Electron's title bar understands. */
+function toHex(css: string): string {
+  const c = document.createElement('canvas');
+  c.width = c.height = 1;
+  const g = c.getContext('2d')!;
+  g.fillStyle = css;
+  g.fillRect(0, 0, 1, 1);
+  const [r, gr, b] = g.getImageData(0, 0, 1, 1).data;
+  return '#' + [r, gr, b].map((v) => v!.toString(16).padStart(2, '0')).join('');
+}
+
+/** Where the app draws the title bar: keep the window buttons in the theme's colours (they follow light / dark). */
+function useTitleBarColors(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const bridge = window.aps;
+    if (!bridge?.titleBar || !bridge.titleBarColors) return;
+    const sync = () => {
+      if (!ref.current) return;
+      const cs = getComputedStyle(ref.current);
+      const muted = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || cs.color;
+      bridge.titleBarColors!(toHex(cs.backgroundColor), toHex(muted), ref.current.getBoundingClientRect().height);
+    };
+    sync();
+    // a zoom change (UI scale) resizes the page: the window buttons follow the bar's height
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => (clearTimeout(t), (t = setTimeout(sync, 150)));
+    addEventListener('resize', onResize);
+    const mo = new MutationObserver(() => requestAnimationFrame(sync));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', sync);
+    return () => (mo.disconnect(), mq.removeEventListener('change', sync), removeEventListener('resize', onResize), clearTimeout(t));
+  }, [ref]);
+}
+
 export function TopBar() {
   const set = useApp((s) => s.set);
   const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
+  const header = useRef<HTMLElement>(null);
+  const drawn = !!window.aps?.titleBar;
+  useTitleBarColors(header);
   return (
-    <header className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-chrome" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+    <header
+      ref={header}
+      className="h-12 shrink-0 border-b border-line flex items-center gap-2 px-3 bg-chrome"
+      // the drawn title bar: the window buttons sit over the right end (titlebar-area-width is what is left of it)
+      style={{ WebkitAppRegion: 'drag', ...(drawn ? { paddingRight: 'calc(100vw - env(titlebar-area-width, calc(100vw - 138px)) + 8px)' } : {}) } as React.CSSProperties}
+    >
+      {drawn && (
+        <IconButton
+          label="Menu (File, Edit, View, Window, Help)"
+          className="h-8 w-8 -ml-1"
+          style={noDrag}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            window.aps?.appMenu?.(r.left, r.bottom + 4);
+          }}
+        >
+          <MenuIcon size={17} />
+        </IconButton>
+      )}
       <div className="flex items-center gap-2 pr-1" style={noDrag}>
         {/* the TestPion wordmark; on the light theme it sits on a navy badge so the white "Pion" stays visible */}
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#0c1440] px-2 py-1 dark:bg-transparent dark:px-0 dark:py-0">

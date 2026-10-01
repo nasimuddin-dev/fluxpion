@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, shell, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, safeStorage, screen, shell, nativeTheme } from 'electron';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -51,18 +51,30 @@ function windowIcon(): string | undefined {
   return join(__dirname, '..', 'build', win32 ? 'icon.ico' : join('icons', '256x256.png'));
 }
 
+/**
+ * Windows and Linux: no system title bar. The app's own top bar (logo, wordmark, workspace, search) is the title bar,
+ * with the window buttons drawn over its right end in the theme's colours, and the application menu behind its ☰ button.
+ * macOS keeps its native title bar and menu.
+ */
+const overlayTitleBar = process.platform !== 'darwin';
+const TITLE_BAR_HEIGHT = 48;
+
 function createWindow(): void {
+  // fit the screen: a smaller screen (a laptop at 125 %) opens the window maximised instead of past its edges
+  const area = screen.getPrimaryDisplay().workAreaSize;
+  const small = !capture && (area.width < 1440 || area.height < 900);
   win = new BrowserWindow({
-    width: 1440,
+    width: capture ? 1440 : Math.min(1440, area.width),
     // capture mode renders at an exact size even on small screens
     enableLargerThanScreen: !!capture,
     useContentSize: !!capture,
-    height: 900,
+    height: capture ? 900 : Math.min(900, area.height),
     minWidth: 960,
     minHeight: 600,
     title: 'TestPion',
     // the window and taskbar icon (the packaged Windows app also has it in its .exe)
     icon: windowIcon(),
+    ...(overlayTitleBar ? { titleBarStyle: 'hidden' as const, titleBarOverlay: { color: nativeTheme.shouldUseDarkColors ? '#0b0f24' : '#f1f2f8', symbolColor: nativeTheme.shouldUseDarkColors ? '#c9cfe8' : '#3b4160', height: TITLE_BAR_HEIGHT } } : {}),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     show: false,
     webPreferences: {
@@ -73,7 +85,11 @@ function createWindow(): void {
       spellcheck: false,
     },
   });
-  win.once('ready-to-show', () => !capture && win?.show());
+  win.once('ready-to-show', () => {
+    if (capture) return;
+    if (small) win?.maximize();
+    win?.show();
+  });
   installTextContextMenu(win);
   win.webContents.on('did-finish-load', () => console.log('[aps] renderer loaded'));
   win.webContents.on('render-process-gone', (_e, d) => console.error(`[aps] renderer gone: ${d.reason} (exit ${d.exitCode})`));
@@ -221,6 +237,22 @@ function start(): void {
     }
   });
   ipcMain.handle('aps:startup', () => ({ backendMs: Date.now() - t0 }));
+  // the drawn title bar: whether there is one, its colours (the page follows the app's theme), and the ☰ menu
+  ipcMain.on('aps:titlebar', (e) => (e.returnValue = overlayTitleBar));
+  ipcMain.on('aps:titlebar-colors', (e, c: { color: string; symbolColor: string; height?: number }) => {
+    if (!overlayTitleBar || !win || e.sender !== win.webContents) return;
+    try {
+      // the top bar's height in CSS pixels, times the page zoom (the UI scale setting), is its height on screen
+      const height = c.height ? Math.round(c.height * win.webContents.getZoomFactor()) : TITLE_BAR_HEIGHT;
+      win.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height });
+    } catch {
+      /* not a colour Electron understands */
+    }
+  });
+  ipcMain.on('aps:app-menu', (e, p: { x: number; y: number }) => {
+    if (!win || e.sender !== win.webContents) return;
+    Menu.getApplicationMenu()?.popup({ window: win, x: Math.round(p.x), y: Math.round(p.y) });
+  });
 
   installAppMenu({
     menu,

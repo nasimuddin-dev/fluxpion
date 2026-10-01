@@ -16,6 +16,11 @@ interface Bridge {
   platform: string;
   invoke(method: string, params?: unknown): Promise<any>;
   on(channel: string, cb: (payload: any) => void): () => void;
+  /** Electron on Windows / Linux: the app draws the title bar (window buttons over the top bar's right end). */
+  titleBar?: boolean;
+  titleBarColors?(color: string, symbolColor: string, height?: number): void;
+  /** Open the application menu (File, Edit, View …) at a point of the window. */
+  appMenu?(x: number, y: number): void;
 }
 
 declare global {
