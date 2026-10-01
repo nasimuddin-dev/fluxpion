@@ -21,6 +21,7 @@ import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
+import { readDataset, type DatasetRecord } from '../runner/datasets.js';
 import { collectionRealtimeTests, collectionSavedItems } from '../runner/collection-realtime.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -826,8 +827,20 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
     {
       name: 'run_collection',
       write: true,
-      description: 'Run a collection (or one folder) like the Collection Runner: requests in order with their scripts and assertions. Returns totals and per-request results.',
-      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), folder: str('Only run this folder or request (name or id)'), environment: str('Environment name') }, required: ['collection'] },
+      description:
+        'Run a collection (or one folder) like the Collection Runner: requests in order with their scripts and assertions. Returns totals and per-request results. With `data` (a CSV / JSON / JSONL file or a SQLite database inside the workspace, plus `query` for SQLite) each row is one iteration ({{column}} in requests, pm.iterationData in scripts).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          collection: str('Collection name or id'),
+          folder: str('Only run this folder or request (name or id)'),
+          environment: str('Environment name'),
+          data: str('Data file inside the workspace (relative path): .csv, .json, .jsonl, or a SQLite .db / .sqlite with `query`'),
+          query: str('For a SQLite data file: one read-only SELECT whose rows are the iterations'),
+          iterations: { type: 'number', description: 'How many iterations (default: one per data row, or 1)' },
+        },
+        required: ['collection'],
+      },
       run: async (a) => {
         const environment = checkEnvironment(a.environment);
         const c = findCollection(a.collection);
@@ -841,10 +854,19 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           if (!n) throw new ApsError('ConfigurationError', `No folder or request "${String(a.folder)}" in "${c.name}"`);
           selection = [n.id];
         }
+        // data files are read only from inside the workspace
+        let data: DatasetRecord[] | undefined;
+        if (a.data) {
+          const file = store.safePath(String(a.data));
+          if (!existsSync(file)) throw new ApsError('ConfigurationError', `No data file ${String(a.data)} in the workspace`);
+          data = [];
+          for await (const r of readDataset({ path: file, query: a.query ? String(a.query) : undefined, limit: 10_000 })) data.push(r);
+        }
+        const iterations = a.iterations === undefined ? undefined : Math.min(Math.max(1, Math.floor(Number(a.iterations)) || 1), 1000);
         const ctx = createEngineContext({ store, secrets, settings, environment, collectionId: c.id });
         const results: TestResult[] = [];
         try {
-          const summary = await runCollection({ name: c.name, runId: shortId('mcp-'), collection: c, selection, realtime: collectionRealtimeTests(store, c, selection), services: ctx.services, traceMode: 'none', environment, onEvent: (e: RunEvent) => e.type === 'test-end' && results.push(e.result) });
+          const summary = await runCollection({ name: c.name, runId: shortId('mcp-'), collection: c, selection, data, iterations, realtime: collectionRealtimeTests(store, c, selection), services: ctx.services, traceMode: 'none', environment, onEvent: (e: RunEvent) => e.type === 'test-end' && results.push(e.result) });
           return { total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, skipped: summary.skipped, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
         } finally {
           await ctx.dispose();

@@ -288,6 +288,11 @@ describe('example workspace (end-to-end)', () => {
       expect(adhoc.status).toBe(200);
       const run = JSON.parse((await text('run_collection', { collection: 'Veterinary API', folder: 'Authentication', environment: 'Development' })).text);
       expect(run).toMatchObject({ total: 1, passed: 1 });
+      // iterations, and data files only from inside the workspace
+      expect(JSON.parse((await text('run_collection', { collection: 'Veterinary API', folder: 'Authentication', environment: 'Development', iterations: 2 })).text)).toMatchObject({ total: 2, passed: 2 });
+      const outside = await text('run_collection', { collection: 'Veterinary API', folder: 'Authentication', environment: 'Development', data: '../outside.csv' });
+      expect(outside.isError).toBe(true);
+      expect(outside.text).toMatch(/escapes the workspace/);
       // production environments are refused unless the server allows them
       const prod = await text('send_request', { method: 'GET', url: '{{baseUrl}}/health', environment: 'Production' });
       expect(prod.isError).toBe(true);
