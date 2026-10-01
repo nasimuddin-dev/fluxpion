@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.23.0 — 2026-10-01
+
+Highlights: SQLite databases as datasets, WSDL 2.0 imports, a collection Overview and more charts.
+
+- **SQLite datasets**: a `.db` / `.sqlite` file with a read-only `query` feeds tests (`dataset: { path, query, params }`), collection runs (`run-collection -d app.db --iteration-query "SELECT …"`) and the Collection Runner, which lists the database's tables and starts with the first one that has rows. The database is opened read-only and only one SELECT is accepted.
+- **WSDL 2.0 imports**: `<description>` documents with SOAP 1.2 (or 1.1) endpoints, `wsoap:action`, operations inherited through `extends` and sample envelopes from the schema. HTTP bindings are skipped.
+- **Collection Overview** tab: requests, how many have checks and docs, how many are failing now, requests by method and a *Request health* list (latest status, median time, failures, last sent). Also `testpion requests "My API" --health` and the `collection_health` MCP tool.
+- **Runs overview** in Tests: pass rate and duration of the last 40 runs (click to open one), and a pass/fail bar on every run in the list.
+- **More visuals**: the latest 20 results as a strip next to each monitor (Monitors list and Home), a relative duration bar on History and Traces rows, and bars in the AI Lab model comparison (latency, first token, tokens, cost).
+- **MCP**: `run_collection` takes a data file from the workspace (`data`, `query`) and `iterations`.
+- **Fixes**: a model that fails in the AI Lab comparison shows its error once; "1 traces" / "1 spans" wording.
+
 ## 0.22.0 — 2026-10-01
 
 Highlights: charts across the app — a Home activity dashboard, a Charts tab on every run, better load-test charts and a richer HTML report.
