@@ -109,6 +109,27 @@ export function CollectionTree({
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
   /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
+  const renameNode = async (c: Collection, n: CollectionNode) => {
+    const name = await promptText(n.kind === 'folder' ? 'Rename folder' : 'Rename request', { value: n.name, okLabel: 'Rename' });
+    if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
+  };
+  const deleteNode = async (c: Collection, n: CollectionNode) => {
+    const ok =
+      n.kind === 'folder'
+        ? await confirmAction({ title: 'Delete folder', message: `Delete the folder "${n.name}" and all requests in it?`, confirmLabel: 'Delete folder', danger: true })
+        : await confirmAction({ title: 'Delete request', message: `Delete the request "${n.name}"?`, detail: 'Its saved examples are deleted too.', confirmLabel: 'Delete request', danger: true });
+    if (ok) removeWithUndo(c, n);
+  };
+  /** F2 renames and Delete deletes the focused request or folder (like a file tree). */
+  const rowKeys = (c: Collection, n: CollectionNode) => (e: React.KeyboardEvent) => {
+    if (e.key === 'F2') {
+      e.preventDefault();
+      void renameNode(c, n);
+    } else if (e.key === 'Delete') {
+      e.preventDefault();
+      void deleteNode(c, n);
+    }
+  };
   const removeWithUndo = (c: Collection, n: CollectionNode) => {
     onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? null : x)) });
     // its tabs (and those of everything in a deleted folder) close too
@@ -255,7 +276,7 @@ export function CollectionTree({
         return (
           <div key={n.id}>
             <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })}>
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id)}>
+              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id)} onKeyDown={rowKeys(c, n)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
                 <span className="truncate">{n.name}</span>
@@ -264,11 +285,8 @@ export function CollectionTree({
               <NodeMenu
                 onEdit={() => setEditing({ c, folder: n })}
                 onMove={() => setMoving({ c, n })}
-                onRename={async () => {
-                  const name = await promptText('Rename folder', { value: n.name, okLabel: 'Rename' });
-                  if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
-                }}
-                onDelete={async () => (await confirmAction({ title: 'Delete folder', message: `Delete the folder "${n.name}" and all requests in it?`, confirmLabel: 'Delete folder', danger: true })) && removeWithUndo(c, n)}
+                onRename={() => void renameNode(c, n)}
+                onDelete={() => void deleteNode(c, n)}
                 onNewRequest={() => onNewRequest(c, n.id)}
                 newRequestLabel={newRequestLabel}
                 onRun={onRun && (() => onRun(c, n.id))}
@@ -305,7 +323,7 @@ export function CollectionTree({
               {examplesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
           )}
-          <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)}>
+          <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)} onKeyDown={rowKeys(c, n)} title="Enter opens · F2 renames · Delete deletes">
             <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
           </button>
@@ -314,11 +332,8 @@ export function CollectionTree({
             onOpenChange={(o) => setMenuFor(o ? n.id : undefined)}
             onOpen={() => onOpen(c, n)}
             copyItems={n.kind === 'http' ? copyMenu(c, n) : undefined}
-            onRename={async () => {
-              const name = await promptText('Rename request', { value: n.name, okLabel: 'Rename' });
-              if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
-            }}
-            onDelete={async () => (await confirmAction({ title: 'Delete request', message: `Delete the request "${n.name}"?`, detail: 'Its saved examples are deleted too.', confirmLabel: 'Delete request', danger: true })) && removeWithUndo(c, n)}
+            onRename={() => void renameNode(c, n)}
+            onDelete={() => void deleteNode(c, n)}
             onDuplicate={() => onChange({ ...c, items: duplicateNode(c.items, n.id, (x) => ({ ...x, id: uid('req-'), name: `${x.name} copy` })) })}
             onMove={() => setMoving({ c, n })}
             onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}
