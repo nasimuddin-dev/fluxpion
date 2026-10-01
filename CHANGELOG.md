@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.1 — 2026-09-30
+
+- **F2 and Delete on every sidebar row**: MCP servers, gRPC calls and connections (in a collection or not) rename with F2 and delete with Delete, asking first, like requests and folders.
+
 ## 0.20.0 — 2026-09-30
 
 Highlights: the sidebar reveals what you open and works from the keyboard; Insomnia imports bring gRPC and WebSocket requests; monitors can watch gRPC calls and connections; one shared collection list makes large workspaces lighter.
