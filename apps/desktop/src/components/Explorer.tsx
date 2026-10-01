@@ -282,7 +282,18 @@ export function Explorer() {
     void load();
   }, [load, ws?.id]);
   // saving anything (in any view), or connecting an MCP server, refreshes the lists
-  useEffect(() => on('data.changed', () => void load()), [load]);
+  // (coalesced: a run or an import saves many things in a row, one reload follows the last of them)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = on('data.changed', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void load(), 120);
+    });
+    return () => {
+      clearTimeout(timer);
+      off();
+    };
+  }, [load]);
 
   const grpcByCollection = useMemo(() => groupByCollection(grpc), [grpc]);
   const socketsByCollection = useMemo(() => groupByCollection(sockets), [sockets]);

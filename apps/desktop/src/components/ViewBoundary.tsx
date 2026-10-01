@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react';
 import { RotateCcw, TriangleAlert } from 'lucide-react';
 import { Button } from './ui';
+import { dropDraft } from '../lib/draft-store';
 
 /** The saved draft (persisted state) of each view, which "Reset this view" clears. */
 const DRAFT_KEYS: Record<string, string[]> = {
@@ -34,13 +35,7 @@ export class ViewBoundary extends Component<{ view: string; children: ReactNode 
 
   private reset = (clearDraft: boolean) => {
     if (clearDraft)
-      for (const k of DRAFT_KEYS[this.props.view] ?? []) {
-        try {
-          localStorage.removeItem(k);
-        } catch {
-          /* storage unavailable */
-        }
-      }
+      for (const k of DRAFT_KEYS[this.props.view] ?? []) dropDraft(k.replace(/^aps\.draft\./, ''));
     this.setState({ error: undefined });
   };
 

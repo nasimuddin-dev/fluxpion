@@ -3,6 +3,7 @@ import { docKey, isDocView, routeDoc, useDocs } from './lib/docs';
 import { create } from 'zustand';
 import type { AppSettings, WorkspaceCurrent } from './types';
 import { call } from './api';
+import { loadDraft, saveDraft } from './lib/draft-store';
 
 export type ViewId =
   | 'home'
@@ -272,19 +273,11 @@ export function persisted<T>(key: string, fallback: T): { load(): T; save(v: T):
     /** The draft of one document of a multi-document editor (`main` is the plain key). */
     forDoc: (docId?: string) => persisted<T>(`${key}${docKey(docId)}`, fallback),
     load() {
-      try {
-        const s = localStorage.getItem(`aps.draft.${key}`);
-        return s ? (JSON.parse(s) as T) : fallback;
-      } catch {
-        return fallback;
-      }
+      return loadDraft<T>(key) ?? fallback;
     },
+    /** Written a moment later (lib/draft-store), not on every keystroke. */
     save(v: T) {
-      try {
-        localStorage.setItem(`aps.draft.${key}`, JSON.stringify(v));
-      } catch {
-        /* quota */
-      }
+      saveDraft(key, v);
     },
   };
 }

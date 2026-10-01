@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import { create } from 'zustand';
 import type { ViewId } from '../store';
+import { dropDraft } from './draft-store';
 
 /**
  * Multi-document editors (Postman-style tabs for GraphQL, gRPC, WebSocket and MCP servers): each open document is its
@@ -72,11 +73,7 @@ export const useDocs = create<DocsState>((set, get) => ({
     set({ docs, active });
     persist({ docs, active });
     // the closed document's draft goes with it
-    try {
-      localStorage.removeItem(`aps.draft.${view}${docId === 'main' ? '' : `:${docId}`}`);
-    } catch {
-      /* storage unavailable */
-    }
+    dropDraft(`${view}${docKey(docId)}`);
   },
   setItem: (view, docId, item) => {
     const k = `${view}:${docId}`;

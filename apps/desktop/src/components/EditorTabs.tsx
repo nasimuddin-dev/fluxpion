@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { useApp, type ViewId } from '../store';
 import { docKey, isDocView, useDoc, useDocs } from '../lib/docs';
+import { loadDraft, saveDraft } from '../lib/draft-store';
 import { cx, Menu, type MenuItem } from './ui';
 
 /**
@@ -149,14 +150,15 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
         ? () => {
             // the copy starts from this document's draft, not linked to the saved item (saving creates a new one)
             try {
-              const draft = JSON.parse(localStorage.getItem(`aps.draft.${view}${docKey(docId)}`) ?? 'null') as Record<string, unknown> | null;
+              const source = loadDraft<Record<string, unknown>>(`${view}${docKey(docId)}`);
+              const draft = source ? (JSON.parse(JSON.stringify(source)) as Record<string, unknown>) : null;
               const copy = useDocs.getState().newDoc(view);
               if (draft) {
                 delete draft.requestId;
                 delete draft.collectionId;
                 delete draft.savedId;
                 if (typeof draft.name === 'string' && draft.name) draft.name = `${draft.name} copy`;
-                localStorage.setItem(`aps.draft.${view}${docKey(copy)}`, JSON.stringify(draft));
+                saveDraft(`${view}${docKey(copy)}`, draft);
               }
               useApp.getState().setView(view);
             } catch {
