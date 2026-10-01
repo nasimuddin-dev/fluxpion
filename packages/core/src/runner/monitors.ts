@@ -159,16 +159,18 @@ const resultsFile = (store: WorkspaceStore, id: string) => store.path('runs', 'm
 export function monitorResults(store: WorkspaceStore, id: string, limit = 50): MonitorResult[] {
   const f = resultsFile(store, id);
   if (!existsSync(f)) return [];
+  // newest are last: parse from the end and stop at the limit (lists ask for one or a few)
+  const lines = readFileSync(f, 'utf8').split('\n');
   const out: MonitorResult[] = [];
-  for (const line of readFileSync(f, 'utf8').split('\n')) {
-    if (!line.trim()) continue;
+  for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
+    if (!lines[i]!.trim()) continue;
     try {
-      out.push(JSON.parse(line) as MonitorResult);
+      out.push(JSON.parse(lines[i]!) as MonitorResult);
     } catch {
       /* a partly written last line */
     }
   }
-  return out.reverse().slice(0, limit);
+  return out;
 }
 
 export function lastMonitorResult(store: WorkspaceStore, id: string): MonitorResult | undefined {
