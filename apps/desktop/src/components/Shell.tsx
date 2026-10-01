@@ -82,14 +82,14 @@ export function Sidebar() {
         aria-label={label}
         className={cx(
           // short windows: icons only (the tooltip names them), so the whole rail fits without scrolling
-          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:680px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
+          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:680px)]:py-0.5 rounded-xl text-[0.72rem] font-medium transition-colors duration-150',
           view === id ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
-        {view === id && <span aria-hidden className="absolute -left-1.5 top-1.5 h-6 w-[3px] rounded-r-full bg-[image:var(--brand-gradient)]" />}
+        {view === id && <span aria-hidden className="absolute -left-1.5 top-2 h-6 w-[3px] rounded-r-full bg-[image:var(--brand-gradient)]" />}
         <span
           className={cx(
-            'grid place-items-center h-7 w-11 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90',
+            'grid place-items-center h-8 w-12 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90 [&>svg]:h-[22px] [&>svg]:w-[22px] [@media(max-height:680px)]:[&>svg]:h-5 [@media(max-height:680px)]:[&>svg]:w-5',
             view === id ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover',
           )}
         >
@@ -115,12 +115,12 @@ export function Sidebar() {
         aria-current={inRequests ? 'page' : undefined}
         aria-label="Collections"
         className={cx(
-          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:680px)]:py-0.5 rounded-xl text-[0.7rem] font-medium transition-colors duration-150',
+          'group relative w-full flex flex-col items-center gap-0.5 py-1 [@media(max-height:680px)]:py-0.5 rounded-xl text-[0.72rem] font-medium transition-colors duration-150',
           inRequests ? 'text-fg' : 'text-muted hover:text-fg',
         )}
       >
-        {inRequests && <span aria-hidden className="absolute -left-1.5 top-1.5 h-6 w-[3px] rounded-r-full bg-[image:var(--brand-gradient)]" />}
-        <span className={cx('grid place-items-center h-7 w-11 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90', inRequests ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover')}>
+        {inRequests && <span aria-hidden className="absolute -left-1.5 top-2 h-6 w-[3px] rounded-r-full bg-[image:var(--brand-gradient)]" />}
+        <span className={cx('grid place-items-center h-8 w-12 rounded-lg transition-[background-color,color,transform] duration-150 group-active:scale-90 [&>svg]:h-[22px] [&>svg]:w-[22px] [@media(max-height:680px)]:[&>svg]:h-5 [@media(max-height:680px)]:[&>svg]:w-5', inRequests ? 'bg-accent-soft text-accent shadow-sm ring-1 ring-accent/15' : 'group-hover:bg-hover')}>
           <FolderTree size={18} />
         </span>
         <span className="w-full truncate px-0.5 text-center leading-tight [@media(max-height:680px)]:hidden">Collections</span>
