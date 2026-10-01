@@ -98,7 +98,7 @@ testpion variable-flow "Veterinary API"  # who sets and uses each variable; exit
 testpion attention -w my-workspace               # what needs attention (exit 1 on a high-severity item)
 testpion certificates --warn 21          # TLS certificates of the hosts called, soonest to expire first; exit 1 if one expires within 21 days
 testpion certificates --check api.example.com:443 https://auth.example.com --warn 21   # connect and check now (trust, days left)
-testpion workspace-report -o report.html # activity, collection health, monitors (with 30-day uptime) and runs as one HTML file to share
+testpion workspace-report -o report.html # what needs attention, activity, collection health, monitors (with 30-day uptime) and runs as one HTML file to share
 testpion datasets                        # data files in datasets/ (for run-collection -d); SQLite tables too
 testpion requests "Veterinary API"       # its requests, then its gRPC calls and WebSocket / MQTT connections
 testpion requests "Veterinary API" --json

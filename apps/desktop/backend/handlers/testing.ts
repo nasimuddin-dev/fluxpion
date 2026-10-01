@@ -24,6 +24,7 @@ import {
   testHistory,
   flakyTests,
   scoreTrend,
+  workspaceAttention,
 } from '@testpion/core';
 import type { Backend, Handlers, EvalRunParams } from '../backend.js';
 
@@ -101,7 +102,7 @@ export function testingHandlers(be: Backend): Handlers {
     },
     /** The workspace report (activity, collection health, monitors, runs) as one HTML file, saved where the user picks. */
     'report.workspace': async ({ days, tzOffsetMin }: { days?: number; tzOffsetMin?: number } = {}) => {
-      const text = workspaceReportHtml(be.ws, { days, tzOffsetMin });
+      const text = workspaceReportHtml(be.ws, { days, tzOffsetMin, attention: await workspaceAttention(be.ws) });
       const name = `${be.ws.workspace.name.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'workspace'}-report.html`;
       return be.saveOrDownload(name, [{ name: 'HTML', extensions: ['html'] }], (dest) => writeFileSync(dest, text), () => Buffer.from(text));
     },

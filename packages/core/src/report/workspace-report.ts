@@ -46,7 +46,7 @@ function dayColumns(days: ActivityDay[], ok: (d: ActivityDay) => number, bad: (d
  * each collection's request health, monitors with their latest results, and the latest runs.
  * Only names, counts, statuses and timings: no request bodies, headers or variable values.
  */
-export function workspaceReportHtml(store: WorkspaceStore, opts: { days?: number; tzOffsetMin?: number } = {}): string {
+export function workspaceReportHtml(store: WorkspaceStore, opts: { days?: number; tzOffsetMin?: number; attention?: Array<{ severity: 'high' | 'medium' | 'low'; message: string }> } = {}): string {
   const ws = store.workspace;
   const a = store.meta.activity({ days: opts.days ?? 14, tzOffsetMin: opts.tzOffsetMin });
   const sum = (f: (d: ActivityDay) => number) => a.days.reduce((x, d) => x + f(d), 0);
@@ -91,7 +91,7 @@ h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:24px 0 8px}.muted{colo
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}.chart{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .chart h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}.chart svg{width:100%;height:auto;font-size:10px}.chart svg text{fill:var(--muted)}.chart svg line{stroke:var(--line)}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:500}td.n{text-align:right;font-variant-numeric:tabular-nums}
-.strip{display:inline-flex;gap:1px;vertical-align:middle}.strip i{display:inline-block;width:4px;height:12px;border-radius:1px}.strip.days{gap:2px}.strip.days i{width:6px}
+.warn{color:var(--warn)}.strip{display:inline-flex;gap:1px;vertical-align:middle}.strip i{display:inline-block;width:4px;height:12px;border-radius:1px}.strip.days{gap:2px}.strip.days i{width:6px}
 </style></head><body>
 <h1>${esc(ws.name)}</h1>
 <div class="muted">Workspace report · last ${a.days.length} days · ${esc(new Date().toLocaleString())} · TestPion ${ENGINE_VERSION}</div>
@@ -100,7 +100,14 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px
   out.push(card('Request success', pct(requests - failed, requests), '2xx/3xx, OK and tool results', !requests ? '' : failed / requests > 0.05 ? 'bad' : 'ok'));
   out.push(card('Median response', ms(a.medianMs), 'all requests of the period'));
   out.push(card('Tests passed', pct(tests - failedTests, tests), runsCount ? `${tests} tests in ${runsCount} runs` : 'no test runs', !tests ? '' : failedTests ? 'bad' : 'ok'));
-  out.push(`</div><div class="charts">`);
+  out.push(`</div>`);
+  // what needs attention (from workspaceAttention, computed by the caller): before the charts
+  if (opts.attention?.length) {
+    out.push(`<h2>Needs attention</h2><table>`);
+    for (const a of opts.attention.slice(0, 20)) out.push(`<tr><td class="${a.severity === 'high' ? 'bad' : a.severity === 'medium' ? 'warn' : 'muted'}" style="width:70px">${a.severity}</td><td>${esc(a.message)}</td></tr>`);
+    out.push(`</table>`);
+  }
+  out.push(`<div class="charts">`);
   out.push(`<section class="chart"><h3>Requests per day</h3>${dayColumns(a.days, (d) => d.requests - d.failedRequests, (d) => d.failedRequests, 'Requests per day')}</section>`);
   out.push(`<section class="chart"><h3>Tests per day</h3>${dayColumns(a.days, (d) => d.tests - d.failedTests, (d) => d.failedTests, 'Tests per day')}</section>`);
   out.push(`</div>`);

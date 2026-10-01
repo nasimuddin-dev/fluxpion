@@ -445,11 +445,11 @@ export function registerDataCommands(program: Command): void {
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('-d, --days <n>', 'days of activity, up to 90', '14')
     .option('-o, --out <file>', 'write here (default: <workspace>-report.html)')
-    .action((o: { workspace?: string; days: string; out?: string }) => {
+    .action(async (o: { workspace?: string; days: string; out?: string }) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         const out = resolve(o.out ?? `${store.workspace.name.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'workspace'}-report.html`);
-        writeFileSync(out, workspaceReportHtml(store, { days: Number(o.days) || 14, tzOffsetMin: new Date().getTimezoneOffset() }));
+        writeFileSync(out, workspaceReportHtml(store, { days: Number(o.days) || 14, tzOffsetMin: new Date().getTimezoneOffset(), attention: await workspaceAttention(store) }));
         console.log(green(`Wrote ${out}`));
       } finally {
         store.close();
