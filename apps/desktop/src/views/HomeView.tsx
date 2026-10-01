@@ -1,4 +1,4 @@
-import { Activity as ActivityIcon, AlarmClock, BookOpen, FileDown, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
+import { Activity as ActivityIcon, AlarmClock, BookOpen, FileDown, Bot, LockKeyhole, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { asError, call, modKey } from '../api';
 import { finishSave, type SaveResult } from '../lib/files';
@@ -91,6 +91,7 @@ export function HomeView() {
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [monitors, setMonitors] = useState<HomeMonitor[]>([]);
   const [runs, setRuns] = useState<HomeRun[]>([]);
+  const [certs, setCerts] = useState<Array<{ host: string; issuer?: string; validTo?: string; daysLeft?: number; lastSeen: string }>>([]);
   const [activity, setActivity] = useState<Activity>();
   // the dashboard's period, remembered
   const [days, setDays] = useState<number>(() => {
@@ -121,6 +122,7 @@ export function HomeView() {
     void call<{ items: HistoryItem[] }>('history.list', { limit: 8 }).then((r) => setRecent(r.items));
     void call<HomeMonitor[]>('monitor.list').then(setMonitors, () => setMonitors([]));
     void call<{ items: HomeRun[] }>('runs.list', { limit: 6 }).then((r) => setRuns(r.items), () => setRuns([]));
+    void call<typeof certs>('certificates.list').then(setCerts, () => setCerts([]));
     loadActivity();
   };
   useEffect(() => {
@@ -295,6 +297,21 @@ export function HomeView() {
               </Card>
             )}
           </div>
+        )}
+
+        {certs.length > 0 && (
+          // HTTPS hosts called from here (app, runs, monitors, agents): the certificates that expire first
+          <Card title="Certificates" icon={<LockKeyhole size={15} />} action={<span className="text-xs text-muted">{plural(certs.length, 'host')}</span>}>
+            {certs.slice(0, 6).map((c) => (
+              <div key={c.host} className="flex items-center gap-2 px-2 py-1.5 text-sm" title={`${c.host}: valid until ${c.validTo ? new Date(c.validTo).toLocaleDateString() : '?'}${c.issuer ? `, issued by ${c.issuer}` : ''} · last seen ${timeAgo(c.lastSeen)}`}>
+                <span className={cx('w-2 h-2 rounded-full shrink-0', c.daysLeft === undefined ? 'bg-muted/50' : c.daysLeft < 14 ? 'bg-bad' : c.daysLeft < 30 ? 'bg-warn' : 'bg-ok')} />
+                <span className="truncate mono text-xs flex-1">{c.host}</span>
+                <span className="text-xs text-muted truncate max-w-[40%] hidden sm:inline">{c.issuer}</span>
+                <Badge tone={c.daysLeft === undefined ? 'default' : c.daysLeft < 14 ? 'bad' : c.daysLeft < 30 ? 'warn' : 'ok'}>{c.daysLeft === undefined ? '?' : c.daysLeft < 0 ? 'expired' : `${c.daysLeft} days`}</Badge>
+              </div>
+            ))}
+            {certs.length > 6 && <div className="px-2 pt-1 text-xs text-muted">and {certs.length - 6} more: testpion certificates</div>}
+          </Card>
         )}
 
         <div className="text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">

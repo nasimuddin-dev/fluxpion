@@ -109,6 +109,7 @@ import {
   APP_CLAUDE_SECRET,
   DEFAULT_CLAUDE_MODEL,
   appClaudeProvider,
+  recordCertificate,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -714,6 +715,7 @@ export class Backend {
         requestId: p.requestId,
         responseMeta: { headers: ctx.redactor.redact(response.headers), contentType: response.contentType, truncated: response.truncated },
       });
+      recordCertificate(this.ws, prepared.url, response.connection?.certificate);
       const clip = (t: string | undefined) => (t && t.length > CONSOLE_BODY_CHARS ? t.slice(0, CONSOLE_BODY_CHARS) + `… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);
       // values typed into sensitive headers are secrets too (e.g. echoed back in a response body)
       for (const h of spec.headers ?? [])
@@ -877,6 +879,7 @@ export class Backend {
       }
       const trace = tracer.finish();
       this.ws.saveTrace(trace, 'graphql');
+      recordCertificate(this.ws, r.prepared.url, r.response.connection?.certificate);
       this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'graphql', name: p.name ?? p.operationName ?? 'GraphQL query', method: 'POST', url: r.prepared.url, status: r.response.status, durationMs: r.response.durationMs, size: r.response.size, request: ctx.redactor.redact(p.request), traceId: trace.traceId, collectionId: p.collectionId, requestId: p.requestId });
       const clip = (t: string) => (t.length > CONSOLE_BODY_CHARS ? `${t.slice(0, CONSOLE_BODY_CHARS)}… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);
       this.consoleEntry({

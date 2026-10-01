@@ -8,6 +8,7 @@ import { ProviderRegistry } from './ai/index.js';
 import { McpManager, type McpTraceEvent } from './protocols/mcp/client.js';
 import type { ExecServices } from './runner/execute.js';
 import type { WorkspaceStore } from './storage/workspace.js';
+import { recordCertificate } from './storage/certificates.js';
 import { secretKeys, type SecretStore } from './storage/secrets.js';
 import { CookieJar } from './cookies/cookie-jar.js';
 import { APP_CLAUDE_ID, APP_CLAUDE_SECRET, appClaudeProvider } from './ai/app-provider.js';
@@ -113,6 +114,7 @@ export function createEngineContext(opts: ContextOptions): EngineContext {
     environmentName: environment?.name,
     readFile: (path: string) => readFileSync(store.safePath(path, opts.fileRoot ?? store.root), 'utf8'),
     scriptPackage: (name: string) => store.readScriptPackage(name),
+    onCertificate: (url, c) => recordCertificate(store, url, c),
   };
   return { services, vars, redactor, environment, collection, dispose: () => mcp.close() };
 }

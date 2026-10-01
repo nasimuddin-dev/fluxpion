@@ -16,6 +16,7 @@ import { ApsError, normalizeError } from '../errors.js';
 import { Redactor } from '../util/redact.js';
 import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
+import { listCertificates, recordCertificate } from '../storage/certificates.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext } from '../engine.js';
 import { executeHttp, timingSummary } from '../protocols/http/client.js';
@@ -283,7 +284,8 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const ctx = createEngineContext({ store, secrets, settings, environment });
         try {
           const spec: HttpRequestSpec = ctx.vars.resolveDeep(requestFrom(a).request);
-          const { response } = await executeHttp({ ...spec, settings: { timeoutMs: settings.defaultTimeoutMs } }, { redactor: ctx.redactor, maxPreviewBytes: 1024 * 1024, cookieJar: ctx.services.cookieJar });
+          const { response, prepared } = await executeHttp({ ...spec, settings: { timeoutMs: settings.defaultTimeoutMs } }, { redactor: ctx.redactor, maxPreviewBytes: 1024 * 1024, cookieJar: ctx.services.cookieJar });
+          recordCertificate(store, prepared.url, response.connection?.certificate);
           return {
             status: response.status,
             statusText: response.statusText,
@@ -810,6 +812,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         required: ['provider'],
       },
       run: (a) => ciConfig(store, a as unknown as CiConfigOptions),
+    },
+    {
+      name: 'list_certificates',
+      description: 'TLS certificates of the HTTPS hosts this workspace has called (from the app, test runs, monitors and agents), soonest to expire first: host, subject, issuer, valid until, days left and when last seen. Use it to find certificates that expire soon.',
+      inputSchema: { type: 'object', properties: { withinDays: { type: 'number', description: 'Only those that expire within this many days' } } },
+      run: (a) => listCertificates(store).filter((c) => a.withinDays === undefined || (c.daysLeft !== undefined && c.daysLeft <= Number(a.withinDays))),
     },
     {
       name: 'list_monitors',

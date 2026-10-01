@@ -29,6 +29,7 @@ import {
   schemaFromSdl,
   workspaceStorage,
   deleteRunsBefore,
+  listCertificates,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
@@ -87,6 +88,8 @@ export function requestsHandlers(be: Backend): Handlers {
     'stats.activity': (q: { days?: number; tzOffsetMin?: number } = {}) => be.ws.meta.activity(q),
     /** Per saved request of a collection: responses, failures, latest status and median time (collection Overview). */
     'stats.requests': ({ collectionId }: { collectionId: string }) => be.ws.meta.requestStats(collectionId),
+    /** TLS certificates of the HTTPS hosts called, soonest to expire first. */
+    'certificates.list': () => listCertificates(be.ws),
     'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
     'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
     'history.clear': () => be.ws.meta.clearHistory(),

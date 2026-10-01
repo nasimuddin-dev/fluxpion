@@ -53,6 +53,7 @@ import {
   loadHistory,
   workspaceStorage,
   deleteRunsBefore,
+  listCertificates,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -286,6 +287,38 @@ export function registerDataCommands(program: Command): void {
         for (const p of u.parts) console.log(`${p.label.padEnd(28)} ${(p.bytes / 1048576).toFixed(1).padStart(8)} MB  ${dim(`${p.files} files`)}`);
         console.log(`${'Total'.padEnd(28)} ${(u.totalBytes / 1048576).toFixed(1).padStart(8)} MB`);
         console.log(dim(`${u.runs} runs, ${u.history} history entries, ${u.traces} traces`));
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('certificates')
+    .description('TLS certificates of the HTTPS hosts the workspace has called (app, runs, monitors, agents), soonest to expire first; with --warn, exit 1 when one expires within that many days')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--warn <days>', 'exit 1 when a certificate expires within this many days (for cron or CI)')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace?: string; warn?: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const list = listCertificates(store);
+        const warn = o.warn === undefined ? undefined : Number(o.warn);
+        if (warn !== undefined && !(warn >= 0)) throw new CliError('--warn needs a number of days', EXIT.CONFIG_ERROR);
+        const soon = warn === undefined ? [] : list.filter((c) => c.daysLeft !== undefined && c.daysLeft <= warn);
+        if (o.json) console.log(JSON.stringify(list, null, 2));
+        else if (!list.length) console.log(dim('No certificates yet: they are recorded when HTTPS requests are sent from the app, test runs, monitors or agents.'));
+        else {
+          const w = Math.min(40, Math.max(...list.map((c) => c.host.length)));
+          for (const c of list) {
+            const d = c.daysLeft;
+            const text = (d === undefined ? '?' : d < 0 ? `expired ${-d}d ago` : `${d} days`).padEnd(16);
+            const left = d === undefined ? dim(text) : d < 14 ? red(text) : d < 30 ? yellow(text) : green(text);
+            console.log(`${c.host.slice(0, w).padEnd(w)}  ${left} ${dim(`${c.validTo?.slice(0, 10) ?? ''} · ${c.issuer ?? ''} · seen ${c.lastSeen.slice(0, 10)}`)}`);
+          }
+        }
+        if (soon.length) {
+          if (!o.json) console.error(red(`${soon.length} certificate${soon.length === 1 ? '' : 's'} expire${soon.length === 1 ? 's' : ''} within ${warn} days: ${soon.map((c) => c.host).join(', ')}`));
+          process.exitCode = EXIT.TEST_FAILURE;
+        }
       } finally {
         store.close();
       }
