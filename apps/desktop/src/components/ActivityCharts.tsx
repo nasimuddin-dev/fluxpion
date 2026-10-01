@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, ChartCard, ChartTip, niceMax, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard, ChartTip, niceMax, StackedColumns, Swatch, useWidth } from './charts';
 import { cx } from './ui';
 
 /** Workspace activity from `stats.activity` (see summarizeActivity in core). */
@@ -82,7 +82,7 @@ function YGrid({ max, y, width, format = String, whole }: { max: number; y(v: nu
   );
 }
 
-/** One stacked bar per day: the good part at the base, the failed part above it (2px gap). */
+/** One stacked column per day: the good part at the base, the failed part above it. First, middle and last day labelled. */
 function DailyStack({
   title,
   aside,
@@ -104,18 +104,7 @@ function DailyStack({
   tip(d: ActivityDay): ReactNode;
   empty: string;
 }) {
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number>();
-  // counts: whole numbers on the axis (at least 0, 1, 2)
-  const max = Math.max(2, niceMax(Math.max(...days.map((d) => ok(d) + bad(d)), 1)));
-  const innerW = Math.max(0, width - PAD.l - PAD.r);
-  const slot = days.length ? innerW / days.length : 0;
-  const bw = Math.max(2, Math.min(22, slot * 0.7));
-  const x = (i: number) => PAD.l + slot * i + slot / 2;
-  const base = H - PAD.b;
-  const h = (v: number) => (v / max) * (base - PAD.t);
-  const y = (v: number) => base - h(v);
-  const anything = days.some((d) => ok(d) + bad(d) > 0);
+  const ticks = (n: number) => (n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : [...Array(n).keys()]);
   return (
     <ChartCard
       title={title}
@@ -127,34 +116,21 @@ function DailyStack({
         </>
       }
     >
-      <div ref={ref} className="relative" onMouseLeave={() => setHover(undefined)}>
-        <svg width={width} height={H} role="img" aria-label={`${title} per day`}>
-          <YGrid max={max} y={y} width={width} whole />
-          {days.map((d, i) => {
-            const okH = h(ok(d));
-            const badH = h(bad(d));
-            return (
-              <g key={d.day} onMouseEnter={() => setHover(i)} opacity={hover === undefined || hover === i ? 1 : 0.5}>
-                <rect x={PAD.l + slot * i} y={PAD.t} width={slot} height={base - PAD.t} fill="transparent" />
-                {okH > 0 && <rect x={x(i) - bw / 2} y={base - okH} width={bw} height={okH} rx={2} fill="var(--ok)" />}
-                {badH > 0 && <rect x={x(i) - bw / 2} y={base - okH - badH - (okH > 0 ? 2 : 0)} width={bw} height={badH} rx={2} fill="var(--bad)" />}
-              </g>
-            );
-          })}
-          <DayAxis days={days} x={x} width={width} />
-          {!anything && (
-            <text x={PAD.l + innerW / 2} y={base / 2 + 4} textAnchor="middle" fontSize={11} fill="var(--muted)">
-              {empty}
-            </text>
-          )}
-        </svg>
-        {hover !== undefined && days[hover] && (
-          <ChartTip x={x(hover)} width={width}>
-            <div className="font-medium text-fg">{longDay(days[hover]!.day)}</div>
-            <div className="text-muted mt-0.5">{tip(days[hover]!)}</div>
-          </ChartTip>
+      <StackedColumns
+        items={days}
+        ok={ok}
+        bad={bad}
+        keyOf={(d) => d.day}
+        label={`${title} per day`}
+        empty={empty}
+        labelOf={(d, i, n) => (ticks(n).includes(i) ? shortDay(d.day, i, n) : undefined)}
+        tip={(d) => (
+          <>
+            <div className="font-medium text-fg">{longDay(d.day)}</div>
+            <div className="text-muted mt-0.5">{tip(d)}</div>
+          </>
         )}
-      </div>
+      />
     </ChartCard>
   );
 }

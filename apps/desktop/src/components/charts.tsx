@@ -172,3 +172,91 @@ export function PointLine<T>({
     </div>
   );
 }
+
+/**
+ * Columns of passed (at the base) and failed (above, 2px apart) per item: days, latency ranges, runs.
+ * Whole-number axis, the hovered column's tooltip, labels under the columns that `labelOf` names.
+ */
+export function StackedColumns<T>({
+  items,
+  ok,
+  bad,
+  keyOf,
+  tip,
+  label,
+  labelOf,
+  empty,
+  emptyMark,
+  height = 140,
+  maxBar = 22,
+}: {
+  items: T[];
+  ok(d: T): number;
+  bad(d: T): number;
+  keyOf(d: T): string;
+  tip(d: T): ReactNode;
+  label: string;
+  /** Text under a column (undefined for none); `slot` is the column width in px. */
+  labelOf?(d: T, i: number, n: number, slot: number): string | undefined;
+  /** Shown in the middle when every column is empty. */
+  empty?: string;
+  /** Items drawn as a thin red mark even when empty (e.g. a run that could not start). */
+  emptyMark?(d: T): boolean;
+  height?: number;
+  maxBar?: number;
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number>();
+  const H = height;
+  const pad = { l: 48, r: 6, t: 8, b: labelOf ? 20 : 8 };
+  const max = Math.max(2, niceMax(Math.max(1, ...items.map((d) => ok(d) + bad(d)))));
+  const innerW = Math.max(0, width - pad.l - pad.r);
+  const slot = items.length ? innerW / items.length : 0;
+  const bw = Math.max(2, Math.min(maxBar, slot * 0.72));
+  const x = (i: number) => pad.l + slot * i + slot / 2;
+  const base = H - pad.b;
+  const h = (v: number) => (v / max) * (base - pad.t);
+  const anything = items.some((d) => ok(d) + bad(d) > 0);
+  return (
+    <div ref={ref} className="relative" onMouseLeave={() => setHover(undefined)}>
+      <svg width={width} height={H} role="img" aria-label={label}>
+        {[0, Math.round(max / 2), max].map((t) => (
+          <g key={t}>
+            <line x1={pad.l} x2={width - pad.r} y1={base - h(t)} y2={base - h(t)} stroke="var(--line)" strokeWidth={1} />
+            <text x={pad.l - 6} y={base - h(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
+              {t}
+            </text>
+          </g>
+        ))}
+        {items.map((d, i) => {
+          const okH = h(ok(d));
+          const badH = h(bad(d));
+          const text = labelOf?.(d, i, items.length, slot);
+          return (
+            <g key={keyOf(d)} onMouseEnter={() => setHover(i)} opacity={hover === undefined || hover === i ? 1 : 0.5}>
+              <rect x={pad.l + slot * i} y={pad.t} width={slot} height={base - pad.t} fill="transparent" />
+              {okH > 0 && <rect x={x(i) - bw / 2} y={base - okH} width={bw} height={okH} rx={2} fill="var(--ok)" />}
+              {badH > 0 && <rect x={x(i) - bw / 2} y={base - okH - badH - (okH > 0 ? 2 : 0)} width={bw} height={badH} rx={2} fill="var(--bad)" />}
+              {!okH && !badH && emptyMark?.(d) && <rect x={x(i) - bw / 2} y={base - 2} width={bw} height={2} rx={1} fill="var(--bad)" />}
+              {text !== undefined && (
+                <text x={Math.min(Math.max(x(i), pad.l + 14), width - pad.r - 14)} y={H - 5} fontSize={10} fill="var(--muted)" textAnchor="middle">
+                  {text}
+                </text>
+              )}
+            </g>
+          );
+        })}
+        {!anything && empty && (
+          <text x={pad.l + innerW / 2} y={base / 2 + 4} textAnchor="middle" fontSize={11} fill="var(--muted)">
+            {empty}
+          </text>
+        )}
+      </svg>
+      {hover !== undefined && items[hover] && (
+        <ChartTip x={x(hover)} width={width}>
+          {tip(items[hover]!)}
+        </ChartTip>
+      )}
+    </div>
+  );
+}

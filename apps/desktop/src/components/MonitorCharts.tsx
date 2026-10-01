@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatMs, timeAgo } from '../lib/format';
 import { cx } from './ui';
-import { axisMs, ChartCard as Card, ChartTip, PointLine, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard as Card, ChartTip, PointLine, StackedColumns, Swatch, useWidth } from './charts';
 
 /** A monitor run, as the charts need it. */
 export interface RunPoint {
@@ -122,19 +122,9 @@ export function RunTimeChart({ runs }: { runs: RunPoint[] }) {
   );
 }
 
-/** Requests per run: passed stacked under failed (failed + errors), one bar per run. */
+/** Requests per run: passed stacked under failed (failed + errors), one column per run. */
 export function RequestsChart({ runs }: { runs: RunPoint[] }) {
   const ordered = useMemo(() => [...runs].slice(0, 40).reverse(), [runs]);
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number>();
-  const H = 150;
-  const pad = { l: 28, r: 4, t: 8, b: 20 };
-  const max = Math.max(...ordered.map((r) => r.total), 1);
-  const innerW = Math.max(0, width - pad.l - pad.r);
-  const gap = 2;
-  const bw = ordered.length ? Math.max(3, Math.min(18, (innerW - gap * (ordered.length - 1)) / ordered.length)) : 0;
-  const h = (v: number) => (v / max) * (H - pad.t - pad.b);
-  const base = H - pad.b;
   const anyFailed = ordered.some((r) => r.failed + r.errors > 0);
   return (
     <Card
@@ -147,34 +137,17 @@ export function RequestsChart({ runs }: { runs: RunPoint[] }) {
         </>
       }
     >
-      <div ref={ref} className="relative" onMouseLeave={() => setHover(undefined)}>
-        <svg width={width} height={H} role="img" aria-label="Requests passed and failed per run">
-          {[0, max].map((t) => (
-            <g key={t}>
-              <line x1={pad.l} x2={width - pad.r} y1={base - h(t)} y2={base - h(t)} stroke="var(--line)" strokeWidth={1} />
-              <text x={pad.l - 6} y={base - h(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
-                {t}
-              </text>
-            </g>
-          ))}
-          {ordered.map((r, i) => {
-            const bx = pad.l + i * (bw + gap);
-            const bad = r.failed + r.errors;
-            const okH = h(r.passed);
-            const badH = h(bad);
-            return (
-              <g key={r.runId} onMouseEnter={() => setHover(i)} opacity={hover === undefined || hover === i ? 1 : 0.5}>
-                {/* the hit target is the whole column, not only the bar */}
-                <rect x={bx} y={pad.t} width={bw} height={base - pad.t} fill="transparent" />
-                {okH > 0 && <rect x={bx} y={base - okH} width={bw} height={okH} rx={2} fill="var(--ok)" />}
-                {badH > 0 && <rect x={bx} y={base - okH - badH - (okH > 0 ? gap : 0)} width={bw} height={badH} rx={2} fill="var(--bad)" />}
-                {r.total === 0 && <rect x={bx} y={base - 2} width={bw} height={2} rx={1} fill="var(--bad)" />}
-              </g>
-            );
-          })}
-        </svg>
-        {hover !== undefined && ordered[hover] && <Tip r={ordered[hover]!} x={pad.l + hover * (bw + gap)} width={width} />}
-      </div>
+      <StackedColumns
+        items={ordered}
+        ok={(r) => r.passed}
+        bad={(r) => r.failed + r.errors}
+        keyOf={(r) => r.runId}
+        height={150}
+        maxBar={18}
+        label="Requests passed and failed per run"
+        emptyMark={(r) => r.total === 0}
+        tip={(r) => <TipBody r={r} />}
+      />
     </Card>
   );
 }

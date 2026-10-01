@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { call } from '../api';
 import { formatMs, plural } from '../lib/format';
-import { ChartCard, ChartTip, niceMax, Swatch, useWidth } from './charts';
+import { ChartCard, StackedColumns, Swatch } from './charts';
 import { StatusIcon } from './Results';
 import { Empty } from './ui';
 
@@ -76,17 +76,6 @@ const bucketLabel = (b: Breakdown['histogram'][number]) => (b.toMs === undefined
 
 /** How long the run's tests took: one column per latency range, passed at the base, failed above. */
 function LatencyHistogram({ data }: { data: Breakdown['histogram'] }) {
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number>();
-  const H = 160;
-  const pad = { l: 36, r: 6, t: 8, b: 22 };
-  const max = Math.max(2, niceMax(Math.max(...data.map((b) => b.passed + b.failed), 1)));
-  const innerW = Math.max(0, width - pad.l - pad.r);
-  const slot = data.length ? innerW / data.length : 0;
-  const bw = Math.max(4, Math.min(48, slot * 0.72));
-  const base = H - pad.b;
-  const h = (v: number) => (v / max) * (base - pad.t);
-  const x = (i: number) => pad.l + slot * i + slot / 2;
   return (
     <ChartCard
       title="Response time"
@@ -98,40 +87,24 @@ function LatencyHistogram({ data }: { data: Breakdown['histogram'] }) {
         </>
       }
     >
-      <div ref={ref} className="relative" onMouseLeave={() => setHover(undefined)}>
-        <svg width={width} height={H} role="img" aria-label="Tests per response-time range">
-          {[0, Math.round(max / 2), max].map((t) => (
-            <g key={t}>
-              <line x1={pad.l} x2={width - pad.r} y1={base - h(t)} y2={base - h(t)} stroke="var(--line)" strokeWidth={1} />
-              <text x={pad.l - 6} y={base - h(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
-                {t}
-              </text>
-            </g>
-          ))}
-          {data.map((b, i) => {
-            const okH = h(b.passed);
-            const badH = h(b.failed);
-            return (
-              <g key={b.fromMs} onMouseEnter={() => setHover(i)} opacity={hover === undefined || hover === i ? 1 : 0.5}>
-                <rect x={pad.l + slot * i} y={pad.t} width={slot} height={base - pad.t} fill="transparent" />
-                {okH > 0 && <rect x={x(i) - bw / 2} y={base - okH} width={bw} height={okH} rx={2} fill="var(--ok)" />}
-                {badH > 0 && <rect x={x(i) - bw / 2} y={base - okH - badH - (okH > 0 ? 2 : 0)} width={bw} height={badH} rx={2} fill="var(--bad)" />}
-                <text x={x(i)} y={H - 6} fontSize={10} fill="var(--muted)" textAnchor="middle">
-                  {slot > 64 ? bucketLabel(b) : b.toMs === undefined ? `≥${formatMs(b.fromMs)}` : `<${formatMs(b.toMs)}`}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-        {hover !== undefined && data[hover] && (
-          <ChartTip x={x(hover)} width={width}>
-            <div className="font-medium text-fg">{bucketLabel(data[hover]!)}</div>
+      <StackedColumns
+        items={data}
+        ok={(b) => b.passed}
+        bad={(b) => b.failed}
+        keyOf={(b) => String(b.fromMs)}
+        height={160}
+        maxBar={48}
+        label="Tests per response-time range"
+        labelOf={(b, _i, _n, slot) => (slot > 64 ? bucketLabel(b) : b.toMs === undefined ? `≥${bound(b.fromMs)}` : `<${bound(b.toMs)}`)}
+        tip={(b) => (
+          <>
+            <div className="font-medium text-fg">{bucketLabel(b)}</div>
             <div className="text-muted mt-0.5">
-              {plural(data[hover]!.passed, 'test')} passed · {data[hover]!.failed} failed
+              {plural(b.passed, 'test')} passed · {b.failed} failed
             </div>
-          </ChartTip>
+          </>
         )}
-      </div>
+      />
     </ChartCard>
   );
 }
