@@ -87,7 +87,7 @@ const store = persisted<Draft>('graphql', { endpoint: '{{graphqlEndpoint}}', que
 
 export function GraphQLView() {
   // this document's draft (each tab of this editor is its own document)
-  const { docId, active: docActive } = useDoc();
+  const { docId } = useDoc();
   const docDrafts = useMemo(() => store.forDoc(docId), [docId]);
   // drafts saved by older versions may hold the variables as an object: the editors need text
   const [d, setD] = useState<Draft>(() => {

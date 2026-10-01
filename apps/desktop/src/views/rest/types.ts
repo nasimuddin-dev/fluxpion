@@ -7,14 +7,6 @@ import { uid } from '../../lib/format';
 
 export const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
-/** Request tab widths; tabs that don't fit go into the "+N" overflow dropdown. */
-export const TAB_WIDTH = 180;
-
-export const PINNED_TAB_WIDTH = 150;
-
-/** Room kept for the new-tab, tab-actions and overflow buttons. */
-export const TAB_STRIP_RESERVED = 140;
-
 export interface RestTab {
   id: string;
   name: string;

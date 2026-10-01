@@ -4,14 +4,9 @@ import { createPortal } from 'react-dom';
 import { asError, call } from '../api';
 import { useApp } from '../store';
 import { dynamicVariables } from '../editor-intel';
+import { clearVariablesCache, inspectVariables, type VarInfo } from '../lib/vars-cache';
 import { Button, cx, useDebounced } from './ui';
 
-interface VarInfo {
-  name: string;
-  scope?: string;
-  value?: string;
-  secret?: boolean;
-}
 
 /**
  * Single-line input that highlights {{variables}} (resolved = blue, unresolved = red), shows where
@@ -59,7 +54,7 @@ export function VarInput({
 
   useEffect(() => {
     if (!/\{\{/.test(debounced)) return setVars({});
-    void call<VarInfo[]>('vars.inspect', { environment: env, collectionId, template: debounced }).then((list) => setVars(Object.fromEntries(list.map((v) => [v.name, v]))));
+    void inspectVariables({ environment: env, collectionId, template: debounced }).then((list) => setVars(Object.fromEntries(list.map((v) => [v.name, v]))));
   }, [debounced, env, collectionId, refresh]);
 
   /** A click inside a {{variable}} opens its popover. */
@@ -81,7 +76,7 @@ export function VarInput({
   };
 
   const loadAll = () =>
-    void Promise.all([call<VarInfo[]>('vars.inspect', { environment: env, collectionId }), dynamicVariables()]).then(([list, dynamic]) =>
+    void Promise.all([inspectVariables({ environment: env, collectionId }), dynamicVariables()]).then(([list, dynamic]) =>
       setAll([...list.filter((v) => v.name !== 'workspaceDir'), ...dynamic]),
     );
 
@@ -174,7 +169,7 @@ export function VarInput({
           x={pop.x}
           y={pop.y}
           onClose={() => setPop(null)}
-          onSaved={() => setRefresh((n) => n + 1)}
+          onSaved={() => (clearVariablesCache(), setRefresh((n) => n + 1))}
         />
       )}
       {suggest && matches.length > 0 && (

@@ -1,7 +1,7 @@
 import { Check, Copy, Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
-import { useApp, type CiRequest } from '../store';
+import { useApp } from '../store';
 import type { Collection } from '../types';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Button, Field, Input, Modal, Select, Tabs } from './ui';

@@ -1,5 +1,5 @@
 import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';

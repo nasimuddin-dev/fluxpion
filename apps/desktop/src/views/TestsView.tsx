@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, History, KeyRo
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
-import { useIntent } from '../hooks';
+import { useIntent, useSaveShortcut } from '../hooks';
 import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunPanel } from '../components/RunPanel';
@@ -202,16 +202,7 @@ export function TestsView() {
     }
   });
 
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'tests') {
-        e.preventDefault();
-        void save();
-      }
-    };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  });
+  useSaveShortcut('tests', () => void save());
 
   const renderTree = (nodes: Node[], depth = 0): React.ReactNode =>
     nodes.map((n) =>

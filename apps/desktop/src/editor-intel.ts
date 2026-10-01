@@ -1,6 +1,7 @@
 import type * as Monaco from 'monaco-editor';
 import { call } from './api';
 import { useApp } from './store';
+import { inspectVariables, type VarInfo } from './lib/vars-cache';
 
 /**
  * Editor intelligence for every code editor (Monaco): {{variable}} completion, hover and highlighting in
@@ -8,12 +9,7 @@ import { useApp } from './store';
  * (MCP tool arguments, gRPC messages …). Installed once, when Monaco loads.
  */
 
-export interface VarInfo {
-  name: string;
-  scope?: string;
-  value?: string;
-  secret?: boolean;
-}
+export type { VarInfo };
 
 const DYNAMIC_FALLBACK: VarInfo[] = [
   { name: '$guid', scope: 'dynamic', value: 'A random UUID' },
@@ -34,24 +30,14 @@ function loadDynamic(): Promise<void> {
   return dynamicLoaded;
 }
 
-/* ------------------------------------------------------------------ variables (cached per environment) */
+/* ------------------------------------------------------------------ variables (shared cache, lib/vars-cache) */
 
-let cache: { key: string; at: number; vars: VarInfo[] } | undefined;
-let pending: Promise<VarInfo[]> | undefined;
-
-/** Variables of the active environment (plus collection, workspace and global ones), refreshed every few seconds. */
+/** Variables of the active environment (plus collection, workspace and global ones) and the dynamic ones. */
 export function editorVariables(): Promise<VarInfo[]> {
-  const env = useApp.getState().environment ?? '';
-  if (cache && cache.key === env && Date.now() - cache.at < 5000) return Promise.resolve(cache.vars);
-  pending ??= Promise.all([call<VarInfo[]>('vars.inspect', { environment: env || undefined }), loadDynamic()])
-    .then(([list]) => {
-      const vars = [...list.filter((v) => v.name !== 'workspaceDir'), ...DYNAMIC];
-      cache = { key: env, at: Date.now(), vars };
-      return vars;
-    })
-    .catch(() => cache?.vars ?? DYNAMIC)
-    .finally(() => (pending = undefined));
-  return pending;
+  const env = useApp.getState().environment;
+  return Promise.all([inspectVariables({ environment: env || undefined }), loadDynamic()])
+    .then(([list]) => [...list.filter((v) => v.name !== 'workspaceDir'), ...DYNAMIC])
+    .catch(() => DYNAMIC);
 }
 
 /** Defined somewhere, or resolved at run time (dynamic values, {{$env.NAME}}, secret references). */

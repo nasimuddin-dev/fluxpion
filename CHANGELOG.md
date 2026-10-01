@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Faster, leaner editor** (refactoring, no change in behaviour):
+  - Fields that highlight `{{variables}}` share one short-lived cache of variable lookups (also used by the code editors' completion and hover), so a request with many headers or params, or switching environment, asks the backend once per distinct question instead of once per field.
+  - The Collections sidebar counts each collection's REST, SOAP and GraphQL requests in a single pass, cached per collection, and indexes gRPC calls and connections by collection, instead of walking every tree several times per render.
+  - The REST view no longer runs the measurements of its old tab strip (replaced by the shared one) on every tab change and resize; that strip's dead code is gone.
+  - Duplicated code merged: Ctrl+S is one shared hook in every editor (REST and Tests too), leaving an editor when its last tab closes is one function, and the sidebar edits saved gRPC calls and connections through one helper.
+  - Unused imports and variables removed, and the desktop app's TypeScript settings now reject new ones (`noUnusedLocals`, `noUnusedParameters`).
+
 - **Click a {{variable}} to see its value**: clicking a variable in the URL bar or any field that highlights variables (headers, params, auth …) opens a popover with its value and where it comes from (environment, collection, global …). Copy it, edit it when it comes from the active environment (Enter or Save), or, for a variable that isn't defined, add it to the active environment right there. Secret values stay masked (type a new one to replace it); variables set by a collection or request are shown read-only with where to change them.
 
 ## 0.15.0 — 2026-09-30

@@ -179,12 +179,7 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
               const docs = useDocs.getState();
               docs.close(view, docId);
               // the last document of this editor: go to another open tab (or REST)
-              if (!(docs.docs[view] ?? []).length && useApp.getState().view === view) {
-                const others = Object.values(useEditorTabsStore.getState().byView).flat().filter((t) => t && t.view !== view);
-                const next = others[others.length - 1];
-                useApp.getState().setView(next?.view ?? 'rest');
-                next?.onSelect?.();
-              }
+              if (!(docs.docs[view] ?? []).length) leaveEditor(view);
             },
           },
         ]
@@ -198,18 +193,24 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
             onClose: () => {
               setHidden(true);
               // leave the editor for another open tab (or REST)
-              if (useApp.getState().view === view) {
-                const others = Object.values(useEditorTabsStore.getState().byView).flat().filter((t) => t && t.view !== view);
-                const next = others[others.length - 1];
-                useApp.getState().setView(next?.view ?? 'rest');
-                next?.onSelect?.();
-              }
+              leaveEditor(view);
             },
           },
         ]
       : [],
     tab ? key : undefined,
   );
+}
+
+/** An editor's last tab closed while it's on screen: show the last other open tab (or REST). */
+function leaveEditor(view: ViewId) {
+  if (useApp.getState().view !== view) return;
+  const others = Object.values(useEditorTabsStore.getState().byView)
+    .flat()
+    .filter((t) => t && t.view !== view);
+  const next = others[others.length - 1];
+  useApp.getState().setView(next?.view ?? 'rest');
+  next?.onSelect?.();
 }
 
 /** Close every tab that shows one of these saved items (they were deleted), whatever the editor. */

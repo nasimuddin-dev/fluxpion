@@ -32,7 +32,7 @@ function infoOf(text: string): { title?: string; version?: string; openapi?: str
  * request: the document itself (editable), its API coverage and a comparison with another version.
  */
 export function ApiDefinitionView() {
-  const { docId, active } = useDoc();
+  const { docId } = useDoc();
   const docState = useMemo(() => tabSpec.forDoc(docId), [docId]);
   const [spec, setSpec] = useState<string | undefined>(() => docState.load().spec);
   useEffect(() => docState.save({ spec }), [spec, docState]);

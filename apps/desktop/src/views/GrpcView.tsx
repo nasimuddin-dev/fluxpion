@@ -1,4 +1,4 @@
-import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2, Bookmark, History, KeyRound, Plug } from 'lucide-react';
+import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2, Bookmark, History, KeyRound } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';

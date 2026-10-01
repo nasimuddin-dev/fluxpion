@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
-import { confirmAction, promptText, useApp, type ViewId } from '../store';
+import { confirmAction, promptText, useApp } from '../store';
 import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
 import { uid } from '../lib/format';
 import { addToFolder, CATEGORY_META, CollectionTree, type ExtraGroup } from './CollectionTree';
@@ -140,6 +140,14 @@ function FolderLabel({ name }: { name: string }) {
   return <div className="pl-6 pr-3 pt-1.5 pb-0.5 text-[0.7rem] font-medium text-muted truncate">{name}</div>;
 }
 
+const NONE: SavedItem[] = [];
+/** Saved items by the collection they're shown in. */
+function groupByCollection(items: SavedItem[]): Map<string, SavedItem[]> {
+  const map = new Map<string, SavedItem[]>();
+  for (const i of items) if (i.collectionId) map.set(i.collectionId, [...(map.get(i.collectionId) ?? []), i]);
+  return map;
+}
+
 interface SavedItem {
   id: string;
   name: string;
@@ -276,6 +284,8 @@ export function Explorer() {
   // saving anything (in any view), or connecting an MCP server, refreshes the lists
   useEffect(() => on('data.changed', () => void load()), [load]);
 
+  const grpcByCollection = useMemo(() => groupByCollection(grpc), [grpc]);
+  const socketsByCollection = useMemo(() => groupByCollection(sockets), [sockets]);
   const f = filter.trim().toLowerCase();
   const match = (...t: Array<string | undefined>) => !f || t.some((x) => x?.toLowerCase().includes(f));
   // gRPC calls and connections not (or no longer) in a collection
@@ -287,7 +297,6 @@ export function Explorer() {
   const shownSpecs = specs.filter((s) => match(s));
 
   const intent = useApp.getState().openIntent;
-  const setView = (v: ViewId) => useApp.getState().setView(v);
   const saveCollection = async (c: Collection) => {
     try {
       await call('col.save', c);
@@ -302,17 +311,7 @@ export function Explorer() {
   };
   const importDefinition = () => intent('collections', { import: true });
   /** Show a saved gRPC call / connection in another collection (or in none). */
-  const moveItem = async (kind: 'grpc' | 'websocket', id: string, collectionId: string | undefined) => {
-    try {
-      const lib = await call<Library<unknown>>('lib.get', { kind });
-      const items = lib.items.map((i: LibraryItem<unknown>) => (i.id === id ? { ...i, collectionId } : i));
-      await call('lib.save', { kind, library: { folders: lib.folders, items } });
-      await load();
-    } catch (e) {
-      useApp.getState().toast(asError(e).message, 'error');
-    }
-  };
-  /** Change a saved gRPC call / connection list (rename, duplicate, delete). */
+  /** Change a saved gRPC call / connection list (move, rename, duplicate, delete): the one place that loads, edits and saves it. */
   const editLibrary = async (kind: 'grpc' | 'websocket', fn: (items: Array<LibraryItem<unknown>>) => Array<LibraryItem<unknown>>) => {
     try {
       const lib = await call<Library<unknown>>('lib.get', { kind });
@@ -322,6 +321,7 @@ export function Explorer() {
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
+  const moveItem = (kind: 'grpc' | 'websocket', id: string, collectionId: string | undefined) => editLibrary(kind, (items) => items.map((i) => (i.id === id ? { ...i, collectionId } : i)));
   /** The menu of a gRPC call or connection: the same actions as a request's (open, rename, duplicate, move, delete). */
   const moveMenu = (kind: 'grpc' | 'websocket', item: SavedItem): MenuItem[] => [
     { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(kind, { savedId: item.id }) },
@@ -412,19 +412,18 @@ export function Explorer() {
           await call('col.save', col);
         }
         const ids = new Set(items.map((i) => i.id));
-        const lib = await call<Library<unknown>>('lib.get', { kind });
-        await call('lib.save', { kind, library: { folders: lib.folders, items: lib.items.map((i: LibraryItem<unknown>) => (ids.has(i.id) ? { ...i, collectionId: col!.id } : i)) } });
+        const colId = col.id;
+        await editLibrary(kind, (list) => list.map((i) => (ids.has(i.id) ? { ...i, collectionId: colId } : i)));
         moved += items.length;
       }
-      await load();
       useApp.getState().toast(`Moved ${moved} item${moved === 1 ? '' : 's'} into collections`, 'success');
     } catch (e) {
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
   const extraGroups = (c: Collection): ExtraGroup[] => [
-    { cat: 'grpc', items: grpc.filter((i) => i.collectionId === c.id), onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
-    { cat: 'websocket', items: sockets.filter((i) => i.collectionId === c.id), onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
+    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
+    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
   ];
   const newOfCategory = (c: Collection, cat: RequestCategory) => {
     if (cat === 'grpc' || cat === 'websocket') return intent(cat, { newDoc: true, collectionId: c.id });

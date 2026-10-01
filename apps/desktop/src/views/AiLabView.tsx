@@ -1,4 +1,4 @@
-import { FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Sparkles, Square, Trash2, WifiOff, Bookmark, History, Plug } from 'lucide-react';
+import { FlaskConical, KeyRound, Play, Plus, RefreshCw, Save, Sparkles, Square, Trash2, WifiOff, Bookmark, History } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSticky } from '../lib/sticky';
 import { useLibrary } from '../lib/library';

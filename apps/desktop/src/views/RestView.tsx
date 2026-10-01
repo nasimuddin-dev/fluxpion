@@ -1,8 +1,8 @@
-import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Copy, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
-import { useIntent, useSendShortcut } from '../hooks';
+import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
 import type { Collection, CollectionNode, HttpRequestSpec, KeyValue, SavedExample, SavedHttpRequest, SseEvent } from '../types';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
 import { CodeModal } from '../components/CodeModal';
@@ -40,11 +40,10 @@ import { saveResponseVariable } from '../lib/save-variable';
 import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
-import { Button, cx, Empty, IconButton, Input, Menu, Split, Tooltip } from '../components/ui';
-import { METHODS, TAB_WIDTH, PINNED_TAB_WIDTH, TAB_STRIP_RESERVED, RestTab, SendResult, blankRequest, drafts } from './rest/types';
+import { Button, cx, Empty, IconButton, Input, Menu, Split } from '../components/ui';
+import { METHODS, RestTab, SendResult, blankRequest, drafts } from './rest/types';
 import { RequestEditor } from './rest/RequestEditor';
 import { SaveModal, ImportModal } from './rest/dialogs';
-import { RequestTabItem } from './rest/RequestTabItem';
 import { saveAsTestFile } from '../lib/save-test';
 
 
@@ -113,11 +112,6 @@ export function RestView() {
   const placeholder = useMemo(() => blankRequest(), []);
   const noTabs = tabs.length === 0;
   const tab = tabs.find((t) => t.id === active) ?? tabs[0] ?? placeholder;
-  const newTab = () => {
-    const t = blankRequest();
-    setTabs((ts) => [...ts, t]);
-    setActive(t.id);
-  };
   const streams = useRef<Record<string, string>>({});
   /** Server-Sent Events arriving for requests still being sent, by send id (shown live). */
   const [liveEvents, setLiveEvents] = useState<Record<string, SseEvent[]>>({});
@@ -295,52 +289,10 @@ export function RestView() {
   };
 
   const quickSave = () => (noTabs ? undefined : tab.collectionId && tab.requestId ? saveTab(tab.collectionId, tab.name) : setSaving(true));
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'rest') {
-        e.preventDefault();
-        void quickSave();
-      }
-    };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  });
+  useSaveShortcut('rest', () => void quickSave());
 
   // pinned tabs first, in their own order
   const ordered = [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)];
-  /*
-   * Tab overflow (like Postman / VS Code): no horizontal scrolling. Pinned tabs and the most recently
-   * used tabs that fit are shown; the rest are listed in the "+N" dropdown. Picking one from the
-   * dropdown makes it recent, so it moves into the strip and the least recent tab moves out.
-   */
-  const [recent, setRecent] = useState<string[]>([]);
-  useEffect(() => {
-    if (active) setRecent((r) => (r[0] === active ? r : [active, ...r.filter((id) => id !== active)]));
-  }, [active]);
-  const [stripWidth, setStripWidth] = useState(0);
-  // a callback ref: the strip mounts after the first render, so an effect would miss it
-  const stripObserver = useRef<ResizeObserver>(undefined);
-  const stripRef = useCallback((el: HTMLDivElement | null) => {
-    stripObserver.current?.disconnect();
-    if (!el) return;
-    stripObserver.current = new ResizeObserver(() => setStripWidth(el.clientWidth));
-    stripObserver.current.observe(el);
-    setStripWidth(el.clientWidth);
-  }, []);
-  const { shown, hidden } = useMemo(() => {
-    const pinned = ordered.filter((t) => t.pinned);
-    const rest = ordered.filter((t) => !t.pinned);
-    const room = stripWidth - TAB_STRIP_RESERVED - pinned.length * PINNED_TAB_WIDTH;
-    const slots = Math.max(1, Math.floor(room / TAB_WIDTH));
-    if (rest.length <= slots) return { shown: ordered, hidden: [] as RestTab[] };
-    const rank = (t: RestTab) => {
-      const i = recent.indexOf(t.id);
-      return i < 0 ? recent.length + rest.indexOf(t) : i;
-    };
-    const keep = new Set([...rest].sort((a, b) => rank(a) - rank(b)).slice(0, slots).map((t) => t.id));
-    return { shown: [...pinned, ...rest.filter((t) => keep.has(t.id))], hidden: rest.filter((t) => !keep.has(t.id)) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs, recent, stripWidth]);
   /** Close several tabs, asking once when any has unsaved changes. */
   const closeTabs = async (ids: string[]) => {
     const closing = tabs.filter((x) => ids.includes(x.id));

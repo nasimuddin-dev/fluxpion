@@ -5,7 +5,6 @@ import { call, visualizationUrl } from '../api';
 import type { CheckResult, HttpResponseData, Trace } from '../types';
 import { SseEvents } from './SseEvents';
 import { formatBytes, formatMs } from '../lib/format';
-import { useApp } from '../store';
 import { CheckList } from './Results';
 import { ResponseHistory } from './ResponseHistory';
 import { JsonTree, RawView, type TreeAssertion, type TreeVariable } from './JsonView';

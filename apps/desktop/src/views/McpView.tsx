@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Radio, Save, Sparkles, Trash2, Unplug, Wrench, Bookmark, History, KeyRound } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Radio, Save, Sparkles, Trash2, Unplug, Wrench, History, KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
@@ -66,7 +66,7 @@ function mergeEvents(a: McpEvent[], b: McpEvent[]): McpEvent[] {
 const tabServer = persisted<{ serverId?: string }>('mcp', {});
 
 export function McpView() {
-  const { docId, active } = useDoc();
+  const { docId } = useDoc();
   const docState = useMemo(() => tabServer.forDoc(docId), [docId]);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [selected, setSelected] = useState<string | undefined>(() => docState.load().serverId);

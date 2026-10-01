@@ -24,14 +24,39 @@ export function requestCategory(node: CollectionNode): 'rest' | 'soap' | 'graphq
   return soapHeader || soapBody ? 'soap' : 'rest';
 }
 
+type CollectionCategory = 'rest' | 'soap' | 'graphql';
+const countsCache = new WeakMap<CollectionNode[], Record<CollectionCategory, number>>();
+
+/**
+ * How many requests of each category these nodes hold (through their folders), in one pass. Node lists
+ * are immutable (every change makes new arrays), so the result is cached per list: the sidebar asks
+ * for every collection and folder on each render.
+ */
+export function categoryCounts(nodes: CollectionNode[]): Record<CollectionCategory, number> {
+  let counts = countsCache.get(nodes);
+  if (!counts) {
+    counts = { rest: 0, soap: 0, graphql: 0 };
+    for (const n of nodes) {
+      if (n.kind === 'folder') {
+        const inner = categoryCounts(n.items);
+        counts.rest += inner.rest;
+        counts.soap += inner.soap;
+        counts.graphql += inner.graphql;
+      } else counts[requestCategory(n)!]++;
+    }
+    countsCache.set(nodes, counts);
+  }
+  return counts;
+}
+
 /** Whether these nodes hold a request of this category (anywhere in their folders). */
 export function hasCategory(nodes: CollectionNode[], cat: RequestCategory): boolean {
-  return nodes.some((n) => (n.kind === 'folder' ? hasCategory(n.items, cat) : requestCategory(n) === cat));
+  return countCategory(nodes, cat) > 0;
 }
 
 /** Requests of this category in these nodes. */
 export function countCategory(nodes: CollectionNode[], cat: RequestCategory): number {
-  return nodes.reduce((sum, n) => sum + (n.kind === 'folder' ? countCategory(n.items, cat) : requestCategory(n) === cat ? 1 : 0), 0);
+  return cat === 'grpc' || cat === 'websocket' ? 0 : categoryCounts(nodes)[cat];
 }
 
 /** Folders with no requests at all (they show under the collection's first category). */
