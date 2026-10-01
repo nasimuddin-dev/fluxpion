@@ -91,7 +91,7 @@ export function WebSocketView() {
   const env = useApp((s) => s.environment);
   // saved connections (URL, subprotocols, handshake headers, message) with folders
   const saved = useLibrary<Draft>('websocket');
-  const [savedId, setSavedId] = useSticky<string | undefined>(`ws:saved:${docId ?? 'main'}`, undefined);
+  const [savedId, setSavedId] = useSticky<string | undefined>(`ws:saved:${docId ?? 'main'}`, undefined, { persist: true });
   const current = saved.lib.items.find((i) => i.id === savedId);
   // New ▸ WebSocket in a collection: the connection is saved into that collection
   const [collectionId, setCollectionId] = useSticky<string | undefined>(`ws:collection:${docId ?? 'main'}`, undefined);
@@ -222,16 +222,12 @@ export function WebSocketView() {
     const send = mqtt ? (d.topic ? [{ topic: d.topic, payload: d.message, qos: d.qos ?? 0 }] : []) : sio ? (d.event ? [{ event: d.event, args: Array.isArray(parsed) ? parsed : [parsed], ack: !!d.ack }] : []) : d.message.trim() ? [d.message] : [];
     void saveAsTestFile(`${hostOf(d.url)} replies`, { kind: 'websocket', mode: d.mode ?? 'websocket', url: d.url, send, subscribe: mqtt ? (d.subscriptions ?? []).map((s) => s.topic) : undefined, headers: mqtt ? undefined : d.headers, username: mqtt ? d.username : undefined, password: mqtt ? d.password : undefined });
   };
-  const [tabTitle, setTabTitle] = useSticky<string | undefined>(`ws:title:${docId ?? 'main'}`, undefined);
+  const [tabTitle, setTabTitle] = useSticky<string | undefined>(`ws:title:${docId ?? 'main'}`, undefined, { persist: true });
   // a new tab is "New WebSocket / Socket.IO / MQTT request", not its URL (often a {{variable}})
   const title = current?.name ?? tabTitle ?? NEW_TAB_TITLE[d.mode === 'mqtt' ? 'mqtt' : d.mode === 'socketio' ? 'socketio' : 'websocket'];
-  const renameTab = async () => {
-    const name = (await promptText('Rename', { message: 'Name', value: title, okLabel: 'Rename' }))?.trim();
-    if (!name) return;
-    if (current) await saved.put({ ...current, name });
-    else setTabTitle(name);
-  };
-  useSingleEditorTab('websocket', { title, badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]', item: savedId, onRename: () => void renameTab(), onSaveAsTest: saveTest });
+  // a saved connection is renamed in the workspace; a new tab just gets the title
+  const renameTabTo = async (name: string) => (current ? saved.put({ ...current, name }) : setTabTitle(name));
+  useSingleEditorTab('websocket', { title, badge: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', badgeClass: 'text-[#d97706]', item: savedId, onRenameTo: renameTabTo, onSaveAsTest: saveTest });
   return (
     <Split id="ws-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell

@@ -93,7 +93,7 @@ export function GrpcView() {
   // the client private key is never part of them
   type Saved = Omit<typeof d, 'keyRef'> & { keyRef?: string };
   const saved = useLibrary<Saved>('grpc');
-  const [savedId, setSavedId] = useSticky<string | undefined>(`grpc:saved:${docId ?? 'main'}`, undefined);
+  const [savedId, setSavedId] = useSticky<string | undefined>(`grpc:saved:${docId ?? 'main'}`, undefined, { persist: true });
   const currentSaved = saved.lib.items.find((i) => i.id === savedId);
   // New ▸ gRPC in a collection: the call is saved into that collection
   const [collectionId, setCollectionId] = useSticky<string | undefined>(`grpc:collection:${docId ?? 'main'}`, undefined);
@@ -234,16 +234,12 @@ export function GrpcView() {
     }
     void saveAsTestFile(`${d.method.split('/').pop() ?? 'gRPC call'} works`, { kind: 'grpc', target: d.target, method: d.method, message, metadata: d.metadata, tls: d.tls });
   };
-  const [tabTitle, setTabTitle] = useSticky<string | undefined>(`grpc:title:${docId ?? 'main'}`, undefined);
+  const [tabTitle, setTabTitle] = useSticky<string | undefined>(`grpc:title:${docId ?? 'main'}`, undefined, { persist: true });
   // a new tab is "New gRPC request" (the save dialog suggests the method's name)
   const title = currentSaved?.name ?? tabTitle ?? NEW_TAB_TITLE.grpc;
-  const renameTab = async () => {
-    const name = (await promptText('Rename', { message: 'Name', value: title, okLabel: 'Rename' }))?.trim();
-    if (!name) return;
-    if (currentSaved) await saved.put({ ...currentSaved, name });
-    else setTabTitle(name);
-  };
-  useSingleEditorTab('grpc', { title, badge: 'gRPC', badgeClass: 'text-[#2ea99e]', item: savedId, onRename: () => void renameTab(), onSaveAsTest: d.method ? saveTest : undefined });
+  // a saved call is renamed in the workspace; a new tab just gets the title
+  const renameTabTo = async (name: string) => (currentSaved ? saved.put({ ...currentSaved, name }) : setTabTitle(name));
+  useSingleEditorTab('grpc', { title, badge: 'gRPC', badgeClass: 'text-[#2ea99e]', item: savedId, onRenameTo: renameTabTo, onSaveAsTest: d.method ? saveTest : undefined });
   return (
     <Split id="grpc-saved" sidebar collapsed initial={18} min={12}>
     <SidebarShell

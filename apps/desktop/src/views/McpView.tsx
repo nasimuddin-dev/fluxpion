@@ -241,12 +241,8 @@ export function McpView() {
           badgeClass: 'text-accent',
           dirty,
           item: draft ? undefined : current.id,
-          onRename: async () => {
-            const name = (await promptText('Rename server', { message: 'Name', value: form.name, okLabel: 'Rename' }))?.trim();
-            if (!name) return;
-            if (draft) setForm({ ...form, name });
-            else await serverOps.renameItem(current.id, name);
-          },
+          // a new server just gets the name; a saved one is renamed in the workspace
+          onRenameTo: (name: string) => (draft ? setForm({ ...form, name }) : serverOps.renameItem(current.id, name)),
           onDuplicate: draft ? undefined : () => void serverOps.duplicateItem?.(current.id),
         }
       : undefined,

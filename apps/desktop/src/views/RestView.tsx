@@ -341,9 +341,8 @@ export function RestView() {
     });
     setActive(copy.id);
   };
-  /** Rename a tab; a saved request is renamed in its collection too. */
-  const renameTab = async (t: RestTab) => {
-    const name = (await promptText('Rename request', { message: 'Request name', value: t.name, okLabel: 'Rename' }))?.trim();
+  /** Rename a tab (edited in place in the tab strip); a saved request is renamed in its collection too. */
+  const renameTabTo = async (t: RestTab, name: string) => {
     if (!name || name === t.name) return;
     setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, name } : x)));
     if (!t.collectionId || !t.requestId) return;
@@ -481,7 +480,7 @@ export function RestView() {
       onClose: () => void closeTab(t.id),
       closeMany: (keys: string[]) => void closeTabs(keys.map((k) => k.replace(/^rest:/, ''))),
       // the tab menu itself is the shared one (EditorTabs), the same on every request tab
-      onRename: () => void renameTab(t),
+      onRenameTo: (name: string) => renameTabTo(t, name),
       onDuplicate: () => duplicateTab(t),
       onSaveAsTest: () => saveTabAsTest(t),
       onTogglePin: () => setTabs((ts) => ts.map((x) => (x.id === t.id ? { ...x, pinned: !x.pinned } : x))),

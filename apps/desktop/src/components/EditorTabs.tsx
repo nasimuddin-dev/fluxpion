@@ -5,6 +5,7 @@ import { useApp, type ViewId } from '../store';
 import { docKey, isDocView, useDoc, useDocs } from '../lib/docs';
 import { loadDraft, saveDraft } from '../lib/draft-store';
 import { Button, cx, Empty, Menu, type MenuItem } from './ui';
+import { InlineRename } from './TreeParts';
 
 /**
  * One tab strip for every request editor (Postman-style): REST's tabs and a tab for each other editor that
@@ -28,6 +29,8 @@ export interface EditorTab {
   /** Close several of this editor's tabs at once (one question about unsaved changes); by keys. */
   closeMany?(keys: string[]): void;
   onRename?(): void;
+  /** Rename to this name (the strip edits the title in place); without it, onRename opens the editor's own dialog. */
+  onRenameTo?(name: string): unknown;
   /** Open a copy of this tab (not saved yet). */
   onDuplicate?(): void;
   /** Save what the tab holds as a YAML test file. */
@@ -289,7 +292,7 @@ export function newRequestItems(): MenuItem[] {
 }
 
 /** The right-click menu of every tab: pin, rename, duplicate, save as test, and closing across every tab in the strip. */
-function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
+function defaultTabMenu(t: EditorTab, all: EditorTab[], startRename: (t: EditorTab) => void): MenuItem[] {
   const i = all.indexOf(t);
   // per editor: one batch close where the editor offers it (REST), else tab by tab
   const close = (list: EditorTab[]) => {
@@ -305,7 +308,7 @@ function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
   // one menu for every tab; what an editor can't do is shown disabled, so every menu reads the same
   return [
     { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, disabled: !t.onTogglePin, onSelect: () => t.onTogglePin?.() },
-    { label: 'Rename', icon: <Pencil size={13} />, shortcut: 'Double-click', disabled: !t.onRename, onSelect: () => t.onRename?.() },
+    { label: 'Rename', icon: <Pencil size={13} />, shortcut: 'F2', disabled: !t.onRename && !t.onRenameTo, onSelect: () => startRename(t) },
     { label: 'Duplicate tab', icon: <Copy size={13} />, disabled: !t.onDuplicate, onSelect: () => t.onDuplicate?.() },
     { label: 'Save as test file…', icon: <FileCheck2 size={13} />, disabled: !t.onSaveAsTest, onSelect: () => t.onSaveAsTest?.() },
     { label: 'Close tab', icon: <X size={13} />, separator: true, shortcut: 'Middle-click', disabled: !!t.pinned, onSelect: () => t.onClose() },
@@ -331,6 +334,14 @@ export function EditorTabStrip() {
   const tabs = [...inOrder.filter((t) => t.pinned), ...inOrder.filter((t) => !t.pinned)];
   const activeKey = isDocView(view) ? `${view}:${activeDocs[view]}` : activeByView[view];
   const [menuFor, setMenuFor] = useState<string>();
+  /** The tab whose title is being edited in place (double-click, F2 or Rename in its menu). */
+  const [editingTab, setEditingTab] = useState<string>();
+  const startRename = (t: EditorTab) => {
+    if (t.onRenameTo) {
+      select(t);
+      setEditingTab(t.key);
+    } else t.onRename?.();
+  };
   const stripRef = useRef<HTMLDivElement>(null);
   // keep the active tab in view (scrolling only the strip: scrollIntoView could shift the whole window)
   useEffect(() => {
@@ -356,7 +367,15 @@ export function EditorTabStrip() {
               aria-selected={active}
               title={t.dirty ? `${t.title} (unsaved changes)` : t.title}
               onClick={() => select(t)}
-              onDoubleClick={t.onRename}
+              onDoubleClick={() => startRename(t)}
+              tabIndex={active ? 0 : -1}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'F2') {
+                  e.preventDefault();
+                  startRename(t);
+                }
+              }}
               onAuxClick={(e) => e.button === 1 && !t.pinned && t.onClose()}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -370,7 +389,19 @@ export function EditorTabStrip() {
             >
               {t.pinned && <Pin size={11} className="shrink-0 text-muted" aria-label="Pinned" />}
               <span className={cx('mono method-badge text-[0.62rem] font-bold shrink-0', t.badgeClass)}>{t.badge}</span>
-              <span className="truncate flex-1 min-w-0">{t.title}</span>
+              {editingTab === t.key ? (
+                <InlineRename
+                  value={t.title}
+                  label="Tab name"
+                  onCommit={(name) => {
+                    setEditingTab(undefined);
+                    void t.onRenameTo?.(name);
+                  }}
+                  onCancel={() => setEditingTab(undefined)}
+                />
+              ) : (
+                <span className="truncate flex-1 min-w-0">{t.title}</span>
+              )}
               {t.dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="Unsaved changes" />}
               {!t.pinned && (
                 <button aria-label={`Close ${t.title}`} className={cx('shrink-0 rounded p-0.5 hover:text-fg hover:bg-hover focus:opacity-100', active ? 'opacity-60' : 'opacity-0 group-hover:opacity-100')} onClick={(e) => (e.stopPropagation(), t.onClose())}>
@@ -378,7 +409,7 @@ export function EditorTabStrip() {
                 </button>
               )}
               {menuFor === t.key && (
-                <Menu open onOpenChange={(o) => !o && setMenuFor(undefined)} align="start" width={210} items={tabMenu(t, tabs)} trigger={<span aria-hidden className="absolute left-2 bottom-0 w-0 h-0" />} />
+                <Menu open onOpenChange={(o) => !o && setMenuFor(undefined)} align="start" width={210} items={tabMenu(t, tabs, startRename)} trigger={<span aria-hidden className="absolute left-2 bottom-0 w-0 h-0" />} />
               )}
             </div>
           );
