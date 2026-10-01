@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import type { Collection, CollectionNode } from '../types';
 import { formatMs, plural, timeAgo } from '../lib/format';
-import { BarRow, ChartCard } from './charts';
+import { BarRow, ChartCard, StatTile } from './charts';
 import { Badge, cx, statusTone } from './ui';
 
 /** From `stats.requests` (summarizeRequestStats in core). */
@@ -34,16 +34,6 @@ function walk(nodes: CollectionNode[], path: string[], out: { rows: Row[]; folde
 }
 
 const hasChecks = (n: Saved) => !!n.assertions?.length || !!n.testScript?.trim();
-
-function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'ok' | 'bad' }) {
-  return (
-    <div className="rounded-xl border border-line bg-panel/40 px-4 py-3 min-w-0">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={cx('text-2xl font-semibold tabular-nums mt-0.5', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad')}>{value}</div>
-      {sub && <div className="text-xs text-muted mt-0.5 truncate">{sub}</div>}
-    </div>
-  );
-}
 
 const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : '—');
 
@@ -84,10 +74,10 @@ export function CollectionOverview({ collection, onOpen }: { collection: Collect
   return (
     <div className="p-3 flex flex-col gap-3">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile label="Requests" value={String(rows.length)} sub={[kinds.http && `${kinds.http} REST`, kinds.graphql && `${kinds.graphql} GraphQL`, plural(folders, 'folder')].filter(Boolean).join(' · ')} />
-        <Tile label="With checks" value={pct(withChecks, rows.length)} sub={`${withChecks} of ${rows.length} have assertions or tests`} tone={!rows.length ? undefined : withChecks === rows.length ? 'ok' : undefined} />
-        <Tile label="Documented" value={pct(documented, kinds.http ?? 0)} sub={`${documented} of ${kinds.http ?? 0} REST requests`} />
-        <Tile label="Failing now" value={sent.length ? String(failing.length) : '—'} sub={sent.length ? `latest response of ${plural(sent.length, 'sent request')}` : 'nothing sent from the app yet'} tone={!sent.length ? undefined : failing.length ? 'bad' : 'ok'} />
+        <StatTile label="Requests" value={String(rows.length)} sub={[kinds.http && `${kinds.http} REST`, kinds.graphql && `${kinds.graphql} GraphQL`, plural(folders, 'folder')].filter(Boolean).join(' · ')} />
+        <StatTile label="With checks" value={pct(withChecks, rows.length)} sub={`${withChecks} of ${rows.length} have assertions or tests`} tone={!rows.length ? undefined : withChecks === rows.length ? 'ok' : undefined} />
+        <StatTile label="Documented" value={pct(documented, kinds.http ?? 0)} sub={`${documented} of ${kinds.http ?? 0} REST requests`} />
+        <StatTile label="Failing now" value={sent.length ? String(failing.length) : '—'} sub={sent.length ? `latest response of ${plural(sent.length, 'sent request')}` : 'nothing sent from the app yet'} tone={!sent.length ? undefined : failing.length ? 'bad' : 'ok'} />
       </div>
       <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_3fr]">
         <ChartCard title="By method">

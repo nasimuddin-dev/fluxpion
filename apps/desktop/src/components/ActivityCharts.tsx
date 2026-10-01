@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, BarRow, ChartCard, ChartTip, niceMax, StackedColumns, Swatch, useWidth } from './charts';
-import { cx } from './ui';
+import { axisMs, BarRow, ChartCard, ChartTip, niceMax, StackedColumns, StatTile, Swatch, useWidth } from './charts';
 
 /** Workspace activity from `stats.activity` (see summarizeActivity in core). */
 export interface ActivityDay {
@@ -195,16 +194,6 @@ function MedianLine({ days, overall }: { days: ActivityDay[]; overall?: number }
   );
 }
 
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'ok' | 'bad' }) {
-  return (
-    <div className="rounded-xl border border-line bg-panel/40 px-4 py-3 min-w-0">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={cx('text-2xl font-semibold tabular-nums mt-0.5', tone === 'ok' && 'text-ok', tone === 'bad' && 'text-bad')}>{value}</div>
-      {sub && <div className="text-xs text-muted mt-0.5 truncate">{sub}</div>}
-    </div>
-  );
-}
-
 /** Requests per protocol: one hue (it's magnitude), labelled bars. */
 function ByKind({ byKind }: { byKind: Record<string, number> }) {
   const rows = Object.entries(byKind).sort((a, b) => b[1] - a[1]);
@@ -268,10 +257,10 @@ export function ActivityCharts({ activity }: { activity: Activity }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat label="Requests sent" value={String(requests)} sub={failed ? `${failed} failed` : requests ? 'none failed' : 'nothing sent yet'} />
-        <Stat label="Request success" value={pct(requests - failed, requests)} tone={!requests ? undefined : failed / requests > 0.05 ? 'bad' : 'ok'} sub="2xx/3xx, OK and tool results" />
-        <Stat label="Median response" value={activity.medianMs !== undefined ? formatMs(activity.medianMs) : '—'} sub="all requests of the period" />
-        <Stat
+        <StatTile label="Requests sent" value={String(requests)} sub={failed ? `${failed} failed` : requests ? 'none failed' : 'nothing sent yet'} />
+        <StatTile label="Request success" value={pct(requests - failed, requests)} tone={!requests ? undefined : failed / requests > 0.05 ? 'bad' : 'ok'} sub="2xx/3xx, OK and tool results" />
+        <StatTile label="Median response" value={activity.medianMs !== undefined ? formatMs(activity.medianMs) : '—'} sub="all requests of the period" />
+        <StatTile
           label="Tests passed"
           value={pct(tests - failedTests, tests)}
           tone={!tests ? undefined : failedTests ? 'bad' : 'ok'}
