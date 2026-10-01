@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fixed: a collection could appear twice, and expanding one expanded the other.** Saving a collection whose file name differs from its id (two of the examples' collections) wrote a second file with the same id instead of updating the first. Collections are now found and saved in their own file; two files that already share an id are listed, opened and saved separately; and importing a collection the workspace already has adds a copy instead of replacing it.
+- **Fixed: some sidebar items didn't collapse on the first click** (a category, or the collection holding the open request, which start expanded).
+- **Fixed: Import from a menu did nothing**: a dialog opened from a menu item closed again straight away (for every menu in the app). Export in the sidebar menu only switched views.
+- **Import and Export in the sidebar header**: **Import** opens the import dialog right there; **Export** asks what (a collection or the whole workspace) and the format (TestPion, Postman, OpenAPI, Bruno folder). **Refresh** is beside them.
 - **Desktop notification when a run finishes in the background**: a test, collection or evaluation run that ends while TestPion isn't in front shows how it went (passed, failed, errors, time); clicking it opens the run. *Settings ▸ General* turns it off. The `run.finished` event now carries the counts.
 - **CLI: `testpion collections` and `testpion requests <collection>`** list a workspace's collections and what each holds (requests, gRPC calls, connections), as text or `--json`, the same as the MCP tools.
 - **AI agents see the whole collection**: the MCP tools `list_collections` (counts of gRPC calls and connections) and `list_requests` (each gRPC call's target and method, each connection's URL and mode) include a collection's gRPC calls and connections, which `run_collection` runs.

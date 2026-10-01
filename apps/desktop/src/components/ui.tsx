@@ -261,11 +261,24 @@ export function Menu({
   open?: boolean;
   onOpenChange?(open: boolean): void;
 }) {
+  // an item that opens a dialog (Import, Rename …) must keep the focus there: giving it back to the menu's
+  // button as the menu closes would count as a click outside the dialog, which then closes at once
+  const picked = useRef(false);
   return (
     <MenuPrimitive.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <MenuPrimitive.Trigger asChild>{trigger}</MenuPrimitive.Trigger>
       <MenuPrimitive.Portal>
         <MenuPrimitive.Content
+          onCloseAutoFocus={(e) => {
+            if (picked.current) e.preventDefault();
+            picked.current = false;
+          }}
+          onClickCapture={(e) => {
+            if ((e.target as HTMLElement).closest('[role=menuitem]')) picked.current = true;
+          }}
+          onKeyDownCapture={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') picked.current = true;
+          }}
           align={align}
           sideOffset={4}
           style={{ minWidth: width }}

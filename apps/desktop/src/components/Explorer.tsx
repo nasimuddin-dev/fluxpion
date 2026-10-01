@@ -7,6 +7,8 @@ import { uid } from '../lib/format';
 import { addToFolder, CATEGORY_META, CollectionTree, savedItemDragProps, type ExtraGroup } from './CollectionTree';
 import type { RequestCategory } from '../lib/collection-filter';
 import { closeTabsFor, newRequestItems, useEditorTabsStore } from './EditorTabs';
+import { ExportDialog } from './ExportDialog';
+import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
 
@@ -321,7 +323,10 @@ export function Explorer() {
     const name = await promptText('New collection', { message: 'Collection name', placeholder: 'My API', okLabel: 'Create' });
     if (name) await saveCollection({ schemaVersion: '1.0', id: uid('col-'), name, version: 0, variables: [], items: [], updatedAt: '' });
   };
-  const importDefinition = () => intent('collections', { import: true });
+  // Import and Export open here, without leaving the request editors
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const importDefinition = () => setImporting(true);
   /** Show a saved gRPC call / connection in another collection (or in none). */
   /** Change a saved gRPC call / connection list (move, rename, duplicate, delete): the one place that loads, edits and saves it. */
   const editLibrary = async (kind: 'grpc' | 'websocket', fn: (items: Array<LibraryItem<unknown>>) => Array<LibraryItem<unknown>>) => {
@@ -460,19 +465,16 @@ export function Explorer() {
           }
           items={[{ label: 'Collection', icon: <FolderPlus size={14} />, onSelect: () => void newCollection() }, ...newRequestItems().map((it, i) => (i === 0 ? { ...it, separator: true } : it))]}
         />
-        <Menu
-          width={250}
-          trigger={
-            <IconButton label="More: import, export, refresh" className="h-7 w-7">
-              <MoreHorizontal size={15} />
-            </IconButton>
-          }
-          items={[
-            { label: 'Import (OpenAPI, Postman, Insomnia, Bruno, HAR …)', icon: <Upload size={14} />, onSelect: importDefinition },
-            { label: 'Export collections or the workspace', icon: <Download size={14} />, onSelect: () => intent('collections', {}) },
-            { label: 'Refresh', icon: <RefreshCw size={14} />, separator: true, onSelect: () => void load() },
-          ]}
-        />
+        {/* in the header, not in a menu: the actions used every day */}
+        <IconButton label="Import (OpenAPI, Postman, Insomnia, Bruno, HAR, WSDL, cURL …)" className="h-7 w-7" onClick={importDefinition}>
+          <Upload size={14} />
+        </IconButton>
+        <IconButton label="Export a collection or the workspace" className="h-7 w-7" onClick={() => setExporting(true)}>
+          <Download size={14} />
+        </IconButton>
+        <IconButton label="Refresh" className="h-7 w-7" onClick={() => void load()}>
+          <RefreshCw size={14} />
+        </IconButton>
         <IconButton label="Hide the sidebar (Ctrl+B)" className="h-7 w-7" onClick={() => useApp.getState().toggleExplorer(false)}>
           <PanelLeftClose size={14} />
         </IconButton>
@@ -583,6 +585,8 @@ export function Explorer() {
           )}
         </Section>
       </div>
+      {importing && <ImportModal onClose={() => setImporting(false)} onDone={() => void load()} />}
+      {exporting && <ExportDialog collections={collections.map((c) => ({ id: c.id, name: c.name }))} onClose={() => setExporting(false)} />}
     </aside>
   );
 }
