@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { call, on } from '../api';
 import { useApp } from '../store';
@@ -42,7 +42,14 @@ export function AttentionCard() {
           <AlertTriangle size={15} />
         </span>
         Needs attention
-        <span className="ml-auto text-xs font-normal text-muted">
+        <button
+          className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-accent hover:underline"
+          title="Ask the AI assistant what to fix first (the items' messages and severities are sent)"
+          onClick={() => useApp.getState().set({ assistant: { task: 'triage-attention', title: 'What to fix first', context: { items: items.map((i) => ({ severity: i.severity, kind: i.kind, message: i.message })) } } })}
+        >
+          <Sparkles size={12} /> What first?
+        </button>
+        <span className="text-xs font-normal text-muted">
           {items.length} item{items.length === 1 ? '' : 's'}
         </span>
       </header>
