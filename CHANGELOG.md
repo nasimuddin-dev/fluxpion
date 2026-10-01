@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.34.0 — 2026-10-01
+
+Highlights: latest results in test files, collection health on Home, WebSocket timing.
+
+- **Test files**: the preview shows each test's latest result and when it ran; click it to open that run.
+- **Home**: the Collections card shows how many requests are failing now in each collection (a green dot when every sent request passes); **Check now** on a certificate connects and reads it again; **What first?** asks the AI assistant to triage what needs attention.
+- **WebSocket**: the *Connected* message says how long the connection took: DNS, TCP, TLS and the upgrade.
+- **Docs**: latest results, test history and scores by run.
+
 ## 0.33.0 — 2026-10-01
 
 Highlights: what needs attention, timing everywhere, AI help for monitors.
