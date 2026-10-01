@@ -41,3 +41,19 @@ describe('workspace activity', () => {
     expect(a.days[1]!.requests).toBe(1);
   });
 });
+
+describe('request stats', () => {
+  it('summarises the responses of each saved request, newest first', async () => {
+    const { summarizeRequestStats } = await import('@testpion/core');
+    const out = summarizeRequestStats([
+      { requestId: 'a', timestamp: '2026-10-01T03:00:00Z', status: 500, durationMs: 300 },
+      { requestId: 'a', timestamp: '2026-10-01T02:00:00Z', status: 200, durationMs: 100 },
+      { requestId: 'b', timestamp: '2026-10-01T01:00:00Z', status: 200, durationMs: 50 },
+      { timestamp: '2026-10-01T00:00:00Z', status: 200 },
+    ]);
+    expect(out).toEqual([
+      { requestId: 'a', count: 2, failed: 1, lastStatus: 500, lastAt: '2026-10-01T03:00:00Z', lastOk: false, medianMs: 200 },
+      { requestId: 'b', count: 1, failed: 0, lastStatus: 200, lastAt: '2026-10-01T01:00:00Z', lastOk: true, medianMs: 50 },
+    ]);
+  });
+});

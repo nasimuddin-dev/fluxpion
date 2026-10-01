@@ -11,6 +11,12 @@ Collections hold folders and requests (REST and GraphQL), plus collection-level 
 
 Each collection is a versioned JSON file under `collections/` in the workspace, and its `version` increments on every save. Commit it to git for review and history.
 
+## Overview
+
+A collection's **Overview** tab shows it at a glance: how many requests and folders it has, how many have checks (assertions or a test script), how many REST requests are documented, and how many are failing now (their latest response failed). *By method* counts the requests per HTTP method. *Request health* lists every request with its latest status, median response time (of the latest 50), how many of its responses failed and when it was last sent from the app: failing requests first, then the slowest, then those never sent. Click a request to open it.
+
+For scripts and agents: `testpion requests "My API" --health --json` in the CLI and the `collection_health` MCP tool return the same numbers.
+
 ## Favorites
 
 To keep frequently used endpoints close at hand, choose **Add to favorites** from a REST or GraphQL request's **⋯** menu. In the REST view, select the star beside **Filter requests** to show only favorites. Their parent folders stay visible so the request's place in the collection remains clear. Favorites are stored with the request in the collection JSON and can be removed from the same menu.

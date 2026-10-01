@@ -83,6 +83,8 @@ export function requestsHandlers(be: Backend): Handlers {
     'history.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listHistory(q),
     /** Per-day requests, failures and runs for the Home dashboard charts. */
     'stats.activity': (q: { days?: number; tzOffsetMin?: number } = {}) => be.ws.meta.activity(q),
+    /** Per saved request of a collection: responses, failures, latest status and median time (collection Overview). */
+    'stats.requests': ({ collectionId }: { collectionId: string }) => be.ws.meta.requestStats(collectionId),
     'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
     'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
     'history.clear': () => be.ws.meta.clearHistory(),

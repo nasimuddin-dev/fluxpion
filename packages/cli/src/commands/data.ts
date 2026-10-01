@@ -243,8 +243,9 @@ export function registerDataCommands(program: Command): void {
     .description("list what a collection holds: its HTTP and GraphQL requests, then its gRPC calls and WebSocket / Socket.IO / MQTT connections (run-collection runs them all)")
     .argument('<collection>', 'collection name or id')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--health', 'add how each HTTP and GraphQL request has been doing in the app: responses, failed, latest status, median time, whether it has checks')
     .option('--json', 'print as JSON')
-    .action((ref: string, o: { workspace?: string; json?: boolean }) => {
+    .action((ref: string, o: { workspace?: string; json?: boolean; health?: boolean }) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         const cols = store.listCollections().filter((c) => !c.problem);
@@ -260,8 +261,23 @@ export function registerDataCommands(program: Command): void {
             return { id: i.id, kind: 'websocket', name: i.name, folder: i.folder, method: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', target: redactor.redactString(d.url ?? '') };
           }),
         ];
+        if (o.health) {
+          const stats = new Map(store.meta.requestStats(c.id).map((s) => [s.requestId, s]));
+          const checks = new Map(collectionRequests(c).map((r) => [r.id, !!r.node.assertions?.length || !!r.node.testScript?.trim()]));
+          for (const r of rows as Array<Record<string, unknown>>) {
+            if (!checks.has(r.id as string)) continue;
+            const s = stats.get(r.id as string);
+            Object.assign(r, { hasChecks: checks.get(r.id as string), responses: s?.count ?? 0, failed: s?.failed, lastStatus: s?.lastStatus, lastOk: s?.lastOk, medianMs: s?.medianMs });
+          }
+        }
         if (o.json) return console.log(JSON.stringify(rows, null, 2));
-        for (const r of rows) console.log(`${r.method.padEnd(6)} ${r.folder ? dim(`${r.folder} / `) : ''}${r.name}  ${dim(r.target)}`);
+        for (const r of rows as Array<(typeof rows)[number] & { responses?: number; failed?: number; lastStatus?: number | string; lastOk?: boolean; medianMs?: number; hasChecks?: boolean }>) {
+          const health =
+            o.health && r.responses !== undefined
+              ? '  ' + (r.responses ? `${r.lastOk ? green(String(r.lastStatus ?? 'ok')) : red(String(r.lastStatus ?? 'failed'))} ${r.medianMs !== undefined ? formatDuration(r.medianMs) : ''} ${dim(`${r.failed}/${r.responses} failed`)}` : dim('not sent')) + (r.hasChecks ? '' : yellow(' no checks'))
+              : '';
+          console.log(`${r.method.padEnd(6)} ${r.folder ? dim(`${r.folder} / `) : ''}${r.name}  ${dim(r.target)}${health}`);
+        }
       } finally {
         store.close();
       }

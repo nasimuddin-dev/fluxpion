@@ -1,3 +1,4 @@
+import { CollectionOverview } from '../components/CollectionOverview';
 import { ArchiveRestore, Download, FileCode, FileJson, FilePlus2, FolderPlus, FolderTree, Package, Play, Radio, Send, ShieldCheck, Trash2, Upload, FolderOpen } from 'lucide-react';
 import { downloadContent } from '../lib/files';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,7 +27,7 @@ export function CollectionsView() {
   const [cols, setCols] = useState<Collection[]>([]);
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Collection>();
-  const [tab, setTab] = useState<'requests' | 'variables' | 'auth' | 'scripts' | 'docs' | 'run' | 'mock'>('requests');
+  const [tab, setTab] = useState<'overview' | 'requests' | 'variables' | 'auth' | 'scripts' | 'docs' | 'run' | 'mock'>('requests');
   const [runFolder, setRunFolder] = useState<string>();
   const [importing, setImporting] = useState(false);
   const load = useCallback(async () => {
@@ -213,6 +214,7 @@ export function CollectionsView() {
               value={tab}
               onChange={setTab}
               tabs={[
+                { id: 'overview', label: 'Overview' },
                 { id: 'requests', label: 'Requests', badge: count(draft.items) },
                 { id: 'variables', label: 'Variables', badge: draft.variables.length },
                 { id: 'auth', label: 'Authorization' },
@@ -224,6 +226,7 @@ export function CollectionsView() {
             />
             <div className={cx('flex-1 min-h-0', tab !== 'run' && tab !== 'docs' && 'overflow-auto')}>
               {tab === 'mock' && <MockPanel collectionId={draft.id} onOpenRequest={(requestId) => useApp.getState().openIntent('rest', { collectionId: draft.id, requestId })} />}
+              {tab === 'overview' && <CollectionOverview collection={draft} onOpen={(n) => open(draft, n)} />}
               {tab === 'run' && <CollectionRunner collection={draft} folderId={runFolder} onFolderChange={setRunFolder} />}
               {tab === 'requests' && (
                 <div className="p-2">

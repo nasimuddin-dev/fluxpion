@@ -125,6 +125,42 @@ export function summarizeActivity(
   return { days, medianMs: all.length ? median(all) : undefined, byKind, slowest };
 }
 
+/** How the saved requests of a collection have been doing, from the responses sent in the app. */
+export interface RequestStat {
+  requestId: string;
+  /** Responses recorded (the newest 50 count for the median). */
+  count: number;
+  failed: number;
+  lastStatus?: number | string;
+  lastAt: string;
+  lastOk: boolean;
+  medianMs?: number;
+}
+
+/** Per saved request: responses, failures, the latest status and the median time of the latest 50. Rows newest first. */
+export function summarizeRequestStats(rows: Array<{ requestId?: string; timestamp: string; status?: number | string; durationMs?: number }>): RequestStat[] {
+  const by = new Map<string, { stat: RequestStat; times: number[] }>();
+  for (const r of rows) {
+    if (!r.requestId) continue;
+    let e = by.get(r.requestId);
+    if (!e) {
+      e = { stat: { requestId: r.requestId, count: 0, failed: 0, lastStatus: r.status, lastAt: r.timestamp, lastOk: historyOk(r.status) }, times: [] };
+      by.set(r.requestId, e);
+    }
+    e.stat.count++;
+    if (!historyOk(r.status)) e.stat.failed++;
+    if (typeof r.durationMs === 'number' && e.times.length < 50) e.times.push(r.durationMs);
+  }
+  return [...by.values()].map(({ stat, times }) => {
+    if (times.length) {
+      times.sort((a, b) => a - b);
+      const m = times.length >> 1;
+      stat.medianMs = Math.round(times.length % 2 ? times[m]! : (times[m - 1]! + times[m]!) / 2);
+    }
+    return stat;
+  });
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -158,6 +194,8 @@ export interface MetaStore {
   getTrace(id: string): TraceMeta | undefined;
   /** Workspace activity per day (requests, failures, runs) for charts. */
   activity(opts?: { days?: number; tzOffsetMin?: number }): Activity;
+  /** Per saved request of a collection: responses, failures, latest status, median time. */
+  requestStats(collectionId: string): RequestStat[];
   close(): void;
 }
 
@@ -363,6 +401,20 @@ class SqliteMetaStore implements MetaStore {
     return summarizeActivity(hist, runs, opts);
   }
 
+  requestStats(collectionId: string): RequestStat[] {
+    const rows = this.db
+      .prepare("SELECT ts, status, duration, json_extract(doc, '$.requestId') AS rid FROM history WHERE json_extract(doc, '$.collectionId') = ? ORDER BY ts DESC LIMIT 5000")
+      .all(collectionId) as Array<Record<string, unknown>>;
+    return summarizeRequestStats(
+      rows.map((r) => ({
+        requestId: (r.rid as string) ?? undefined,
+        timestamp: r.ts as string,
+        status: r.status === null ? undefined : isNaN(Number(r.status)) ? (r.status as string) : Number(r.status),
+        durationMs: (r.duration as number) ?? undefined,
+      })),
+    );
+  }
+
   addTrace(t: TraceMeta): void {
     this.stmt('INSERT OR REPLACE INTO traces (id, name, kind, status, start, duration, spans, run_id, path) VALUES (?,?,?,?,?,?,?,?,?)').run(t.id, t.name, t.kind, t.status, t.startTime, t.durationMs, t.spanCount, t.runId ?? null, t.path);
     if (this.inserts.traces++ % PRUNE_EVERY === 0) {
@@ -504,6 +556,14 @@ class JsonlMetaStore implements MetaStore {
       this.data.history.filter((h) => h.timestamp >= since),
       this.data.runs.filter((r) => r.startedAt >= since),
       opts,
+    );
+  }
+  requestStats(collectionId: string) {
+    return summarizeRequestStats(
+      this.data.history
+        .filter((h) => h.collectionId === collectionId)
+        .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
+        .slice(0, 5000),
     );
   }
   addTrace(t: TraceMeta) {

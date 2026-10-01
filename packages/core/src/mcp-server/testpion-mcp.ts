@@ -187,6 +187,29 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       },
     },
     {
+      name: 'collection_health',
+      description:
+        'How the HTTP and GraphQL requests of a collection are doing, from the responses sent in the TestPion app: per request its folder, method, whether it has checks (assertions or a test script), responses recorded, how many failed, the latest status and the median time of the latest 50. Failing requests first, then the slowest; never-sent ones last. Use it to find broken, slow or untested endpoints.',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id') }, required: ['collection'] },
+      run: (a) => {
+        const c = findCollection(a.collection);
+        const stats = new Map(store.meta.requestStats(c.id).map((s) => [s.requestId, s]));
+        const rows = flatten(c.items).map(({ node, folder }) => {
+          const s = stats.get(node.id);
+          return {
+            id: node.id,
+            name: node.name,
+            folder: folder || undefined,
+            method: node.kind === 'http' ? node.request.method : 'GRAPHQL',
+            hasChecks: !!node.assertions?.length || !!node.testScript?.trim(),
+            ...(s ? { responses: s.count, failed: s.failed, lastStatus: s.lastStatus, lastOk: s.lastOk, lastAt: s.lastAt, medianMs: s.medianMs } : { responses: 0 }),
+          };
+        });
+        const rank = (r: (typeof rows)[number]) => (!r.responses ? 2 : 'lastOk' in r && !r.lastOk ? 0 : 1);
+        return rows.sort((x, y) => rank(x) - rank(y) || ((y as { medianMs?: number }).medianMs ?? 0) - ((x as { medianMs?: number }).medianMs ?? 0));
+      },
+    },
+    {
       name: 'get_request',
       description: 'Show one saved request (headers, body, auth type, scripts, documentation and saved example names), or one of the collection’s gRPC calls (target, method, message, metadata) or connections (url, mode, message). Sensitive values are masked.',
       inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request, gRPC call or connection: name or id') }, required: ['collection', 'request'] },
