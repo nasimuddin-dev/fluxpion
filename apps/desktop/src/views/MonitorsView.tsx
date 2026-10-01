@@ -1,5 +1,6 @@
-import { AlarmClock, Folder, KeyRound, Pause, Pencil, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlarmClock, Folder, KeyRound, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { SidebarShell } from '../components/SidebarShell';
+import { FolderList, type FolderListOps } from '../components/FolderList';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { asError, call, on } from '../api';
@@ -21,6 +22,7 @@ interface MonitorDraft {
   iterations?: number;
   bail?: boolean;
   webhook?: string;
+  folder?: string;
 }
 
 interface MonitorRow extends MonitorDraft {
@@ -43,7 +45,6 @@ const statusLabel = (r?: MonitorResult) => (!r ? 'Never ran' : r.status === 'pas
 
 export function MonitorsView() {
   const [rows, setRows] = useState<MonitorRow[]>([]);
-  const [filter, setFilter] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [sel, setSel] = useState<string>();
   const [results, setResults] = useState<MonitorResult[]>([]);
@@ -52,9 +53,12 @@ export function MonitorsView() {
   const [busy, setBusy] = useState<string>();
   const toast = useApp((s) => s.toast);
 
+  // folders of the list (empty ones included) live in the workspace library "monitors"
+  const [folders, setFolders] = useState<string[]>([]);
   const load = useCallback(async () => {
-    const [list, cols] = await Promise.all([call<MonitorRow[]>('monitor.list'), call<Collection[]>('col.list')]);
+    const [list, cols, lib] = await Promise.all([call<MonitorRow[]>('monitor.list'), call<Collection[]>('col.list'), call<Library<unknown>>('lib.get', { kind: 'monitors' }).catch(() => ({ folders: [], items: [] }))]);
     setRows(list);
+    setFolders(lib.folders);
     setCollections(cols);
     setLoaded(true);
     setSel((s) => (s && list.some((m) => m.id === s) ? s : list[0]?.id));
@@ -62,6 +66,8 @@ export function MonitorsView() {
   const loadResults = useCallback(async (id?: string) => setResults(id ? await call<MonitorResult[]>('monitor.results', { id, limit: 100 }) : []), []);
 
   useEffect(() => void load(), [load]);
+  // monitors saved elsewhere (the sidebar, the CLI, an AI agent through MCP) show up here
+  useEffect(() => on('data.changed', () => void load()), [load]);
   useEffect(() => void loadResults(sel), [sel, loadResults]);
   // scheduled runs finish in the background: refresh the list and the open monitor
   useEffect(() => {
@@ -124,7 +130,42 @@ export function MonitorsView() {
     await load();
   };
 
-  const shown = filter ? rows.filter((m) => `${m.name} ${colName(m.collectionId)}`.toLowerCase().includes(filter.toLowerCase())) : rows;
+  const newDraft = (): MonitorDraft => ({ name: '', collectionId: collections[0]?.id ?? '', everyMinutes: 15, enabled: true, environment: useApp.getState().environment });
+  /** Change the monitors library directly (folders): monitors keep their data, only folders change. */
+  const editLibrary = async (fn: (lib: Library<unknown>) => Library<unknown>) => {
+    const lib = await call<Library<unknown>>('lib.get', { kind: 'monitors' });
+    await call('lib.save', { kind: 'monitors', library: fn(lib) });
+    await load();
+  };
+  const update = async (id: string, change: Partial<MonitorDraft>) => {
+    const m = rows.find((x) => x.id === id);
+    if (!m) return;
+    try {
+      await call('monitor.save', { monitor: { ...m, ...change } });
+      await load();
+    } catch (e) {
+      toast(asError(e).message, 'error');
+    }
+  };
+  const monitorOps: FolderListOps = {
+    renameItem: (id, name) => update(id, { name }),
+    moveItem: (id, folder) => update(id, { folder }),
+    deleteItem: async (id) => {
+      await call('monitor.delete', { id });
+      await load();
+    },
+    duplicateItem: async (id) => {
+      const m = rows.find((x) => x.id === id);
+      if (!m) return;
+      const { id: _id, lastResult: _r, running: _x, schedule: _s, nextRunAt: _n, due: _d, ...data } = m;
+      const copy = await call<MonitorRow>('monitor.save', { monitor: { ...data, name: `${m.name} copy` } });
+      await load();
+      setSel(copy.id);
+    },
+    setFolders: (next) => editLibrary((lib) => ({ ...lib, folders: next })),
+    renameFolder: (from, to) => editLibrary((lib) => ({ ...lib, folders: lib.folders.map((f) => (f === from ? to : f)), items: lib.items.map((i) => (i.folder === from ? { ...i, folder: to } : i)) })),
+    deleteFolder: (name) => editLibrary((lib) => ({ ...lib, folders: lib.folders.filter((f) => f !== name), items: lib.items.map((i) => (i.folder === name ? { ...i, folder: undefined } : i)) })),
+  };
   return (
     <Split id="monitors" sidebar initial={20} min={12}>
       <SidebarShell
@@ -135,58 +176,41 @@ export function MonitorsView() {
             label: 'Monitors',
             icon: <AlarmClock size={13} />,
             render: () => (
-              <>
-                <div className="flex items-center gap-1 px-3 h-8 shrink-0">
-                  <span className="text-[11px] font-semibold tracking-wider uppercase text-muted flex-1 truncate">Monitors</span>
-                  <IconButton label="Refresh" className="h-6 w-6" onClick={() => void load()}>
-                    <RefreshCw size={13} />
-                  </IconButton>
-                  <IconButton
-                    label={collections.length ? 'New monitor' : 'Create a collection first'}
-                    className="h-6 w-6"
-                    disabled={!collections.length}
-                    onClick={() => setEditing({ name: '', collectionId: collections[0]?.id ?? '', everyMinutes: 15, enabled: true, environment: useApp.getState().environment })}
-                  >
-                    <Plus size={14} />
-                  </IconButton>
-                </div>
-                {rows.length > 0 && (
-                  <div className="px-2 pb-2">
-                    <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter monitors" aria-label="Filter monitors" value={filter} onChange={(e) => setFilter(e.target.value)} />
-                  </div>
-                )}
-                <div className="flex-1 min-h-0 overflow-auto px-1 flex flex-col">
-                  {shown.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setSel(m.id)}
-                      // double-click opens its settings, like the edit (pencil) button
-                      onDoubleClick={() => {
-                        setSel(m.id);
-                        setEditing(m);
-                      }}
-                      title="Double-click to edit"
-                      className={cx('w-full text-left px-2 py-1.5 rounded-md flex flex-col gap-0.5 transition-colors', sel === m.id ? 'bg-accent-soft' : 'hover:bg-hover')}
-                    >
-                      <div className="flex items-center gap-2 text-sm min-w-0">
-                        <span className={cx('w-2 h-2 rounded-full shrink-0', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
-                        <span className="truncate font-medium">{m.name}</span>
-                        {!m.enabled && <Badge>paused</Badge>}
-                      </div>
-                      <div className="text-xs text-muted pl-4 truncate">
-                        {colName(m.collectionId)} · {m.schedule}
-                        {m.lastResult && ` · ${timeAgo(m.lastResult.startedAt)}`}
-                      </div>
-                    </button>
-                  ))}
-                  {rows.length > 0 && !shown.length && <p className="px-3 py-4 text-sm text-muted text-center">No monitors match this filter.</p>}
-                  {loaded && !rows.length && (
-                    <Empty icon={<AlarmClock size={24} />} title="No monitors yet" action={collections.length ? undefined : <span className="text-xs text-muted">Create a collection first.</span>}>
-                      A monitor runs a collection (or some of its folders) on a schedule and tells you when it starts failing.
-                    </Empty>
-                  )}
-                </div>
-              </>
+              <FolderList
+                id="monitors"
+                title="Monitors"
+                itemNoun="monitor"
+                addLabel={collections.length ? 'New monitor' : 'Create a collection first'}
+                folders={folders}
+                selected={editing ? undefined : sel}
+                onSelect={(id) => {
+                  setEditing(undefined);
+                  setSel(id);
+                }}
+                onAdd={(folder) => collections.length && setEditing({ ...newDraft(), ...(folder ? { folder } : {}) })}
+                items={rows.map((m) => ({
+                  id: m.id,
+                  name: m.name,
+                  folder: m.folder,
+                  icon: <span className={cx('block w-2 h-2 rounded-full', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />,
+                  badge: m.enabled ? undefined : <Badge>paused</Badge>,
+                  subtitle: `${colName(m.collectionId)} · ${m.schedule}${m.lastResult ? ` · ${timeAgo(m.lastResult.startedAt)}` : ''}`,
+                }))}
+                itemMenu={(id) => {
+                  const m = rows.find((x) => x.id === id)!;
+                  return [
+                    { label: 'Edit', icon: <Pencil size={14} />, onSelect: () => (setSel(id), setEditing(m)) },
+                    { label: 'Run now', icon: <Play size={14} />, disabled: busy === id || m.running, onSelect: () => void run(m) },
+                    { label: m.enabled ? 'Pause' : 'Resume', icon: <AlarmClock size={14} />, onSelect: () => void toggle(m) },
+                  ];
+                }}
+                ops={monitorOps}
+                empty={
+                  <Empty icon={<AlarmClock size={24} />} title="No monitors yet" action={collections.length ? undefined : <span className="text-xs text-muted">Create a collection first.</span>}>
+                    A monitor runs a collection (or some of its folders) on a schedule and tells you when it starts failing.
+                  </Empty>
+                }
+              />
             ),
           },
           { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
