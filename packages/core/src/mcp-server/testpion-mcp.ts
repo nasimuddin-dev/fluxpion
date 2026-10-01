@@ -1424,10 +1424,13 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
   return server;
 }
 
-/** Serve the workspace over stdio until the client disconnects. */
-export async function serveTestPionMcp(opts: TestPionMcpOptions): Promise<void> {
+/**
+ * Serve the workspace over stdio until the client disconnects. `stdio` replaces process.stdin / stdout (the
+ * desktop app passes streams on file descriptors 0 and 1: Electron's process.stdin reads nothing on Windows).
+ */
+export async function serveTestPionMcp(opts: TestPionMcpOptions & { stdio?: { input: NodeJS.ReadableStream; output: NodeJS.WritableStream } }): Promise<void> {
   const server = createTestPionMcpServer(opts);
-  const transport = new StdioServerTransport();
+  const transport = new StdioServerTransport(opts.stdio?.input as never, opts.stdio?.output as never);
   const closed = new Promise<void>((resolve) => (server.onclose = () => resolve()));
   await server.connect(transport);
   await closed;

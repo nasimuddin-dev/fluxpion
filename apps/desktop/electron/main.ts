@@ -6,6 +6,7 @@ import { Backend } from '../backend/backend.js';
 import { canInstallInPlace, createUpdater } from './updater.js';
 import { installAppMenu, installTextContextMenu } from './app-menu.js';
 import { defaultAppDir, normalizeError } from '@testpion/core';
+import { parseMcpMode, runMcpMode } from './mcp-mode.js';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
@@ -17,6 +18,14 @@ let win: BrowserWindow | null = null;
 let rendererCheckedUpdates = false;
 let nativePromptShown = false;
 let backend: Backend | null = null;
+
+// `TestPion --mcp-server`: serve a workspace to an AI agent over stdio, with no window (stdout is the protocol)
+const mcpMode = parseMcpMode(process.argv);
+if (mcpMode) {
+  console.log = console.error;
+  console.info = console.error;
+  app.dock?.hide();
+}
 
 // Documentation screenshot mode (scripts/capture.cjs): isolated profile, fixed size, dark theme.
 const capture = process.env.TESTPION_CAPTURE_SCRIPT;
@@ -33,7 +42,7 @@ if (!capture && !existsSync(join(app.getPath('appData'), 'TestPion'))) {
 }
 
 // Single instance — a second launch focuses the existing window.
-if (!capture && !app.requestSingleInstanceLock()) app.quit();
+if (!capture && !mcpMode && !app.requestSingleInstanceLock()) app.quit();
 // the installer's app id: the taskbar groups TestPion's windows under its own icon (not Electron's, when run from source)
 if (process.platform === 'win32') app.setAppUserModelId('dev.nasimuddin.protolens');
 
@@ -138,6 +147,7 @@ function emit(channel: string, payload: unknown): void {
 const menu = (command: string) => emit('menu.command', { command });
 
 app.whenReady().then(() => {
+  if (mcpMode) return void runMcpMode(mcpMode, process.env.TESTPION_HOME || defaultAppDir()).then((code) => app.exit(code));
   try {
     start();
   } catch (e) {
