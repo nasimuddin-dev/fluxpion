@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.32.0 — 2026-10-01
+
+Highlights: flaky tests across the workspace, scores by run, a variables matrix, per-request monitor numbers.
+
+- **Flaky tests**: the Tests overview lists tests whose result keeps changing across the latest 30 runs (or that pass only after retries), each with its latest results; `testpion history flaky` (exit 1 when there are any) and the `flaky_tests` MCP tool.
+- **Evaluations**: **Scores by run**, one chart per evaluator with its mean score in each run; `testpion history scores` and the `score_trend` MCP tool. The runs list now updates when a run finishes (it kept showing 0 of 0 before).
+- **Environments**: a **Matrix** of every variable across every environment (set, empty, missing or off, secrets marked, never values); `testpion env matrix` and the `environment_matrix` MCP tool.
+- **Monitors**: **Requests** shows each request over the latest runs, slowest first, with p95 and failures; `testpion monitor requests` and the `monitor_requests` MCP tool.
+- **Tests and Evaluations**: **Overview of all runs** returns from a run to the overview.
+- **README**: the new timing, certificate, usage and history features.
+
 ## 0.31.0 — 2026-10-01
 
 Highlights: usage of MCP tools and AI models, timing in traces, direct certificate checks.
