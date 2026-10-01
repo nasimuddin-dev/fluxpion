@@ -51,6 +51,29 @@ export function ChartTip({ x, width, children, top = 0 }: { x: number; width: nu
   );
 }
 
+/**
+ * Keyboard access to a chart's items: focus it (Tab), then ←/→ (Home/End) move the highlighted item and its
+ * tooltip, Enter picks it, Escape leaves. Returns props for the chart's wrapper.
+ */
+export function chartKeys(count: number, hover: number | undefined, setHover: (i?: number) => void, onPick?: (i: number) => void) {
+  return {
+    tabIndex: count ? 0 : -1,
+    onFocus: () => hover === undefined && count && setHover(count - 1),
+    onBlur: () => setHover(undefined),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (!count) return;
+      const i = hover ?? count - 1;
+      const next = e.key === 'ArrowLeft' ? Math.max(0, i - 1) : e.key === 'ArrowRight' ? Math.min(count - 1, i + 1) : e.key === 'Home' ? 0 : e.key === 'End' ? count - 1 : undefined;
+      if (next !== undefined) {
+        e.preventDefault();
+        setHover(next);
+      } else if (e.key === 'Enter' && onPick && hover !== undefined) onPick(hover);
+      else if (e.key === 'Escape') setHover(undefined);
+    },
+    className: 'outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded',
+  };
+}
+
 /** A round number at or above v (1, 2, 5 × 10ⁿ) for an axis maximum. */
 export const niceMax = (v: number) => {
   if (v <= 0) return 1;
@@ -137,7 +160,14 @@ export function PointLine<T>({
     setHover(best);
   };
   return (
-    <div ref={ref} className={'relative' + (onPick ? ' cursor-pointer' : '')} onMouseMove={onMove} onMouseLeave={() => setHover(undefined)} onClick={() => hover !== undefined && items[hover] && onPick?.(items[hover]!)}>
+    <div
+      ref={ref}
+      {...chartKeys(items.length, hover, setHover, onPick && ((i) => onPick(items[i]!)))}
+      className={'relative outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded' + (onPick ? ' cursor-pointer' : '')}
+      onMouseMove={onMove}
+      onMouseLeave={() => setHover(undefined)}
+      onClick={() => hover !== undefined && items[hover] && onPick?.(items[hover]!)}
+    >
       <svg width={width} height={H} role="img" aria-label={label}>
         {[0, max / 2, max].map((t) => (
           <g key={t}>
@@ -218,7 +248,7 @@ export function StackedColumns<T>({
   const h = (v: number) => (v / max) * (base - pad.t);
   const anything = items.some((d) => ok(d) + bad(d) > 0);
   return (
-    <div ref={ref} className="relative" onMouseLeave={() => setHover(undefined)}>
+    <div ref={ref} {...chartKeys(items.length, hover, setHover)} className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded" onMouseLeave={() => setHover(undefined)}>
       <svg width={width} height={H} role="img" aria-label={label}>
         {[0, Math.round(max / 2), max].map((t) => (
           <g key={t}>

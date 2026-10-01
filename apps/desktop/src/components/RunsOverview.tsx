@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, ChartCard, ChartTip, PointLine, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard, chartKeys, ChartTip, PointLine, Swatch, useWidth } from './charts';
 import { Empty } from './ui';
 
 /** A run in a list of runs (runs.list). */
@@ -83,7 +83,7 @@ function PassRate({ runs, onSelect }: { runs: RunRow[]; onSelect?(id: string): v
         </>
       }
     >
-      <div ref={ref} className="relative" onMouseLeave={() => setHover(undefined)}>
+      <div ref={ref} {...chartKeys(runs.length, hover, setHover, onSelect && ((i) => onSelect(runs[i]!.id)))} className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded" onMouseLeave={() => setHover(undefined)}>
         <svg width={width} height={H} role="img" aria-label="Share of tests that passed in each run">
           {[0, 0.5, 1].map((t) => (
             <g key={t}>

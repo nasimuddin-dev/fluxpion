@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, BarRow, ChartCard, ChartTip, niceMax, StackedColumns, StatTile, Swatch, useWidth } from './charts';
+import { axisMs, BarRow, ChartCard, chartKeys, ChartTip, niceMax, StackedColumns, StatTile, Swatch, useWidth } from './charts';
 
 /** Workspace activity from `stats.activity` (see summarizeActivity in core). */
 export interface ActivityDay {
@@ -168,7 +168,7 @@ function MedianLine({ days, overall }: { days: ActivityDay[]; overall?: number }
         ) : undefined
       }
     >
-      <div ref={ref} className="relative" onMouseMove={onMove} onMouseLeave={() => setHover(undefined)}>
+      <div ref={ref} {...chartKeys(days.length, hover, setHover)} className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded" onMouseMove={onMove} onMouseLeave={() => setHover(undefined)}>
         <svg width={width} height={H} role="img" aria-label="Median response time per day">
           <YGrid max={max} y={y} width={width} format={axisMs} />
           {hover !== undefined && <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={H - PAD.b} stroke="var(--muted)" strokeWidth={1} />}

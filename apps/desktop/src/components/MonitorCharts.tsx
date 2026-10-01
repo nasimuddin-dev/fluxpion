@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatMs, timeAgo } from '../lib/format';
 import { cx } from './ui';
-import { axisMs, ChartCard as Card, ChartTip, PointLine, StackedColumns, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard as Card, chartKeys, ChartTip, PointLine, StackedColumns, Swatch, useWidth } from './charts';
 
 /** A monitor run, as the charts need it. */
 export interface RunPoint {
@@ -80,7 +80,7 @@ export function AvailabilityStrip({ runs }: { runs: RunPoint[] }) {
         </>
       }
     >
-      <div ref={ref} className="relative h-8" onMouseLeave={() => setHover(undefined)}>
+      <div ref={ref} {...chartKeys(ordered.length, hover, setHover)} className="relative h-8 outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded" onMouseLeave={() => setHover(undefined)}>
         <svg width={width} height={32} role="img" aria-label={`${ordered.filter((r) => r.status === 'passed').length} of the last ${ordered.length} runs passed`}>
           {ordered.map((r, i) => (
             <rect
