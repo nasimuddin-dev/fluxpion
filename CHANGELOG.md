@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.35.0 — 2026-10-01
+
+Highlights: request health that follows your checks, certificate reminders, traces you can filter.
+
+- **Request health** now follows each request's own checks: a request that expects a 404 and gets one is fine; without checks, the status decides as before. The Collections explorer shows how many requests are failing next to each collection.
+- **Certificates**: when the app starts it reminds you, once a day, of recorded certificates that expire within 7 days.
+- **Monitors**: the list shows each monitor's uptime over 7 days; a run that failed for its certificate is labelled *Attention* (not *Too slow*) in the app, the CLI and alerts, and Home no longer shows "0 failed" for it. **Run now** on a failing monitor in *Needs attention*.
+- **Needs attention**: **Copy** puts the list on the clipboard as Markdown; `testpion attention --markdown` prints it for CI.
+- **Traces**: an **Errors** filter; the timing phases of a request are coloured in the waterfall (connection set-up lighter, download green).
+
 ## 0.34.0 — 2026-10-01
 
 Highlights: latest results in test files, collection health on Home, WebSocket timing.
