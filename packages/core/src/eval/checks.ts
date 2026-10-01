@@ -1,4 +1,5 @@
 import { compareSnapshot, describeDifference } from './snapshot.js';
+import { decodeJwt, describeExpiry, findJwts, type DecodedJwt } from '../util/jwt.js';
 import { createHash } from 'node:crypto';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
@@ -268,6 +269,33 @@ registerCheck('snapshot', (cfg, ctx) => {
   return res(cfg, !diffs.length, diffs.length ? `${diffs.length === 50 ? '50+' : diffs.length} difference${diffs.length === 1 ? '' : 's'} from the snapshot: ${diffs.slice(0, 5).map(describeDifference).join('; ')}` : `matches the snapshot (${mode})`, {
     metadata: { differences: diffs.slice(0, 50), path: cfg.path || '$' },
   });
+});
+
+// a JWT in the response (at `path`, in `header`, or the first one found): decodes, is not expired (or has at least
+// `min` seconds left) and has the expected `claims` (equal values; a list claim like `aud` must contain the value)
+registerCheck('jwt', (cfg, ctx) => {
+  let token: string | undefined;
+  if (cfg.header) token = ctx.headers?.find(([k]) => k.toLowerCase() === String(cfg.header).toLowerCase())?.[1];
+  else if (cfg.path) {
+    const v = target(cfg, ctx).value;
+    token = typeof v === 'string' ? v : undefined;
+  } else token = findJwts(ctx.text || asText(ctx.body))[0];
+  if (!token) return res(cfg, false, cfg.header ? `no ${cfg.header} header` : cfg.path ? `no token at ${cfg.path}` : 'no JWT in the response');
+  let d: DecodedJwt;
+  try {
+    d = decodeJwt(token);
+  } catch (e) {
+    return res(cfg, false, (e as Error).message);
+  }
+  const min = Number(cfg.min ?? 0);
+  if (d.expiresInSec !== undefined && d.expiresInSec <= min) return res(cfg, false, d.expired ? `the token expired ${describeExpiry(d.expiresInSec)}` : `the token expires ${describeExpiry(d.expiresInSec)}: less than ${min} s`, { actual: d.payload });
+  const want = (cfg.claims ?? {}) as Record<string, unknown>;
+  const wrong = Object.entries(want).filter(([k, v]) => {
+    const got = d.payload[k];
+    return Array.isArray(got) ? !got.includes(v) : JSON.stringify(got) !== JSON.stringify(v);
+  });
+  if (wrong.length) return res(cfg, false, `claims differ: ${wrong.map(([k, v]) => `${k} is ${JSON.stringify(d.payload[k])}, expected ${JSON.stringify(v)}`).join('; ')}`, { expected: want, actual: d.payload });
+  return res(cfg, true, `valid JWT (${String(d.header.alg ?? '?')})${d.expiresInSec !== undefined ? `, expires ${describeExpiry(d.expiresInSec)}` : ', no expiry'}`, { actual: d.payload });
 });
 
 // HTTPS: the server's certificate is still valid for at least `min` days (default 14): catches expiry before users do

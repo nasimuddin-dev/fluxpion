@@ -16,7 +16,7 @@
  */
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { buildSchema, graphql } from 'graphql';
 import { WebSocketServer } from 'ws';
@@ -77,6 +77,14 @@ const listen = (server, port) =>
 
 export const DEMO_TOKEN = 'demo-token-3f9a1c';
 
+/** An OpenID Connect style id_token (a JWT signed with a demo secret) for the user who asked for the token. */
+function demoIdToken(sub) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const body = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ iss: 'http://127.0.0.1/demo-auth', sub, aud: ['veterinary-api'], scope: 'patients:read patients:write', iat: now, exp: now + 3600 })}`;
+  return `${body}.${createHmac('sha256', 'demo-secret').update(body).digest('base64url')}`;
+}
+
 export function createRestServer() {
   const patients = new Map([
     ['1', { id: '1', name: 'Rex', species: 'dog', ownerId: '123' }],
@@ -108,7 +116,7 @@ export function createRestServer() {
         creds = Object.fromEntries(params);
       }
       if ((creds.client_id === 'demo' && creds.client_secret === 'demo-secret') || (creds.username === 'vet' && creds.password === 'paws'))
-        return json(res, 200, { access_token: DEMO_TOKEN, token_type: 'Bearer', expires_in: 3600 });
+        return json(res, 200, { access_token: DEMO_TOKEN, token_type: 'Bearer', expires_in: 3600, id_token: demoIdToken(creds.username ?? creds.client_id) });
       return json(res, 401, { error: 'invalid_client', message: 'Unknown client credentials' });
     }
     // cookie session: POST /session/login sets a session cookie and redirects to /session/me

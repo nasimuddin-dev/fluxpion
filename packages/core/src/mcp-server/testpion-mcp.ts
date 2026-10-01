@@ -21,6 +21,7 @@ import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { listCertificates, recordCertificate } from '../storage/certificates.js';
 import { checkCertificate } from '../net/certificate-check.js';
+import { decodeJwt } from '../util/jwt.js';
 import { mcpToolUsage } from '../storage/mcp-usage.js';
 import { llmUsage } from '../storage/llm-usage.js';
 import { workspaceAttention } from '../storage/attention.js';
@@ -436,6 +437,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           await ctx.dispose();
         }
       },
+    },
+    {
+      name: 'decode_jwt',
+      description: 'Decode a JSON Web Token (a "Bearer " prefix is fine): header, claims, issued at, expires at and seconds left. The signature is NOT verified (no keys). Use it to see what an access or id token says, e.g. its scopes, audience or expiry.',
+      inputSchema: { type: 'object', properties: { token: str('The JWT') }, required: ['token'] },
+      run: (a) => decodeJwt(String(a.token)),
     },
     {
       name: 'export_traces',

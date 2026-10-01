@@ -98,6 +98,14 @@ module.exports = async function run(win) {
   await shot('rest-timeline');
   await js(`__cap.click('Body'); true`);
   await sleep(300);
+  // a token response: its id_token (a JWT) decoded in the JWT tab
+  await js(`[...document.querySelectorAll('button')].find((b) => b.offsetParent !== null && b.textContent.includes('Get access token'))?.click(); true`);
+  await sleep(1200);
+  await js(`__cap.click('Send'); true`);
+  await sleep(2500);
+  await js(`__cap.click('JWT'); true`);
+  await sleep(800);
+  await shot('rest-jwt');
 
   // GraphQL: introspect, run, show autocomplete-ready editor
   await js(`__cap.nav('GraphQL'); true`);

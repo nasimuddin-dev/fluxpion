@@ -56,6 +56,8 @@ import {
   deleteRunsBefore,
   listCertificates,
   workspaceAttention,
+  decodeJwt,
+  describeExpiry,
   recordCertificate,
   checkCertificate,
   certificateLint,
@@ -303,6 +305,34 @@ export function registerDataCommands(program: Command): void {
       } finally {
         store.close();
       }
+    });
+  program
+    .command('jwt')
+    .description('decode a JSON Web Token (header, claims, expiry); the signature is not verified. Reads stdin when the token is -')
+    .argument('<token>', 'the token (a "Bearer " prefix is fine), or - for stdin')
+    .option('--json', 'print as JSON')
+    .action(async (token: string, o: { json?: boolean }) => {
+      let t = token;
+      if (t === '-') {
+        const chunks: Buffer[] = [];
+        for await (const c of process.stdin) chunks.push(c as Buffer);
+        t = Buffer.concat(chunks).toString('utf8').trim();
+      }
+      let d: ReturnType<typeof decodeJwt>;
+      try {
+        d = decodeJwt(t);
+      } catch (e) {
+        throw new CliError((e as Error).message, EXIT.CONFIG_ERROR);
+      }
+      if (o.json) return console.log(JSON.stringify(d, null, 2));
+      console.log(bold('Header'), JSON.stringify(d.header));
+      console.log(bold('Claims'));
+      console.log(JSON.stringify(d.payload, null, 2));
+      if (d.issuedAt) console.log(dim(`issued at  ${d.issuedAt}`));
+      if (d.expiresAt) console.log(`${dim('expires at')} ${d.expiresAt}  ${d.expired ? red(`expired ${describeExpiry(d.expiresInSec!)}`) : green(`expires ${describeExpiry(d.expiresInSec!)}`)}`);
+      else console.log(yellow('no expiry (exp) claim'));
+      console.log(dim('The signature is not verified.'));
+      if (d.expired) process.exitCode = EXIT.TEST_FAILURE;
     });
   program
     .command('attention')
