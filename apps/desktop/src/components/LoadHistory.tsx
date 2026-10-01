@@ -58,8 +58,19 @@ function Trend({ runs, title, value, format, axis }: { runs: LoadRun[]; title: s
  * Earlier load tests (of the opened saved load test, or all): p95 and throughput trends and a list.
  * Every finished load test is recorded by the backend.
  */
+/** Change against the reference run, coloured by whether it is better (higher req/s, lower p95). */
+function Delta({ value, base, higherIsBetter }: { value: number; base?: number; higherIsBetter: boolean }) {
+  if (base === undefined || !base) return null;
+  const pctChange = Math.round(((value - base) / base) * 100);
+  if (!pctChange) return <span className="text-muted text-[0.7rem] ml-1">±0%</span>;
+  const better = higherIsBetter ? pctChange > 0 : pctChange < 0;
+  return <span className={cx('text-[0.7rem] ml-1', better ? 'text-ok' : 'text-bad')}>{pctChange > 0 ? `+${pctChange}` : pctChange}%</span>;
+}
+
 export function LoadHistory({ savedId }: { savedId?: string }) {
   const [runs, setRuns] = useState<LoadRun[]>([]);
+  // click a run to compare the others with it
+  const [refId, setRefId] = useState<string>();
   useEffect(() => {
     const load = () => void call<LoadRun[]>('load.history', { savedId, limit: 30 }).then(setRuns, () => setRuns([]));
     load();
@@ -67,9 +78,13 @@ export function LoadHistory({ savedId }: { savedId?: string }) {
   }, [savedId]);
   if (!runs.length) return null;
   const ordered = [...runs].reverse();
+  const ref = runs.find((r) => r.id === refId);
   return (
     <section aria-label="Earlier load tests" className="flex flex-col gap-2">
-      <div className="text-xs text-muted font-semibold">{savedId ? 'Earlier runs of this load test' : 'Earlier load tests'}</div>
+      <div className="text-xs text-muted font-semibold">
+        {savedId ? 'Earlier runs of this load test' : 'Earlier load tests'}
+        <span className="font-normal ml-2">{ref ? '· compared with the highlighted run' : runs.length > 1 ? '· click a run to compare the others with it' : ''}</span>
+      </div>
       {ordered.length > 1 && (
         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           <Trend runs={ordered} title="p95 latency" value={(r) => r.p95} format={formatMs} axis={axisMs} />
@@ -90,12 +105,23 @@ export function LoadHistory({ savedId }: { savedId?: string }) {
         </thead>
         <tbody className="tabular-nums">
           {runs.map((r) => (
-            <tr key={r.id} className="border-t border-line" title={`${r.target}${r.environment ? ` · ${r.environment}` : ''}`}>
+            <tr
+              key={r.id}
+              className={cx('border-t border-line cursor-pointer', r.id === refId ? 'bg-accent/10' : 'hover:bg-hover')}
+              title={`${r.target}${r.environment ? ` · ${r.environment}` : ''}\n${r.id === refId ? 'The reference: click again to stop comparing' : 'Click to compare the other runs with this one'}`}
+              onClick={() => setRefId((x) => (x === r.id ? undefined : r.id))}
+            >
               <td className="py-1 pr-2 whitespace-nowrap">{timeAgo(r.startedAt)}</td>
               {!savedId && <td className="pr-2 truncate max-w-56">{r.name}</td>}
               <td className="text-right">{r.virtualUsers}</td>
-              <td className="text-right">{Math.round(r.throughput)}</td>
-              <td className="text-right">{formatMs(r.p95)}</td>
+              <td className="text-right whitespace-nowrap">
+                {Math.round(r.throughput)}
+                {ref && r.id !== ref.id && <Delta value={r.throughput} base={ref.throughput} higherIsBetter />}
+              </td>
+              <td className="text-right whitespace-nowrap">
+                {formatMs(r.p95)}
+                {ref && r.id !== ref.id && <Delta value={r.p95} base={ref.p95} higherIsBetter={false} />}
+              </td>
               <td className={cx('text-right', r.errorRate > 0.01 && 'text-bad')}>{pct(r.errorRate)}</td>
               <td className="text-right">{r.passed === undefined ? (r.stopped ? <Badge tone="warn">stopped</Badge> : <span className="text-muted">—</span>) : <Badge tone={r.passed ? 'ok' : 'bad'}>{r.passed ? 'passed' : 'failed'}</Badge>}</td>
             </tr>
