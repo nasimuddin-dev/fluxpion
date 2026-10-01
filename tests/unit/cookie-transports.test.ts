@@ -18,6 +18,8 @@ describe('the workspace cookie jar on WebSocket and MCP HTTP connections', () =>
       await s.connect(5000);
       await new Promise((r) => setTimeout(r, 100));
       expect(seen).toBe('session=abc123');
+      // the connection's set-up is measured: a new TCP connection to the local server, then the upgrade
+      expect(s.connectTiming).toMatchObject({ tcpMs: expect.any(Number), upgradeMs: expect.any(Number) });
     } finally {
       s.close();
       await new Promise((r) => wss.close(r));

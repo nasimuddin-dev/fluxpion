@@ -9,6 +9,7 @@ import { ApsError } from '../../errors.js';
 import { shortId } from '../../util/ids.js';
 import type { KeyValue } from '../../model/types.js';
 import type { CookieJar } from '../../cookies/cookie-jar.js';
+import { watchSend } from '../http/socket-timing.js';
 
 export interface WsMessage {
   id: string;
@@ -26,6 +27,8 @@ export class WebSocketSession {
   private listeners: Array<(m: WsMessage) => void> = [];
   private statusListeners: Array<(s: string) => void> = [];
   status: 'connecting' | 'open' | 'closed' = 'closed';
+  /** How the last connection was set up: DNS, TCP and TLS (on a new connection) and the upgrade handshake, in ms. */
+  connectTiming?: { totalMs: number; dnsMs?: number; tcpMs?: number; tlsMs?: number; upgradeMs?: number; tlsProtocol?: string };
 
   constructor(
     readonly url: string,
@@ -77,6 +80,14 @@ export class WebSocketSession {
       }
     }
     this.setStatus('connecting');
+    const t0 = performance.now();
+    let watch: ReturnType<typeof watchSend> | undefined;
+    try {
+      // the handshake is an HTTP GET to the http(s) form of the URL: its connection's timing is measured like a request's
+      watch = watchSend(new URL(this.url.replace(/^ws(s?):/i, 'http$1:')), 'GET');
+    } catch {
+      /* an invalid URL is reported below */
+    }
     return new Promise((resolve, reject) => {
       let ws: InstanceType<typeof UndiciWebSocket>;
       try {
@@ -94,8 +105,22 @@ export class WebSocketSession {
       }, timeoutMs);
       ws.addEventListener('open', () => {
         clearTimeout(timer);
+        const now = performance.now();
+        const sent = watch?.result();
+        watch?.stop();
+        const t = sent?.times;
+        const r = (v?: number) => (v === undefined ? undefined : Math.round(v * 10) / 10);
+        const fresh = !!t && t.created >= t0 - 1;
+        this.connectTiming = {
+          totalMs: r(now - t0)!,
+          ...(fresh ? { dnsMs: t!.lookup !== undefined ? r(t!.lookup - t!.created) : undefined, tcpMs: t!.connect !== undefined ? r(t!.connect - (t!.lookup ?? t!.created)) : undefined, tlsMs: t!.secure !== undefined && t!.connect !== undefined ? r(t!.secure - t!.connect) : undefined } : {}),
+          upgradeMs: sent ? r(now - sent.sentAt) : undefined,
+          tlsProtocol: sent?.tlsProtocol,
+        };
         this.setStatus('open');
-        this.emit('system', `Connected${ws.protocol ? ` (protocol ${ws.protocol})` : ''}`);
+        const c = this.connectTiming;
+        const parts = [c.dnsMs !== undefined && `DNS ${c.dnsMs} ms`, c.tcpMs !== undefined && `TCP ${c.tcpMs} ms`, c.tlsMs !== undefined && `TLS ${c.tlsMs} ms`, c.upgradeMs !== undefined && `upgrade ${c.upgradeMs} ms`].filter(Boolean);
+        this.emit('system', `Connected${ws.protocol ? ` (protocol ${ws.protocol})` : ''} in ${Math.round(c.totalMs)} ms${parts.length ? `: ${parts.join(' · ')}` : ''}`);
         resolve();
       });
       ws.addEventListener('message', (ev) => {
@@ -108,6 +133,7 @@ export class WebSocketSession {
       });
       ws.addEventListener('error', (ev) => {
         clearTimeout(timer);
+        watch?.stop();
         const e = ev as unknown as { error?: Error & { cause?: unknown }; message?: string };
         const msg = e.error?.message || e.message || '';
         if (this.status !== 'connecting') {
