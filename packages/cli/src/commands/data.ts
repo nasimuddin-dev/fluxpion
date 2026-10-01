@@ -502,13 +502,14 @@ export function registerDataCommands(program: Command): void {
     .requiredOption('-w, --workspace <nameOrPath>')
     .option('--collection <nameOrId>', 'collection of --request')
     .option('--request <nameOrId>', 'only responses of this saved request')
+    .option('--failed', 'only responses that failed (4xx/5xx, transport errors, non-OK gRPC codes)')
     .option('-n, --limit <n>', 'how many', '20')
     .option('--json', 'print as JSON')
     .action((o) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         const requestId = o.request ? savedRequestId(store, o.request, o.collection) : undefined;
-        const items = store.meta.listHistory({ requestId, kind: requestId ? 'http' : undefined, limit: Math.min(Number(o.limit) || 20, 500) }).items;
+        const items = store.meta.listHistory({ requestId, kind: requestId ? 'http' : undefined, failed: o.failed || undefined, limit: Math.min(Number(o.limit) || 20, 500) }).items;
         const rows = items.map((h) => ({ id: h.id, timestamp: h.timestamp, kind: h.kind, name: h.name, method: h.method, status: h.status, durationMs: h.durationMs, size: h.size }));
         if (o.json) console.log(JSON.stringify(rows, null, 2));
         else for (const r of rows) console.log(`${dim(r.id)}  ${r.timestamp}  ${String(r.status ?? '').padEnd(4)} ${r.method ?? r.kind} ${r.name}  ${dim(formatDuration(r.durationMs ?? 0))}`);

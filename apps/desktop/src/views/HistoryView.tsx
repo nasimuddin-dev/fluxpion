@@ -29,20 +29,21 @@ export function HistoryView() {
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('');
+  const [failedOnly, setFailedOnly] = useState(false);
   const [sel, setSel] = useState<Entry>();
   const load = useCallback(
     async (reset = true) => {
-      const r = await call<{ items: Entry[]; total: number }>('history.list', { query: query || undefined, kind: kind || undefined, limit: 200, offset: reset ? 0 : items.length });
+      const r = await call<{ items: Entry[]; total: number }>('history.list', { query: query || undefined, kind: kind || undefined, failed: failedOnly || undefined, limit: 200, offset: reset ? 0 : items.length });
       setItems((x) => (reset ? r.items : [...x, ...r.items]));
       setTotal(r.total);
     },
-    [query, kind, items.length],
+    [query, kind, failedOnly, items.length],
   );
   useEffect(() => {
     const t = setTimeout(() => void load(true), 200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, kind]);
+  }, [query, kind, failedOnly]);
   useEffect(() => {
     const onVis = () => useApp.getState().view === 'history' && void load(true);
     return useApp.subscribe((s, p) => s.view !== p.view && onVis());
@@ -71,6 +72,9 @@ export function HistoryView() {
               <option key={k}>{k}</option>
             ))}
           </Select>
+          <label className="flex items-center gap-1 text-xs text-muted whitespace-nowrap" title="Only responses that failed: 4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors">
+            <input type="checkbox" checked={failedOnly} onChange={(e) => setFailedOnly(e.target.checked)} /> Failed
+          </label>
           <Button
             variant="ghost"
             icon={<Download size={13} />}

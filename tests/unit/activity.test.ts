@@ -57,3 +57,29 @@ describe('request stats', () => {
     ]);
   });
 });
+
+describe('history: failed only', () => {
+  it('lists only the responses that failed (SQLite and JSONL stores agree)', async () => {
+    const { openMetaStore } = await import('@testpion/core');
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'tp-hist-'));
+    try {
+      const m = openMetaStore(dir);
+      const add = (id: string, status: number | string | undefined) => m.addHistory({ id, timestamp: `2026-10-01T00:00:0${id}Z`, kind: 'http', name: id, status });
+      add('1', 200);
+      add('2', 404);
+      add('3', 'NetworkError');
+      add('4', 'OK');
+      add('5', 'UNAVAILABLE');
+      add('6', 302);
+      add('7', undefined);
+      expect(m.listHistory({ failed: true }).items.map((h) => h.id).sort()).toEqual(['2', '3', '5']);
+      expect(m.listHistory({ failed: true }).total).toBe(3);
+      m.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

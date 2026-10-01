@@ -171,6 +171,8 @@ export interface ListQuery {
   kind?: string;
   /** History only: entries sent from this saved request. */
   requestId?: string;
+  /** History only: only responses that failed (4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors). */
+  failed?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -326,6 +328,12 @@ class SqliteMetaStore implements MetaStore {
     if (q.requestId) {
       w.sql = (w.sql ? w.sql + ' AND ' : 'WHERE ') + "json_extract(doc, '$.requestId') = ?";
       w.args.push(q.requestId);
+    }
+    if (q.failed) {
+      // the same rule as historyOk: 1xx-3xx and ok / passed / success / connected / closed worked
+      w.sql =
+        (w.sql ? w.sql + ' AND ' : 'WHERE ') +
+        "status IS NOT NULL AND status <> '' AND NOT (status GLOB '[1-3][0-9][0-9]') AND lower(status) NOT IN ('ok', 'passed', 'success', 'connected', 'closed')";
     }
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM history ${w.sql}`).get(...w.args) as { n: number }).n;
     const rows = this.db.prepare(`SELECT * FROM history ${w.sql} ORDER BY ts DESC LIMIT ? OFFSET ?`).all(...w.args, q.limit ?? 100, q.offset ?? 0) as Array<Record<string, unknown>>;
@@ -523,7 +531,8 @@ class JsonlMetaStore implements MetaStore {
     this.log('history', e);
   }
   listHistory(q: ListQuery = {}) {
-    return this.page(q.requestId ? this.data.history.filter((h) => h.requestId === q.requestId) : this.data.history, q, (h, s) => `${h.name} ${h.url} ${h.method} ${h.status}`.toLowerCase().includes(s), (h) => h.timestamp);
+    const base = q.requestId ? this.data.history.filter((h) => h.requestId === q.requestId) : this.data.history;
+    return this.page(q.failed ? base.filter((h) => !historyOk(h.status)) : base, q, (h, s) => `${h.name} ${h.url} ${h.method} ${h.status}`.toLowerCase().includes(s), (h) => h.timestamp);
   }
   getHistory(id: string) {
     return this.data.history.find((h) => h.id === id);

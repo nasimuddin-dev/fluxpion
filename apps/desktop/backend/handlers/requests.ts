@@ -80,7 +80,7 @@ export function requestsHandlers(be: Backend): Handlers {
       if (!payloadPath || !be.ws.isInside(payloadPath, 'payloads')) throw new ApsError('ValidationError', 'Unknown payload');
       return be.saveOrDownload(name ?? 'response.bin', undefined, (dest) => copyFileSync(payloadPath, dest), () => readFileSync(payloadPath));
     },
-    'history.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listHistory(q),
+    'history.list': (q: { query?: string; kind?: string; failed?: boolean; limit?: number; offset?: number }) => be.ws.meta.listHistory(q),
     /** Per-day requests, failures and runs for the Home dashboard charts. */
     'stats.activity': (q: { days?: number; tzOffsetMin?: number } = {}) => be.ws.meta.activity(q),
     /** Per saved request of a collection: responses, failures, latest status and median time (collection Overview). */
