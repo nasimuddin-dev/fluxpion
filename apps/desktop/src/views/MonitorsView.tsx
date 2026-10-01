@@ -51,7 +51,7 @@ const UNITS = [
 ] as const;
 
 const tone = (s?: MonitorResult['status']) => (s === 'passed' ? 'ok' : s ? 'bad' : 'default');
-const statusLabel = (r?: MonitorResult) => (!r ? 'Never ran' : r.status === 'passed' ? 'Passed' : r.status === 'failed' ? (r.reason && !(r.failed + r.errors) ? 'Too slow' : 'Failed') : 'Could not run');
+const statusLabel = (r?: MonitorResult) => (!r ? 'Never ran' : r.status === 'passed' ? 'Passed' : r.status === 'failed' ? (r.reason && !(r.failed + r.errors) ? (r.reason.startsWith('p95') ? 'Too slow' : 'Attention') : 'Failed') : 'Could not run');
 
 export function MonitorsView() {
   const [rows, setRows] = useState<MonitorRow[]>([]);

@@ -42,7 +42,7 @@ function withStore<T>(workspace: string, fn: (store: WorkspaceStore) => T): T {
 }
 
 const statusText = (r?: MonitorResult) =>
-  !r ? dim('never ran') : r.status === 'passed' ? green(`passed ${r.passed}/${r.total}`) : r.status === 'failed' ? red(r.reason && !(r.failed + r.errors) ? `too slow: ${r.reason}` : `failed ${r.failed + r.errors}/${r.total}`) : red(`error: ${r.error}`);
+  !r ? dim('never ran') : r.status === 'passed' ? green(`passed ${r.passed}/${r.total}`) : r.status === 'failed' ? red(r.reason && !(r.failed + r.errors) ? (r.reason.startsWith('p95') ? `too slow: ${r.reason}` : r.reason) : `failed ${r.failed + r.errors}/${r.total}`) : red(`error: ${r.error}`);
 
 function runner(store: WorkspaceStore) {
   const mgr = new WorkspaceManager();
