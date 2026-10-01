@@ -1,4 +1,4 @@
-import { ArchiveRestore, ArrowLeftRight, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Save, ScanSearch, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Check, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Save, ScanSearch, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -9,12 +9,13 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { EnvCompare } from '../components/EnvCompare';
 import { EnvMatrix } from '../components/EnvMatrix';
 import { TrashDialog } from '../components/TrashDialog';
-import { Badge, Button, cx, Empty, Field, Input, Menu, Split, Tabs, Toggle } from '../components/ui';
-import { TreeHeader } from '../components/TreeParts';
+import { Badge, Button, cx, Empty, Field, Input, Menu, MoreMenu, Split, Tabs, Toggle } from '../components/ui';
+import { CountPill, RowMenu, TreeHeader } from '../components/TreeParts';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
   const settings = useApp((s) => s.settings);
+  const activeEnv = useApp((s) => s.environment);
   const [envs, setEnvs] = useState<Environment[]>([]);
   const [comparing, setComparing] = useState(false);
   const [matrix, setMatrix] = useState(false);
@@ -33,6 +34,22 @@ export function EnvironmentsView() {
   };
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Environment>();
+  /** A copy of an environment (secret values are not copied). */
+  const duplicateEnv = async (from: Environment) => {
+    const env = { ...from, id: uid('env-'), name: `${from.name} copy`, isProduction: false, variables: from.variables.map((v) => (v.secret ? { ...v, value: '' } : v)) };
+    await call('env.save', { env });
+    await load();
+    setSel(env.id);
+    await useApp.getState().refreshWorkspace();
+  };
+  const deleteEnv = async (env: Environment) => {
+    if (!(await confirmAction({ title: 'Delete environment', message: `Delete the environment "${env.name}"?`, detail: 'You can restore it, with its secret values, from Recently deleted for 30 days.', confirmLabel: 'Delete environment', danger: true }))) return;
+    await call('env.delete', { id: env.id });
+    if (sel === env.id) setSel(undefined);
+    await load();
+    await useApp.getState().refreshWorkspace();
+  };
+  const [menuFor, setMenuFor] = useState<string>();
   // variables of the open environment that nothing reads (refreshed when it is opened or saved)
   const [unused, setUnused] = useState<string[]>([]);
   const refreshUnused = (env?: string) => void (env ? call<string[]>('vars.unused', { environment: env }).then(setUnused, () => setUnused([])) : setUnused([]));
@@ -144,13 +161,12 @@ export function EnvironmentsView() {
                 menu={[{ label: 'Recently deleted…', icon: <ArchiveRestore size={14} />, onSelect: () => setTrashOpen(true) }]}
               />
               {envs.map((e, i) => (
-                <button
+                <div
                   key={e.id}
                   draggable
-                  title="Drag (or Alt+↑/↓) to reorder"
-                  onClick={() => {
-                    setSel(e.id);
-                    useApp.getState().markPlace('environments', { environmentId: e.id });
+                  onContextMenu={(ev) => {
+                    ev.preventDefault();
+                    setMenuFor(e.id);
                   }}
                   onDragStart={(ev) => {
                     setDragId(e.id);
@@ -167,23 +183,44 @@ export function EnvironmentsView() {
                     if (dragId) void move(dragId, i);
                   }}
                   onDragEnd={() => (setDragId(undefined), setDropAt(undefined))}
-                  onKeyDown={(ev) => {
-                    if (!ev.altKey || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
-                    ev.preventDefault();
-                    void move(e.id, ev.key === 'ArrowUp' ? i - 1 : i + 1);
-                  }}
                   className={cx(
-                    'text-left px-3 py-2 border-b border-line/60 flex items-center gap-2 cursor-grab active:cursor-grabbing',
-                    sel === e.id ? 'bg-accent/10' : 'hover:bg-hover',
+                    'group flex items-center gap-1 h-8 mx-1 pl-3 pr-1 rounded-md cursor-grab active:cursor-grabbing transition-colors',
+                    sel === e.id ? 'bg-accent-soft' : 'hover:bg-hover',
+                    menuFor === e.id && sel !== e.id && 'bg-hover',
                     dragId === e.id && 'opacity-50',
                     dropAt === i && 'shadow-[inset_0_2px_0_var(--accent)]',
                   )}
                 >
-                  <span className="w-2 h-2 rounded-full" style={{ background: e.color ?? (e.isProduction ? 'var(--bad)' : 'var(--ok)') }} />
-                  <span className="text-sm">{e.name}</span>
-                  {e.isProduction && <Badge tone="bad">prod</Badge>}
-                  <span className="ml-auto text-xs text-muted">{e.variables.length}</span>
-                </button>
+                  <button
+                    className="flex-1 min-w-0 flex items-center gap-2 text-left text-sm"
+                    title="Drag (or Alt+↑/↓) to reorder"
+                    data-tree-row
+                    onClick={() => {
+                      setSel(e.id);
+                      useApp.getState().markPlace('environments', { environmentId: e.id });
+                    }}
+                    onKeyDown={(ev) => {
+                      if (!ev.altKey || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+                      ev.preventDefault();
+                      void move(e.id, ev.key === 'ArrowUp' ? i - 1 : i + 1);
+                    }}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: e.color ?? (e.isProduction ? 'var(--bad)' : 'var(--ok)') }} />
+                    <span className="truncate">{e.name}</span>
+                    {e.isProduction && <Badge tone="bad">prod</Badge>}
+                    <span className="ml-auto"><CountPill n={e.variables.length} /></span>
+                  </button>
+                  <RowMenu
+                    label={e.name}
+                    open={menuFor === e.id}
+                    onOpenChange={(o) => setMenuFor(o ? e.id : undefined)}
+                    items={[
+                      { label: 'Make active', icon: <Check size={14} />, disabled: activeEnv === e.name, onSelect: () => void useApp.getState().setEnvironment(e.name) },
+                      { label: 'Duplicate', icon: <Copy size={14} />, separator: true, onSelect: () => void duplicateEnv(e) },
+                      { label: 'Delete', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void deleteEnv(e) },
+                    ]}
+                  />
+                </div>
               ))}
             </div>
             {draft ? (
@@ -207,18 +244,6 @@ export function EnvironmentsView() {
                         Matrix
                       </Button>
                     )}
-                    <Button
-                      icon={<Copy size={13} />}
-                      onClick={async () => {
-                        const env = { ...draft, id: uid('env-'), name: `${draft.name} copy`, isProduction: false, variables: draft.variables.map((v) => (v.secret ? { ...v, value: '' } : v)) };
-                        await call('env.save', { env });
-                        await load();
-                        setSel(env.id);
-                        await useApp.getState().refreshWorkspace();
-                      }}
-                    >
-                      Duplicate
-                    </Button>
                     <Button icon={<ScanSearch size={13} />} title="Where this environment's variables are used; rename one everywhere" onClick={() => useApp.getState().set({ variableUsages: draft.variables[0]?.key ?? true })}>
                       Usages
                     </Button>
@@ -235,23 +260,16 @@ export function EnvironmentsView() {
                         { label: '.env file', icon: <FileText size={14} />, onSelect: () => void exportEnv('dotenv') },
                       ]}
                     />
-                    <Button
-                      variant="ghost"
-                      className="text-bad"
-                      icon={<Trash2 size={13} />}
-                      onClick={async () => {
-                        if (!(await confirmAction({ title: 'Delete environment', message: `Delete the environment "${draft.name}"?`, detail: 'You can restore it, with its secret values, from Recently deleted for 30 days.', confirmLabel: 'Delete environment', danger: true }))) return;
-                        await call('env.delete', { id: draft.id });
-                        setSel(undefined);
-                        await load();
-                        await useApp.getState().refreshWorkspace();
-                      }}
-                    >
-                      Delete
-                    </Button>
                     <Button variant="primary" icon={<Save size={13} />} onClick={save}>
                       Save
                     </Button>
+                    <MoreMenu
+                      label="More environment actions"
+                      items={[
+                        { label: 'Duplicate', icon: <Copy size={14} />, onSelect: () => void duplicateEnv(draft) },
+                        { label: 'Delete environment', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void deleteEnv(draft) },
+                      ]}
+                    />
                   </div>
                 </div>
                 <KeyValueEditor
