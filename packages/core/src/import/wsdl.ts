@@ -5,21 +5,25 @@ import { SCHEMA_VERSION } from '../model/types.js';
 import { shortId, slugify } from '../util/ids.js';
 
 /**
- * WSDL 1.1 → a collection of SOAP requests, like Postman's WSDL import: a folder per SOAP port
- * (SOAP 1.1 and 1.2), a POST per operation with its SOAPAction and a sample envelope built from the
- * XML Schema in <types>. Imported (xsd:import) schemas are not fetched.
+ * WSDL 1.1 and 2.0 → a collection of SOAP requests, like Postman's WSDL import: a folder per SOAP port
+ * or endpoint (SOAP 1.1 and 1.2), a POST per operation with its SOAP action and a sample envelope built
+ * from the XML Schema in <types> (imported schemas when bundled with bundleWsdl).
  */
 
 type X = Record<string, any>;
 
 const SOAP11 = 'http://schemas.xmlsoap.org/wsdl/soap/';
 const SOAP12 = 'http://schemas.xmlsoap.org/wsdl/soap12/';
+const WSDL2 = 'http://www.w3.org/ns/wsdl';
+const WSOAP = 'http://www.w3.org/ns/wsdl/soap';
 const ENVELOPE = { 11: 'http://schemas.xmlsoap.org/soap/envelope/', 12: 'http://www.w3.org/2003/05/soap-envelope' } as const;
 
 export function isWsdl(text: string): boolean {
   const head = text.slice(0, 4000);
   if (/^\s*<testpion-wsdl-bundle>/.test(head)) return true;
-  return /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<([\w-]+:)?definitions[\s>]/.test(head) && /schemas\.xmlsoap\.org\/wsdl\//.test(head);
+  if (/^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<([\w-]+:)?definitions[\s>]/.test(head) && /schemas\.xmlsoap\.org\/wsdl\//.test(head)) return true;
+  // WSDL 2.0
+  return /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<([\w-]+:)?description[\s>]/.test(head) && head.includes(WSDL2);
 }
 
 const IMPORT_RE = /<(?:[\w-]+:)?(?:import|include)\b[^>]*?\b(?:schemaLocation|location)\s*=\s*["']([^"']+)["']/g;
@@ -89,13 +93,13 @@ export function importWsdl(text: string): { collection: Collection } {
 
   // a bundle (bundleWsdl): the WSDL first, then the WSDLs and schemas it imports
   const bundle = kids(doc, 'testpion-wsdl-bundle')[0];
-  const defs = bundle ? kids(bundle, 'definitions') : kids(doc, 'definitions');
+  const defs1 = bundle ? kids(bundle, 'definitions') : kids(doc, 'definitions');
+  // WSDL 2.0: <description> with interface / binding / service-endpoint
+  const wsdl2 = !defs1.length;
+  const defs = wsdl2 ? (bundle ? kids(bundle, 'description') : kids(doc, 'description')) : defs1;
   const all = (name: string) => defs.flatMap((d) => kids(d, name));
   const root = defs[0];
-  if (!root) {
-    if (kids(doc, 'description')[0]) throw new ApsError('ValidationError', 'WSDL 2.0 is not supported yet', { suggestions: ['Most services also publish a WSDL 1.1 document (often at ?wsdl).'] });
-    throw new ApsError('ValidationError', 'Not a WSDL document (no <definitions>)');
-  }
+  if (!root) throw new ApsError('ValidationError', 'Not a WSDL document (no <definitions> or <description>)');
   const targetNs = String(root['@targetNamespace'] ?? '');
 
   // XML Schema: elements, complex and simple types by name (with their schema, for the namespace)
@@ -174,15 +178,89 @@ export function importWsdl(text: string): { collection: Collection } {
     return body.length ? [`${indent}<${tag}>`, ...body, `${indent}</${tag}>`] : [`${indent}<${tag}/>`];
   };
 
+  /** A POST with the SOAP envelope (namespaces used by the body declared on it) and the version's headers. */
+  const soapRequest = (name: string, version: 11 | 12, action: string, body: string[], urlVar: string, description?: string): SavedHttpRequest => {
+    const decls = [...nsPrefix.entries()].map(([ns, p]) => ` xmlns:${p}="${ns}"`).join('');
+    const envelope = [`<soap:Envelope xmlns:soap="${ENVELOPE[version]}"${decls}>`, '  <soap:Header/>', '  <soap:Body>', ...body, '  </soap:Body>', '</soap:Envelope>'].join('\n');
+    const headers: KeyValue[] =
+      version === 12
+        ? [{ key: 'Content-Type', value: `application/soap+xml; charset=utf-8${action ? `; action="${action}"` : ''}`, enabled: true }]
+        : [
+            { key: 'Content-Type', value: 'text/xml; charset=utf-8', enabled: true },
+            { key: 'SOAPAction', value: `"${action}"`, enabled: true },
+          ];
+    return {
+      kind: 'http',
+      id: shortId('req-'),
+      name,
+      ...(description ? { description } : {}),
+      request: { method: 'POST', url: `{{${urlVar}}}`, params: [], headers, body: { type: 'xml', content: envelope }, auth: { type: 'inherit' } },
+      assertions: [{ type: 'status', expected: 200 }],
+    } as SavedHttpRequest;
+  };
+
+  const items: CollectionFolder[] = [];
+  const variables: KeyValue[] = [];
+  const baseUrls = new Map<string, string>();
+  /** {{baseUrl}} for the first address, a variable named after the port / endpoint for others. */
+  const urlVarFor = (address: string, portName: string) => {
+    let v = [...baseUrls.entries()].find(([, a]) => a === address)?.[0];
+    if (!v) {
+      v = baseUrls.size === 0 ? 'baseUrl' : `${slugify(portName).replace(/-(\w)/g, (_, c: string) => c.toUpperCase())}Url`;
+      baseUrls.set(v, address);
+      variables.push({ key: v, value: address, enabled: true });
+    }
+    return v;
+  };
+  /** An attribute by local name in a namespace (e.g. wsoap:version), whatever its prefix. */
+  const attrNs = (n: X | undefined, name: string, ns?: string) =>
+    Object.entries(n ?? {}).find(([k]) => k.startsWith('@') && local(k.slice(1)) === name && (!ns || nsOf(k.slice(1)) === ns))?.[1] as string | undefined;
+
+  if (wsdl2) {
+    // interface operations (with inherited ones): input element, document/literal; #any and #none give an empty body
+    const interfaces = new Map(all('interface').map((i) => [String(i['@name']), i]));
+    const opsOf = (iface: X | undefined, seen = new Set<string>()): X[] => {
+      if (!iface || seen.has(String(iface['@name']))) return [];
+      seen.add(String(iface['@name']));
+      const inherited = String(iface['@extends'] ?? '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .flatMap((e) => opsOf(interfaces.get(local(e)), seen));
+      return [...inherited, ...kids(iface, 'operation')];
+    };
+    for (const service of all('service')) {
+      for (const endpoint of kids(service, 'endpoint')) {
+        const binding = all('binding').find((b) => b['@name'] === local(endpoint['@binding']));
+        if (!binding || String(binding['@type'] ?? '') !== WSOAP) continue; // HTTP bindings are not SOAP
+        // SOAP 1.2 unless wsoap:version="1.1"
+        const version: 11 | 12 = String(attrNs(binding, 'version', WSOAP) ?? '1.2') === '1.1' ? 11 : 12;
+        const address = String(endpoint['@address'] ?? '');
+        const urlVar = urlVarFor(address, String(endpoint['@name']));
+        const iface = interfaces.get(local(binding['@interface'] ?? service['@interface']));
+        const actions = new Map(kids(binding, 'operation').map((bop) => [local(bop['@ref']), String(attrNs(bop, 'action', WSOAP) ?? '')]));
+        const requests: SavedHttpRequest[] = [];
+        for (const op of opsOf(iface)) {
+          const name = String(op['@name']);
+          const input = kids(op, 'input')[0];
+          const elName = String(input?.['@element'] ?? '#none');
+          nsPrefix.clear();
+          const el = elName.startsWith('#') ? undefined : elements.get(local(elName));
+          const body = el ? elementXml(el.node, el.schema, '    ', 0, new Set(), true) : [];
+          // the binding's wsoap:action, else the interface input's wsam:Action
+          const action = actions.get(name) || String(attrNs(input, 'Action') ?? '');
+          requests.push(soapRequest(name, version, action, body, urlVar, docOf(op)));
+        }
+        if (requests.length) items.push({ kind: 'folder', id: shortId('fld-'), name: `${service['@name']} · ${endpoint['@name']}${version === 12 ? ' (SOAP 1.2)' : ''}`, items: requests });
+      }
+    }
+  }
+
   const messages = new Map<string, X[]>();
   for (const m of all('message')) messages.set(String(m['@name']), kids(m, 'part'));
   const portTypes = new Map<string, Map<string, X>>();
   for (const pt of all('portType')) portTypes.set(String(pt['@name']), new Map(kids(pt, 'operation').map((o) => [String(o['@name']), o])));
 
-  const items: CollectionFolder[] = [];
-  const variables: KeyValue[] = [];
-  const baseUrls = new Map<string, string>();
-  for (const service of all('service')) {
+  for (const service of wsdl2 ? [] : all('service')) {
     for (const port of kids(service, 'port')) {
       const binding = all('binding').find((b) => b['@name'] === local(port['@binding']));
       if (!binding) continue;
@@ -190,13 +268,7 @@ export function importWsdl(text: string): { collection: Collection } {
       if (!soapBinding) continue; // an HTTP binding: not SOAP
       const version: 11 | 12 = kids(binding, 'binding', SOAP12)[0] ? 12 : 11;
       const address = String((kids(port, 'address', version === 12 ? SOAP12 : SOAP11)[0] ?? kids(port, 'address')[0])?.['@location'] ?? '');
-      // the first address is {{baseUrl}}; other addresses get their own variable
-      let urlVar = [...baseUrls.entries()].find(([, v]) => v === address)?.[0];
-      if (!urlVar) {
-        urlVar = baseUrls.size === 0 ? 'baseUrl' : `${slugify(String(port['@name'])).replace(/-(\w)/g, (_, c: string) => c.toUpperCase())}Url`;
-        baseUrls.set(urlVar, address);
-        variables.push({ key: urlVar, value: address, enabled: true });
-      }
+      const urlVar = urlVarFor(address, String(port['@name']));
       const ops = portTypes.get(local(binding['@type'])) ?? new Map<string, X>();
       const requests: SavedHttpRequest[] = [];
       for (const bop of kids(binding, 'operation')) {
@@ -231,29 +303,12 @@ export function importWsdl(text: string): { collection: Collection } {
             return el ? elementXml(el.node, el.schema, '    ', 0, new Set(), true) : [];
           });
         }
-        const decls = [...nsPrefix.entries()].map(([ns, p]) => ` xmlns:${p}="${ns}"`).join('');
-        const envelope = [`<soap:Envelope xmlns:soap="${ENVELOPE[version]}"${decls}>`, '  <soap:Header/>', '  <soap:Body>', ...body, '  </soap:Body>', '</soap:Envelope>'].join('\n');
-        const headers: KeyValue[] =
-          version === 12
-            ? [{ key: 'Content-Type', value: `application/soap+xml; charset=utf-8${action ? `; action="${action}"` : ''}`, enabled: true }]
-            : [
-                { key: 'Content-Type', value: 'text/xml; charset=utf-8', enabled: true },
-                { key: 'SOAPAction', value: `"${action}"`, enabled: true },
-              ];
-        const description = docOf(op);
-        requests.push({
-          kind: 'http',
-          id: shortId('req-'),
-          name,
-          ...(description ? { description } : {}),
-          request: { method: 'POST', url: `{{${urlVar}}}`, params: [], headers, body: { type: 'xml', content: envelope }, auth: { type: 'inherit' } },
-          assertions: [{ type: 'status', expected: 200 }],
-        } as SavedHttpRequest);
+        requests.push(soapRequest(name, version, action, body, urlVar, docOf(op)));
       }
       if (requests.length) items.push({ kind: 'folder', id: shortId('fld-'), name: `${service['@name']} · ${port['@name']}${version === 12 ? ' (SOAP 1.2)' : ''}`, items: requests });
     }
   }
-  if (!items.length) throw new ApsError('ValidationError', 'The WSDL has no SOAP operations', { suggestions: ['Only SOAP 1.1 and 1.2 bindings are imported (not HTTP GET/POST bindings).'] });
+  if (!items.length) throw new ApsError('ValidationError', 'The WSDL has no SOAP operations', { suggestions: ['Only SOAP 1.1 and 1.2 bindings are imported (not HTTP bindings).'] });
   // one port: no need for the folder level
   const name = String(root['@name'] ?? all('service')[0]?.['@name'] ?? 'SOAP service');
   const description = docOf(root) ?? docOf(all('service')[0]);

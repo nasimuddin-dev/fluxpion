@@ -46,7 +46,7 @@ Copied commands include the request's real header and token values, so they run 
 - Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment. From a v4 export, gRPC requests (with their `.proto` files) and WebSocket requests come over as the collection's gRPC calls and connections.
 - Bruno collections: the collection folder itself (**Bruno folder…**, the folder with `bruno.json` and the `.bru` files you keep in git), a single `.bru` request file, or a JSON export (*Export collection*). See [Bruno](#bruno) below.
 - Hoppscotch collections (JSON).
-- WSDL 1.1 documents of SOAP services (a file, or a `?wsdl` link). See [SOAP](#soap-wsdl) below.
+- WSDL 1.1 and 2.0 documents of SOAP services (a file, or a `?wsdl` link). See [SOAP](#soap-wsdl) below.
 - HAR files.
 
 From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Insomnia and Hoppscotch scripts use each tool's own script API, so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
@@ -59,7 +59,7 @@ A Postman import keeps collection-level and request scripts, path variables, OAu
 
 ### SOAP (WSDL)
 
-A WSDL 1.1 document becomes a collection of SOAP requests, one folder per SOAP port (SOAP 1.1 and SOAP 1.2 ports are both kept; with a single port there is no folder level). Each operation is a `POST` to `{{baseUrl}}` (the service address, set as a collection variable) with:
+A WSDL 1.1 or 2.0 document becomes a collection of SOAP requests, one folder per SOAP port or endpoint (SOAP 1.1 and SOAP 1.2 are both kept; WSDL 2.0 endpoints are SOAP 1.2 unless the binding says `wsoap:version="1.1"`, operations inherited through `extends` are included, and HTTP bindings are skipped; with a single port there is no folder level). Each operation is a `POST` to `{{baseUrl}}` (the service address, set as a collection variable) with:
 
 - the right headers: `Content-Type: text/xml` and `SOAPAction` for SOAP 1.1, `Content-Type: application/soap+xml; action=…` for SOAP 1.2;
 - a sample envelope built from the XML Schema in the WSDL's `<types>`: every element of the input message with a placeholder value (`?` for text, `0` for numbers, `false`, the first value of an enumeration, dates), including the fields of base types (`extension`), with document/literal and RPC styles;
