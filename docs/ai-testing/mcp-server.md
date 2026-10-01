@@ -39,7 +39,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 |---|---|
 | `list_collections` | Collections with their request, gRPC call, connection and example counts. |
 | `list_requests` | What a collection holds: its requests (id, name, method, URL with `{{variables}}`, folder), then its gRPC calls (target, method) and WebSocket / Socket.IO / MQTT connections (url, mode). `run_collection` runs them all. |
-| `get_request` | One saved request: headers, body, auth type, scripts, assertions, documentation, example names. |
+| `get_request` | One saved request (headers, body, auth type, scripts, docs, example names), or one of the collection's gRPC calls (target, method, message, metadata) or connections (url, mode, message). Sensitive values are masked. |
 | `list_environments` | Environments and their variable **names** (values are not returned). |
 | `collection_docs` | The collection's [Markdown documentation](/api-testing/collections#documentation). |
 | `send_request` | Send a saved request (its scripts and assertions run too) or an ad-hoc request: `method` + `url` (+ `headers`, `body`), or a copied cURL / fetch / PowerShell `snippet`. `{{variables}}` resolve from the chosen environment. Returns status, headers, body (up to 20,000 characters) and timing; for a saved request also the scripts' `console.log` output (`scriptLogs`) and the [`pm.visualizer`](/api-testing/rest#visualize-responses-pm-visualizer) rendering (`visualization.html`). |

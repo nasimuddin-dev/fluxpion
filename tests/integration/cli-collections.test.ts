@@ -3,6 +3,7 @@ import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { McpSession, mcpResultBody } from '../../packages/core/src/index.js';
 
 // `testpion collections` and `testpion requests` show what a workspace holds, gRPC calls and connections
 // included (the same as the list_collections / list_requests MCP tools).
@@ -35,4 +36,20 @@ describe('CLI: collections and requests', () => {
     expect(missing.status).not.toBe(0);
     expect(missing.err).toMatch(/No collection "nope"/);
   });
+
+  it('MCP: list_requests and get_request show the gRPC calls and connections', async () => {
+    const s = new McpSession({ id: 'tp', name: 'testpion', transport: 'stdio', command: process.execPath, args: [join(process.cwd(), 'packages/cli/bin/testpion.js'), 'mcp-server', '-w', ws], env: { TESTPION_HOME: join(dir, 'home') } });
+    await s.connect(20_000);
+    try {
+      const call = async (tool: string, args: Record<string, unknown>) => JSON.parse(mcpResultBody(await s.callTool(tool, args)).text) as any;
+      const cols = await call('list_collections', {});
+      expect(cols.find((c: any) => c.id === 'grpc')).toMatchObject({ grpcCalls: 3, connections: 0 });
+      const items = await call('list_requests', { collection: 'WebSocket & MQTT' });
+      expect(items.map((i: any) => i.kind)).toEqual(['websocket', 'websocket', 'websocket']);
+      const one = await call('get_request', { collection: 'gRPC (grpcb.in)', request: 'Add two numbers' });
+      expect(one).toMatchObject({ kind: 'grpc', name: 'Add two numbers', method: 'addsvc.Add/Sum', target: '{{grpcHost}}' });
+    } finally {
+      await s.close();
+    }
+  }, 60_000);
 });

@@ -188,10 +188,18 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
     },
     {
       name: 'get_request',
-      description: 'Show one saved request (headers, body, auth type, scripts, documentation and saved example names). Sensitive values are masked.',
-      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request name or id') }, required: ['collection', 'request'] },
+      description: 'Show one saved request (headers, body, auth type, scripts, documentation and saved example names), or one of the collection’s gRPC calls (target, method, message, metadata) or connections (url, mode, message). Sensitive values are masked.',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id'), request: str('Request, gRPC call or connection: name or id') }, required: ['collection', 'request'] },
       run: (a) => {
-        const { node, folder } = findRequest(findCollection(a.collection), a.request);
+        const col = findCollection(a.collection);
+        // a gRPC call or connection of the collection (saved in the library, shown in the collection)
+        const saved = collectionSavedItems(store, col.id);
+        const ref = String(a.request);
+        for (const kind of ['grpc', 'websocket'] as const) {
+          const it = saved?.[kind]?.find((i) => i.id === ref) ?? saved?.[kind]?.find((i) => i.name.toLowerCase() === ref.toLowerCase());
+          if (it) return { id: it.id, name: it.name, kind, folder: it.folder, ...(redactor.redact(it.data) as object) };
+        }
+        const { node, folder } = findRequest(col, a.request);
         const base = { id: node.id, name: node.name, folder: folder || undefined, request: redactor.redact(node.request) };
         return node.kind === 'http'
           ? { ...base, description: node.description, preRequestScript: node.preRequestScript, testScript: node.testScript, assertions: node.assertions, examples: node.examples?.map((e) => ({ name: e.name, status: e.status })) }
