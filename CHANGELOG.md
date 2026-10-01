@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.2 — 2026-09-30
+
+The follow-up to the 0.16.1 review: the items that were left open and could be fixed.
+
+- **Sending a request is faster**: workspace files (environments, the collection, servers, providers) were opened and read again for every request sent and every list shown, which costs milliseconds per file on Windows. Their text is now reused while a file's modification time and size are unchanged (changes made outside the app, by git or an editor, are still picked up). Preparing a request went from about 35 ms to under 1 ms, and from about 130 ms to 13 ms with a 5 MB collection; listing collections is about 8 times faster.
+- **Very large collections in the sidebar**: a collection or folder with more than 300 items shows the first 300 and a **Show 300 more** row (the filter still searches everything, and the open request is always shown), and rows that are scrolled out of view are skipped by layout and paint. Opening a 3,000-request collection no longer builds 3,000 rows at once.
+- **Hardened installers**: the packaged app sets Electron fuses, so the installed program can't be started as a plain Node.js runtime, doesn't read `NODE_OPTIONS`, ignores `--inspect` and only loads the app from its archive.
+- **Command palette**: *Record traffic*, *Find variable usages*, *Compare OpenAPI versions* and *API coverage* had no icon; every command now has one.
+- **Docs**: the development guide explains the hardening and what is needed to code-sign the installers.
+
 ## 0.16.1 — 2026-09-30
 
 A security and performance review of the code; these are its fixes.
