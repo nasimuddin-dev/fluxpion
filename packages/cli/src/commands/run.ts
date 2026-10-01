@@ -13,6 +13,9 @@ import {
   parseThreshold,
   createEngineContext,
   runLoadTest,
+  recordLoadRun,
+  loadRunRecord,
+  Redactor,
   writeReports,
   type LoadTarget,
 } from '@testpion/core';
@@ -158,6 +161,7 @@ export function registerRunCommands(program: Command): void {
         }
       }
       let last = 0;
+      const startedAt = new Date().toISOString();
       const snap = await runLoadTest(
         {
           target,
@@ -185,6 +189,42 @@ export function registerRunCommands(program: Command): void {
         for (const t of checked) console.log(`  ${t.passed ? green('✓') : red('✗')} ${t.expr} ${dim(`(actual ${t.actual ?? 'n/a'}${t.percent ? '%' : ''})`)}`);
       }
       if (o.json) writeFileSync(o.json, JSON.stringify({ ...snap, ...(checked ? { thresholds: checked } : {}) }, null, 2));
+      // in a workspace, the run joins its load test history (the app's Load view and the load_history MCP tool)
+      if ((o.workspace || o.saved || o.collection) && snap.requests) {
+        try {
+          const { store, ephemeral } = openWorkspace(o.workspace, undefined, mgr);
+          try {
+            if (!ephemeral) {
+              const targetText =
+                target.kind === 'http'
+                  ? `${target.request.method} ${new Redactor(settings.redactFields).redactUrl(target.request.url)}`
+                  : target.kind === 'grpc'
+                    ? `gRPC ${target.request.target} ${target.request.method}`
+                    : target.kind === 'sequence'
+                      ? `collection ${String(o.collection)}${o.folder ? ` / ${String(o.folder)}` : ''}`
+                      : 'load test';
+              recordLoadRun(
+                store,
+                loadRunRecord(snap, {
+                  id: `load-${Date.now().toString(36)}`,
+                  startedAt,
+                  savedId: o._savedId as string | undefined,
+                  name: (o._savedName as string | undefined) ?? targetText,
+                  target: targetText,
+                  environment: o.environment,
+                  virtualUsers: Number(o.vus),
+                  durationSec: Number(o.duration),
+                  thresholds: checked?.map((t) => ({ expr: t.expr, passed: t.passed, actual: t.actual })),
+                }),
+              );
+            }
+          } finally {
+            store.close();
+          }
+        } catch {
+          /* the history is a convenience: never fail the run for it */
+        }
+      }
       // with thresholds, they decide; without, more than 5% errors fails
       process.exitCode = (checked ? checked.some((t) => !t.passed) : snap.errorRate > 0.05) ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
     });
@@ -243,7 +283,7 @@ interface SavedLoadTest {
  */
 function applySavedLoadTest(o: Record<string, unknown>, cmd: Command, url: string | undefined): string | undefined {
   const { store } = openWorkspace(o.workspace as string | undefined, undefined, new WorkspaceManager());
-  let item: { name: string; data: SavedLoadTest } | undefined;
+  let item: { id: string; name: string; data: SavedLoadTest } | undefined;
   let names: string[] = [];
   try {
     const items = store.getLibrary<SavedLoadTest>('load-tests').items;
@@ -252,6 +292,11 @@ function applySavedLoadTest(o: Record<string, unknown>, cmd: Command, url: strin
     item = items.find((i) => i.id === o.saved) ?? items.find((i) => i.name.toLowerCase() === ref);
   } finally {
     store.close();
+  }
+  if (item) {
+    // remembered for the load history
+    o._savedId = item.id;
+    o._savedName = item.name;
   }
   if (!item) throw new CliError(`No saved load test "${String(o.saved)}". Saved: ${names.join(', ') || 'none (save one in the app: Load ▸ Save)'}`, EXIT.CONFIG_ERROR);
   const d = item.data;

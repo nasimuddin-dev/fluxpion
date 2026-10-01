@@ -9,7 +9,7 @@ description: "Load test HTTP endpoints, whole collections and LLM providers with
 
 Configure virtual users, duration, ramp-up and ramp-down, a global requests-per-second cap, and think time. The results include throughput, p50/p90/p95/p99 latency, error rate, status code distribution and connection failures, with live charts: requests per second, p95 latency, errors per second and virtual users over time (one crosshair across all four; hover for the values at that second) and a status-code bar with counts and shares.
 
-Every finished load test is kept in the workspace (`runs/load/history.jsonl`, the newest 500): under the results, *Earlier load tests* shows the p95 latency and throughput of the last runs as trends and lists them with virtual users, requests per second, p95, error rate and whether the pass rules held. With a saved load test open, only its runs are shown. AI agents read the same history with the `load_history` MCP tool, and `load_test` runs are recorded too.
+Every finished load test is kept in the workspace (`runs/load/history.jsonl`, the newest 500): under the results, *Earlier load tests* shows the p95 latency and throughput of the last runs as trends and lists them with virtual users, requests per second, p95, error rate and whether the pass rules held. With a saved load test open, only its runs are shown. AI agents read the same history with the `load_history` MCP tool; `load_test` runs, and `testpion load` runs in a workspace (`-w`, `--saved` or `--collection`), are recorded too.
 
 LLM targets also report tokens per second, input and output tokens, estimated cost, time to first token, time between tokens and total generation time.
 
