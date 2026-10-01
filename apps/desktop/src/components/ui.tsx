@@ -3,7 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as MenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { ChevronRight, Loader2, X } from 'lucide-react';
+import { ChevronRight, Loader2, MoreHorizontal, X } from 'lucide-react';
 
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ');
@@ -492,6 +492,38 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
     <div className="flex items-center justify-between h-10 px-3 text-[0.72rem] uppercase tracking-[0.08em] text-muted font-semibold shrink-0">
       <span>{children}</span>
       {right}
+    </div>
+  );
+}
+
+/** The ⋯ button that opens a menu of more actions (in a page header, a card, a toolbar). */
+export function MoreMenu({ label = 'More actions', items, width = 230 }: { label?: string; items: MenuItem[]; width?: number }) {
+  return (
+    <Menu
+      width={width}
+      items={items}
+      trigger={
+        <IconButton label={label} className="h-8 w-8 data-[state=open]:bg-hover data-[state=open]:text-fg">
+          <MoreHorizontal size={16} />
+        </IconButton>
+      }
+    />
+  );
+}
+
+/** The header of a detail page (a monitor, a load test, a run …): icon, title, a line under it, the main actions and a ⋯ menu for the rest. */
+export function PageHeader({ icon, title, subtitle, actions, menu, menuLabel }: { icon?: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; menu?: MenuItem[]; menuLabel?: string }) {
+  return (
+    <div className="flex items-start gap-3 flex-wrap">
+      {icon && <div className="grid place-items-center h-9 w-9 rounded-lg bg-accent-soft text-accent shrink-0">{icon}</div>}
+      <div className="min-w-0 flex-1">
+        <h2 className="text-lg font-semibold truncate leading-tight">{title}</h2>
+        {subtitle && <div className="text-sm text-muted truncate mt-0.5">{subtitle}</div>}
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {actions}
+        {menu && menu.length > 0 && <MoreMenu label={menuLabel} items={menu} />}
+      </div>
     </div>
   );
 }

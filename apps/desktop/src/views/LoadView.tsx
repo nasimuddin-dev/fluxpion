@@ -12,7 +12,7 @@ import { EnvironmentsPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
 import { useIntent } from '../hooks';
-import { Badge, Button, cx, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, Input, Metric, PageHeader, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
 import { LoadTimeline, StatusCodes } from '../components/LoadCharts';
 import { LoadHistory } from '../components/LoadHistory';
@@ -254,19 +254,24 @@ export function LoadView() {
       />
     <Split id="load-main" initial={34}>
       <div className="h-full overflow-auto p-3 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Gauge size={16} />
-          <span className="font-semibold truncate">{current ? current.name : 'Load test'}</span>
-          <Button size="sm" icon={<Save size={12} />} title={current ? `Save changes to "${current.name}"` : 'Save this load test to run it again later'} onClick={() => void saveLoad()}>
-            {current && dirty ? 'Save*' : 'Save'}
-          </Button>
-          <Select className="ml-auto" value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' | 'collection' | 'grpc' })} aria-label="Target">
+        <PageHeader
+          icon={<Gauge size={18} />}
+          title={current ? current.name : 'New load test'}
+          subtitle={current ? (dirty ? 'Unsaved changes' : 'Saved load test') : 'Not saved yet'}
+          actions={
+            <Button size="sm" icon={<Save size={12} />} title={current ? `Save changes to "${current.name}"` : 'Save this load test to run it again later'} onClick={() => void saveLoad()}>
+              {current && dirty ? 'Save*' : 'Save'}
+            </Button>
+          }
+        />
+        <Field label="Target">
+          <Select value={d.kind} onChange={(e) => set({ kind: e.target.value as 'http' | 'llm' | 'collection' | 'grpc' })} aria-label="Target">
             <option value="http">HTTP endpoint</option>
             <option value="collection">Collection</option>
             <option value="grpc">gRPC method</option>
             <option value="llm">LLM provider</option>
           </Select>
-        </div>
+        </Field>
         {d.kind === 'collection' ? (
           <>
             <div className="grid grid-cols-2 gap-2">

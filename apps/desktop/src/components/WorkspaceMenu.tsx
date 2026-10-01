@@ -105,7 +105,7 @@ export function WorkspaceMenu() {
     );
   const rowMenu = (w: WorkspaceInfo): MenuItem[] => [
     { label: isCurrent(w) ? 'Open (current)' : 'Open', icon: <Check size={14} />, disabled: isCurrent(w), onSelect: () => switchTo(w) },
-    { label: 'Rename…', icon: <Pencil size={14} />, onSelect: () => setNameDialog({ mode: 'rename', target: w, value: w.name }) },
+    { label: 'Rename', icon: <Pencil size={14} />, onSelect: () => setNameDialog({ mode: 'rename', target: w, value: w.name }) },
     { label: 'Duplicate…', icon: <Copy size={14} />, onSelect: () => setNameDialog({ mode: 'duplicate', target: w, value: `${w.name} copy` }) },
     { label: 'Show in folder', icon: <FolderOpen size={14} />, onSelect: () => void call('app.openPath', { path: w.path }) },
     {
@@ -181,7 +181,7 @@ export function WorkspaceMenu() {
                     items={rowMenu(w)}
                     trigger={
                       <button
-                        aria-label={`Actions for ${w.name}`}
+                        aria-label={`More actions for ${w.name}`}
                         className={cx('shrink-0 grid place-items-center h-7 w-7 rounded-md text-muted hover:text-fg hover:bg-panel2', menuFor === w.path ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100')}
                         onClick={(e) => e.stopPropagation()}
                       >

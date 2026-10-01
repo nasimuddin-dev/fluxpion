@@ -257,7 +257,7 @@ function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
   // one menu for every tab; what an editor can't do is shown disabled, so every menu reads the same
   return [
     { label: t.pinned ? 'Unpin tab' : 'Pin tab', icon: t.pinned ? <PinOff size={13} /> : <Pin size={13} />, disabled: !t.onTogglePin, onSelect: () => t.onTogglePin?.() },
-    { label: 'Rename…', icon: <Pencil size={13} />, shortcut: 'Double-click', disabled: !t.onRename, onSelect: () => t.onRename?.() },
+    { label: 'Rename', icon: <Pencil size={13} />, shortcut: 'Double-click', disabled: !t.onRename, onSelect: () => t.onRename?.() },
     { label: 'Duplicate tab', icon: <Copy size={13} />, disabled: !t.onDuplicate, onSelect: () => t.onDuplicate?.() },
     { label: 'Save as test file…', icon: <FileCheck2 size={13} />, disabled: !t.onSaveAsTest, onSelect: () => t.onSaveAsTest?.() },
     { label: 'Close tab', icon: <X size={13} />, separator: true, shortcut: 'Middle-click', disabled: !!t.pinned, onSelect: () => t.onClose() },

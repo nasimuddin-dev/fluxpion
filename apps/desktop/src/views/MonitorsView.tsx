@@ -12,7 +12,7 @@ import { useIntent } from '../hooks';
 import { confirmAction, useApp } from '../store';
 import type { Collection, CollectionNode, Library } from '../types';
 import { formatMs, timeAgo } from '../lib/format';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, Menu, MetricGrid, ModalOrPanel, Select, Split, Toggle, Tooltip } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, Input, Metric, Menu, MetricGrid, ModalOrPanel, PageHeader, Select, Split, Toggle, Tooltip } from '../components/ui';
 
 interface MonitorDraft {
   id?: string;
@@ -243,7 +243,7 @@ export function MonitorsView() {
                   folder: m.folder,
                   icon: <span className={cx('block w-2 h-2 rounded-full', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />,
                   badge: m.enabled ? <RecentRuns statuses={m.recent ?? []} /> : <Badge>paused</Badge>,
-                  subtitle: `${colName(m.collectionId)} · ${m.schedule}${m.uptime7d !== undefined ? ` · ${m.uptime7d}% (7 days)` : ''}${m.lastResult ? ` · ${timeAgo(m.lastResult.startedAt)}` : ''}`,
+                  subtitle: `${colName(m.collectionId)}${m.enabled ? ` · ${m.schedule}` : ''}${m.uptime7d !== undefined ? ` · ${m.uptime7d}% (7 days)` : ''}${m.lastResult ? ` · ${timeAgo(m.lastResult.startedAt)}` : ''}`,
                 }))}
                 itemMenu={(id) => {
                   const m = rows.find((x) => x.id === id)!;
@@ -351,56 +351,60 @@ function MonitorDetail(p: {
   const next = m.enabled && m.nextRunAt ? Date.parse(m.nextRunAt) - Date.now() : undefined;
   return (
     <div className="p-4 flex flex-col gap-4 max-w-4xl">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold truncate">{m.name}</h2>
-          <div className="text-sm text-muted">
+      <PageHeader
+        icon={<AlarmClock size={18} />}
+        title={m.name}
+        subtitle={
+          <>
             {p.collectionName}
             {p.folderNames.length > 0 && ` › ${p.folderNames.join(', ')}`}
             {m.environment && ` · ${m.environment}`} · {m.schedule}
-          </div>
-        </div>
-        <Button size="sm" variant="primary" icon={<Play size={14} />} loading={p.busy} onClick={p.onRun}>
-          Run now
-        </Button>
-        {last && last.status !== 'passed' && (
-          <Button
-            size="sm"
-            icon={<Sparkles size={14} />}
-            title="Ask the AI assistant what is wrong and what to do (the monitor's results, reasons and per-request numbers are sent; no bodies or secrets)"
-            onClick={() =>
-              void call('monitor.requests', { id: m.id, runs: 20 }).then(
-                (requests) =>
-                  useApp.getState().set({
-                    assistant: {
-                      task: 'explain-monitor',
-                      title: `Why "${m.name}" is failing`,
-                      context: {
-                        monitor: { name: m.name, schedule: m.schedule, environment: m.environment, maxP95Ms: m.maxP95Ms, minCertDays: m.minCertDays },
-                        latestResults: results.slice(0, 15).map((r) => ({ when: r.startedAt, status: r.status, passed: r.passed, total: r.total, p95Ms: r.p95Ms, certDaysLeft: r.certDaysLeft, reason: r.reason, error: r.error })),
-                        requests,
-                      },
-                    },
-                  }),
-                () => undefined,
-              )
-            }
-          >
-            Explain with AI
-          </Button>
-        )}
-        <Tooltip content={m.enabled ? 'Pause the schedule' : 'Resume the schedule'}>
-          <Button size="sm" icon={m.enabled ? <Pause size={14} /> : <AlarmClock size={14} />} onClick={p.onToggle}>
-            {m.enabled ? 'Pause' : 'Resume'}
-          </Button>
-        </Tooltip>
-        <IconButton label="Edit" onClick={p.onEdit}>
-          <Pencil size={14} />
-        </IconButton>
-        <IconButton label="Delete" onClick={p.onDelete}>
-          <Trash2 size={14} />
-        </IconButton>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <Button size="sm" variant="primary" icon={<Play size={14} />} loading={p.busy} onClick={p.onRun}>
+              Run now
+            </Button>
+            {last && last.status !== 'passed' && (
+              <Button
+                size="sm"
+                icon={<Sparkles size={14} />}
+                title="Ask the AI assistant what is wrong and what to do (the monitor's results, reasons and per-request numbers are sent; no bodies or secrets)"
+                onClick={() =>
+                  void call('monitor.requests', { id: m.id, runs: 20 }).then(
+                    (requests) =>
+                      useApp.getState().set({
+                        assistant: {
+                          task: 'explain-monitor',
+                          title: `Why "${m.name}" is failing`,
+                          context: {
+                            monitor: { name: m.name, schedule: m.schedule, environment: m.environment, maxP95Ms: m.maxP95Ms, minCertDays: m.minCertDays },
+                            latestResults: results.slice(0, 15).map((r) => ({ when: r.startedAt, status: r.status, passed: r.passed, total: r.total, p95Ms: r.p95Ms, certDaysLeft: r.certDaysLeft, reason: r.reason, error: r.error })),
+                            requests,
+                          },
+                        },
+                      }),
+                    () => undefined,
+                  )
+                }
+              >
+                Explain with AI
+              </Button>
+            )}
+            <Tooltip content={m.enabled ? 'Pause the schedule' : 'Resume the schedule'}>
+              <Button size="sm" icon={m.enabled ? <Pause size={14} /> : <AlarmClock size={14} />} onClick={p.onToggle}>
+                {m.enabled ? 'Pause' : 'Resume'}
+              </Button>
+            </Tooltip>
+            <Button size="sm" icon={<Pencil size={14} />} onClick={p.onEdit}>
+              Edit
+            </Button>
+          </>
+        }
+        menuLabel="More monitor actions"
+        menu={[{ label: 'Delete monitor', icon: <Trash2 size={14} />, danger: true, onSelect: p.onDelete }]}
+      />
 
       <MetricGrid compact>
         <Metric label="Last result" value={statusLabel(last)} tone={last ? (last.status === 'passed' ? 'ok' : 'bad') : undefined} sub={last ? (last.reason ?? timeAgo(last.startedAt)) : undefined} />

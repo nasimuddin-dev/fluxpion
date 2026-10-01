@@ -38,7 +38,7 @@ export function SidebarShell({ id, panes, value, onChange }: { id: string; panes
   const pane = panes.find((p) => p.id === active) ?? panes[0]!;
   return (
     <div className="h-full flex flex-col bg-panel/50 border-r border-line min-w-0">
-      {/* labels show only when the sidebar itself is wide enough (a container query), otherwise icons with tooltips */}
+      {/* labels show (two panes always; more when the sidebar is wide enough, a container query), otherwise icons with tooltips */}
       <div role="tablist" aria-label="Sidebar" className="@container flex items-center gap-0.5 px-2 pt-2 pb-2 shrink-0">
         {panes.map((p) => (
           <Tooltip key={p.id} content={p.label}>
@@ -53,7 +53,7 @@ export function SidebarShell({ id, panes, value, onChange }: { id: string; panes
               )}
             >
               {p.icon}
-              <span className={cx('truncate hidden', panes.length > 3 ? '@[26rem]:inline' : '@[20rem]:inline')}>{p.label}</span>
+              <span className={cx('truncate', panes.length <= 2 ? 'inline' : panes.length > 3 ? 'hidden @[24rem]:inline' : 'hidden @[18rem]:inline')}>{p.label}</span>
             </button>
           </Tooltip>
         ))}

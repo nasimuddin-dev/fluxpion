@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronRight, Copy, Folder, FolderInput, FolderOpen, FolderPlus, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { confirmAction, promptText } from '../store';
-import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
+import { Button, cx, Input, type MenuItem } from './ui';
 import { closeTabsFor } from './EditorTabs';
+import { askFolderName, folderMenuItems, moveToFolderItem, RowMenu, TreeFolderRow, TreeHeader } from './TreeParts';
 
 export interface FolderListItem {
   id: string;
@@ -87,27 +88,18 @@ export function FolderList({
   const allFolders = [...new Set([...folders, ...items.map((i) => i.folder).filter((f): f is string => !!f)])].sort((a, b) => a.localeCompare(b));
 
   const newFolder = async () => {
-    const name = (await promptText('New folder', { message: 'Folder name', value: '', okLabel: 'Create' }))?.trim();
+    const name = await askFolderName();
     if (name && !allFolders.includes(name)) await ops.setFolders([...allFolders, name]);
   };
-  const moveTo = async (itemId: string) => {
-    const item = items.find((i) => i.id === itemId);
-    const name = await promptText(`Move ${item?.name ?? itemNoun}`, {
-      message: allFolders.length ? `Folder name: an existing one (${allFolders.join(', ')}) or a new one.` : 'Folder name (a new folder is created).',
-      value: item?.folder ?? allFolders[0] ?? '',
-      okLabel: 'Move',
-    });
-    if (!name) return;
-    const folder = name.trim();
+  const moveTo = async (itemId: string, folder: string | undefined) => {
     if (folder && !allFolders.includes(folder)) await ops.setFolders([...allFolders, folder]);
     await ops.moveItem(itemId, folder);
   };
   const standardMenu = (it: FolderListItem): MenuItem[] => [
     ...(itemMenu?.(it.id) ?? []),
-    { label: 'Rename…', icon: <Pencil size={14} />, separator: !!itemMenu, onSelect: () => void promptText(`Rename ${itemNoun}`, { message: 'Name', value: it.name, okLabel: 'Rename' }).then((n) => n?.trim() && ops.renameItem(it.id, n.trim())) },
-    { label: 'Move to folder…', icon: <FolderInput size={14} />, onSelect: () => void moveTo(it.id) },
-    ...(it.folder ? [{ label: 'Move to top level', icon: <FolderOpen size={14} />, onSelect: () => void ops.moveItem(it.id, undefined) }] : []),
+    { label: 'Rename', icon: <Pencil size={14} />, separator: !!itemMenu, onSelect: () => void promptText(`Rename ${itemNoun}`, { message: 'Name', value: it.name, okLabel: 'Rename' }).then((n) => n?.trim() && ops.renameItem(it.id, n.trim())) },
     ...(ops.duplicateItem ? [{ label: 'Duplicate', icon: <Copy size={14} />, onSelect: () => void ops.duplicateItem!(it.id) }] : []),
+    moveToFolderItem({ folders: allFolders, current: it.folder, move: (f) => moveTo(it.id, f) }),
     {
       label: 'Delete',
       icon: <Trash2 size={14} />,
@@ -116,18 +108,7 @@ export function FolderList({
       onSelect: () => void confirmAction({ title: `Delete ${itemNoun}`, message: `Delete "${it.name}"?`, confirmLabel: 'Delete', danger: true }).then((ok) => ok && ops.deleteItem(it.id)),
     },
   ];
-  const folderMenu = (f: string): MenuItem[] => [
-    { label: `${addLabel} here`, icon: <Plus size={14} />, onSelect: () => onAdd(f) },
-    { label: 'Rename folder…', icon: <Pencil size={14} />, onSelect: () => void promptText('Rename folder', { message: 'Folder name', value: f, okLabel: 'Rename' }).then((n) => n?.trim() && n.trim() !== f && ops.renameFolder(f, n.trim())) },
-    {
-      label: 'Delete folder',
-      icon: <Trash2 size={14} />,
-      danger: true,
-      separator: true,
-      onSelect: () =>
-        void confirmAction({ title: 'Delete folder', message: `Delete the folder "${f}"?`, detail: `Its ${itemNoun}s are kept and move to the top level.`, confirmLabel: 'Delete folder', danger: true }).then((ok) => ok && ops.deleteFolder(f)),
-    },
-  ];
+  const folderMenu = (f: string): MenuItem[] => folderMenuItems({ name: f, itemNoun, addLabel, onAdd: () => onAdd(f), rename: (to) => ops.renameFolder(f, to), remove: () => ops.deleteFolder(f) });
 
   // drag an item onto a folder (or the top level) to move it
   const dropProps = (folder: string | null) => ({
@@ -150,43 +131,25 @@ export function FolderList({
       draggable
       onDragStart={(e) => e.dataTransfer.setData('application/x-testpion-item', it.id)}
       onContextMenu={(e) => (e.preventDefault(), setMenuFor(it.id))}
-      className={cx('group flex items-start gap-1 pr-1 border-l-2 cursor-pointer', nested ? 'pl-5' : 'pl-2', selected === it.id ? 'bg-accent-soft border-accent' : 'border-transparent hover:bg-hover', menuFor === it.id && 'bg-hover')}
+      className={cx('group flex items-center gap-1 mx-1 pr-1 rounded-md cursor-pointer transition-colors', nested ? 'pl-9' : 'pl-3', selected === it.id ? 'bg-accent-soft' : 'hover:bg-hover', menuFor === it.id && selected !== it.id && 'bg-hover')}
       onClick={() => onSelect(it.id)}
     >
       <div className="flex-1 min-w-0 py-1.5">
         <div className="flex items-center gap-2 text-sm">
-          {it.icon}
-          <span className="font-medium truncate">{it.name}</span>
-          {it.badge}
+          {it.icon && <span className="shrink-0 grid place-items-center w-3.5">{it.icon}</span>}
+          <span className="truncate">{it.name}</span>
+          {it.badge && <span className="ml-auto shrink-0">{it.badge}</span>}
         </div>
-        {it.subtitle && <div className="text-xs text-muted truncate mono pl-4">{it.subtitle}</div>}
+        {it.subtitle && <div className={cx('text-xs text-muted truncate', !!it.icon && 'pl-[1.375rem]')}>{it.subtitle}</div>}
       </div>
-      <Menu
-        open={menuFor === it.id}
-        onOpenChange={(o) => setMenuFor(o ? it.id : undefined)}
-        width={210}
-        items={standardMenu(it)}
-        trigger={
-          <IconButton label={`Actions for ${it.name}`} className={cx('mt-1 h-6 w-6 shrink-0', menuFor === it.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')} onClick={(e) => e.stopPropagation()}>
-            <MoreHorizontal size={14} />
-          </IconButton>
-        }
-      />
+      <RowMenu label={it.name} items={standardMenu(it)} open={menuFor === it.id} onOpenChange={(o) => setMenuFor(o ? it.id : undefined)} />
     </div>
   );
 
   const top = shown.filter((i) => !i.folder);
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex items-center gap-1 pl-3 pr-1 h-9 shrink-0">
-        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted flex-1 truncate">{title}</span>
-        <IconButton label="New folder" onClick={() => void newFolder()}>
-          <FolderPlus size={14} />
-        </IconButton>
-        <IconButton label={addLabel} onClick={() => onAdd()}>
-          <Plus size={14} />
-        </IconButton>
-      </div>
+      <TreeHeader title={title} count={items.length} addLabel={addLabel} onAdd={() => onAdd()} menu={[{ label: 'New folder', icon: <FolderPlus size={14} />, onSelect: () => void newFolder() }]} />
       {items.length > 0 && (
         <div className="px-2 pb-2 shrink-0">
           <Input className="w-full h-7 min-h-7 text-sm" placeholder={`Filter ${itemNoun}s`} aria-label={`Filter ${itemNoun}s`} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -198,30 +161,9 @@ export function FolderList({
           const open = !!ql || !collapsed[f];
           return (
             <div key={`folder:${f}`}>
-              <div
-                {...dropProps(f)}
-                onContextMenu={(e) => (e.preventDefault(), setMenuFor(`folder:${f}`))}
-                className={cx('group flex items-center gap-1.5 px-2 h-8 text-sm cursor-pointer select-none', dropTarget === f ? 'bg-accent-soft ring-1 ring-accent' : 'hover:bg-hover', menuFor === `folder:${f}` && 'bg-hover')}
-                onClick={() => toggle(f)}
-              >
-                {open ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
-                {open ? <FolderOpen size={14} className="text-muted" /> : <Folder size={14} className="text-muted" />}
-                <span className="truncate flex-1">{f}</span>
-                <span className="text-xs text-muted">{inFolder.length}</span>
-                <Menu
-                  open={menuFor === `folder:${f}`}
-                  onOpenChange={(o) => setMenuFor(o ? `folder:${f}` : undefined)}
-                  width={210}
-                  items={folderMenu(f)}
-                  trigger={
-                    <IconButton label={`Actions for folder ${f}`} className={cx('h-6 w-6', menuFor === `folder:${f}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')} onClick={(e) => e.stopPropagation()}>
-                      <MoreHorizontal size={14} />
-                    </IconButton>
-                  }
-                />
-              </div>
+              <TreeFolderRow {...dropProps(f)} dropTarget={dropTarget === f} name={f} count={inFolder.length} open={open} onToggle={() => toggle(f)} menu={folderMenu(f)} />
               {open && inFolder.map((it) => row(it, true))}
-              {open && !inFolder.length && <div className="pl-9 py-1 text-xs text-muted">Empty: drag a {itemNoun} here or use Move to folder.</div>}
+              {open && !inFolder.length && <div className="pl-9 py-1 text-xs text-muted">Empty folder: drag a {itemNoun} here or use Move to folder.</div>}
             </div>
           );
         })}

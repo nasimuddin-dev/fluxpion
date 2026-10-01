@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, Folder, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -11,7 +11,8 @@ import { ExportDialog } from './ExportDialog';
 import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
-import { Button, cx, IconButton, Input, Menu, menuKeys, rowActionClass, type MenuItem } from './ui';
+import { Button, cx, IconButton, Input, Menu, menuKeys, type MenuItem } from './ui';
+import { askFolderName, folderMenuItems, moveToFolderItem, RowAdd, RowMenu, TreeFolderRow } from './TreeParts';
 
 /**
  * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
@@ -90,22 +91,8 @@ function Section({
           <span className="text-[0.82rem] font-semibold truncate">{title}</span>
           {count !== undefined && count > 0 && <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{count}</span>}
         </button>
-        {onAdd && (
-          <IconButton label={addLabel ?? 'New'} className={rowActionClass(true)} onClick={onAdd}>
-            <Plus size={14} />
-          </IconButton>
-        )}
-        <Menu
-          width={230}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-          trigger={
-            <button aria-label={`More actions for ${title}`} className={rowActionClass(true)}>
-              <MoreHorizontal size={14} />
-            </button>
-          }
-          items={items}
-        />
+        {onAdd && <RowAdd label={addLabel ?? 'New'} onClick={onAdd} header />}
+        <RowMenu label={title} items={items} open={menuOpen} onOpenChange={setMenuOpen} header />
       </div>
       {open && <div className="pb-2">{children}</div>}
     </div>
@@ -129,51 +116,7 @@ function Row({ icon, label, sub, onClick, title, active, menu, drag, indent }: {
         <span className="truncate flex-1">{label}</span>
         {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}
       </button>
-      {menu && (
-        <Menu
-          width={230}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-          trigger={
-            <button aria-label={`More actions for ${label}`} className={rowActionClass()}>
-              <MoreHorizontal size={14} />
-            </button>
-          }
-          items={menu}
-        />
-      )}
-    </div>
-  );
-}
-
-/** A folder in a section (MCP servers, API definitions), drawn like a collection's folder: chevron, folder icon, name, count and a ⋯ menu (also on right-click). */
-function FolderRow({ name, count, open, onToggle, menu }: { name: string; count: number; open: boolean; onToggle(): void; menu: MenuItem[] }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  return (
-    <div
-      className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 pl-5 transition-colors', menuOpen && 'bg-hover')}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setMenuOpen(true);
-      }}
-    >
-      <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={onToggle} aria-expanded={open} data-tree-row>
-        {open ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
-        <Folder size={13} className="text-muted shrink-0" />
-        <span className="truncate flex-1">{name}</span>
-        <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{count}</span>
-      </button>
-      <Menu
-        width={230}
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        trigger={
-          <button aria-label={`More actions for ${name}`} className={rowActionClass()}>
-            <MoreHorizontal size={14} />
-          </button>
-        }
-        items={menu}
-      />
+      {menu && <RowMenu label={label} items={menu} open={menuOpen} onOpenChange={setMenuOpen} />}
     </div>
   );
 }
@@ -548,50 +491,43 @@ export function Explorer() {
         return { folders: lib.folders, items: specs.map((p) => ({ id: p, name: p, folder: fn(p, now.get(p)) || undefined, data: null })).filter((i) => i.folder) };
       }),
   };
-  const askFolderName = async (title: string, value = '') => (await promptText(title, { message: 'Folder name', value, okLabel: value ? 'Rename' : 'Create' }))?.trim() || undefined;
-  const newFolder = async (ops: FolderOps, moveId?: string) => {
-    const name = await askFolderName('New folder');
-    if (!name) return;
-    await ops.setFolders((fs) => [...fs, name]);
-    if (moveId) await ops.assign((id, folder) => (id === moveId ? name : folder));
+  /** All folder names of a section: the kept ones and the ones its items are in. */
+  const folderNames = (ops: FolderOps, items: Array<{ folder?: string }>) => [...new Set([...ops.folders, ...items.map((i) => i.folder).filter((x): x is string => !!x)])].sort((a, b) => a.localeCompare(b));
+  const newFolder = async (ops: FolderOps) => {
+    const name = await askFolderName();
+    if (name) await ops.setFolders((fs) => [...fs, name]);
   };
-  /** The ⋯ menu of a folder: rename it, or remove it (its items stay, out of the folder). */
-  const folderMenu = (ops: FolderOps, name: string): MenuItem[] => [
-    {
-      label: 'Rename folder',
-      icon: <Pencil size={14} />,
-      onSelect: async () => {
-        const next = await askFolderName('Rename folder', name);
-        if (!next || next === name) return;
+  /** The ⋯ menu of a folder (the shared one): rename it, or delete it (its items move to the top level). */
+  const folderMenu = (ops: FolderOps, name: string, itemNoun: string, addLabel: string, onAdd: () => void): MenuItem[] =>
+    folderMenuItems({
+      name,
+      itemNoun,
+      addLabel,
+      onAdd,
+      rename: async (next) => {
         await ops.assign((_, folder) => (folder === name ? next : folder));
         await ops.setFolders((fs) => fs.map((x) => (x === name ? next : x)));
       },
-    },
-    {
-      label: 'Remove folder (keep its items)',
-      icon: <FolderX size={14} />,
-      separator: true,
-      onSelect: async () => {
+      remove: async () => {
         await ops.assign((_, folder) => (folder === name ? undefined : folder));
         await ops.setFolders((fs) => fs.filter((x) => x !== name));
       },
-    },
-  ];
-  /** "Move to folder" in an item's menu: the folders, a new one, or out of its folder. */
-  const moveToFolder = (ops: FolderOps, itemId: string, current: string | undefined): MenuItem => ({
-    label: 'Move to folder',
-    icon: <FolderInput size={14} />,
+    });
+  /** "Move to folder" in an item's menu (the shared one). */
+  const moveToFolder = (ops: FolderOps, all: Array<{ folder?: string }>, itemId: string, current: string | undefined): MenuItem => ({
+    ...moveToFolderItem({
+      folders: folderNames(ops, all),
+      current,
+      move: async (to) => {
+        if (to && !ops.folders.includes(to)) await ops.setFolders((fs) => [...fs, to]);
+        await ops.assign((id, folder) => (id === itemId ? to : folder));
+      },
+    }),
     separator: true,
-    onSelect: () => undefined,
-    items: [
-      ...ops.folders.filter((x) => x !== current).map((x) => ({ label: x, icon: <Folder size={14} />, onSelect: () => void ops.assign((id, folder) => (id === itemId ? x : folder)) })),
-      { label: 'New folder…', icon: <FolderPlus size={14} />, separator: ops.folders.some((x) => x !== current), onSelect: () => void newFolder(ops, itemId) },
-      ...(current ? [{ label: 'Out of the folder', icon: <FolderX size={14} />, onSelect: () => void ops.assign((id, folder) => (id === itemId ? undefined : folder)) }] : []),
-    ],
   });
   /** A section's items in their folders (like a collection's), then the ones in none. */
-  const renderFoldered = <T extends { id: string; folder?: string }>(section: string, items: T[], ops: FolderOps, row: (item: T, inFolder: boolean) => ReactNode) => {
-    const names = [...new Set([...ops.folders, ...items.map((i) => i.folder).filter((x): x is string => !!x)])].sort((a, b) => a.localeCompare(b));
+  const renderFoldered = <T extends { id: string; folder?: string }>(section: string, items: T[], ops: FolderOps, menuOf: (name: string) => MenuItem[], row: (item: T, inFolder: boolean) => ReactNode) => {
+    const names = folderNames(ops, items);
     return (
       <>
         {names.map((name) => {
@@ -601,7 +537,7 @@ export function Explorer() {
           const isOpen = !!f || sections.isOpen(key, true);
           return (
             <div key={key}>
-              <FolderRow name={name} count={inside.length} open={isOpen} onToggle={() => sections.toggle(key, true)} menu={folderMenu(ops, name)} />
+              <TreeFolderRow className="pl-5" name={name} count={inside.length} open={isOpen} onToggle={() => sections.toggle(key, true)} menu={menuOf(name)} />
               {isOpen && (inside.length ? inside.map((i) => row(i, true)) : <p className="pl-10 py-1 text-xs text-muted">Empty folder</p>)}
             </div>
           );
@@ -752,7 +688,7 @@ export function Explorer() {
 
         <Section id="mcp" title="MCP servers" icon={<Plug size={14} />} count={servers.length} sections={sections} def={servers.length > 0} forceOpen={!!f && shownServers.length > 0} addLabel="Add an MCP server" onAdd={() => intent('mcp', { addServer: true })} menu={[{ label: 'New folder', icon: <FolderPlus size={14} />, onSelect: () => void newFolder(mcpOps) }, { label: 'Open MCP inspector', icon: <ExternalLink size={14} />, onSelect: () => intent('mcp', {}) }]}>
           {servers.length || mcpFolders.length ? (
-            renderFoldered('mcp', shownServers, mcpOps, (s, inFolder) => (
+            renderFoldered('mcp', shownServers, mcpOps, (name) => folderMenu(mcpOps, name, 'server', 'Add an MCP server', () => intent('mcp', { addServer: true })), (s, inFolder) => (
               <Row
                 key={s.id}
                 indent={inFolder}
@@ -762,7 +698,7 @@ export function Explorer() {
                 title={`${s.name} (${s.connected ? 'connected' : 'not connected'})`}
                 active={openRequestId === s.id}
                 onClick={() => intent('mcp', { serverId: s.id })}
-                menu={withMove(serverMenu(s), moveToFolder(mcpOps, s.id, s.folder))}
+                menu={withMove(serverMenu(s), moveToFolder(mcpOps, servers, s.id, s.folder))}
               />
             ))
           ) : (
@@ -772,7 +708,7 @@ export function Explorer() {
 
         <Section id="specs" title="API definitions" icon={<FileCode2 size={14} />} count={specs.length} sections={sections} def={specs.length > 0} forceOpen={!!f && shownSpecs.length > 0} addLabel="Import an OpenAPI document" onAdd={importDefinition} menu={[{ label: 'New folder', icon: <FolderPlus size={14} />, onSelect: () => void newFolder(specOps) }, { label: 'Open API definitions', icon: <ExternalLink size={14} />, onSelect: () => intent('apidef', {}) }]}>
           {specs.length || specFolders.folders.length ? (
-            renderFoldered('specs', shownSpecs.map((p) => ({ id: p, folder: specFolderOf.get(p) })), specOps, ({ id: s, folder }, inFolder) => (
+            renderFoldered('specs', shownSpecs.map((p) => ({ id: p, folder: specFolderOf.get(p) })), specOps, (name) => folderMenu(specOps, name, 'API definition', 'Import an OpenAPI document', importDefinition), ({ id: s, folder }, inFolder) => (
               <Row
                 key={s}
                 indent={inFolder}
@@ -785,7 +721,7 @@ export function Explorer() {
                   { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'definition' }) },
                   { label: 'API coverage', icon: <ScanSearch size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'coverage' }) },
                   { label: 'Compare versions', icon: <GitCompare size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'compare' }) },
-                  moveToFolder(specOps, s, folder),
+                  moveToFolder(specOps, specFolders.items, s, folder),
                 ]}
               />
             ))
