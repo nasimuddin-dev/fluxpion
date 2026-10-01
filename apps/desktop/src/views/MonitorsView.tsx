@@ -453,6 +453,16 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
     if (!d.collectionId && collections[0]) setD((x) => ({ ...x, collectionId: collections[0]!.id }));
   }, [collections, d.collectionId]);
   const col = collections.find((c) => c.id === d.collectionId);
+  // what the monitor's recent runs measured, to help choose a response time limit
+  const [recentP95, setRecentP95] = useState<number[]>([]);
+  const monitorId = (draft as { id?: string }).id;
+  useEffect(() => {
+    if (!monitorId) return;
+    void call<MonitorResult[]>('monitor.results', { id: monitorId, limit: 20 }).then(
+      (r) => setRecentP95(r.map((x) => x.p95Ms).filter((v): v is number => typeof v === 'number').sort((a, b) => a - b)),
+      () => setRecentP95([]),
+    );
+  }, [monitorId]);
   const [realtime, setRealtime] = useState<Array<{ id: string; label: string; depth: number; folder: boolean }>>([]);
   useEffect(() => {
     let live = true;
@@ -578,6 +588,11 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
             <Input type="number" min={1} placeholder="e.g. 800" value={d.maxP95Ms ?? ''} onChange={(e) => setD({ ...d, maxP95Ms: e.target.value ? Math.max(1, Number(e.target.value)) : undefined })} aria-label="p95 response time limit in milliseconds" />
             <span className="text-sm text-muted shrink-0">ms (p95)</span>
           </div>
+          {recentP95.length > 0 && (
+            <p className="text-xs text-muted mt-1">
+              The last {recentP95.length === 1 ? 'run' : `${recentP95.length} runs`} measured p95 {recentP95.length === 1 ? formatMs(recentP95[0]!) : `${formatMs(recentP95[Math.floor((recentP95.length - 1) / 2)]!)} (median), ${formatMs(recentP95[recentP95.length - 1]!)} at worst`}.
+            </p>
+          )}
         </Field>
         <Field label="Alert webhook (optional)" hint="Posted when the monitor starts failing or passes again: a Slack, Teams or Discord incoming webhook, or any URL. {{variables}} of the environment work, so the URL can be a secret.">
           <div className="flex gap-2">
