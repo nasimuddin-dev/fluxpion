@@ -302,6 +302,16 @@ testpion docs api.postman_collection.json > API.md
 | `-o, --out <file>` | Write to a file instead of standard output. |
 | `--no-examples` | Leave out saved examples. |
 
+## `jwt`
+
+Decode a JSON Web Token: header, claims, when it was issued and when it expires. The signature is not verified. A `Bearer ` prefix is fine; `-` reads the token from standard input.
+
+```bash
+testpion jwt eyJhbGciOiJIUzI1NiJ9...
+curl -s https://auth.example.com/token | jq -r .access_token | testpion jwt -
+testpion jwt "$TOKEN" --json
+```
+
 ## `export` and `export-environment`
 
 Convert a collection to a Postman v2.1 collection, or write an environment in Postman's environment format. See [Export](/api-testing/collections#export) for what the Postman format can hold.

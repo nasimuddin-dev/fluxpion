@@ -74,7 +74,7 @@ The method, URL, query parameters, headers, cookies, body (JSON, form, multipart
 
 The left sidebar of the REST view has three panes, like Postman's:
 
-- **Collections:** the request tree, with a filter, **Import** and **New collection**. Right-click or use **⋯** on folders and requests for more actions.
+- **Collections:** the request tree, with a filter, **Import** and **New collection**. Every row has the same buttons: **+** (*New HTTP request*) and **⋯** on collections, **⋯** on folders and requests, and a right-click opens the same menu. An empty collection offers **New HTTP request**. Below the collections, **MCP servers** and **API definitions** have a **+** and a **⋯** too, and folders of their own: **⋯ ▸ New folder**, then **Move to folder** on a server or definition.
 - **Environments:** click an environment to make it active. **Edit** opens it, and **+** creates one.
 - **History:** your recent HTTP requests grouped by day, with a filter. Click one to open it in a new tab.
 
@@ -115,6 +115,7 @@ The status, duration, size, headers, cookies and a timeline are always shown. Th
 - **Table** appears when the JSON is an array of objects, or holds one up to three levels deep (such as `items`, `data.users`; the largest is used; GraphQL responses have it too): a column per key, click a header to sort (again to reverse), and filter rows by any cell. The first 500 rows are shown; **Copy CSV** copies every matching row. **Chart** (when a column holds numbers) draws one bar per row: choose the number and the label column; sorting and filtering apply. **Save as dataset** writes the rows to `datasets/<name>.csv` in the workspace (never overwriting), where the Collection Runner lists them next to *Select file* (agents use the same file with `run_collection`'s `data`).
 - **Raw** is a virtualised text view with search.
 - **Preview** renders HTML in a sandboxed frame.
+- **JWT** appears when the body or a header holds a JSON Web Token (an `access_token`, `id_token` or `Authorization` value): its header and claims, when it was issued and when it expires (*expires in 58 min*, or *expired 2 h ago*). The signature is not verified. A `jwt` check (see [Assertions](/test-runner/assertions)) tests the same in a test; `testpion jwt <token>` and the `decode_jwt` MCP tool decode one outside the app.
 
 The full body is streamed to `payloads/` on disk. The viewer only holds a preview, 2 MB by default and configurable in Settings. Larger bodies show a *truncated* badge; **Save response** exports the complete file.
 

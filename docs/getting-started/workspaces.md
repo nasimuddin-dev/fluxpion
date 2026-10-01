@@ -14,7 +14,7 @@ Click the workspace name at the top left (or right-click it) to open the switche
 - **Find a workspace:** type to filter by name or folder. **Enter** opens the first match.
 - Each workspace shows its folder. The open one is marked **current**.
 - Click a workspace to switch to it.
-- **New**, **Open folder** and **Import** are at the bottom. **Open folder** adds an existing workspace folder, such as a git checkout. **Import** takes a TestPion workspace export (it opens as a new workspace), or a Postman collection or environment, OpenAPI or HAR file (added to the open workspace).
+- **New**, **Open folder**, **Import** and **Export** are at the bottom. **Open folder** adds an existing workspace folder, such as a git checkout. **Import** takes a TestPion workspace export (it opens as a new workspace named *… (imported)*, with exactly the export's environments), or a Postman, Insomnia, Bruno or Hoppscotch collection, OpenAPI, HAR or `.env` file (added to the open workspace). **Export** saves the open workspace (collections, environments, tests, providers and MCP servers) to one `.json` file and says where; cancelling the save dialog does nothing. Secret values are never exported.
 
 ### Workspace actions
 
@@ -23,7 +23,7 @@ Hover a workspace and click **⋯**, or right-click it:
 | Action | What it does |
 |---|---|
 | **Open** | Switch to the workspace. |
-| **Rename…** | Rename it. This works for any workspace, not only the open one. |
+| **Rename** | Rename it. This works for any workspace, not only the open one. |
 | **Duplicate…** | Copy collections, environments, tests and settings into a new workspace and open it. Run history, traces and secret values are not copied. |
 | **Show in folder** | Open the workspace folder in your file manager. |
 | **Export…** | Save a workspace export file (secret values are never exported). |

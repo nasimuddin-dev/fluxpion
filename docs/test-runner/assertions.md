@@ -22,6 +22,7 @@ All checks share `type`, an optional `name`, and usually `path` (JSONPath such a
 | `type`, `length`, `threshold`, `greater-than`, `less-than` | `path`, `expected` / `min` / `max` |
 | `latency`, `tokens`, `cost` | `max` (`tokens` also takes `field: input\|output\|total`) |
 | `header` | `header`, `expected` |
+| `jwt` | A JSON Web Token in the response: from `header` (e.g. `Authorization`), from `path` (a JSONPath such as `$.access_token`), or the first one found. Fails when there is none, it has expired, or it expires within `min` seconds; `claims` must match (a list claim such as `aud` must contain the value). The signature is not verified. Example: `{ type: jwt, path: $.id_token, min: 300, claims: { iss: https://auth.example.com } }`. |
 | `certificate` | HTTPS: `min` days the server's TLS certificate must still be valid (default 14). Fails when it expires sooner or has expired; the message names the subject, issuer and date. Useful in [monitors](./monitors.md). |
 | `graphql-no-errors`, `graphql-errors` | `expected` (count or message) |
 | `grpc-status` | `expected`: a gRPC status name (`OK`, `NOT_FOUND` …), a code, or a list. Default `OK`. |

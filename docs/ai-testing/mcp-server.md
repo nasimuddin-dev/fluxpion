@@ -57,6 +57,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `collection_timing` | Where a collection's request time went (DNS, TCP, TLS, server, download; new vs reused connections). |
 | `collection_health` | How the requests of a collection are doing: per request its folder, method, whether it has checks, responses, failures, latest status and median time (failing first, then slowest). |
 | `run_breakdown` | A finished run in detail: tests per response-time range, results per type, slowest and flaky tests, most failed checks and evaluator scores. |
+| `decode_jwt` | Decode a JSON Web Token (header, claims, issued / expires / not before, seconds left, expired); the signature is not verified. |
 | `compare_runs` | What changed between two runs: new failures, fixed tests, slower tests, new and removed tests and the change of totals; `passed` is false when something regressed. |
 | `list_datasets` | Data files in the workspace's `datasets/` folder (path, format, size; tables of SQLite databases), to pass to `run_collection` as `data`. |
 | `load_history` | Earlier load tests (from the app and `load_test`), newest first: target, virtual users, throughput, error rate, p50 / p95 / p99 and pass rules. |
