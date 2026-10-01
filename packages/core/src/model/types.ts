@@ -182,7 +182,7 @@ export type McpServerConfig = { id: string; name: string; /** Folder in the MCP 
 
 /* ------------------------------------------------------------------ ai */
 
-export type ProviderKind = 'openai-compatible' | 'azure-openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
+export type ProviderKind = 'openai-compatible' | 'azure-openai' | 'anthropic' | 'gemini' | 'bedrock' | 'ollama' | 'mock';
 
 export interface RateLimitConfig {
   requestsPerSecond?: number;
@@ -202,6 +202,8 @@ export interface ProviderConfig {
   embeddingModel?: string;
   /** Azure OpenAI api-version, Anthropic version header, etc. */
   apiVersion?: string;
+  /** AWS region (Amazon Bedrock); defaults to the one in the base URL. */
+  region?: string;
   headers?: KeyValue[];
   rateLimit?: RateLimitConfig;
   timeoutMs?: number;

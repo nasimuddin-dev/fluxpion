@@ -69,6 +69,7 @@ export * from './report/response-diff.js';
 export * from './report/response-stats.js';
 export * from './report/collection-html.js';
 export * from './ai/app-provider.js';
+export { bedrockCredentials, bedrockRegion } from './ai/providers/bedrock.js';
 export * from './storage/history-compare.js';
 export * from './storage/history-har.js';
 export * from './storage/variable-refactor.js';

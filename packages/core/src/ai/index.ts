@@ -4,6 +4,7 @@ import type { ChatRequest, ChatResponse, LlmProvider } from './types.js';
 import { OpenAICompatibleProvider } from './providers/openai.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { GeminiProvider } from './providers/gemini.js';
+import { BedrockProvider } from './providers/bedrock.js';
 import { MockProvider } from './providers/mock.js';
 import { RateLimiter, Semaphore, withRetry } from '../util/concurrency.js';
 import type { Redactor } from '../util/redact.js';
@@ -16,6 +17,7 @@ export const DEFAULT_BASE_URLS: Record<string, string> = {
   'azure-openai': 'https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT',
   anthropic: 'https://api.anthropic.com',
   gemini: 'https://generativelanguage.googleapis.com',
+  bedrock: 'https://bedrock-runtime.us-east-1.amazonaws.com',
   ollama: 'http://127.0.0.1:11434/v1',
   mock: 'mock://local',
 };
@@ -82,6 +84,9 @@ export function createProvider(config: ProviderConfig, apiKey: string | undefine
       break;
     case 'gemini':
       p = new GeminiProvider({ ...config, baseUrl: config.baseUrl || DEFAULT_BASE_URLS.gemini! }, apiKey, redactor);
+      break;
+    case 'bedrock':
+      p = new BedrockProvider({ ...config, baseUrl: config.baseUrl || DEFAULT_BASE_URLS.bedrock! }, apiKey, redactor);
       break;
     case 'mock':
       p = new MockProvider(config);

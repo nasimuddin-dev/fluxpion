@@ -32,10 +32,11 @@ The Playground's **Saved prompts** list keeps prompts with their model, paramete
 | Azure OpenAI | Deployment URL plus `api-version`. |
 | Anthropic | Messages API. |
 | Google Gemini | `generateContent` / `streamGenerateContent`. |
+| Amazon Bedrock | The Converse API, so every Bedrock model works the same way (text, system prompt, tools). The key is `accessKeyId:secretAccessKey` (add `:sessionToken` for temporary credentials), signed with AWS Signature V4, or a Bedrock API key. Set the region (or use a `bedrock-runtime.<region>` base URL). Answers arrive whole rather than streamed. Embeddings use Titan (default) or Cohere models. |
 | Ollama | Local, OpenAI-compatible endpoint. |
 | Mock | Offline and deterministic, with configurable rules. |
 
-AWS Bedrock is not built in; use an OpenAI-compatible gateway in front of it. Providers support per-provider rate limits (requests per second or minute, tokens per minute, concurrency) and retries with exponential backoff that honour `Retry-After`.
+Providers support per-provider rate limits (requests per second or minute, tokens per minute, concurrency) and retries with exponential backoff that honour `Retry-After`.
 
 ## Metrics
 

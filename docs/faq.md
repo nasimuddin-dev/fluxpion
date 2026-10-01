@@ -15,7 +15,7 @@ No. Requests go only to the servers you call, and prompts only to the AI provide
 
 ## Which AI providers are supported?
 
-OpenAI and any OpenAI-compatible server (vLLM, LM Studio, OpenRouter and others), Azure OpenAI, Anthropic, Google Gemini, Ollama for local models, and a built-in offline mock. AWS Bedrock works through an OpenAI-compatible gateway. See [AI testing](/ai-testing/overview).
+OpenAI and any OpenAI-compatible server (vLLM, LM Studio, OpenRouter and others), Azure OpenAI, Anthropic, Google Gemini, Amazon Bedrock (any model, through the Converse API), Ollama for local models, and a built-in offline mock. See [AI testing](/ai-testing/overview).
 
 ## Do I need an internet connection?
 

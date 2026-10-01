@@ -600,7 +600,7 @@ function Compare({ providers }: { providers: ProviderConfig[] }) {
 function NoProviders() {
   return (
     <Empty icon={<WifiOff size={26} />} title="No AI providers configured">
-      Add an OpenAI-compatible, Azure OpenAI, Anthropic, Gemini or Ollama provider in the Providers tab. The built-in "mock" provider works fully offline.
+      Add an OpenAI-compatible, Azure OpenAI, Anthropic, Gemini, Amazon Bedrock or Ollama provider in the Providers tab. The built-in "mock" provider works fully offline.
     </Empty>
   );
 }
@@ -610,6 +610,7 @@ const KINDS: Array<[ProviderConfig['kind'], string, string]> = [
   ['azure-openai', 'Azure OpenAI', 'https://RESOURCE.openai.azure.com/openai/deployments/DEPLOYMENT'],
   ['anthropic', 'Anthropic', 'https://api.anthropic.com'],
   ['gemini', 'Google Gemini', 'https://generativelanguage.googleapis.com'],
+  ['bedrock', 'Amazon Bedrock', 'https://bedrock-runtime.us-east-1.amazonaws.com'],
   ['ollama', 'Ollama (local)', 'http://127.0.0.1:11434/v1'],
   ['mock', 'Mock (offline, deterministic)', 'mock://local'],
 ];
@@ -713,7 +714,7 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
             </Field>
             {p.kind !== 'mock' && (
               <Field label="API key" hint={p.hasKey ? 'A key is stored in the OS credential store. Type to replace it.' : 'Stored encrypted in the OS credential store — never in workspace files. You can also reference {{$env.NAME}} in the field below.'}>
-                <Input type="password" placeholder={p.hasKey ? '••••••••••••' : 'sk-…'} value={keys[p.id] ?? ''} onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })} />
+                <Input type="password" placeholder={p.hasKey ? '••••••••••••' : p.kind === 'bedrock' ? 'accessKeyId:secretAccessKey[:sessionToken] or a Bedrock API key' : 'sk-…'} value={keys[p.id] ?? ''} onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })} />
               </Field>
             )}
             {p.kind !== 'mock' && (
@@ -728,6 +729,11 @@ function Providers({ providers, onSaved }: { providers: ProviderConfig[]; onSave
               <Field label="Embedding model">
                 <Input className="mono" value={p.embeddingModel ?? ''} onChange={(e) => upd({ embeddingModel: e.target.value || undefined })} />
               </Field>
+              {p.kind === 'bedrock' && (
+                <Field label="AWS region" hint="Used to sign requests; defaults to the region in the base URL.">
+                  <Input className="mono" value={p.region ?? ''} placeholder="us-east-1" onChange={(e) => upd({ region: e.target.value || undefined, ...(e.target.value && /bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com/.test(p.baseUrl) ? { baseUrl: `https://bedrock-runtime.${e.target.value}.amazonaws.com` } : {}) })} />
+                </Field>
+              )}
               {(p.kind === 'azure-openai' || p.kind === 'anthropic') && (
                 <Field label="API version">
                   <Input className="mono" value={p.apiVersion ?? ''} placeholder={p.kind === 'anthropic' ? '2023-06-01' : '2024-10-21'} onChange={(e) => upd({ apiVersion: e.target.value || undefined })} />

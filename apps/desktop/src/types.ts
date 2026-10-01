@@ -282,8 +282,9 @@ export interface RunSummary {
 export interface ProviderConfig {
   id: string;
   name: string;
-  kind: 'openai-compatible' | 'azure-openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
+  kind: 'openai-compatible' | 'azure-openai' | 'anthropic' | 'gemini' | 'bedrock' | 'ollama' | 'mock';
   baseUrl: string;
+  region?: string;
   apiKey?: string;
   defaultModel?: string;
   embeddingModel?: string;
