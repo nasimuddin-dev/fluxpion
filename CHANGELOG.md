@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breadcrumb above the request**: *Collection › Folder › Request* shows where the open REST request is saved (click the collection for its settings, runner and docs), with *unsaved changes* when there are any; a request that isn't in a collection says so, with **Save**. It follows renames and moves made in the sidebar.
+
 ## 0.18.0 — 2026-09-30
 
 Highlights: fixes for duplicated collections, expanding in the sidebar and Import from menus; Import and Export buttons in the sidebar; duplicate, rename and delete collections from their menu; drag gRPC calls and connections between collections; `testpion collections` / `requests`; notifications when runs finish.
