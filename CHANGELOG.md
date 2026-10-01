@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.20.0 — 2026-09-30
+
+Highlights: the sidebar reveals what you open and works from the keyboard; Insomnia imports bring gRPC and WebSocket requests; monitors can watch gRPC calls and connections; one shared collection list makes large workspaces lighter.
 
 - **Copy from the sidebar**: a gRPC call's menu has *Copy as grpcurl* and a connection's *Copy URL* (`{{variables}}` resolved), like *Copy as cURL* on requests.
 - **Monitors can watch gRPC calls and connections**: *What to run* lists the collection's gRPC calls and connections after its requests, so a monitor can check just those.
