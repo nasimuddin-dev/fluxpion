@@ -7,7 +7,7 @@ import { SidebarShell } from '../components/SidebarShell';
 import { useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
-import { useIntent } from '../hooks';
+import { useIntent, useSaveShortcut } from '../hooks';
 import type { KeyValue } from '../types';
 import { CodeEditor } from '../components/CodeEditor';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -121,6 +121,8 @@ export function GrpcView() {
     if (!name) return;
     setSavedId(await saved.put({ name, folder, collectionId, data: d }));
   };
+  // Ctrl+S saves this tab's call (asks for a name the first time)
+  useSaveShortcut('grpc', () => void saveRequest());
   // History → open: fill in the address, method, message and metadata
   useIntent('grpc', (p) => {
     if (p?.collectionId && !p.savedId) setCollectionId(p.collectionId as string);

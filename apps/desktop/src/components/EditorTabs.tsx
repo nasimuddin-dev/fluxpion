@@ -267,7 +267,7 @@ function defaultTabMenu(t: EditorTab, all: EditorTab[]): MenuItem[] {
 /** Every tab's menu, the same for every kind of request. */
 const tabMenu = defaultTabMenu;
 
-const ORDER: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp'];
+const ORDER: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp', 'apidef'];
 const TAB_W = 190;
 
 export function EditorTabStrip() {

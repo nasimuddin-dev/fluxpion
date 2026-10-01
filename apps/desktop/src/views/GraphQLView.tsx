@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { parse, print } from 'graphql';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
-import { useIntent, useSendShortcut } from '../hooks';
+import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
 import { setGraphQLSchema } from '../monaco';
 import type { AuthConfig, CheckConfig, CheckResult, Collection, HttpRequestSpec, HttpResponseData, KeyValue, SavedGraphQLRequest } from '../types';
 import { CodeModal } from '../components/CodeModal';
@@ -306,16 +306,7 @@ export function GraphQLView() {
     useApp.getState().toast('Saved to collection', 'success');
   };
 
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'graphql' && docActive) {
-        e.preventDefault();
-        void save();
-      }
-    };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  });
+  useSaveShortcut('graphql', () => void save());
 
   const prettify = () => {
     try {

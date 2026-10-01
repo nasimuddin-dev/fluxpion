@@ -183,6 +183,24 @@ export function Spinner({ size = 14 }: { size?: number }) {
   return <Loader2 size={size} className="spin text-muted" />;
 }
 
+/** A dialog, or the same content inline in an editor tab (its actions then sit in a toolbar on top). */
+export function ModalOrPanel({ inline, title, onClose, width, footer, children }: { inline?: boolean; title: ReactNode; onClose(): void; width?: number; footer?: ReactNode; children: ReactNode }) {
+  if (!inline)
+    return (
+      <Modal title={title} onClose={onClose} width={width} footer={footer}>
+        {children}
+      </Modal>
+    );
+  return (
+    <div className="h-full overflow-auto">
+      <div className="p-4 flex flex-col gap-3 max-w-6xl">
+        {footer && <div className="flex flex-wrap items-center justify-end gap-2">{footer}</div>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** Accessible dialog (focus trap, Escape, click outside) with an open animation. Mount it to show it. */
 export function Modal({ title, onClose, children, footer, width = 560 }: { title: ReactNode; onClose(): void; children: ReactNode; footer?: ReactNode; width?: number }) {
   return (

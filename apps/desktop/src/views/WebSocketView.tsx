@@ -9,7 +9,7 @@ import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
 import { useDoc } from '../lib/docs';
-import { useIntent } from '../hooks';
+import { useIntent, useSaveShortcut } from '../hooks';
 import type { KeyValue } from '../types';
 import { CodeEditor } from '../components/CodeEditor';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -115,6 +115,8 @@ export function WebSocketView() {
     if (!name) return;
     setSavedId(await saved.put({ name, folder, collectionId, data: persistable(d) }));
   };
+  // Ctrl+S saves this tab's connection (asks for a name the first time)
+  useSaveShortcut('websocket', () => void save());
   const sessionRef = useRef<string | undefined>(undefined);
   sessionRef.current = session;
   useEffect(() => docDrafts.save(persistable(d)), [d, docDrafts]);

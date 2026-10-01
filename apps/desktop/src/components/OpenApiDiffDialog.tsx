@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { useApp } from '../store';
 import { pickTextFile } from '../lib/files';
-import { Button, Field, Input, Modal, Select } from './ui';
+import { Button, cx, Field, Input, ModalOrPanel, Select } from './ui';
 
 interface ApiChange {
   level: 'breaking' | 'non-breaking';
@@ -67,7 +67,7 @@ export function SidePicker({ label, specs, value, onChange }: { label: string; s
 }
 
 /** Compare two OpenAPI versions and list what can break clients (same engine as `testpion openapi-diff`). */
-export function OpenApiDiffDialog({ onClose }: { onClose(): void }) {
+export function OpenApiDiffDialog({ onClose, inline, before: fixedBefore }: { onClose(): void; /** In an API definition's tab, comparing that document (the previous version) with another. */ inline?: boolean; before?: string }) {
   const [specs, setSpecs] = useState<string[]>([]);
   const [before, setBefore] = useState<Side>({ path: undefined });
   const [after, setAfter] = useState<Side>({ path: undefined });
@@ -76,8 +76,10 @@ export function OpenApiDiffDialog({ onClose }: { onClose(): void }) {
   useEffect(() => {
     void call<string[]>('openapi.specs').then((s) => {
       setSpecs(s);
-      setBefore({ path: s[0] });
-      setAfter(s.length > 1 ? { path: s[1] } : { url: '' });
+      const first = fixedBefore ?? s[0];
+      setBefore({ path: first });
+      const other = s.find((x) => x !== first);
+      setAfter(other ? { path: other } : { url: '' });
     });
   }, []);
   const ready = (s: Side) => !!(s.path || s.url?.trim() || s.text);
@@ -93,7 +95,8 @@ export function OpenApiDiffDialog({ onClose }: { onClose(): void }) {
     }
   };
   return (
-    <Modal
+    <ModalOrPanel
+      inline={inline}
       title="Compare OpenAPI versions"
       onClose={onClose}
       width={760}
@@ -105,10 +108,16 @@ export function OpenApiDiffDialog({ onClose }: { onClose(): void }) {
     >
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted">Lists what can break existing clients: removed operations or success responses, new required parameters or body fields, changed types, removed or now-optional response fields. In CI: <span className="mono">testpion openapi-diff old new --fail-on-breaking</span>.</p>
-        <SidePicker label="Previous version" specs={specs} value={before} onChange={setBefore} />
+        {fixedBefore ? (
+          <p className="text-sm">
+            Previous version: <span className="mono">{fixedBefore}</span>
+          </p>
+        ) : (
+          <SidePicker label="Previous version" specs={specs} value={before} onChange={setBefore} />
+        )}
         <SidePicker label="New version" specs={specs} value={after} onChange={setAfter} />
         {result && (
-          <div className="flex flex-col gap-2 max-h-[46vh] overflow-auto">
+          <div className={cx('flex flex-col gap-2 overflow-auto', !inline && 'max-h-[46vh]')}>
             <div className="text-sm text-muted flex items-center gap-2">
               {result.operations.old} → {result.operations.new} operations ({result.operations.added} added, {result.operations.removed} removed)
               {!!(result.breaking.length + result.nonBreaking.length) && (
@@ -161,6 +170,6 @@ export function OpenApiDiffDialog({ onClose }: { onClose(): void }) {
           </div>
         )}
       </div>
-    </Modal>
+    </ModalOrPanel>
   );
 }

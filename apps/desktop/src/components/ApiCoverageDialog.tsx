@@ -4,7 +4,7 @@ import { asError, call } from '../api';
 import { useApp } from '../store';
 import { download } from '../lib/format';
 import { SidePicker, type Side } from './OpenApiDiffDialog';
-import { Badge, Button, cx, Field, Input, Metric, MetricGrid, Modal, Select, Toggle } from './ui';
+import { Badge, Button, cx, Field, Input, Metric, MetricGrid, ModalOrPanel, Select, Toggle } from './ui';
 
 interface OperationCoverage {
   method: string;
@@ -39,7 +39,7 @@ type Filter = 'all' | 'gaps' | 'uncovered';
  * API coverage (same engine as `testpion coverage` and the api_coverage MCP tool): which operations
  * and documented responses of an OpenAPI document the test runs and request history exercised.
  */
-export function ApiCoverageDialog({ runId, spec: initialSpec, onClose }: { runId?: string; spec?: string; onClose(): void }) {
+export function ApiCoverageDialog({ runId, spec: initialSpec, onClose, inline }: { runId?: string; spec?: string; onClose(): void; /** In an API definition's tab: that document, no dialog. */ inline?: boolean }) {
   const [specs, setSpecs] = useState<string[]>([]);
   const [spec, setSpec] = useState<Side>({ path: undefined });
   const [useRun, setUseRun] = useState(true);
@@ -95,7 +95,8 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose }: { runId
   const s = result?.report.summary;
   const tone = (p: number) => (p >= 80 ? 'ok' : p >= 50 ? 'warn' : 'bad');
   return (
-    <Modal
+    <ModalOrPanel
+      inline={inline}
       title="API coverage"
       onClose={onClose}
       width={880}
@@ -121,7 +122,7 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose }: { runId
         <p className="text-sm text-muted">
           Which operations and documented responses of an OpenAPI document your tests and requests exercised, and which they never did. In CI: <span className="mono">testpion coverage specs/api.yaml --min 80</span>.
         </p>
-        <SidePicker label="OpenAPI document" specs={specs} value={spec} onChange={setSpec} />
+        {!(inline && initialSpec) && <SidePicker label="OpenAPI document" specs={specs} value={spec} onChange={setSpec} />}
         <div className="flex flex-wrap items-end gap-4">
           <Toggle checked={useRun} onChange={setUseRun} label={runId ? 'This run' : 'Latest run'} />
           <Toggle checked={history} onChange={setHistory} label="Request history (last 1,000)" />
@@ -146,7 +147,7 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose }: { runId
                 <option value="uncovered">Never called</option>
               </Select>
             </div>
-            <div className="max-h-[42vh] overflow-auto rounded-lg border border-line">
+            <div className={cx('overflow-auto rounded-lg border border-line', !inline && 'max-h-[42vh]')}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-panel text-xs text-muted text-left">
                   <tr>
@@ -220,6 +221,6 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose }: { runId
           </div>
         )}
       </div>
-    </Modal>
+    </ModalOrPanel>
   );
 }

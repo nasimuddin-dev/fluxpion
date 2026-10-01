@@ -45,3 +45,22 @@ export function useSendShortcut(view: ViewId, fn: () => void): void {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [view]);
 }
+
+/** Save on Ctrl/Cmd+S while this view (and, in a multi-document editor, this tab) is on screen. */
+export function useSaveShortcut(view: ViewId, fn: () => void): void {
+  const f = useRef(fn);
+  f.current = fn;
+  const doc = useDoc();
+  const active = useRef(doc.active);
+  active.current = doc.active;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's' && useApp.getState().view === view && active.current) {
+        e.preventDefault();
+        f.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [view]);
+}

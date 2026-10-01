@@ -7,7 +7,7 @@ import type { ViewId } from '../store';
  * own instance of the editor, with its own draft, response and connection. The first document of each
  * editor is `main` (it keeps the draft saved before tabs existed).
  */
-export const DOC_VIEWS: ViewId[] = ['graphql', 'grpc', 'websocket', 'mcp'];
+export const DOC_VIEWS: ViewId[] = ['graphql', 'grpc', 'websocket', 'mcp', 'apidef'];
 export const isDocView = (v: ViewId) => DOC_VIEWS.includes(v);
 
 /** Which document an editor instance is, and whether it's the one on screen. */
@@ -99,7 +99,7 @@ export function routeDoc(view: ViewId, payload: Record<string, unknown> | undefi
   const s = useDocs.getState();
   const p = payload ?? {};
   if (p.newDoc || p.reset || p.addServer) return s.newDoc(view);
-  const item = (p.requestId ?? p.savedId ?? p.serverId) as string | undefined;
+  const item = (p.requestId ?? p.savedId ?? p.serverId ?? p.spec) as string | undefined;
   if (item) {
     const found = (s.docs[view] ?? []).find((d) => s.items[`${view}:${d}`] === item);
     if (found) {

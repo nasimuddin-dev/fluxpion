@@ -30,6 +30,9 @@ import {
 } from '@testpion/core';
 import type { Backend, Handlers, CollectionRunParams } from '../backend.js';
 
+/** An API definition's workspace path: a JSON or YAML file directly in specs/. */
+const SPEC_PATH = /^specs\/[^/\\]+\.(json|ya?ml)$/i;
+
 export function collectionsHandlers(be: Backend): Handlers {
   return {
     'col.list': () => be.ws.listCollections(),
@@ -153,6 +156,17 @@ export function collectionsHandlers(be: Backend): Handlers {
     'openapi.specs': () => {
       const dir = be.ws.path('specs');
       return existsSync(dir) ? readdirSync(dir).filter((f) => /\.(json|ya?ml)$/i.test(f)).map((f) => `specs/${f}`) : [];
+    },
+    /** The text of an OpenAPI document kept in the workspace (specs/), for its editor tab. */
+    'openapi.spec.get': ({ path }: { path: string }) => {
+      if (!SPEC_PATH.test(path)) throw new ApsError('ValidationError', `Not an API definition in specs/: ${path}`);
+      return { path, text: readFileSync(be.ws.safePath(path), 'utf8') };
+    },
+    /** Save an OpenAPI document edited in its tab (only files in specs/). */
+    'openapi.spec.save': ({ path, text }: { path: string; text: string }) => {
+      if (!SPEC_PATH.test(path)) throw new ApsError('ValidationError', `Not an API definition in specs/: ${path}`);
+      writeFileSync(be.ws.safePath(path), text);
+      return { path };
     },
     /** Breaking and other changes between two OpenAPI versions; each side is a workspace path, a link or the text. */
     'openapi.diff': async ({ old, new: next }: { old: { path?: string; url?: string; text?: string }; new: { path?: string; url?: string; text?: string } }) => {

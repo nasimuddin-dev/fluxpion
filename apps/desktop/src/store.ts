@@ -11,6 +11,7 @@ export type ViewId =
   | 'websocket'
   | 'grpc'
   | 'mcp'
+  | 'apidef'
   | 'ai'
   | 'evaluations'
   | 'tests'
@@ -134,7 +135,7 @@ interface AppState {
 let toastId = 0;
 
 /** The request editors: they use the Collections explorer as their (only) sidebar and aren't on the rail. */
-export const REQUEST_VIEWS: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp', 'collections'];
+export const REQUEST_VIEWS: ViewId[] = ['rest', 'graphql', 'grpc', 'websocket', 'mcp', 'apidef', 'collections'];
 export const isRequestView = (v: ViewId) => REQUEST_VIEWS.includes(v);
 
 /** A place in the app: a view, and the item opened in it when there is one. */

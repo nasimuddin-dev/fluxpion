@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
 import { useDoc, useDocs } from '../lib/docs';
-import { useIntent, useSendShortcut } from '../hooks';
+import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, McpServerConfig } from '../types';
 import { formatMs, uid, plural } from '../lib/format';
 import { AssertionEditor } from '../components/AssertionEditor';
@@ -226,16 +226,7 @@ export function McpView() {
     await saveServers(servers.filter((s) => s.id !== current.id));
     setSelected(undefined);
   };
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'mcp' && active && form) {
-        e.preventDefault();
-        void saveForm();
-      }
-    };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  });
+  useSaveShortcut('mcp', () => void saveForm());
 
   // this editor's tab in the shared tab strip (while a server is selected)
   useSingleEditorTab(

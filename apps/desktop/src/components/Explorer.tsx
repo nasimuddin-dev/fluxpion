@@ -463,19 +463,17 @@ export function Explorer() {
         <Section id="specs" title="API definitions" icon={<FileCode2 size={14} />} count={specs.length} sections={sections} def={specs.length > 0} forceOpen={!!f && shownSpecs.length > 0} addLabel="Import an OpenAPI document" onAdd={importDefinition}>
           {specs.length ? (
             shownSpecs.map((s) => (
-              <Menu
+              <Row
                 key={s}
-                width={220}
-                align="start"
-                trigger={
-                  <button className="w-[calc(100%-0.5rem)] mx-1 flex items-center gap-2 h-7 pl-6 pr-2 rounded-md text-sm text-left hover:bg-hover data-[state=open]:bg-hover">
-                    <FileCode2 size={13} className="text-muted shrink-0" />
-                    <span className="truncate">{s.replace(/^specs\//, '')}</span>
-                  </button>
-                }
-                items={[
-                  { label: 'API coverage', icon: <ScanSearch size={14} />, onSelect: () => useApp.getState().set({ apiCoverage: { spec: s } }) },
-                  { label: 'Compare versions', icon: <GitCompare size={14} />, onSelect: () => useApp.getState().set({ openapiDiff: true }) },
+                icon={<FileCode2 size={13} />}
+                label={s.replace(/^specs\//, '')}
+                title={s}
+                active={openRequestId === s}
+                onClick={() => intent('apidef', { spec: s })}
+                menu={[
+                  { label: 'Open', icon: <FileCode2 size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'definition' }) },
+                  { label: 'API coverage', icon: <ScanSearch size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'coverage' }) },
+                  { label: 'Compare versions', icon: <GitCompare size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'compare' }) },
                 ]}
               />
             ))
