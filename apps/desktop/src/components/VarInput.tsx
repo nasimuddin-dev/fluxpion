@@ -1,8 +1,10 @@
+import { Copy, KeyRound, Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { call } from '../api';
+import { createPortal } from 'react-dom';
+import { asError, call } from '../api';
 import { useApp } from '../store';
 import { dynamicVariables } from '../editor-intel';
-import { cx, useDebounced } from './ui';
+import { Button, cx, useDebounced } from './ui';
 
 interface VarInfo {
   name: string;
@@ -13,7 +15,8 @@ interface VarInfo {
 
 /**
  * Single-line input that highlights {{variables}} (resolved = blue, unresolved = red), shows where
- * each value comes from on hover, and autocompletes variable names after typing `{{`.
+ * each value comes from on hover, autocompletes variable names after typing `{{`, and shows a
+ * variable's value (to copy, edit or add to the environment) when it's clicked.
  * Uses an overlay so the native input keeps full editing behaviour.
  */
 export function VarInput({
@@ -49,11 +52,33 @@ export function VarInput({
   const debounced = useDebounced(value, 300);
   const overlay = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  // the variable whose popover is open (clicked in the field), and where to show it
+  const [pop, setPop] = useState<{ name: string; x: number; y: number } | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     if (!/\{\{/.test(debounced)) return setVars({});
     void call<VarInfo[]>('vars.inspect', { environment: env, collectionId, template: debounced }).then((list) => setVars(Object.fromEntries(list.map((v) => [v.name, v]))));
-  }, [debounced, env, collectionId]);
+  }, [debounced, env, collectionId, refresh]);
+
+  /** A click inside a {{variable}} opens its popover. */
+  const openAtCaret = () => {
+    const el = input.current;
+    if (!el || el.selectionStart !== el.selectionEnd) return;
+    const caret = el.selectionStart ?? 0;
+    for (const m of value.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) {
+      const start = m.index ?? 0;
+      if (caret > start && caret < start + m[0].length) {
+        const token = overlay.current?.querySelector<HTMLElement>(`[data-var="${start}"]`);
+        // shown on top of everything (fixed), under the clicked variable, so no pane can clip it
+        const r = (token ?? box.current ?? el).getBoundingClientRect();
+        setSuggest(null);
+        return setPop({ name: m[1]!.trim(), x: r.left, y: (box.current ?? el).getBoundingClientRect().bottom });
+      }
+    }
+    setPop(null);
+  };
 
   const loadAll = () =>
     void Promise.all([call<VarInfo[]>('vars.inspect', { environment: env, collectionId }), dynamicVariables()]).then(([list, dynamic]) =>
@@ -88,7 +113,7 @@ export function VarInput({
     const base = name.split('.')[0]!;
     const resolved = name.startsWith('$') || vars[base]?.scope !== undefined;
     parts.push(
-      <span key={m.index} className={resolved ? 'var-token' : 'var-missing'}>
+      <span key={m.index} data-var={m.index} className={resolved ? 'var-token' : 'var-missing'}>
         {m[0]}
       </span>,
     );
@@ -101,8 +126,9 @@ export function VarInput({
 
   return (
     <div
+      ref={box}
       className={cx(cell ? 'relative flex items-center min-h-[26px] rounded focus-within:bg-field focus-within:shadow-[inset_0_0_0_1.5px_var(--accent)]' : 'relative field p-0 flex items-center', className)}
-      title={suggest ? undefined : tooltip || undefined}
+      title={suggest || pop ? undefined : tooltip ? `${tooltip}\n(click a variable to see or edit it)` : undefined}
     >
       <div ref={overlay} aria-hidden className={cx('absolute inset-0 flex items-center whitespace-pre overflow-hidden mono pointer-events-none', cell ? 'px-1.5' : 'px-2')}>
         <span>{parts}</span>
@@ -126,6 +152,7 @@ export function VarInput({
           if (onPasteText?.(text)) e.preventDefault();
         }}
         onBlur={() => setTimeout(() => setSuggest(null), 150)}
+        onClick={openAtCaret}
         onScroll={(e) => overlay.current && (overlay.current.scrollLeft = e.currentTarget.scrollLeft)}
         onKeyUp={(e) => overlay.current && (overlay.current.scrollLeft = e.currentTarget.scrollLeft)}
         onKeyDown={(e) => {
@@ -135,9 +162,21 @@ export function VarInput({
             if (e.key === 'Enter' || e.key === 'Tab') return (e.preventDefault(), pick(matches[suggest.index]!));
             if (e.key === 'Escape') return setSuggest(null);
           }
+          if (e.key === 'Escape' && pop) return setPop(null);
           if (e.key === 'Enter') onEnter?.();
         }}
       />
+      {pop && (
+        <VarPopover
+          name={pop.name}
+          info={vars[pop.name.split('.')[0]!]}
+          environment={env}
+          x={pop.x}
+          y={pop.y}
+          onClose={() => setPop(null)}
+          onSaved={() => setRefresh((n) => n + 1)}
+        />
+      )}
       {suggest && matches.length > 0 && (
         <div role="listbox" className="absolute left-0 top-full mt-1 z-40 w-96 max-w-full rounded-md border border-line bg-bg shadow-xl py-1 text-sm">
           {matches.map((v, i) => (
@@ -156,5 +195,96 @@ export function VarInput({
         </div>
       )}
     </div>
+  );
+}
+
+/** What a {{variable}} holds and where it comes from; set it in the active environment, or add it there. */
+function VarPopover({ name, info, environment, x, y, onClose, onSaved }: { name: string; info?: VarInfo; environment?: string; x: number; y: number; onClose(): void; onSaved(): void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const dynamic = name.startsWith('$');
+  const defined = info?.scope !== undefined;
+  // a value from the environment (or a missing one) is edited there; other scopes are shown as they are
+  const editable = !dynamic && (!defined || info?.scope === 'environment');
+  const [draft, setDraft] = useState(info?.secret ? '' : info?.value ?? '');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [onClose]);
+  const save = async () => {
+    if (!environment) return;
+    setBusy(true);
+    try {
+      const r = await call<{ environment: string }>('vars.setInEnvironment', { environment, name, value: draft });
+      useApp.getState().toast(`${defined ? 'Updated' : 'Added'} {{${name}}} in ${r.environment}`, 'success');
+      onSaved();
+      onClose();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const changed = info?.secret ? draft !== '' : draft !== (info?.value ?? '');
+  return createPortal(
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={`Variable ${name}`}
+      className="fixed z-[80] w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-popover shadow-lg p-3 flex flex-col gap-2 text-sm font-sans animate-in fade-in-0 zoom-in-95 duration-150"
+      style={{ left: Math.max(8, Math.min(x, window.innerWidth - 336)), top: Math.min(y + 6, window.innerHeight - 240) }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={cx('mono font-semibold truncate', defined || dynamic ? 'text-accent' : 'text-bad')}>{`{{${name}}}`}</span>
+        <span className={cx('ml-auto shrink-0 text-[0.7rem] rounded px-1.5 border', defined || dynamic ? 'border-line text-muted' : 'border-bad/40 text-bad')}>{dynamic ? 'dynamic' : defined ? info!.scope : 'not defined'}</span>
+        <button aria-label="Close" className="shrink-0 text-muted hover:text-fg" onClick={onClose}>
+          <X size={14} />
+        </button>
+      </div>
+      {dynamic ? (
+        <p className="text-xs text-muted">A dynamic variable: it gives a new value each time a request uses it.</p>
+      ) : editable ? (
+        <>
+          <label className="text-xs text-muted">{defined ? 'Value in the active environment' : 'Not defined in the active environment. Add it:'}</label>
+          <input
+            autoFocus
+            className="field mono text-sm"
+            type={info?.secret ? 'password' : 'text'}
+            placeholder={info?.secret ? 'Secret: type a new value to replace it' : 'value'}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && changed && void save()}
+          />
+        </>
+      ) : (
+        <>
+          <div className="field mono text-sm break-all max-h-28 overflow-auto">{info?.secret ? '••••••' : info?.value || <span className="text-muted">(empty)</span>}</div>
+          <p className="text-xs text-muted">Set in the {info?.scope} variables{info?.scope === 'collection' ? ' (collection settings)' : ''}; it takes precedence over the environment.</p>
+        </>
+      )}
+      <div className="flex items-center gap-2 pt-1">
+        {!dynamic && defined && !info?.secret && (
+          <Button size="sm" icon={<Copy size={12} />} onClick={() => void navigator.clipboard.writeText(info?.value ?? '').then(() => useApp.getState().toast('Copied'))}>
+            Copy
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" icon={<KeyRound size={12} />} onClick={() => (useApp.getState().setView('environments'), onClose())}>
+          Environments
+        </Button>
+        {editable && (
+          <Button size="sm" variant="primary" className="ml-auto" icon={<Save size={12} />} loading={busy} disabled={!changed || !environment} title={environment ? undefined : 'Choose an environment in the top bar first'} onClick={() => void save()}>
+            {defined ? 'Save' : 'Add'}
+          </Button>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }

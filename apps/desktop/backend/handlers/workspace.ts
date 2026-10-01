@@ -178,6 +178,20 @@ export function workspaceHandlers(be: Backend): Handlers {
       for (const [k, v] of Object.entries(secrets ?? {})) if (v) await be.secrets.set(secretKeys.envVar(env.id, k), v);
       return be.ws.saveEnvironment(env);
     },
+    /** Set one variable in an environment (from the {{variable}} popover): updates it, or adds it; secret ones stay in the secret store. */
+    'vars.setInEnvironment': async ({ environment, name, value }: { environment: string; name: string; value: string }) => {
+      const env = be.ws.getEnvironment(environment) ?? be.ws.listEnvironments().find((e) => e.name === environment);
+      if (!env) throw new ApsError('ConfigurationError', 'Choose an environment first (top bar), then add the variable to it');
+      if (!/^[\w.$-]+$/.test(name)) throw new ApsError('ValidationError', `"${name}" isn't a valid variable name`);
+      const existing = env.variables.find((v) => v.key === name);
+      if (existing?.secret) {
+        await be.secrets.set(secretKeys.envVar(env.id, name), value);
+        return { environment: env.name, secret: true };
+      }
+      const variables = existing ? env.variables.map((v) => (v.key === name ? { ...v, value, enabled: true } : v)) : [...env.variables, { key: name, value, enabled: true }];
+      be.ws.saveEnvironment({ ...env, variables });
+      return { environment: env.name, secret: false };
+    },
     'env.delete': ({ id }: { id: string }) => be.ws.deleteEnvironment(id),
     /** Recently deleted collections and environments (30 days). */
     'trash.list': () => listTrash(be.ws),

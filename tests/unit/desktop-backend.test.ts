@@ -91,5 +91,20 @@ describe('desktop backend', () => {
     await expect(Promise.resolve().then(() => call('settings.save', { ...current, tls: { extraCa: '-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----' } }))).rejects.toThrow(/Extra CA certificates/);
     await expect(Promise.resolve().then(() => call('settings.save', { ...current, proxy: { mode: 'custom', url: 'proxy:8080 x' } }))).rejects.toThrow(/not a URL/);
   });
-});
 
+  it('vars.setInEnvironment adds a variable to an environment, then updates it (the {{variable}} popover)', async () => {
+    const env = { id: 'pop-env', name: 'Popover', variables: [{ key: 'baseUrl', value: 'http://a', enabled: true }] };
+    await call('env.save', { env });
+    await call('vars.setInEnvironment', { environment: 'pop-env', name: 'token', value: 't1' });
+    await call('vars.setInEnvironment', { environment: 'Popover', name: 'baseUrl', value: 'http://b' });
+    const saved = ((await call('env.list')) as Array<{ id: string; variables: Array<{ key: string; value: string }> }>).find((e) => e.id === 'pop-env')!;
+    expect(saved.variables).toEqual([
+      { key: 'baseUrl', value: 'http://b', enabled: true },
+      { key: 'token', value: 't1', enabled: true },
+    ]);
+    const inspect = (await call('vars.inspect', { environment: 'pop-env', template: '{{token}}' })) as Array<{ name: string; scope?: string; value?: string }>;
+    expect(inspect[0]).toMatchObject({ name: 'token', scope: 'environment', value: 't1' });
+    await expect(Promise.resolve().then(() => call('vars.setInEnvironment', { environment: 'nope', name: 'x', value: '1' }))).rejects.toThrow(/environment/);
+    await expect(Promise.resolve().then(() => call('vars.setInEnvironment', { environment: 'pop-env', name: 'bad name', value: '1' }))).rejects.toThrow(/valid variable name/);
+  });
+});

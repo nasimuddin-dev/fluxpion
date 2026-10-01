@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Click a {{variable}} to see its value**: clicking a variable in the URL bar or any field that highlights variables (headers, params, auth …) opens a popover with its value and where it comes from (environment, collection, global …). Copy it, edit it when it comes from the active environment (Enter or Save), or, for a variable that isn't defined, add it to the active environment right there. Secret values stay masked (type a new one to replace it); variables set by a collection or request are shown read-only with where to change them.
+
 ## 0.15.0 — 2026-09-30
 
 Highlights: MCP servers and API definitions open in their own tabs like every request, and Ctrl+S saves whatever tab is on screen.
