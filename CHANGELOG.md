@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.0 — 2026-10-01
+
+Highlights: monitors open in tabs and show charts.
+
+- **Monitors in tabs**: opening a monitor (list, menu, link) gives it its own tab, like requests; open several and run them side by side (each tab keeps its own runs and running state, and runs started together go in parallel). Middle-click or ✕ closes a tab; its right-click menu has *Run now*, *Close tab*, *Close other tabs* and *Close all tabs*. Open tabs are remembered.
+- **Monitor charts**: *Availability* (one block per run, oldest left, like a status page, with uptime over the last 24 hours and 7 days), *Run time* (a line over the last runs with each point coloured by its result and the median dashed) and *Requests per run* (passed and failed stacked). Hover any chart for that run's result, requests, time and date. A *Median response* tile joins the summary.
+
 ## 0.20.4 — 2026-09-30
 
 - **Monitors in folders**: the monitor list works like every other saved list: a new-folder button and **+** in its header, folders (drag or *Move to folder…*), a filter, and menus to rename, duplicate, move or delete a monitor or folder, plus *Edit*, *Run now* and *Pause / Resume*. Monitors saved elsewhere (the CLI, an AI agent) appear straight away.
