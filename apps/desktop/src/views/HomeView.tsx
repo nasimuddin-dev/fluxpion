@@ -1,6 +1,7 @@
-import { Activity as ActivityIcon, AlarmClock, BookOpen, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
+import { Activity as ActivityIcon, AlarmClock, BookOpen, FileDown, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { call, modKey } from '../api';
+import { asError, call, modKey } from '../api';
+import { finishSave, type SaveResult } from '../lib/files';
 import { promptText, useApp } from '../store';
 import { runMenuCommand } from '../menu-commands';
 import type { Collection, CollectionNode, HttpRequestSpec } from '../types';
@@ -183,7 +184,20 @@ export function HomeView() {
                 <ActivityIcon size={15} />
               </span>
               Activity
-              <div role="radiogroup" aria-label="Period" className="ml-auto flex rounded-lg border border-line p-0.5 text-xs font-normal">
+              <button
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-xs font-normal text-muted hover:text-fg hover:bg-hover"
+                title="Save this dashboard, the collections' health, monitors and latest runs as one HTML file to share"
+                onClick={() =>
+                  void call<SaveResult>('report.workspace', { days, tzOffsetMin: new Date().getTimezoneOffset() }).then(
+                    (r) => finishSave(r, 'Workspace report'),
+                    (e) => useApp.getState().toast(asError(e).message, 'error'),
+                  )
+                }
+              >
+                <FileDown size={13} />
+                Share report
+              </button>
+              <div role="radiogroup" aria-label="Period" className="flex rounded-lg border border-line p-0.5 text-xs font-normal">
                 {[7, 14, 30].map((n) => (
                   <button key={n} role="radio" aria-checked={days === n} className={cx('px-2.5 py-1 rounded-md', days === n ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-fg')} onClick={() => pickDays(n)}>
                     {n} days

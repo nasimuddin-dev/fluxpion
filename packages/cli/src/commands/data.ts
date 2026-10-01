@@ -47,6 +47,7 @@ import {
   historyToHar,
   collectionSavedItems,
   listWorkspaceDatasets,
+  workspaceReportHtml,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -235,6 +236,22 @@ export function registerDataCommands(program: Command): void {
         if (o.json) return console.log(JSON.stringify(rows, null, 2));
         if (!rows.length) return console.log(dim('No collections. Create one in the app, or import one: testpion import <file>'));
         for (const r of rows) console.log(`${r.name}  ${dim(r.id)}  ${[`${r.requests} request${r.requests === 1 ? '' : 's'}`, r.grpcCalls ? `${r.grpcCalls} gRPC` : '', r.connections ? `${r.connections} connection${r.connections === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('workspace-report')
+    .description('the workspace at a glance as one HTML file to share: requests and tests per day, the health of each collection, monitors and the latest runs (names, counts and timings only)')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('-d, --days <n>', 'days of activity, up to 90', '14')
+    .option('-o, --out <file>', 'write here (default: <workspace>-report.html)')
+    .action((o: { workspace?: string; days: string; out?: string }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const out = resolve(o.out ?? `${store.workspace.name.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'workspace'}-report.html`);
+        writeFileSync(out, workspaceReportHtml(store, { days: Number(o.days) || 14, tzOffsetMin: new Date().getTimezoneOffset() }));
+        console.log(green(`Wrote ${out}`));
       } finally {
         store.close();
       }

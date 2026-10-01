@@ -877,7 +877,7 @@ export class Backend {
       }
       const trace = tracer.finish();
       this.ws.saveTrace(trace, 'graphql');
-      this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'graphql', name: p.operationName ?? 'GraphQL query', method: 'POST', url: r.prepared.url, status: r.response.status, durationMs: r.response.durationMs, size: r.response.size, request: ctx.redactor.redact(p.request), traceId: trace.traceId });
+      this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'graphql', name: p.name ?? p.operationName ?? 'GraphQL query', method: 'POST', url: r.prepared.url, status: r.response.status, durationMs: r.response.durationMs, size: r.response.size, request: ctx.redactor.redact(p.request), traceId: trace.traceId, collectionId: p.collectionId, requestId: p.requestId });
       const clip = (t: string) => (t.length > CONSOLE_BODY_CHARS ? `${t.slice(0, CONSOLE_BODY_CHARS)}… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);
       this.consoleEntry({
         id,

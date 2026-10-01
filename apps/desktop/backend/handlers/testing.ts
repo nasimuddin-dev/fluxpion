@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   evaluationTests,
+  workspaceReportHtml,
   loadHistory,
   type SavedEvaluation,
   ApsError,
@@ -88,6 +89,12 @@ export function testingHandlers(be: Backend): Handlers {
       const file = { html: 'report.html', markdown: 'report.md', junit: 'junit.xml', json: 'report.json' }[format];
       const src = join(be.ws.runDir(runId), file);
       return be.saveOrDownload(file, undefined, (dest) => copyFileSync(src, dest), () => readFileSync(src));
+    },
+    /** The workspace report (activity, collection health, monitors, runs) as one HTML file, saved where the user picks. */
+    'report.workspace': async ({ days, tzOffsetMin }: { days?: number; tzOffsetMin?: number } = {}) => {
+      const text = workspaceReportHtml(be.ws, { days, tzOffsetMin });
+      const name = `${be.ws.workspace.name.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'workspace'}-report.html`;
+      return be.saveOrDownload(name, [{ name: 'HTML', extensions: ['html'] }], (dest) => writeFileSync(dest, text), () => Buffer.from(text));
     },
     'baselines.list': () => be.ws.listBaselines(),
     'baselines.save': async ({ runId, name }: { runId: string; name: string }) => {
