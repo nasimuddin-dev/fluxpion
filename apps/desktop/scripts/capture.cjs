@@ -6,6 +6,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { dirname, join, resolve } = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const root = resolve(__dirname, '..', '..', '..');
 const home = mkdtempSync(join(tmpdir(), 'aps-capture-'));
@@ -19,11 +20,11 @@ for (const rel of tracked) {
   mkdirSync(dirname(dest), { recursive: true });
   writeFileSync(dest, content);
 }
-// the copied workspace launches the repo's MCP server (which needs the repo's node_modules)
-writeFileSync(
-  join(ws, 'mcp-servers.json'),
-  JSON.stringify({ schemaVersion: '1.0', servers: [{ id: 'customer-mcp', name: 'customer-mcp', transport: 'stdio', command: 'node', args: [join(root, 'examples', 'servers', 'mcp-server.mjs')] }] }, null, 2),
-);
+// the example's MCP server is {{workspaceDir}}/../servers/mcp-server.mjs: a shim there runs the repo's
+// server (which needs the repo's node_modules), so screenshots show the committed, portable command
+mkdirSync(join(home, 'examples', 'servers'), { recursive: true });
+writeFileSync(join(home, 'examples', 'servers', 'mcp-server.mjs'), `import ${JSON.stringify(pathToFileURL(join(root, 'examples', 'servers', 'mcp-server.mjs')).href)};
+`);
 writeFileSync(join(home, 'settings.json'), JSON.stringify({ lastWorkspace: ws, workspacePaths: [ws], theme: process.env.TESTPION_CAPTURE_THEME ?? 'dark' }, null, 2));
 
 const servers = spawn(process.execPath, [join(root, 'examples', 'servers', 'demo-servers.mjs')], { stdio: 'ignore' });
