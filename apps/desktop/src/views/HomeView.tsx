@@ -73,7 +73,7 @@ interface HomeMonitor {
   name: string;
   enabled: boolean;
   recent?: string[];
-  lastResult?: { status: 'passed' | 'failed' | 'error'; passed: number; failed: number; errors: number; total: number; startedAt: string };
+  lastResult?: { status: 'passed' | 'failed' | 'error'; passed: number; failed: number; errors: number; total: number; startedAt: string; reason?: string };
 }
 interface HomeRun {
   id: string;
@@ -286,7 +286,7 @@ export function HomeView() {
                       <span className={cx('w-2 h-2 rounded-full shrink-0', !r ? 'bg-muted/50' : r.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
                       <span className="truncate flex-1">{m.name}</span>
                       {m.enabled && <RecentRuns statuses={m.recent ?? []} className="hidden sm:inline-flex" />}
-                      {!m.enabled ? <Badge>paused</Badge> : r ? <Badge tone={r.status === 'passed' ? 'ok' : 'bad'}>{r.status === 'passed' ? `${r.passed}/${r.total}` : r.status === 'failed' ? `${r.failed + r.errors} failed` : 'error'}</Badge> : <span className="text-xs text-muted">not run yet</span>}
+                      {!m.enabled ? <Badge>paused</Badge> : r ? <Badge tone={r.status === 'passed' ? 'ok' : 'bad'}>{r.status === 'passed' ? `${r.passed}/${r.total}` : r.status === 'failed' ? (r.failed + r.errors ? `${r.failed + r.errors} failed` : r.reason?.startsWith('p95') ? 'too slow' : 'attention') : 'error'}</Badge> : <span className="text-xs text-muted">not run yet</span>}
                       <span className="text-xs text-muted shrink-0 w-16 text-right">{r ? timeAgo(r.startedAt) : ''}</span>
                     </button>
                   );
