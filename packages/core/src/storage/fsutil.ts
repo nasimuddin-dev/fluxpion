@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs';
+import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ApsError } from '../errors.js';
@@ -33,7 +33,42 @@ export function atomicWrite(path: string, data: string | Buffer): void {
   } catch (e) {
     rmSync(tmp, { force: true });
     throw e;
+  } finally {
+    forgetText(path);
   }
+}
+
+/*
+ * The text of JSON files already read, reused while a file's modification time and size are unchanged.
+ * Workspace files (environments, collections, servers) are read again for every request sent and every
+ * list shown; opening a file is the slow part (milliseconds each on Windows), checking it is not.
+ * Only the text is kept: every read still parses, so callers get objects of their own to change.
+ */
+const textCache = new Map<string, { mtimeMs: number; size: number; text: string }>();
+const TEXT_CACHE_MAX_BYTES = 64 * 1024 * 1024;
+let textCacheBytes = 0;
+
+function forgetText(path: string): void {
+  const hit = textCache.get(path);
+  if (!hit) return;
+  textCache.delete(path);
+  textCacheBytes -= hit.text.length;
+}
+
+function cachedText(path: string, mtimeMs: number, size: number): string {
+  const hit = textCache.get(path);
+  if (hit && hit.mtimeMs === mtimeMs && hit.size === size) return hit.text;
+  const text = readFileSync(path, 'utf8');
+  forgetText(path);
+  textCache.set(path, { mtimeMs, size, text });
+  textCacheBytes += text.length;
+  // oldest first (insertion order) until it fits again
+  for (const [k, v] of textCache) {
+    if (textCacheBytes <= TEXT_CACHE_MAX_BYTES || k === path) break;
+    textCache.delete(k);
+    textCacheBytes -= v.text.length;
+  }
+  return text;
 }
 
 export function writeJson(path: string, value: unknown): void {
@@ -45,14 +80,17 @@ export function writeJson(path: string, value: unknown): void {
  * as `<file>.corrupt-<timestamp>` for recovery and a descriptive error is thrown.
  */
 export function readJson<T>(path: string, fallback?: T): T {
-  if (!existsSync(path)) {
+  const stat = statSync(path, { throwIfNoEntry: false });
+  if (!stat) {
+    forgetText(path);
     if (fallback !== undefined) return fallback;
     throw new ApsError('ConfigurationError', `File not found: ${path}`);
   }
-  const text = readFileSync(path, 'utf8');
+  const text = cachedText(path, stat.mtimeMs, stat.size);
   try {
     return JSON.parse(text.replace(/^﻿/, '')) as T;
   } catch (e) {
+    forgetText(path);
     const backup = `${path}.corrupt-${Date.now()}`;
     try {
       renameSync(path, backup);
