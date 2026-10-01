@@ -27,6 +27,7 @@ import {
   importRequestSnippet,
   isRequestSnippet,
   type Collection,
+  collectionSavedItems,
 } from '@testpion/core';
 import type { Backend, Handlers, CollectionRunParams } from '../backend.js';
 
@@ -118,7 +119,7 @@ export function collectionsHandlers(be: Backend): Handlers {
       // an OpenAPI document is kept in specs/ and its requests get an openapi contract check
       // .env imports: secret-looking values go to the OS secret store, never into workspace files
       const r = importIntoWorkspace(be.ws, text, { name: envName, secrets: be.secrets });
-      return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks, scriptWarnings: r.scriptWarnings };
+      return { format: r.format, collection: r.collection?.name, environment: r.environments?.map((e) => e.name).join(', ') || r.environment?.name, specPath: r.specPath, contractChecks: r.contractChecks, scriptWarnings: r.scriptWarnings, savedItems: r.savedItems };
     },
     /** Record traffic: a reverse proxy on 127.0.0.1 in front of `target`; every exchange is sent as a `record.exchange` event. */
     'record.start': async ({ target, port }: { target: string; port?: number }) => {
@@ -263,7 +264,13 @@ export function collectionsHandlers(be: Backend): Handlers {
         if (dest) writeFileSync(dest, text);
         return { path: dest, text: dest ? undefined : text, name, notes: [] as string[] };
       }
-      const { collection, notes } = format === 'postman' ? exportPostmanCollection(c) : { collection: c as unknown as Record<string, unknown>, notes: [] as string[] };
+      // a TestPion collection file carries its gRPC calls and connections too (Postman's format can't)
+      const savedItems = collectionSavedItems(be.ws, c.id);
+      const { collection, notes } =
+        format === 'postman'
+          ? exportPostmanCollection(c)
+          : { collection: { ...c, ...(savedItems ? { savedItems } : {}) } as unknown as Record<string, unknown>, notes: [] as string[] };
+      if (format === 'postman' && savedItems) notes.push(`${Object.values(savedItems).reduce((n, l) => n + (l?.length ?? 0), 0)} gRPC call(s) or connection(s) aren't in the Postman file (its format has no place for them); export in TestPion's format to keep them`);
       const name = format === 'postman' ? `${c.name}.postman_collection.json` : `${c.name}.collection.json`;
       const dest = await be.host.saveDialog?.({ defaultPath: name, filters: [{ name: 'Collection', extensions: ['json'] }] });
       if (dest) writeFileSync(dest, JSON.stringify(collection, null, 2));

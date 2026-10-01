@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Collection, CollectionNode, Environment } from '../model/types.js';
+import type { Collection, CollectionNode, Environment, LibraryItem } from '../model/types.js';
+import { COLLECTION_ITEM_KINDS } from '../runner/collection-realtime.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { shortId, slugify } from '../util/ids.js';
 import { secretKeys, type SecretStore } from '../storage/secrets.js';
@@ -21,6 +22,41 @@ export interface WorkspaceImportResult {
   contractChecks?: number;
   /** Script APIs the sandbox doesn't provide (cheerio, pm.vault …): these requests need a change to run. */
   scriptWarnings?: ScriptWarning[];
+  /** gRPC calls and connections restored from a TestPion collection file, by kind. */
+  savedItems?: Record<string, number>;
+}
+
+/**
+ * Put a collection file's `savedItems` (gRPC calls, connections) into the workspace library, shown in the
+ * imported collection. An item whose id the workspace already uses gets a new one, so nothing is replaced.
+ */
+function restoreSavedItems(store: WorkspaceStore, text: string, collectionId: string): Record<string, number> | undefined {
+  let saved: unknown;
+  try {
+    saved = (JSON.parse(text) as { savedItems?: unknown }).savedItems;
+  } catch {
+    return undefined;
+  }
+  if (!saved || typeof saved !== 'object') return undefined;
+  const counts: Record<string, number> = {};
+  for (const kind of COLLECTION_ITEM_KINDS) {
+    const items = (saved as Record<string, unknown>)[kind];
+    if (!Array.isArray(items) || !items.length) continue;
+    const lib = store.getLibrary(kind);
+    const taken = new Set(lib.items.map((i) => i.id));
+    const added: LibraryItem[] = [];
+    for (const raw of items) {
+      if (!raw || typeof raw !== 'object' || typeof (raw as LibraryItem).name !== 'string' || !(raw as LibraryItem).data) continue;
+      const it = raw as LibraryItem;
+      const id = it.id && !taken.has(it.id) ? it.id : shortId('lib-');
+      taken.add(id);
+      added.push({ id, name: it.name, folder: typeof it.folder === 'string' ? it.folder : undefined, collectionId, data: it.data, updatedAt: new Date().toISOString() });
+    }
+    if (!added.length) continue;
+    store.saveLibrary(kind, { folders: lib.folders, items: [...lib.items, ...added] });
+    counts[kind] = added.length;
+  }
+  return Object.keys(counts).length ? counts : undefined;
 }
 
 /**
@@ -54,6 +90,8 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
   }
   if (collection) {
     out.collection = store.saveCollection(collection);
+    // a TestPion collection file can carry the collection's gRPC calls and connections
+    if (r.format === 'aps-collection') out.savedItems = restoreSavedItems(store, text, out.collection.id);
     const warnings = scriptCompatibility(collection, (name) => store.readScriptPackage(name) !== undefined);
     if (warnings.length) out.scriptWarnings = warnings;
   }

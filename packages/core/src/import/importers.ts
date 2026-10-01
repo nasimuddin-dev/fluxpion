@@ -441,7 +441,8 @@ export function importAny(text: string, opts: { name?: string } = {}): { format:
       return { format, environment: r.environment, environments: [r.environment], secretValues: { [r.environment.id]: r.secretValues } };
     }
     case 'aps-collection': {
-      const c = JSON.parse(text) as Collection;
+      // `savedItems` (its gRPC calls and connections) are restored by importIntoWorkspace, not kept in the collection
+      const { savedItems: _items, ...c } = JSON.parse(text) as Collection & { savedItems?: unknown };
       return { format, collection: { ...c, id: c.id || shortId('col-') } };
     }
     default: {

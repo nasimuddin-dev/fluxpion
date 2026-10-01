@@ -105,6 +105,22 @@ export function savedConnectionToTest(item: LibraryItem<SavedConnection>, collec
   };
 }
 
+/** Library kinds whose items can belong to a collection. */
+export const COLLECTION_ITEM_KINDS = ['grpc', 'websocket'] as const;
+
+/**
+ * A collection's gRPC calls and connections, for a TestPion collection file (`savedItems`): sharing the
+ * file shares everything the collection holds. Import puts them back (see `importIntoWorkspace`).
+ */
+export function collectionSavedItems(store: Pick<WorkspaceStore, 'getLibrary'>, collectionId: string): Partial<Record<(typeof COLLECTION_ITEM_KINDS)[number], LibraryItem[]>> | undefined {
+  const out: Partial<Record<(typeof COLLECTION_ITEM_KINDS)[number], LibraryItem[]>> = {};
+  for (const kind of COLLECTION_ITEM_KINDS) {
+    const items = store.getLibrary(kind).items.filter((i) => i.collectionId === collectionId);
+    if (items.length) out[kind] = items;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /**
  * The gRPC calls and connections shown in a collection, as tests (gRPC first, then connections; each in
  * folder and name order). With a selection, only the selected ones.

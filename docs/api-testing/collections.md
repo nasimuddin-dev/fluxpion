@@ -95,7 +95,7 @@ Postman has no place for some TestPion features. When they are left out, a messa
 - Assertions: a `status` check becomes a `pm.test(...)` in the request's test script, and other assertion types are skipped.
 - JWT auth and the per-request Cookies table (its cookies are sent as a `Cookie` header instead).
 
-Importing an exported file back into TestPion gives the same collection, and the round trip is tested. **Environments → Export** writes an environment in Postman's environment format. Secret variables are exported with an empty value and type `secret`, because their values stay in your OS credential store.
+Importing an exported file back into TestPion gives the same collection, and the round trip is tested. A collection exported in **TestPion's format** also carries its gRPC calls and WebSocket / Socket.IO / MQTT connections (`savedItems`); importing the file puts them back in the imported collection (an id the workspace already uses gets a new one, so nothing is replaced). Postman's format has no place for them, so a Postman export says how many it left out. **Environments → Export** writes an environment in Postman's environment format. Secret variables are exported with an empty value and type `secret`, because their values stay in your OS credential store.
 
 From the CLI:
 

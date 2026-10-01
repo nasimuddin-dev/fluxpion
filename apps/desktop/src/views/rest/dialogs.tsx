@@ -99,7 +99,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
   const [link, setLink] = useState('');
   const linkOk = /^https?:\/\/\S+$/i.test(link.trim());
   const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }>; specPath?: string; contractChecks?: number; scriptWarnings?: Array<{ where: string; script: string; api: string; hint: string }> } | null>) => {
+  const run = async (fn: () => Promise<{ format: string; collection?: string; environment?: string; request?: string; placeholders?: Array<{ variable: string }>; specPath?: string; contractChecks?: number; savedItems?: Record<string, number>; scriptWarnings?: Array<{ where: string; script: string; api: string; hint: string }> } | null>) => {
     setBusy(true);
     try {
       const r = await fn();
@@ -111,7 +111,7 @@ export function ImportModal({ onClose, onDone }: { onClose(): void; onDone(): vo
           );
         else
           useApp.getState().toast(
-            `Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (${r.environment.includes(', ') ? 'environments' : 'environment'} ${r.environment})` : ''}${r.contractChecks ? `. Each request checks the OpenAPI contract (${r.specPath})` : ''}`,
+            `Imported ${r.format}${r.collection ? `: ${r.collection}` : ''}${r.environment ? ` (${r.environment.includes(', ') ? 'environments' : 'environment'} ${r.environment})` : ''}${r.contractChecks ? `. Each request checks the OpenAPI contract (${r.specPath})` : ''}${r.savedItems ? `, with ${[r.savedItems.grpc ? `${r.savedItems.grpc} gRPC call${r.savedItems.grpc > 1 ? 's' : ''}` : '', r.savedItems.websocket ? `${r.savedItems.websocket} connection${r.savedItems.websocket > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ')}` : ''}`,
             'success',
           );
         const w = r.scriptWarnings ?? [];

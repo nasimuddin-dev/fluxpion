@@ -45,6 +45,7 @@ import {
   variableUsages,
   renameVariable,
   historyToHar,
+  collectionSavedItems,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -253,7 +254,20 @@ export function registerDataCommands(program: Command): void {
         } else process.stdout.write(text);
         return;
       }
-      const { collection, notes } = o.format === 'postman' ? exportPostmanCollection(c) : { collection: c, notes: [] as string[] };
+      // a workspace collection's gRPC calls and connections go into a TestPion file (`savedItems`)
+      let savedItems: ReturnType<typeof collectionSavedItems>;
+      const wsDir = o.workspace ?? findWorkspaceUp(process.cwd());
+      if (wsDir) {
+        try {
+          const { store } = openWorkspace(wsDir, undefined, new WorkspaceManager());
+          savedItems = collectionSavedItems(store, c.id);
+          store.close();
+        } catch {
+          savedItems = undefined;
+        }
+      }
+      const { collection, notes } = o.format === 'postman' ? exportPostmanCollection(c) : { collection: { ...c, ...(savedItems ? { savedItems } : {}) }, notes: [] as string[] };
+      if (o.format === 'postman' && savedItems) notes.push(`${Object.values(savedItems).reduce((n, l) => n + (l?.length ?? 0), 0)} gRPC call(s) or connection(s) (Postman's format has no place for them; use --format testpion)`);
       const json = JSON.stringify(collection, null, 2) + '\n';
       for (const n of notes) console.error(yellow(`not exported: ${n}`));
       if (o.out) {
