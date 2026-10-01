@@ -199,7 +199,9 @@ function start(): void {
     }
   };
 
-  ipcMain.handle('aps:rpc', async (_e, method: string, params: unknown) => {
+  ipcMain.handle('aps:rpc', async (e, method: string, params: unknown) => {
+    // only the app's own page (the window's top frame) may call the backend, never an embedded frame
+    if (!win || e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame) return { ok: false, error: normalizeError(new Error('Not allowed')) };
     try {
       return { ok: true, data: await backend!.invoke(method, params) };
     } catch (err) {

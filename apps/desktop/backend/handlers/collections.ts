@@ -246,7 +246,8 @@ export function collectionsHandlers(be: Backend): Handlers {
           if (!be.host.openDialog) throw new ApsError('ValidationError', 'Exporting a Bruno folder needs the desktop app', { suggestions: ['Use testpion export "<collection>" --format bruno --out <folder>.'] });
           return { name: c.name, notes: [] as string[] };
         }
-        const out = join(parent, c.name.replace(/[<>:"/\\|?*]/g, '-'));
+        // a folder name, never a path: a collection called ".." must not write outside the chosen folder
+        const out = join(parent, c.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/^\.+/, '').trim() || 'collection');
         for (const f of files) {
           const p = join(out, ...f.path.split('/'));
           mkdirSync(dirname(p), { recursive: true });

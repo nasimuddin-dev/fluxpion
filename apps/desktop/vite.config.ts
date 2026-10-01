@@ -3,7 +3,16 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      // the packaged app talks to its backend over IPC only: the development endpoints leave its security policy
+      name: 'production-csp',
+      apply: 'build',
+      transformIndexHtml: (html) => html.replace(" connect-src 'self' http://127.0.0.1:5174 ws://localhost:5173 http://localhost:5173;", " connect-src 'self';"),
+    },
+  ],
   base: './',
   clearScreen: false,
   server: {

@@ -143,9 +143,16 @@ export class WorkspaceStore {
 
   /** Guard against path traversal for user-supplied relative paths. */
   safePath(rel: string, base = this.root): string {
-    const p = resolve(base, rel);
-    if (p !== base && !p.startsWith(base + sep)) throw new ApsError('ValidationError', `Path escapes the workspace: ${rel}`);
+    const root = resolve(base);
+    const p = resolve(root, rel);
+    if (p !== root && !p.startsWith(root + sep)) throw new ApsError('ValidationError', `Path escapes the workspace: ${rel}`);
     return p;
+  }
+
+  /** Whether an absolute path is inside one of the workspace's folders (e.g. `payloads`). */
+  isInside(file: string, ...folder: string[]): boolean {
+    const base = resolve(this.root, ...folder);
+    return typeof file === 'string' && resolve(file).startsWith(base + sep);
   }
 
   /* collections */
@@ -287,8 +294,12 @@ export class WorkspaceStore {
   /** A server config ready to connect: a mock's definition file becomes an absolute path in this workspace. */
   resolveMcpServer(cfg: McpServerConfig): McpServerConfig {
     if (cfg.transport !== 'mock') return cfg;
-    const file = resolve(this.root, cfg.mockFile);
-    if (!file.startsWith(resolve(this.root))) throw new ApsError('ConfigurationError', `The MCP mock file must be inside the workspace: ${cfg.mockFile}`);
+    let file: string;
+    try {
+      file = this.safePath(cfg.mockFile);
+    } catch {
+      throw new ApsError('ConfigurationError', `The MCP mock file must be inside the workspace: ${cfg.mockFile}`);
+    }
     return { ...cfg, mockFile: file };
   }
 
@@ -410,7 +421,11 @@ export class WorkspaceStore {
   }
 
   runDir(runId: string): string {
-    return this.path('runs', runId);
+    // one folder under runs/: an id from a caller (RPC, MCP tool) can't point anywhere else
+    const base = this.path('runs');
+    const dir = this.safePath(String(runId), base);
+    if (dir === base || dirname(dir) !== base) throw new ApsError('ValidationError', `Not a run id: ${runId}`);
+    return dir;
   }
 
   /** Portable export bundle. Secret values are never included. */

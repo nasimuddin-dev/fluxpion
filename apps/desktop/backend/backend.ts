@@ -490,8 +490,9 @@ export class Backend {
   }
 
   async invoke(method: string, params: unknown): Promise<unknown> {
-    const h = this.handlers[method];
-    if (!h) throw new ApsError('ConfigurationError', `Unknown backend method ${method}`);
+    // own methods only: "constructor", "toString" … are not RPC methods
+    const h = typeof method === 'string' && Object.hasOwn(this.handlers, method) ? this.handlers[method] : undefined;
+    if (!h) throw new ApsError('ConfigurationError', `Unknown backend method ${String(method).slice(0, 80)}`);
     const t0 = performance.now();
     try {
       const r = await h(params ?? {});

@@ -76,7 +76,8 @@ export function requestsHandlers(be: Backend): Handlers {
     /** Paste-to-request: cURL (bash/cmd), fetch, fetch (Node.js) or PowerShell from browser devtools. */
     'http.parseSnippet': ({ text }: { text: string }) => ({ format: detectRequestSnippet(text), request: parseRequestSnippet(text) }),
     'http.saveBody': async ({ payloadPath, name }: { payloadPath: string; name?: string }) => {
-      if (!payloadPath || !payloadPath.startsWith(be.ws.path('payloads'))) throw new ApsError('ValidationError', 'Unknown payload');
+      // resolved first: a prefix test alone would accept payloads/../../anything
+      if (!payloadPath || !be.ws.isInside(payloadPath, 'payloads')) throw new ApsError('ValidationError', 'Unknown payload');
       return be.saveOrDownload(name ?? 'response.bin', undefined, (dest) => copyFileSync(payloadPath, dest), () => readFileSync(payloadPath));
     },
     'history.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listHistory(q),

@@ -1,5 +1,5 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import type { HistoryEntry, RunSummary } from '../model/types.js';
 import { atomicWrite } from './fsutil.js';
@@ -92,12 +92,47 @@ function loadSqlite() {
 
 export const SQLITE_SCHEMA_VERSION = 1;
 
+/** History entries and traces kept; older ones are pruned, with their files. */
+const MAX_HISTORY = 20_000;
+const MAX_TRACES = 50_000;
+/** Pruning runs once per this many inserts (not on every one: a run can add thousands of traces). */
+const PRUNE_EVERY = 200;
+
+/**
+ * Delete the files of removed history entries (response bodies in payloads/) and traces (traces/…).
+ * Only files inside those two folders of the workspace are touched, whatever the stored path says.
+ */
+function removeFiles(root: string, paths: Array<string | null | undefined>): void {
+  const allowed = [resolve(root, 'payloads') + sep, resolve(root, 'traces') + sep];
+  for (const p of paths) {
+    if (!p) continue;
+    const file = resolve(root, p);
+    if (!allowed.some((a) => file.startsWith(a))) continue;
+    try {
+      rmSync(file, { force: true });
+    } catch {
+      /* in use or already gone: it stays until the next clean-up */
+    }
+  }
+}
+
 class SqliteMetaStore implements MetaStore {
   readonly backend = 'sqlite' as const;
   private db: SqliteDb;
+  private root: string;
+  /** Prepared once: inserts happen for every request sent and every trace of a run. */
+  private statements = new Map<string, ReturnType<SqliteDb['prepare']>>();
+  private inserts = { history: 0, traces: 0 };
+
+  private stmt(sql: string) {
+    let s = this.statements.get(sql);
+    if (!s) this.statements.set(sql, (s = this.db.prepare(sql)));
+    return s;
+  }
 
   constructor(path: string, Db: new (p: string) => SqliteDb) {
     mkdirSync(dirname(path), { recursive: true });
+    this.root = dirname(path);
     this.db = new Db(path);
     this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;');
     this.migrate();
@@ -122,11 +157,16 @@ class SqliteMetaStore implements MetaStore {
   }
 
   addHistory(e: HistoryEntry): void {
-    this.db
-      .prepare('INSERT OR REPLACE INTO history (id, ts, kind, name, method, url, status, duration, size, trace_id, payload, doc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    this.stmt('INSERT OR REPLACE INTO history (id, ts, kind, name, method, url, status, duration, size, trace_id, payload, doc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(e.id, e.timestamp, e.kind, e.name, e.method ?? null, e.url ?? null, e.status === undefined ? null : String(e.status), e.durationMs ?? null, e.size ?? null, e.traceId ?? null, e.payloadPath ?? null, JSON.stringify({ request: e.request, responseMeta: e.responseMeta, collectionId: e.collectionId, requestId: e.requestId }));
-    // bound history size
-    this.db.exec('DELETE FROM history WHERE id IN (SELECT id FROM history ORDER BY ts DESC LIMIT -1 OFFSET 20000)');
+    // bound history size (and delete the saved response bodies of what goes)
+    if (this.inserts.history++ % PRUNE_EVERY === 0) {
+      const old = this.db.prepare(`SELECT id, payload FROM history ORDER BY ts DESC LIMIT -1 OFFSET ${MAX_HISTORY}`).all() as Array<{ id: string; payload: string | null }>;
+      if (old.length) {
+        this.db.exec(`DELETE FROM history WHERE id IN (SELECT id FROM history ORDER BY ts DESC LIMIT -1 OFFSET ${MAX_HISTORY})`);
+        removeFiles(this.root, old.map((r) => r.payload));
+      }
+    }
   }
 
   private where(q: ListQuery, cols: string[]): { sql: string; args: unknown[] } {
@@ -160,11 +200,16 @@ class SqliteMetaStore implements MetaStore {
   }
 
   deleteHistory(id: string): void {
+    const row = this.db.prepare('SELECT payload FROM history WHERE id = ?').get(id) as { payload: string | null } | undefined;
     this.db.prepare('DELETE FROM history WHERE id = ?').run(id);
+    removeFiles(this.root, [row?.payload]);
   }
 
   clearHistory(): void {
+    // the saved response bodies go too: "clear" must not leave them on disk
+    const rows = this.db.prepare('SELECT payload FROM history WHERE payload IS NOT NULL').all() as Array<{ payload: string }>;
     this.db.exec('DELETE FROM history');
+    removeFiles(this.root, rows.map((r) => r.payload));
   }
 
   addRun(s: RunSummary, dir: string): void {
@@ -200,10 +245,14 @@ class SqliteMetaStore implements MetaStore {
   }
 
   addTrace(t: TraceMeta): void {
-    this.db
-      .prepare('INSERT OR REPLACE INTO traces (id, name, kind, status, start, duration, spans, run_id, path) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run(t.id, t.name, t.kind, t.status, t.startTime, t.durationMs, t.spanCount, t.runId ?? null, t.path);
-    this.db.exec('DELETE FROM traces WHERE id IN (SELECT id FROM traces ORDER BY start DESC LIMIT -1 OFFSET 50000)');
+    this.stmt('INSERT OR REPLACE INTO traces (id, name, kind, status, start, duration, spans, run_id, path) VALUES (?,?,?,?,?,?,?,?,?)').run(t.id, t.name, t.kind, t.status, t.startTime, t.durationMs, t.spanCount, t.runId ?? null, t.path);
+    if (this.inserts.traces++ % PRUNE_EVERY === 0) {
+      const old = this.db.prepare(`SELECT path FROM traces ORDER BY start DESC LIMIT -1 OFFSET ${MAX_TRACES}`).all() as Array<{ path: string | null }>;
+      if (old.length) {
+        this.db.exec(`DELETE FROM traces WHERE id IN (SELECT id FROM traces ORDER BY start DESC LIMIT -1 OFFSET ${MAX_TRACES})`);
+        removeFiles(this.root, old.map((r) => r.path));
+      }
+    }
   }
 
   listTraces(q: ListQuery = {}): Page<TraceMeta> {
@@ -263,8 +312,11 @@ class JsonlMetaStore implements MetaStore {
   readonly backend = 'jsonl' as const;
   private data: { history: HistoryEntry[]; runs: RunMeta[]; traces: TraceMeta[] } = { history: [], runs: [], traces: [] };
 
+  private root: string;
+
   constructor(private path: string) {
     mkdirSync(dirname(path), { recursive: true });
+    this.root = dirname(path);
     if (existsSync(path)) {
       for (const line of readFileSync(path, 'utf8').split('\n')) {
         if (!line.trim()) continue;
@@ -306,10 +358,12 @@ class JsonlMetaStore implements MetaStore {
     return this.data.history.find((h) => h.id === id);
   }
   deleteHistory(id: string) {
+    removeFiles(this.root, [this.data.history.find((h) => h.id === id)?.payloadPath]);
     this.data.history = this.data.history.filter((h) => h.id !== id);
     this.log('history', id, 'del');
   }
   clearHistory() {
+    removeFiles(this.root, this.data.history.map((h) => h.payloadPath));
     this.data.history = [];
     this.log('history', null, 'clear');
   }

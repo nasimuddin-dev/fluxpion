@@ -10,6 +10,8 @@ import {
   getTlsTrust,
   clearTokenCache,
 } from '@testpion/core';
+import { existsSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Backend, Handlers } from '../backend.js';
 
 export function appHandlers(be: Backend): Handlers {
@@ -77,6 +79,12 @@ export function appHandlers(be: Backend): Handlers {
       if (!/^https?:\/\//.test(url)) throw new ApsError('ValidationError', 'Only http(s) URLs can be opened');
       return be.host.openExternal?.(url);
     },
-    'app.openPath': ({ path }: { path: string }) => be.host.openPath?.(path),
+    /** Show a workspace folder in the file manager. Only folders of known workspaces: opening a path runs it if it's a program. */
+    'app.openPath': ({ path }: { path: string }) => {
+      const known = [be.ws.root, ...be.manager.list().map((w) => w.path)].map((p) => resolve(p));
+      const target = resolve(String(path));
+      if (!known.includes(target) || !existsSync(target) || !statSync(target).isDirectory()) throw new ApsError('ValidationError', 'Only workspace folders can be opened');
+      return be.host.openPath?.(target);
+    },
   };
 }
