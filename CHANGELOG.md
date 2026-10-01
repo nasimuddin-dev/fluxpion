@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.1 — 2026-09-30
+
+- **Resizable Collections sidebar**: drag its right edge to make it wider or narrower (200–640 px); the width is remembered, double-click the edge resets it, and the arrow keys resize it when the edge has focus.
+- **Not in a collection ▸ Put them in collections**: one click moves gRPC calls and WebSocket / MQTT connections saved before collections could hold them into a **gRPC** and a **WebSocket & MQTT** collection (existing collections of those names are reused).
+
 ## 0.14.0 — 2026-09-30
 
 Highlights: MCP servers are edited inline like every other request, and every tab has the same menu.
