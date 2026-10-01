@@ -12,7 +12,16 @@ describe('collection timing', () => {
     const store = WorkspaceStore.create(join(dir, 'ws'), 'Timing');
     let n = 0;
     const add = (collectionId: string, timing?: Record<string, unknown>) =>
-      store.meta.addHistory({ id: `h${++n}`, timestamp: `2026-10-01T00:00:0${n}.000Z`, kind: 'http', name: 'GET /', status: 200, collectionId, requestId: 'r', responseMeta: timing ? { timing } : {} });
+      store.meta.addHistory({
+        id: `h${++n}`,
+        timestamp: `2026-10-01T00:00:0${n}.000Z`,
+        kind: 'http',
+        name: 'GET /',
+        status: 200,
+        collectionId,
+        requestId: 'r',
+        responseMeta: timing ? { timing } : {},
+      });
     add('c1', { dnsMs: 5, tcpMs: 10, tlsMs: 20, ttfbMs: 40, downloadMs: 2, reusedConnection: false });
     add('c1', { ttfbMs: 30, downloadMs: 1, reusedConnection: true });
     add('c1');

@@ -45,7 +45,11 @@ export function AiUsage() {
         <StatTile label="Prompts run" value={calls.toLocaleString()} sub={plural(rows.length, 'model')} />
         <StatTile label="Input tokens" value={tokensIn.toLocaleString()} />
         <StatTile label="Output tokens" value={tokensOut.toLocaleString()} />
-        <StatTile label="Estimated cost" value={priced.length ? formatCost(cost) : '—'} sub={!priced.length ? 'no price configured' : priced.length < rows.length ? 'models with a known price' : 'from the price table'} />
+        <StatTile
+          label="Estimated cost"
+          value={priced.length ? formatCost(cost) : '—'}
+          sub={!priced.length ? 'no price configured' : priced.length < rows.length ? 'models with a known price' : 'from the price table'}
+        />
       </div>
       <ChartCard
         title="Tokens per model"

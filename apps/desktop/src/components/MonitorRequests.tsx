@@ -34,7 +34,14 @@ export function MonitorRequests({ monitorId, refresh }: { monitorId: string; ref
   const cut = first.lastIndexOf(' / ');
   const prefix = cut > 0 && rows.every((r) => r.name.startsWith(first.slice(0, cut + 3))) ? first.slice(0, cut + 3) : '';
   return (
-    <ChartCard title="Requests" aside={<span>{prefix ? `${prefix.slice(0, -3)} · ` : ''}median time over the last runs{failing ? <b className="text-bad"> · {plural(failing, 'request')} failed</b> : null}</span>}>
+    <ChartCard
+      title="Requests"
+      aside={
+        <span>
+          {prefix ? `${prefix.slice(0, -3)} · ` : ''}median time over the last runs{failing ? <b className="text-bad"> · {plural(failing, 'request')} failed</b> : null}
+        </span>
+      }
+    >
       <div className="flex flex-col gap-1.5">
         {rows.slice(0, 15).map((r) => (
           <BarRow

@@ -12,7 +12,15 @@ describe('MCP tool usage', () => {
     const store = WorkspaceStore.create(join(dir, 'ws'), 'MCP');
     let n = 0;
     const call = (serverId: string, server: string, tool: string, ok: boolean, ms: number) =>
-      store.meta.addHistory({ id: `h${++n}`, timestamp: `2026-10-01T00:00:${String(n).padStart(2, '0')}.000Z`, kind: 'mcp', name: `${server} · ${tool}`, status: ok ? 'ok' : 'error', durationMs: ms, request: { serverId, tool, args: {} } });
+      store.meta.addHistory({
+        id: `h${++n}`,
+        timestamp: `2026-10-01T00:00:${String(n).padStart(2, '0')}.000Z`,
+        kind: 'mcp',
+        name: `${server} · ${tool}`,
+        status: ok ? 'ok' : 'error',
+        durationMs: ms,
+        request: { serverId, tool, args: {} },
+      });
     call('s1', 'weather', 'forecast', true, 10);
     call('s1', 'weather', 'forecast', true, 30);
     call('s1', 'weather', 'forecast', false, 20);

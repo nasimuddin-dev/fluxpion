@@ -65,7 +65,11 @@ export function TestHistory({ id, name, runId }: { id: string; name: string; run
                 assistant: {
                   task: 'explain-test-history',
                   title: `History of "${name}"`,
-                  context: { test: name, summary: { runs: counted.length, passed, failed: counted.length - passed, flips, medianMs: median }, runs: points.map((p) => ({ when: p.startedAt, status: p.status, latencyMs: p.latencyMs, attempts: p.attempts, environment: p.environment, failedChecks: p.failures })) },
+                  context: {
+                    test: name,
+                    summary: { runs: counted.length, passed, failed: counted.length - passed, flips, medianMs: median },
+                    runs: points.map((p) => ({ when: p.startedAt, status: p.status, latencyMs: p.latencyMs, attempts: p.attempts, environment: p.environment, failedChecks: p.failures })),
+                  },
                 },
               })
             }

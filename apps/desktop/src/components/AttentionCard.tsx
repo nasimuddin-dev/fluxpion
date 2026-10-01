@@ -26,7 +26,10 @@ function openItem(i: Item) {
 /** Run a monitor now; the card refreshes on its result. */
 function runMonitor(id: string) {
   void call<{ status: string; passed: number; total: number }>('monitor.run', { id }).then(
-    (r) => useApp.getState().toast(r.status === 'passed' ? `Monitor passed (${r.passed}/${r.total})` : `Monitor still ${r.status === 'error' ? 'cannot run' : 'failing'}`, r.status === 'passed' ? 'success' : 'error'),
+    (r) =>
+      useApp
+        .getState()
+        .toast(r.status === 'passed' ? `Monitor passed (${r.passed}/${r.total})` : `Monitor still ${r.status === 'error' ? 'cannot run' : 'failing'}`, r.status === 'passed' ? 'success' : 'error'),
     (e) => useApp.getState().toast(asError(e).message, 'error'),
   );
 }
@@ -53,7 +56,11 @@ export function AttentionCard() {
         <button
           className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-accent hover:underline"
           title="Ask the AI assistant what to fix first (the items' messages and severities are sent)"
-          onClick={() => useApp.getState().set({ assistant: { task: 'triage-attention', title: 'What to fix first', context: { items: items.map((i) => ({ severity: i.severity, kind: i.kind, message: i.message })) } } })}
+          onClick={() =>
+            useApp
+              .getState()
+              .set({ assistant: { task: 'triage-attention', title: 'What to fix first', context: { items: items.map((i) => ({ severity: i.severity, kind: i.kind, message: i.message })) } } })
+          }
         >
           <Sparkles size={12} /> What first?
         </button>

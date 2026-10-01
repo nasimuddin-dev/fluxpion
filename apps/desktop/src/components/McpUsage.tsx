@@ -88,7 +88,9 @@ export function McpUsage({ serverId }: { serverId: string }) {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-muted">From the tool calls made in the app (the latest 2000). Agents get the same with the <code>mcp_tool_usage</code> MCP tool; <code>testpion history mcp-tools</code> prints it.</p>
+      <p className="text-xs text-muted">
+        From the tool calls made in the app (the latest 2000). Agents get the same with the <code>mcp_tool_usage</code> MCP tool; <code>testpion history mcp-tools</code> prints it.
+      </p>
     </div>
   );
 }

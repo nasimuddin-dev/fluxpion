@@ -12,7 +12,15 @@ describe('LLM usage', () => {
     const store = WorkspaceStore.create(join(dir, 'ws'), 'AI');
     let n = 0;
     const run = (name: string, inputTokens: number, outputTokens: number, ms: number, costUsd?: number, firstTokenMs?: number) =>
-      store.meta.addHistory({ id: `h${++n}`, timestamp: `2026-10-01T00:00:0${n}.000Z`, kind: 'llm', name, status: 'ok', durationMs: ms, responseMeta: { usage: { inputTokens, outputTokens }, costUsd, firstTokenMs } });
+      store.meta.addHistory({
+        id: `h${++n}`,
+        timestamp: `2026-10-01T00:00:0${n}.000Z`,
+        kind: 'llm',
+        name,
+        status: 'ok',
+        durationMs: ms,
+        responseMeta: { usage: { inputTokens, outputTokens }, costUsd, firstTokenMs },
+      });
     run('Claude · claude-sonnet-5-5', 100, 50, 900, 0.0012, 300);
     run('Claude · claude-sonnet-5-5', 200, 80, 1100, 0.002, 500);
     run('Ollama · llama3', 30, 20, 400);

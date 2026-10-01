@@ -26,7 +26,11 @@ describe('certificate check', () => {
 
   it('the security review flags hosts whose recorded certificate expires within 30 days, once per host', () => {
     const req = (id: string, url: string) => ({ kind: 'http', id, name: id, request: { method: 'GET', url, headers: [], params: [] } });
-    const c = { id: 'c', name: 'API', items: [req('a', '{{base}}/pets'), req('b', '{{base}}/owners'), req('c', 'https://ok.example.com/'), req('d', 'http://plain.example.com/')] } as unknown as Collection;
+    const c = {
+      id: 'c',
+      name: 'API',
+      items: [req('a', '{{base}}/pets'), req('b', '{{base}}/owners'), req('c', 'https://ok.example.com/'), req('d', 'http://plain.example.com/')],
+    } as unknown as Collection;
     const certs = [
       { host: 'api.example.com', daysLeft: 5, validTo: '2026-10-06T00:00:00Z' },
       { host: 'ok.example.com', daysLeft: 200 },

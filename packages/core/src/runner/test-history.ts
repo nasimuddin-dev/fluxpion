@@ -121,13 +121,28 @@ async function scanFlaky(store: WorkspaceStore, runs: Array<{ id: string; starte
     for (let i = 1; i < t.statuses.length; i++) if (t.statuses[i] !== t.statuses[i - 1]) flips++;
     if (flips < 2 && !t.retried) continue;
     const passed = t.statuses.filter((s) => s === 'passed').length;
-    out.push({ id: t.id, name: t.name, runs: t.statuses.length, passed, failed: t.statuses.length - passed, flips, retried: t.retried, lastStatus: t.statuses[t.statuses.length - 1]!, lastRunAt: t.lastAt, recent: t.statuses.slice(-20) });
+    out.push({
+      id: t.id,
+      name: t.name,
+      runs: t.statuses.length,
+      passed,
+      failed: t.statuses.length - passed,
+      flips,
+      retried: t.retried,
+      lastStatus: t.statuses[t.statuses.length - 1]!,
+      lastRunAt: t.lastAt,
+      recent: t.statuses.slice(-20),
+    });
   }
   return out.sort((a, b) => b.flips - a.flips || b.retried - a.retried || a.name.localeCompare(b.name));
 }
 
 /** The latest result of each named test over the latest `runs` runs (newest first): one pass, stops once all are found. */
-export async function latestResults(store: WorkspaceStore, names: string[], opts: { runs?: number } = {}): Promise<Record<string, { status: string; runId: string; startedAt: string; latencyMs?: number }>> {
+export async function latestResults(
+  store: WorkspaceStore,
+  names: string[],
+  opts: { runs?: number } = {},
+): Promise<Record<string, { status: string; runId: string; startedAt: string; latencyMs?: number }>> {
   const wanted = new Set(names);
   const out: Record<string, { status: string; runId: string; startedAt: string; latencyMs?: number }> = {};
   if (!wanted.size) return out;
