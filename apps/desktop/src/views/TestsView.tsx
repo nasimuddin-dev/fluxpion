@@ -430,22 +430,38 @@ export function TestsView() {
 }
 
 function RunList({ runs, active, onSelect }: { runs: RunRow[]; active?: string; onSelect(id: string): void }) {
+  // filter by name / environment, and only the runs where something failed
+  const [query, setQuery] = useState('');
+  const [failedOnly, setFailedOnly] = useState(false);
+  const q = query.toLowerCase();
+  const shown = runs.filter((r) => (!failedOnly || r.failed + r.errors > 0) && (!q || `${r.name} ${r.environment ?? ''}`.toLowerCase().includes(q)));
   return (
-    <div className="h-full overflow-auto">
-      {runs.map((r) => (
-        <button key={r.id} onClick={() => onSelect(r.id)} className={cx('w-full text-left px-3 py-2 border-b border-line/60', active === r.id ? 'bg-accent/10' : 'hover:bg-hover')}>
-          <div className="text-sm truncate">{r.name}</div>
-          <RunMiniBar r={r} />
-          <div className="text-xs text-muted flex gap-2">
-            <span className={r.failed + r.errors ? 'text-bad' : 'text-ok'}>
-              {r.passed}/{r.total}
-            </span>
-            {r.environment && <span>{r.environment}</span>}
-            <span className="ml-auto">{timeAgo(r.startedAt)}</span>
-          </div>
-        </button>
-      ))}
-      {!runs.length && <div className="p-3 text-sm text-muted">No runs yet</div>}
+    <div className="h-full flex flex-col min-h-0">
+      {runs.length > 3 && (
+        <div className="flex items-center gap-2 px-2 py-1.5 border-b border-line">
+          <Input className="h-7 min-h-7 text-sm flex-1 min-w-0" placeholder="Filter runs" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Filter runs" />
+          <label className="flex items-center gap-1 text-xs text-muted whitespace-nowrap">
+            <input type="checkbox" checked={failedOnly} onChange={(e) => setFailedOnly(e.target.checked)} /> Failed
+          </label>
+        </div>
+      )}
+      <div className="flex-1 min-h-0 overflow-auto">
+        {shown.map((r) => (
+          <button key={r.id} onClick={() => onSelect(r.id)} className={cx('w-full text-left px-3 py-2 border-b border-line/60', active === r.id ? 'bg-accent/10' : 'hover:bg-hover')}>
+            <div className="text-sm truncate">{r.name}</div>
+            <RunMiniBar r={r} />
+            <div className="text-xs text-muted flex gap-2">
+              <span className={r.failed + r.errors ? 'text-bad' : 'text-ok'}>
+                {r.passed}/{r.total}
+              </span>
+              {r.environment && <span>{r.environment}</span>}
+              <span className="ml-auto">{timeAgo(r.startedAt)}</span>
+            </div>
+          </button>
+        ))}
+        {!runs.length && <div className="p-3 text-sm text-muted">No runs yet</div>}
+        {runs.length > 0 && !shown.length && <div className="p-3 text-sm text-muted">No runs match</div>}
+      </div>
     </div>
   );
 }
