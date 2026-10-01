@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { ChartCard, ChartTip, niceMax, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard, ChartTip, niceMax, Swatch, useWidth } from './charts';
 import { cx } from './ui';
 
 /** Workspace activity from `stats.activity` (see summarizeActivity in core). */
@@ -195,7 +195,7 @@ function MedianLine({ days, overall }: { days: ActivityDay[]; overall?: number }
     >
       <div ref={ref} className="relative" onMouseMove={onMove} onMouseLeave={() => setHover(undefined)}>
         <svg width={width} height={H} role="img" aria-label="Median response time per day">
-          <YGrid max={max} y={y} width={width} format={formatMs} />
+          <YGrid max={max} y={y} width={width} format={axisMs} />
           {hover !== undefined && <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={H - PAD.b} stroke="var(--muted)" strokeWidth={1} />}
           <path d={path} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           {days.map((d, i) => d.medianMs !== undefined && <circle key={d.day} cx={x(i)} cy={y(d.medianMs)} r={hover === i ? 5 : 4} fill="var(--accent)" stroke="var(--bg)" strokeWidth={2} />)}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatMs } from '../lib/format';
-import { ChartCard, ChartTip, niceMax, useWidth } from './charts';
+import { axisMs, ChartCard, ChartTip, niceMax, useWidth } from './charts';
 
 export interface LoadPoint {
   t: number;
@@ -54,7 +54,7 @@ function Series({ series, spec, hover, setHover }: { series: LoadPoint[]; spec: 
             <g key={t}>
               <line x1={PAD.l} x2={width - PAD.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeWidth={1} />
               <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
-                {t === 0 ? '0' : spec.format(t)}
+                {t === 0 ? '0' : spec.field === 'p95' ? axisMs(t) : spec.format(t)}
               </text>
             </g>
           ))}

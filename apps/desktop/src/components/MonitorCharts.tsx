@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatMs, timeAgo } from '../lib/format';
 import { cx } from './ui';
-import { ChartCard as Card, ChartTip, niceMax as nice, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard as Card, ChartTip, niceMax as nice, Swatch, useWidth } from './charts';
 
 /** A monitor run, as the charts need it. */
 export interface RunPoint {
@@ -122,7 +122,7 @@ export function RunTimeChart({ runs }: { runs: RunPoint[] }) {
             <g key={t}>
               <line x1={pad.l} x2={width - pad.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeWidth={1} />
               <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
-                {t === 0 ? '0' : formatMs(t)}
+                {t === 0 ? '0' : axisMs(t)}
               </text>
             </g>
           ))}

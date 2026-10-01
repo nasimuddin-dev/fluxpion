@@ -5,6 +5,7 @@ import { confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSaveShortcut } from '../hooks';
 import { timeAgo } from '../lib/format';
 import { CodeEditor } from '../components/CodeEditor';
+import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { RunPanel } from '../components/RunPanel';
 import { SidebarShell } from '../components/SidebarShell';
 import { EnvironmentsPane } from '../components/SidebarPanes';
@@ -132,7 +133,7 @@ export function TestsView() {
   const [saved, setSaved] = useState('');
   const [preview, setPreview] = useState<{ tests: Array<{ id?: string; name: string; type: string; tags?: string[] }>; suite?: { name: string; tests: string[] } } | { error: string }>();
   const [runId, setRunId] = useState<string>();
-  const [runs, setRuns] = useState<Array<{ id: string; name: string; startedAt: string; passed: number; failed: number; errors: number; total: number; environment?: string }>>([]);
+  const [runs, setRuns] = useState<RunRow[]>([]);
   const [tab, setTab] = useState<'editor' | 'run'>('editor');
   const [opts, setOpts] = useState({ concurrency: 4, retries: 0, grep: '', tags: '' });
   const env = useApp((s) => s.environment);
@@ -419,7 +420,7 @@ export function TestsView() {
           ) : (
             <Split id="tests-runs" initial={22} min={12}>
               <RunList runs={runs} active={runId} onSelect={setRunId} />
-              <Empty title="Select a run" />
+              <RunsOverview runs={runs} onSelect={setRunId} />
             </Split>
           )}
         </div>
@@ -428,12 +429,13 @@ export function TestsView() {
   );
 }
 
-function RunList({ runs, active, onSelect }: { runs: Array<{ id: string; name: string; startedAt: string; passed: number; failed: number; errors: number; total: number; environment?: string }>; active?: string; onSelect(id: string): void }) {
+function RunList({ runs, active, onSelect }: { runs: RunRow[]; active?: string; onSelect(id: string): void }) {
   return (
     <div className="h-full overflow-auto">
       {runs.map((r) => (
         <button key={r.id} onClick={() => onSelect(r.id)} className={cx('w-full text-left px-3 py-2 border-b border-line/60', active === r.id ? 'bg-accent/10' : 'hover:bg-hover')}>
           <div className="text-sm truncate">{r.name}</div>
+          <RunMiniBar r={r} />
           <div className="text-xs text-muted flex gap-2">
             <span className={r.failed + r.errors ? 'text-bad' : 'text-ok'}>
               {r.passed}/{r.total}

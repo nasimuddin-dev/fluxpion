@@ -58,3 +58,6 @@ export const niceMax = (v: number) => {
   const f = v / p;
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
 };
+
+/** A duration for an axis tick: 250 ms, 1 s, 2.5 s (no trailing zeros). */
+export const axisMs = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${Number((ms / 1000).toFixed(2))} s`);
