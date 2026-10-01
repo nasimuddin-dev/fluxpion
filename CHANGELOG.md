@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.37.0 — 2026-10-01
+
+Highlights: AI agents can use TestPion with nothing but the app installed, and get much more from it.
+
+- **The app is an MCP server**: `TestPion --mcp-server -w <workspace>` serves a workspace to AI agents over stdio, with the secrets saved in the app and no window (`--read-only`, `--allow-production` as for the CLI). The app can stay open at the same time.
+- **Settings ▸ AI agents (MCP)**: copy-ready setup for Claude Code, Claude Desktop, Cursor / Windsurf, VS Code (Copilot) and Codex, filled in for the open workspace, with read-only and production switches. **Test connection** starts the server the way your agent will and shows what it offers. Also in the command palette (*Connect an AI agent*).
+- **AGENTS.md**: **Write AGENTS.md** (or `testpion agents-md`) adds a TestPion section to the workspace's AGENTS.md, which coding agents read first: how to use the workspace over MCP and the CLI, the check types and the test file format. Your own text stays; no paths of your machine are written.
+- **MCP server**: every tool has a title and behaviour hints (read-only, destructive, idempotent, reaches the network), so agents can run the read-only ones without asking; results come as structured content too. New **resources** (a guide, the workspace, what needs attention, each collection's docs, a saved request) and **prompts** (`investigate_failures`, `write_tests`, `debug_request`, `api_health_report`, `import_and_test`).
+- **Agents can write tests**: `testpion_guide` (check types and the test file format), `set_request_checks` (checks on a saved request; unknown types are refused) and `write_test_file` (checked before it is saved; never overwrites without `overwrite: true`).
+- **No open requests** shows in every request view when its tabs are closed (it was blank for GraphQL, gRPC, WebSocket, MCP and API definitions), with the view's own New first (e.g. **Add MCP server**); closing the last tab of one editor while others are open shows the nearest tab.
+- Bigger icons on the left rail.
+
 ## 0.36.0 — 2026-10-01
 
 Highlights: the new TestPion logo, one look for every sidebar and menu, a JWT inspector, and workspace Export in the switcher.
