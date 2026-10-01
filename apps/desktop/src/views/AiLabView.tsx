@@ -538,25 +538,38 @@ function Compare({ providers }: { providers: ProviderConfig[] }) {
               <tbody>
                 {(
                   [
-                    ['Latency', (r: ChatResult) => formatMs(r.timing?.totalMs)],
-                    ['Time to first token', (r: ChatResult) => formatMs(r.timing?.firstTokenMs)],
-                    ['Input tokens', (r: ChatResult) => r.usage?.inputTokens],
-                    ['Output tokens', (r: ChatResult) => r.usage?.outputTokens],
-                    ['Est. cost', (r: ChatResult) => formatCost(r.costUsd)],
+                    ['Latency', (r: ChatResult) => formatMs(r.timing?.totalMs), (r: ChatResult) => r.timing?.totalMs],
+                    ['Time to first token', (r: ChatResult) => formatMs(r.timing?.firstTokenMs), (r: ChatResult) => r.timing?.firstTokenMs],
+                    ['Input tokens', (r: ChatResult) => r.usage?.inputTokens, (r: ChatResult) => r.usage?.inputTokens],
+                    ['Output tokens', (r: ChatResult) => r.usage?.outputTokens, (r: ChatResult) => r.usage?.outputTokens],
+                    ['Est. cost', (r: ChatResult) => formatCost(r.costUsd), (r: ChatResult) => r.costUsd],
                     ['Valid JSON', (r: ChatResult) => (d.format === 'text' ? '–' : r.isJson ? '✓' : '✗')],
                     ['Schema valid', (r: ChatResult) => (r.schemaValid === undefined ? '–' : r.schemaValid ? '✓' : '✗')],
                     ['Checks passed', (r: ChatResult) => (r.checks ? `${r.checks.filter((c) => c.passed).length}/${r.checks.length}` : '–')],
-                  ] as Array<[string, (r: ChatResult) => React.ReactNode]>
-                ).map(([label, fn]) => (
-                  <tr key={label} className="border-b border-line">
-                    <td className="px-3 py-1.5 text-muted">{label}</td>
-                    {results.map((r, i) => (
-                      <td key={i} className="px-3 py-1.5 tabular-nums">
-                        {r.error ? <span className="text-bad">{r.error.kind}</span> : fn(r)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                  ] as Array<[string, (r: ChatResult) => React.ReactNode, ((r: ChatResult) => number | undefined)?]>
+                ).map(([label, fn, num]) => {
+                  // numeric rows get a bar per model, relative to the largest value in the row
+                  const max = num ? Math.max(0, ...results.filter((r) => !r.error).map((r) => num(r) ?? 0)) : 0;
+                  return (
+                    <tr key={label} className="border-b border-line">
+                      <td className="px-3 py-1.5 text-muted">{label}</td>
+                      {results.map((r, i) => {
+                        const v = num && !r.error ? num(r) : undefined;
+                        return (
+                          <td key={i} className="px-3 py-1.5 tabular-nums">
+                            {/* a failed model shows its error once (first row); the message is under Output */}
+                            {r.error ? label === 'Latency' ? <span className="text-bad">{r.error.kind}</span> : <span className="text-muted">—</span> : fn(r)}
+                            {v !== undefined && max > 0 && (
+                              <span aria-hidden className="block h-1 mt-1 w-full max-w-40 rounded-full bg-hover/70 overflow-hidden">
+                                <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(3, (v / max) * 100)}%` }} />
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
                 <tr className="align-top">
                   <td className="px-3 py-2 text-muted">Output</td>
                   {results.map((r, i) => (
