@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runBreakdown, type TestResult } from '@testpion/core';
+import { breakdownHtml, runBreakdown, type TestResult } from '@testpion/core';
 
 const r = (name: string, status: TestResult['status'], latencyMs: number, type = 'http', failedCheck?: string): TestResult =>
   ({ id: name, name, type, status, startedAt: '', durationMs: latencyMs + 5, latencyMs, attempts: 1, checks: failedCheck ? [{ type: 'assert', name: failedCheck, passed: false, source: 'assertion', message: '' }] : [] }) as TestResult;
@@ -60,6 +60,10 @@ describe('runBreakdown flaky tests', () => {
     b.add(timed('reused', { ttfbMs: 30, downloadMs: 2, reusedConnection: true }));
     b.add(r('no-timing', 'passed', 10, 'grpc'));
     expect(b.result().phases).toEqual({ requests: 2, newConnections: 1, reused: 1, dnsMs: 4, tcpMs: 10, tlsMs: 20, ttfbMs: 80, downloadMs: 8 });
+    const page = breakdownHtml(b.result());
+    expect(page).toContain('Where the time went');
+    expect(page).toContain('2 requests · 1 new connection, 1 reused');
+    expect(page).toContain('<td>Server (TTFB)</td>');
     const none = runBreakdown();
     none.add(r('a', 'passed', 5));
     expect(none.result().phases).toBeUndefined();

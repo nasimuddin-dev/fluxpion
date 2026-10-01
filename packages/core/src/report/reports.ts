@@ -191,6 +191,29 @@ export function breakdownHtml(b: RunBreakdown): string {
       `<section class="chart"><h3>Response time <span class="muted" style="text-transform:none;font-weight:400;margin-left:6px">tests per range</span></h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tests per response-time range">${grid}${bars}</svg><div class="legend"><span><i style="background:var(--ok)"></i>Passed</span><span><i style="background:var(--bad)"></i>Failed</span></div></section>`,
     );
   }
+  if (b.phases) {
+    // where the requests' time went: one bar per phase (connection set-up lighter), its share of the whole
+    const p = b.phases;
+    const phases = [
+      ['DNS lookup', p.dnsMs, true],
+      ['TCP connect', p.tcpMs, true],
+      ['TLS handshake', p.tlsMs, true],
+      ['Server (TTFB)', p.ttfbMs, false],
+      ['Download', p.downloadMs, false],
+    ] as const;
+    const total = phases.reduce((n, [, v]) => n + v, 0) || 1;
+    const max = Math.max(1, ...phases.map(([, v]) => v));
+    const ms = (v: number) => (v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(2)} s`);
+    const rows = phases
+      .map(
+        ([name, v, connect]) =>
+          `<tr><td>${name}</td><td style="width:100%"><span style="display:block;height:10px;border-radius:2px;background:var(--accent);opacity:${connect ? 0.5 : 0.9};width:${v ? Math.max(0.5, (v / max) * 100) : 0}%"></span></td><td style="text-align:right;white-space:nowrap">${ms(v)}</td><td style="text-align:right" class="muted">${Math.round((v / total) * 100)}%</td></tr>`,
+      )
+      .join('');
+    out.push(
+      `<section class="chart"><h3>Where the time went <span class="muted" style="text-transform:none;font-weight:400;margin-left:6px">${p.requests} request${p.requests === 1 ? '' : 's'} · ${p.newConnections} new connection${p.newConnections === 1 ? '' : 's'}, ${p.reused} reused</span></h3><table>${rows}</table><div class="legend"><span><i style="background:var(--accent);opacity:.5"></i>Setting up connections</span><span><i style="background:var(--accent)"></i>The request itself</span></div></section>`,
+    );
+  }
   if (b.scores.length) {
     // per evaluator: five columns for 0–0.2 … 0.8–1, as small inline bars
     const rows = b.scores
@@ -217,8 +240,8 @@ export async function writeHtmlReport(path: string, summary: RunSummary, results
     await w(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${html(summary.name)} — TestPion report</title>
 <style>
-:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--card:#f6f8fa}
-@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--card:#161b22}}
+:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--accent:#0969da;--card:#f6f8fa}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--accent:#4493f8;--card:#161b22}}
 body{font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px}
 h1{font-size:20px;margin:0 0 4px}.muted{color:var(--muted)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:16px 0}
