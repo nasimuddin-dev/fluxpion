@@ -10,7 +10,7 @@ import { Explorer } from './components/Explorer';
 import { EditorTabStrip, useEditorTabsStore } from './components/EditorTabs';
 import { DOC_VIEWS, DocContext, isDocView, useDocs } from './lib/docs';
 import { watchRunNotifications } from './lib/run-notifications';
-import { watchMonitorAlerts } from './lib/monitor-alerts';
+import { remindExpiringCertificates, watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
 import { Spinner, TooltipProvider } from './components/ui';
@@ -148,6 +148,8 @@ export default function App() {
         scheduleUpdateCheck();
         // warm the code editor in the background once the first screen is up
         setTimeout(() => void loadMonaco(), 1500);
+        // certificates that expire within 7 days: a reminder once a day
+        setTimeout(remindExpiringCertificates, 4000);
       } catch (error) {
         useApp.getState().toast(`Could not finish starting TestPion: ${error instanceof Error ? error.message : String(error)}`, 'error');
       } finally {
