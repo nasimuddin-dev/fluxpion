@@ -1,9 +1,9 @@
 import { Copy, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { confirmAction, promptText } from '../store';
+import { confirmAction } from '../store';
 import { Button, cx, Input, type MenuItem } from './ui';
 import { closeTabsFor } from './EditorTabs';
-import { askFolderName, folderMenuItems, moveToFolderItem, RowMenu, TreeFolderRow, TreeHeader } from './TreeParts';
+import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow, TreeHeader } from './TreeParts';
 
 export interface FolderListItem {
   id: string;
@@ -70,6 +70,13 @@ export function FolderList({
     }
   });
   const [menuFor, setMenuFor] = useState<string>();
+  /** The item being renamed in place (F2, or Rename in its menu). */
+  const [renaming, setRenaming] = useState<string>();
+  const finishRename = (id: string, name?: string) => {
+    setRenaming(undefined);
+    if (name) void ops.renameItem(id, name);
+    focusRow(id);
+  };
   // filter by name, subtitle or folder (like the REST collection tree)
   const [q, setQ] = useState('');
   const ql = q.trim().toLowerCase();
@@ -97,7 +104,7 @@ export function FolderList({
   };
   const standardMenu = (it: FolderListItem): MenuItem[] => [
     ...(itemMenu?.(it.id) ?? []),
-    { label: 'Rename', icon: <Pencil size={14} />, separator: !!itemMenu, onSelect: () => void promptText(`Rename ${itemNoun}`, { message: 'Name', value: it.name, okLabel: 'Rename' }).then((n) => n?.trim() && ops.renameItem(it.id, n.trim())) },
+    { label: 'Rename', icon: <Pencil size={14} />, separator: !!itemMenu, onSelect: () => setRenaming(it.id) },
     ...(ops.duplicateItem ? [{ label: 'Duplicate', icon: <Copy size={14} />, onSelect: () => void ops.duplicateItem!(it.id) }] : []),
     moveToFolderItem({ folders: allFolders, current: it.folder, move: (f) => moveTo(it.id, f) }),
     {
@@ -128,16 +135,33 @@ export function FolderList({
   const row = (it: FolderListItem, nested: boolean) => (
     <div
       key={it.id}
-      draggable
+      draggable={renaming !== it.id}
       onDragStart={(e) => e.dataTransfer.setData('application/x-testpion-item', it.id)}
       onContextMenu={(e) => (e.preventDefault(), setMenuFor(it.id))}
-      className={cx('group flex items-center gap-1 mx-1 pr-1 rounded-md cursor-pointer transition-colors', nested ? 'pl-9' : 'pl-3', selected === it.id ? 'bg-accent-soft' : 'hover:bg-hover', menuFor === it.id && selected !== it.id && 'bg-hover')}
-      onClick={() => onSelect(it.id)}
+      className={cx('group flex items-center gap-1 mx-1 pr-1 rounded-md cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/40', nested ? 'pl-9' : 'pl-3', selected === it.id ? 'bg-accent-soft' : 'hover:bg-hover', menuFor === it.id && selected !== it.id && 'bg-hover')}
+      onClick={() => renaming !== it.id && onSelect(it.id)}
+      // the keyboard works like in the explorer: Enter opens, F2 renames
+      role="button"
+      tabIndex={0}
+      aria-label={it.name}
+      data-tree-row
+      data-rename-id={it.id}
+      title="Enter opens · F2 renames"
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onSelect(it.id);
+        } else if (e.key === 'F2') {
+          e.preventDefault();
+          setRenaming(it.id);
+        }
+      }}
     >
       <div className="flex-1 min-w-0 py-1.5">
         <div className="flex items-center gap-2 text-sm">
           {it.icon && <span className="shrink-0 grid place-items-center w-3.5">{it.icon}</span>}
-          <span className="truncate">{it.name}</span>
+          {renaming === it.id ? <InlineRename value={it.name} onCommit={(name) => finishRename(it.id, name)} onCancel={() => finishRename(it.id)} /> : <span className="truncate">{it.name}</span>}
           {it.badge && <span className="ml-auto shrink-0">{it.badge}</span>}
         </div>
         {it.subtitle && <div className={cx('text-xs text-muted truncate', !!it.icon && 'pl-[1.375rem]')}>{it.subtitle}</div>}
@@ -161,7 +185,7 @@ export function FolderList({
           const open = !!ql || !collapsed[f];
           return (
             <div key={`folder:${f}`}>
-              <TreeFolderRow {...dropProps(f)} dropTarget={dropTarget === f} name={f} count={inFolder.length} open={open} onToggle={() => toggle(f)} menu={folderMenu(f)} />
+              <TreeFolderRow {...dropProps(f)} dropTarget={dropTarget === f} name={f} count={inFolder.length} open={open} onToggle={() => toggle(f)} menu={folderMenu(f)} onRename={(to) => ops.renameFolder(f, to)} />
               {open && inFolder.map((it) => row(it, true))}
               {open && !inFolder.length && <div className="pl-9 py-1 text-xs text-muted">Empty folder: drag a {itemNoun} here or use Move to folder.</div>}
             </div>
