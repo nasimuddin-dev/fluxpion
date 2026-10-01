@@ -10,7 +10,7 @@ export interface AgentConnectOptions {
 }
 
 /** Quote one argument for a command line the user pastes: on Windows paths keep their backslashes (cmd, PowerShell). */
-const shellArg = (a: string) => (/^[\w./:@=\\-]+$/.test(a) ? a : process.platform === 'win32' ? `"${a.replace(/"/g, '\\"')}"` : `"${a.replace(/(["\\$`])/g, '\\$1')}"`);
+const shellArg = (a: string) => (/^[\w./:@=-]+$/.test(a) ? a : process.platform === 'win32' ? `"${a.replace(/"/g, '\\"')}"` : `"${a.replace(/(["\\$`])/g, '\\$1')}"`);
 
 export function agentHandlers(be: Backend): Handlers {
   /** The command that serves the open workspace over MCP: this app with --mcp-server, or the CLI when it is not a desktop app. */
