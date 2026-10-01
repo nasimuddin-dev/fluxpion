@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.29.0 — 2026-10-01
+
+Highlights: where request time goes (DNS, TCP, TLS, server, download), certificate expiry checks, uptime by day.
+
+- **Request timing**: the Timeline is a waterfall of DNS lookup, TCP connect and TLS handshake (on a new connection), waiting for the first byte and download, with the server's address, TLS version and cipher, or *Reused connection*. `testpion send <url> -i` prints the phases; `--json` and the `send_request` MCP tool return them as `timing`.
+- **Certificates**: the Timeline shows the server's certificate (subject, issuer, valid until, days left), and the new **Certificate valid for (days)** check (`type: certificate`, `min: 14`) fails before it expires: give it to a monitored request to be alerted in time.
+- **Run charts**: *Where the time went* adds up the phases of a run's HTTP and GraphQL requests, with new and reused connections; also in the HTML report and the `run_breakdown` MCP tool.
+- **Monitors**: *Uptime by day* over 30 days, like a status page (hover a day for its runs and slowest p95); `testpion monitor uptime` and the `monitor_uptime` MCP tool; the workspace report shows each monitor's 30 days too.
+- **Collection runner**: when no run is open, the pass rate and duration of earlier runs of the collection (click one to open it).
+
 ## 0.28.0 — 2026-10-01
 
 Highlights: compare two history entries, response p95 for monitors, `testpion doctor`.
