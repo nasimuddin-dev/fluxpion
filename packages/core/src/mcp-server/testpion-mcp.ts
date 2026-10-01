@@ -1,5 +1,6 @@
 import { readResultsFile, runTests } from '../runner/runner.js';
 import { compareToBaseline, createBaseline } from '../report/regression.js';
+import { runBreakdown } from '../runner/breakdown.js';
 import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
 import { testFromRequest } from '../runner/test-from.js';
@@ -988,6 +989,19 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         } finally {
           await ctx.dispose();
         }
+      },
+    },
+    {
+      name: 'run_breakdown',
+      description:
+        'A finished run in detail (id from run_tests or the app): how many tests fell in each response-time range (passed and failed), results per test type, the slowest tests, flaky tests (passed only after a retry), the checks that failed most and, for AI evaluations, the score distribution of each evaluator. Use it to see why a run is slow or unstable.',
+      inputSchema: { type: 'object', properties: { runId: str('Run id') }, required: ['runId'] },
+      run: async (a) => {
+        const file = join(store.runDir(String(a.runId)), 'results.jsonl');
+        if (!existsSync(file)) throw new ApsError('ValidationError', `No finished run ${String(a.runId)}`);
+        const b = runBreakdown();
+        for await (const r of await readResultsFile(file)) b.add(r);
+        return b.result();
       },
     },
     {
