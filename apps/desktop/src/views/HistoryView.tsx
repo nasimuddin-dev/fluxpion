@@ -23,6 +23,7 @@ interface Entry {
   size?: number;
   request?: unknown;
   traceId?: string;
+  responseMeta?: unknown;
 }
 
 const MIX = [
@@ -61,6 +62,51 @@ function StatusMix({ items }: { items: Entry[] }) {
           </span>
         ))}
         <span className="ml-auto">of the {items.length} loaded</span>
+      </div>
+    </div>
+  );
+}
+
+/** The timing phases kept with a response (timingSummary in core). */
+interface Timing {
+  dnsMs?: number;
+  tcpMs?: number;
+  tlsMs?: number;
+  ttfbMs?: number;
+  downloadMs?: number;
+  totalMs: number;
+  reusedConnection?: boolean;
+  tlsProtocol?: string;
+}
+
+const PHASES: Array<[keyof Timing, string, string]> = [
+  ['dnsMs', 'DNS', 'color-mix(in oklab, var(--accent) 35%, transparent)'],
+  ['tcpMs', 'TCP', 'color-mix(in oklab, var(--accent) 50%, transparent)'],
+  ['tlsMs', 'TLS', 'color-mix(in oklab, var(--accent) 65%, transparent)'],
+  ['ttfbMs', 'Server', 'var(--accent)'],
+  ['downloadMs', 'Download', 'color-mix(in oklab, var(--ok) 70%, transparent)'],
+];
+
+/** Where an entry's time went, as one bar (connection set-up lighter), with each phase's time. */
+function TimingStrip({ timing }: { timing?: Timing }) {
+  if (!timing || timing.ttfbMs === undefined) return null;
+  const parts = PHASES.filter(([k]) => typeof timing[k] === 'number' && (timing[k] as number) > 0);
+  const sum = parts.reduce((n, [k]) => n + (timing[k] as number), 0) || 1;
+  return (
+    <div className="px-3 py-2 border-b border-line" role="img" aria-label={`Timing: ${parts.map(([k, l]) => `${l} ${formatMs(timing[k] as number)}`).join(', ')}`}>
+      <div className="flex h-2 rounded overflow-hidden gap-0.5">
+        {parts.map(([k, l, c]) => (
+          <span key={k} style={{ flex: timing[k] as number, background: c }} title={`${l}: ${formatMs(timing[k] as number)} (${Math.round(((timing[k] as number) / sum) * 100)}%)`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[0.7rem] text-muted">
+        {parts.map(([k, l, c]) => (
+          <span key={k} className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-sm" style={{ background: c }} />
+            {l} <b className="text-fg font-medium tabular-nums">{formatMs(timing[k] as number)}</b>
+          </span>
+        ))}
+        <span className="ml-auto">{timing.reusedConnection ? 'reused connection' : 'new connection'}{timing.tlsProtocol ? ` · ${timing.tlsProtocol}` : ''}</span>
       </div>
     </div>
   );
@@ -239,6 +285,7 @@ export function HistoryView() {
                 />
               </div>
             </div>
+            <TimingStrip timing={(sel.responseMeta as { timing?: Timing } | undefined)?.timing} />
             <div className="flex-1 min-h-0">
               <JsonTree data={{ timestamp: sel.timestamp, kind: sel.kind, status: sel.status, durationMs: sel.durationMs, request: sel.request }} />
             </div>
