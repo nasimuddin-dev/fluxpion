@@ -1,7 +1,8 @@
 import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Radio, Save, Sparkles, Trash2, Unplug, Wrench, Bookmark, History, KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on, type NormalizedError } from '../api';
-import { confirmAction, promptText, useApp } from '../store';
+import { confirmAction, persisted, promptText, useApp } from '../store';
+import { useDoc, useDocs } from '../lib/docs';
 import { useIntent, useSendShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, McpServerConfig } from '../types';
 import { formatMs, uid, plural } from '../lib/format';
@@ -16,7 +17,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { FolderList, type FolderListOps } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
-import { useSingleEditorTab } from '../components/EditorTabs';
+import { closeTabsFor, useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
 
@@ -61,16 +62,22 @@ function mergeEvents(a: McpEvent[], b: McpEvent[]): McpEvent[] {
   return out.sort((x, y) => x.timestamp - y.timestamp).slice(-5000);
 }
 
+/** Which server each MCP tab shows (each tab is its own document). */
+const tabServer = persisted<{ serverId?: string }>('mcp', {});
+
 export function McpView() {
+  const { docId, active } = useDoc();
+  const docState = useMemo(() => tabServer.forDoc(docId), [docId]);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<string | undefined>(() => docState.load().serverId);
+  useEffect(() => docState.save({ serverId: selected }), [selected, docState]);
   // a server being added: edited inline like any request, saved with Save (or on Connect)
   const [draft, setDraft] = useState<McpServerConfig | null>(null);
   const [discovery, setDiscovery] = useState<Record<string, Discovery>>({});
   const [events, setEvents] = useState<Record<string, McpEvent[]>>({});
   const [connecting, setConnecting] = useState<string>();
   const [connError, setConnError] = useState<NormalizedError>();
-  const [tab, setTab] = useSticky<Tab>('mcp:tab', 'tools');
+  const [tab, setTab] = useSticky<Tab>(`mcp:tab:${docId ?? 'main'}`, 'tools');
   const env = useApp((s) => s.environment);
   const load = useCallback(async () => {
     const s = await call<McpServerConfig[]>('mcp.servers');
@@ -162,6 +169,7 @@ export function McpView() {
     renameItem: (id, name) => saveServers(servers.map((s) => (s.id === id ? { ...s, name } : s))),
     moveItem: (id, folder) => saveServers(servers.map((s) => (s.id === id ? { ...s, folder } : s))),
     deleteItem: async (id) => {
+      closeTabsFor([id]);
       if (servers.find((s) => s.id === id)?.connected) await disconnect(id);
       await saveServers(servers.filter((s) => s.id !== id));
     },
@@ -210,15 +218,17 @@ export function McpView() {
   };
   const removeCurrent = async () => {
     if (!current) return;
-    if (draft) return setDraft(null);
+    // discarding a new server closes its tab
+    if (draft) return docId ? useDocs.getState().close('mcp', docId) : setDraft(null);
     if (!(await confirmAction({ title: 'Remove MCP server', message: `Remove the MCP server "${current.name}"?`, detail: 'Saved tests that call it will fail until you add it again.', confirmLabel: 'Remove server', danger: true }))) return;
     if (server?.connected) await disconnect(current.id);
+    closeTabsFor([current.id]);
     await saveServers(servers.filter((s) => s.id !== current.id));
     setSelected(undefined);
   };
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'mcp' && form) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && useApp.getState().view === 'mcp' && active && form) {
         e.preventDefault();
         void saveForm();
       }

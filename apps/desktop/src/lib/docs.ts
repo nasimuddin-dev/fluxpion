@@ -3,11 +3,11 @@ import { create } from 'zustand';
 import type { ViewId } from '../store';
 
 /**
- * Multi-document editors (Postman-style tabs for GraphQL, gRPC and WebSocket): each open document is its
+ * Multi-document editors (Postman-style tabs for GraphQL, gRPC, WebSocket and MCP servers): each open document is its
  * own instance of the editor, with its own draft, response and connection. The first document of each
  * editor is `main` (it keeps the draft saved before tabs existed).
  */
-export const DOC_VIEWS: ViewId[] = ['graphql', 'grpc', 'websocket'];
+export const DOC_VIEWS: ViewId[] = ['graphql', 'grpc', 'websocket', 'mcp'];
 export const isDocView = (v: ViewId) => DOC_VIEWS.includes(v);
 
 /** Which document an editor instance is, and whether it's the one on screen. */
@@ -98,8 +98,8 @@ export function routeDoc(view: ViewId, payload: Record<string, unknown> | undefi
   if (!isDocView(view)) return undefined;
   const s = useDocs.getState();
   const p = payload ?? {};
-  if (p.newDoc || p.reset) return s.newDoc(view);
-  const item = (p.requestId ?? p.savedId) as string | undefined;
+  if (p.newDoc || p.reset || p.addServer) return s.newDoc(view);
+  const item = (p.requestId ?? p.savedId ?? p.serverId) as string | undefined;
   if (item) {
     const found = (s.docs[view] ?? []).find((d) => s.items[`${view}:${d}`] === item);
     if (found) {
