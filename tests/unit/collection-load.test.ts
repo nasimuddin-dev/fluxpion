@@ -61,6 +61,11 @@ describe('load-testing a collection', () => {
     for (const p of snap.perRequest!) expect(p.requests).toBeGreaterThan(1);
     expect(snap.requests).toBe(snap.perRequest!.reduce((n, p) => n + p.requests, 0));
     expect(snap.statusCodes['401']).toBeUndefined();
+    // two virtual users keep their connections: a few are opened, the rest reused, and the server time is measured
+    expect(snap.http!.newConnections).toBeGreaterThan(0);
+    expect(snap.http!.newConnections + snap.http!.reused).toBe(snap.requests);
+    expect(snap.http!.reused).toBeGreaterThan(snap.http!.newConnections);
+    expect(snap.http!.ttfb.p50).toBeGreaterThanOrEqual(0);
   });
 
   it('without a warm-up the variable stays unresolved, and remote hosts need opt-in', async () => {

@@ -1,7 +1,7 @@
 import { isIP } from 'node:net';
 import type { HttpRequestSpec, LatencyStats, ModelRef, PriceEntry } from '../model/types.js';
 import { ApsError, normalizeError } from '../errors.js';
-import { buildUrl, executeHttp } from '../protocols/http/client.js';
+import { buildUrl, executeHttp, timingSummary } from '../protocols/http/client.js';
 import { LatencyRecorder, round } from '../util/stats.js';
 import { sleep } from '../util/concurrency.js';
 import { estimateCost, type ProviderRegistry } from '../ai/index.js';
@@ -62,6 +62,11 @@ export interface LoadSnapshot {
   perRequest?: Array<{ name: string; requests: number; errors: number; latency: LatencyStats }>;
   /** Sequences: complete passes through all the requests. */
   iterations?: number;
+  /**
+   * HTTP: the server's time to first byte, and the connections: how many requests opened a new one (and paid for
+   * DNS, TCP and TLS, on average `setupMs`) or reused one from the pool.
+   */
+  http?: { ttfb: LatencyStats; newConnections: number; reused: number; setupMs?: number };
 }
 
 class TokenBucket {
@@ -156,6 +161,20 @@ export async function runLoadTest(
   let requests = 0;
   let errors = 0;
   let connFail = 0;
+  // HTTP: server time and connection reuse
+  const ttfbRec = new LatencyRecorder();
+  let newConns = 0;
+  let reusedConns = 0;
+  let setupSum = 0;
+  const recordHttp = (r: Parameters<typeof timingSummary>[0]) => {
+    const t = timingSummary(r);
+    if (t.ttfbMs !== undefined) ttfbRec.record(t.ttfbMs);
+    if (t.reusedConnection === true) reusedConns++;
+    else if (t.reusedConnection === false) {
+      newConns++;
+      setupSum += (t.dnsMs ?? 0) + (t.tcpMs ?? 0) + (t.tlsMs ?? 0);
+    }
+  };
   let bytes = 0;
   let tokensIn = 0;
   let tokensOut = 0;
@@ -194,6 +213,7 @@ export async function runLoadTest(
     try {
       const { response } = await executeHttp(request, { signal, discardBody: true, redactor: deps.redactor, cookieJar });
       const ms = performance.now() - t0;
+      recordHttp(response);
       bytes += response.size;
       status[response.status] = (status[response.status] ?? 0) + 1;
       latency.record(ms);
@@ -249,6 +269,7 @@ export async function runLoadTest(
       } else if (cfg.target.kind === 'http') {
         const { response } = await executeHttp(cfg.target.request, { signal, discardBody: true, redactor: deps.redactor });
         const ms = performance.now() - t0;
+        recordHttp(response);
         bytes += response.size;
         status[response.status] = (status[response.status] ?? 0) + 1;
         latency.record(ms);
@@ -328,6 +349,7 @@ export async function runLoadTest(
       errorKinds: { ...errKinds },
       series: series.slice(-600),
       ...(cfg.target.kind === 'sequence' ? { iterations, perRequest: per.map((p) => ({ name: p.name, requests: p.requests, errors: p.errors, latency: p.latency.stats() })) } : {}),
+      ...(newConns + reusedConns ? { http: { ttfb: ttfbRec.stats(), newConnections: newConns, reused: reusedConns, setupMs: newConns ? round(setupSum / newConns, 1) : undefined } } : {}),
     };
     if (cfg.target.kind === 'llm')
       snap.ai = {

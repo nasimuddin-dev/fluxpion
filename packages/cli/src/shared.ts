@@ -136,6 +136,10 @@ export function printLoad(s: LoadSnapshot): void {
   console.log(`  latency       p50 ${s.latency.p50}ms · p90 ${s.latency.p90}ms · p95 ${s.latency.p95}ms · p99 ${s.latency.p99}ms · max ${s.latency.max}ms`);
   console.log(`  status codes  ${Object.entries(s.statusCodes).map(([k, v]) => `${k}:${v}`).join(' ')}`);
   console.log(`  transferred   ${formatBytes(s.bytes)}`);
+  if (s.http) {
+    console.log(`  server time   p50 ${s.http.ttfb.p50}ms · p95 ${s.http.ttfb.p95}ms (time to first byte)`);
+    console.log(`  connections   ${s.http.newConnections} new${s.http.setupMs !== undefined ? ` (set-up ${s.http.setupMs}ms each)` : ''} · ${s.http.reused} reused`);
+  }
   if (s.perRequest?.length) {
     console.log(bold(`\nPer request (${s.iterations ?? 0} passes through the collection)`));
     const w = Math.min(48, Math.max(...s.perRequest.map((p) => p.name.length)));

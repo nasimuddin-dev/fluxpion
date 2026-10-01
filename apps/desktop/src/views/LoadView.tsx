@@ -36,6 +36,7 @@ interface Snapshot {
   series: Array<{ t: number; rps: number; p95: number; errors: number; vus: number }>;
   perRequest?: Array<{ name: string; requests: number; errors: number; latency: LatencyStats }>;
   iterations?: number;
+  http?: { ttfb: LatencyStats; newConnections: number; reused: number; setupMs?: number };
 }
 
 /** Folders of a collection (with their path), for picking part of it. */
@@ -436,6 +437,15 @@ export function LoadView() {
               <Metric label="p95" value={formatMs(s.latency.p95)} />
               <Metric label="p99" value={formatMs(s.latency.p99)} />
               <Metric label="Transferred" value={formatBytes(s.bytes)} />
+              {s.http && <Metric label="Server time p50 / p95" value={`${formatMs(s.http.ttfb.p50)} / ${formatMs(s.http.ttfb.p95)}`} sub="time to first byte" />}
+              {s.http && (
+                <Metric
+                  label="Connections"
+                  value={`${s.http.newConnections.toLocaleString()} new`}
+                  sub={`${s.http.reused.toLocaleString()} reused${s.http.setupMs !== undefined ? ` · set-up ${formatMs(s.http.setupMs)} each` : ''}`}
+                  tone={s.requests > 50 && s.http.newConnections > s.requests / 2 ? 'warn' : undefined}
+                />
+              )}
             </MetricGrid>
             {s.ai && (
               <MetricGrid>
