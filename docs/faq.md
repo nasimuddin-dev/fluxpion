@@ -45,6 +45,10 @@ Response bodies stream to disk, and the viewer only shows a preview (2 MB by def
 
 In `~/.testpion` (`%USERPROFILE%\.testpion` on Windows): settings, logs, encrypted secrets and workspaces. A workspace can also live in any folder you open, such as one in a git repository. **Settings ▸ Storage** shows how much the open workspace keeps besides its definitions (runs, traces, response bodies, history) and deletes old runs; `testpion storage --delete-runs-older-than 30` does the same from a terminal.
 
+## Something doesn't work. Where do I start?
+
+Run `testpion doctor -w <workspace>`: it checks Node.js, SQLite, the app folder, secrets from the environment, proxy and certificate settings, and whether every collection of the workspace can be read (`--json` for scripts and bug reports). The app's logs are under **Logs** in the status bar.
+
 ## Why does Windows or macOS warn me when installing?
 
 The installers aren't code-signed yet. The [Windows](/installation/windows) and [macOS](/installation/macos) guides show how to proceed safely.

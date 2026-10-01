@@ -14,6 +14,7 @@ import { registerServeCommands } from './commands/serve.js';
 import { registerDataCommands } from './commands/data.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerMonitorCommands } from './commands/monitor.js';
+import { registerDoctorCommand } from './commands/doctor.js';
 
 /** The testpion command line: one module per area of commands (commands/*.ts). */
 export function buildProgram(): Command {
@@ -28,6 +29,7 @@ export function buildProgram(): Command {
   registerServeCommands(program);
   registerDataCommands(program);
   registerWorkspaceCommands(program);
+  registerDoctorCommand(program);
   registerMonitorCommands(program);
 
   return program;
