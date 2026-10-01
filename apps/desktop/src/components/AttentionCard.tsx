@@ -1,6 +1,6 @@
 import { AlertTriangle, ChevronRight, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { call, on } from '../api';
+import { asError, call, on } from '../api';
 import { useApp } from '../store';
 import { cx } from './ui';
 
@@ -21,6 +21,14 @@ function openItem(i: Item) {
   else if ((i.kind === 'run' || i.kind === 'flaky') && i.ref.runId) s.openIntent('tests', { runId: i.ref.runId });
   else if (i.kind === 'flaky') s.setView('tests');
   else if (i.kind === 'request' && i.ref.collectionId && i.ref.requestId) s.openIntent('rest', { collectionId: i.ref.collectionId, requestId: i.ref.requestId });
+}
+
+/** Run a monitor now; the card refreshes on its result. */
+function runMonitor(id: string) {
+  void call<{ status: string; passed: number; total: number }>('monitor.run', { id }).then(
+    (r) => useApp.getState().toast(r.status === 'passed' ? `Monitor passed (${r.passed}/${r.total})` : `Monitor still ${r.status === 'error' ? 'cannot run' : 'failing'}`, r.status === 'passed' ? 'success' : 'error'),
+    (e) => useApp.getState().toast(asError(e).message, 'error'),
+  );
 }
 
 /** What needs attention in the workspace, most severe first; nothing is shown when all is well. */
@@ -57,18 +65,24 @@ export function AttentionCard() {
         {shown.map((i, n) => {
           const clickable = i.kind !== 'certificate';
           return (
-            <button
-              key={n}
-              disabled={!clickable}
-              onClick={() => openItem(i)}
-              className={cx('w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left', clickable ? 'hover:bg-hover' : 'cursor-default')}
-            >
-              <span className={cx('w-2 h-2 rounded-full shrink-0', DOT[i.severity])} aria-label={i.severity} />
-              <span className="flex-1 min-w-0 truncate" title={i.message}>
-                {i.message}
-              </span>
-              {clickable && <ChevronRight size={14} className="text-muted shrink-0" />}
-            </button>
+            <div key={n} className="flex items-center gap-2">
+              <button
+                disabled={!clickable}
+                onClick={() => openItem(i)}
+                className={cx('flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left', clickable ? 'hover:bg-hover' : 'cursor-default')}
+              >
+                <span className={cx('w-2 h-2 rounded-full shrink-0', DOT[i.severity])} aria-label={i.severity} />
+                <span className="flex-1 min-w-0 truncate" title={i.message}>
+                  {i.message}
+                </span>
+                {clickable && <ChevronRight size={14} className="text-muted shrink-0" />}
+              </button>
+              {i.kind === 'monitor' && i.ref.monitorId && (
+                <button className="text-xs text-accent hover:underline shrink-0 pr-2" title="Run this monitor now" onClick={() => runMonitor(i.ref.monitorId!)}>
+                  Run now
+                </button>
+              )}
+            </div>
           );
         })}
         {items.length > 5 && (
