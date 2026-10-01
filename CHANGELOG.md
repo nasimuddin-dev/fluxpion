@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.38.0 — 2026-10-01
+
+Highlights: send feedback and report problems from the app, and steadier tabs.
+
+- **Send feedback or report a problem**: Help ▸ Send Feedback, the **Feedback** button in the status bar, or the command palette. Choose Problem, Idea, Design or Question; include the versions and platform and the app's recent errors only if you want (home folders and secret-looking values are masked; requests, responses, collections and environments are never included). You see the whole report before anything leaves your computer: **Open on GitHub** opens a pre-filled issue for you to post, or **Copy** / **Save as file**.
+- **Problems are captured**: unexpected errors of the window go to the app log (status bar ▸ Logs), and a view that stops with an error offers **Report this problem** with the error filled in. `testpion feedback` builds the same report from a terminal or an agent.
+- **Tabs**: closing a view's last tab moves to the nearest open tab only right after the close; this used to fire while a tab was opening too, which could leave a blank editor without New request, or select the wrong tab. A view whose selected tab is gone selects its first tab.
+- **No open requests** is identical in every view (New request and Describe with AI); folders of saved gRPC calls and connections look like every other folder.
+
 ## 0.37.0 — 2026-10-01
 
 Highlights: AI agents can use TestPion with nothing but the app installed, and get much more from it.
