@@ -359,6 +359,7 @@ testpion history stats -w my-workspace --request "List patients" --json  # media
 testpion history diff h-abc h-def -w my-workspace --json                  # older id first
 testpion history activity -w my-workspace --days 30 --json              # per-day requests, failures, runs
 testpion history test "Authentication / Basic auth" -w my-workspace     # one test across the latest runs; flags flaky ones
+testpion history flaky -w my-workspace                                  # every test that flips between runs (exit 1 if any)
 testpion history mcp-tools -w my-workspace --server weather            # MCP tool calls per tool: count, failures, median / p95
 testpion history llm -w my-workspace                                    # AI Lab prompts per model: tokens, estimated cost, median time
 ```

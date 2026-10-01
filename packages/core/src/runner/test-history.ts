@@ -66,3 +66,50 @@ export function summarizeTestHistory(points: TestHistoryPoint[]): { runs: number
     medianMs: ms.length ? Math.round(ms[Math.floor((ms.length - 1) / 2)]!) : undefined,
   };
 }
+
+export interface FlakyTest {
+  id: string;
+  name: string;
+  runs: number;
+  passed: number;
+  failed: number;
+  /** How often the result changed from one run to the next (oldest to newest). */
+  flips: number;
+  /** Runs where it passed only after a retry. */
+  retried: number;
+  lastStatus: string;
+  lastRunAt: string;
+  /** The latest results, oldest first (up to 20): passed or failed. */
+  recent: string[];
+}
+
+/**
+ * Tests whose result keeps changing across the latest `runs` runs (at least two flips), or that passed only after a
+ * retry, most flips first. One pass over the runs' results.
+ */
+export async function flakyTests(store: WorkspaceStore, opts: { runs?: number } = {}): Promise<FlakyTest[]> {
+  const runs = store.meta.listRuns({ limit: Math.min(Math.max(opts.runs ?? 30, 2), 300) }).items.reverse();
+  const by = new Map<string, { id: string; name: string; statuses: string[]; retried: number; lastAt: string }>();
+  for (const run of runs) {
+    const seen = new Set<string>();
+    for await (const r of await readResultsFile(join(store.runDir(run.id), 'results.jsonl'))) {
+      if (r.status === 'skipped' || seen.has(r.id)) continue;
+      seen.add(r.id);
+      let t = by.get(r.id);
+      if (!t) by.set(r.id, (t = { id: r.id, name: r.name, statuses: [], retried: 0, lastAt: run.startedAt }));
+      t.statuses.push(r.status === 'passed' ? 'passed' : 'failed');
+      if (r.status === 'passed' && r.attempts > 1) t.retried++;
+      t.lastAt = run.startedAt;
+      t.name = r.name;
+    }
+  }
+  const out: FlakyTest[] = [];
+  for (const t of by.values()) {
+    let flips = 0;
+    for (let i = 1; i < t.statuses.length; i++) if (t.statuses[i] !== t.statuses[i - 1]) flips++;
+    if (flips < 2 && !t.retried) continue;
+    const passed = t.statuses.filter((s) => s === 'passed').length;
+    out.push({ id: t.id, name: t.name, runs: t.statuses.length, passed, failed: t.statuses.length - passed, flips, retried: t.retried, lastStatus: t.statuses[t.statuses.length - 1]!, lastRunAt: t.lastAt, recent: t.statuses.slice(-20) });
+  }
+  return out.sort((a, b) => b.flips - a.flips || b.retried - a.retried || a.name.localeCompare(b.name));
+}

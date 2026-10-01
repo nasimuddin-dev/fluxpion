@@ -420,7 +420,7 @@ export function TestsView() {
           ) : (
             <Split id="tests-runs" initial={22} min={12}>
               <RunList runs={runs} active={runId} onSelect={setRunId} />
-              <RunsOverview runs={runs} onSelect={setRunId} />
+              <RunsOverview flaky runs={runs} onSelect={setRunId} />
             </Split>
           )}
         </div>

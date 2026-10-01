@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorkspaceStore, summarizeTestHistory, testHistory, type RunSummary, type TestResult } from '../../packages/core/src/index.js';
+import { WorkspaceStore, flakyTests, summarizeTestHistory, testHistory, type RunSummary, type TestResult } from '../../packages/core/src/index.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'tp-testhist-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -38,6 +38,9 @@ describe('test history across runs', () => {
     expect(summarizeTestHistory(points)).toEqual({ runs: 3, passed: 2, failed: 1, flips: 2, medianMs: 50 });
     expect((await testHistory(store, { name: 'Other' })).map((p) => p.runId)).toEqual(['run-3']);
     expect(await testHistory(store, { id: 'login' }, { limit: 1 })).toHaveLength(1);
+    // across the workspace: login flipped twice (passed, failed, passed) and passed once after a retry; other ran once
+    const flaky = await flakyTests(store);
+    expect(flaky.map((f) => [f.id, f.runs, f.passed, f.flips, f.retried, f.lastStatus, f.recent.join(',')])).toEqual([['login', 3, 2, 2, 1, 'passed', 'passed,failed,passed']]);
     store.close();
   });
 });

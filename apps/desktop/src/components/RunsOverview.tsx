@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { call } from '../api';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, ChartCard, chartKeys, ChartTip, PointLine, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard, chartKeys, ChartTip, PointLine, RecentRuns, Swatch, useWidth } from './charts';
 import { Empty } from './ui';
 
 /** A run in a list of runs (runs.list). */
@@ -129,8 +130,48 @@ function RunDurations({ runs, onSelect }: { runs: RunRow[]; onSelect?(id: string
   );
 }
 
+interface Flaky {
+  id: string;
+  name: string;
+  runs: number;
+  passed: number;
+  flips: number;
+  retried: number;
+  lastStatus: string;
+  recent: string[];
+}
+
+/** Tests whose result keeps changing across the latest runs (or that pass only after retries). */
+function FlakyTests({ refresh }: { refresh?: string }) {
+  const [rows, setRows] = useState<Flaky[]>();
+  useEffect(() => {
+    void call<Flaky[]>('runs.flaky', { runs: 30 }).then(setRows, () => setRows([]));
+  }, [refresh]);
+  if (!rows) return null;
+  return (
+    <ChartCard title="Flaky tests" aside="latest 30 runs">
+      {rows.length ? (
+        <div className="flex flex-col">
+          {rows.slice(0, 8).map((t) => (
+            <div key={t.id} className="flex items-center gap-2 py-1 text-xs min-w-0" title={`${t.name}: ${t.passed} of ${t.runs} runs passed, the result flipped ${t.flips} times${t.retried ? `, ${t.retried} passed after a retry` : ''}`}>
+              <RecentRuns statuses={t.recent} />
+              <span className="truncate flex-1 min-w-0 text-fg">{t.name}</span>
+              <span className="text-warn tabular-nums shrink-0">
+                {t.flips}× flipped{t.retried ? ` · ${t.retried} retried` : ''}
+              </span>
+            </div>
+          ))}
+          {rows.length > 8 && <div className="text-xs text-muted pt-1">and {rows.length - 8} more: testpion history flaky</div>}
+        </div>
+      ) : (
+        <div className="text-sm text-ok">None: every test gave the same result run after run.</div>
+      )}
+    </ChartCard>
+  );
+}
+
 /** The runs at a glance (shown when no run is selected): pass rate and duration of the last 40 runs. */
-export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or a run in the list, to see its results.' }: { runs: RunRow[]; onSelect?(id: string): void; hint?: string }) {
+export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or a run in the list, to see its results.', flaky }: { runs: RunRow[]; onSelect?(id: string): void; hint?: string; flaky?: boolean }) {
   const last = runs.slice(0, 40).reverse();
   if (!last.length) return <Empty title="No runs yet">Run tests, a suite or a collection; each run is listed here with its results and charts.</Empty>;
   return (
@@ -138,6 +179,7 @@ export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or 
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         <PassRate runs={last} onSelect={onSelect} />
         <RunDurations runs={last} onSelect={onSelect} />
+        {flaky && <FlakyTests refresh={runs[0]?.id} />}
       </div>
       <p className="text-xs text-muted mt-3">{hint}</p>
     </div>

@@ -1,7 +1,7 @@
 import { readResultsFile, runTests } from '../runner/runner.js';
 import { compareToBaseline, createBaseline } from '../report/regression.js';
 import { runBreakdown } from '../runner/breakdown.js';
-import { summarizeTestHistory, testHistory } from '../runner/test-history.js';
+import { flakyTests, summarizeTestHistory, testHistory } from '../runner/test-history.js';
 import { monitorRequestStats } from '../runner/monitor-requests.js';
 import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
@@ -471,6 +471,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           .listHistory({ requestId: node.id, kind: 'http', limit })
           .items.map((h) => ({ id: h.id, timestamp: h.timestamp, status: h.status, durationMs: h.durationMs, size: h.size, url: h.url && redactor.redactUrl(h.url) }));
       },
+    },
+    {
+      name: 'flaky_tests',
+      description: 'Tests of the workspace whose result keeps changing across the latest runs (two or more flips) or that passed only after a retry, most flips first: runs, passed, failed, flips, retried, last status and the latest results. Use it to find unreliable tests; test_history shows one of them in detail.',
+      inputSchema: { type: 'object', properties: { runs: { type: 'number', description: 'How many of the latest runs (default 30, max 300)' } } },
+      run: (a) => flakyTests(store, { runs: Number(a.runs) || 30 }),
     },
     {
       name: 'test_history',

@@ -62,6 +62,7 @@ import {
   llmUsage,
   testHistory,
   summarizeTestHistory,
+  flakyTests,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -755,6 +756,26 @@ export function registerDataCommands(program: Command): void {
           const kinds = Object.entries(a.byKind).map(([k, n]) => `${k} ${n}`).join(', ');
           if (kinds) console.log(dim(`By kind: ${kinds}`));
         }
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('flaky')
+    .description('tests whose result keeps changing across the latest runs, or that passed only after a retry (exit 1 when there are any)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-n, --runs <n>', 'how many of the latest runs', '30')
+    .option('--json', 'print as JSON')
+    .action(async (o: { workspace: string; runs: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const rows = await flakyTests(store, { runs: Number(o.runs) || 30 });
+        if (o.json) console.log(JSON.stringify(rows, null, 2));
+        else if (!rows.length) console.log(green('No flaky tests in the latest runs.'));
+        else
+          for (const t of rows)
+            console.log(`${t.recent.map((s) => (s === 'passed' ? green('█') : red('█'))).join('')}  ${bold(t.name)}  ${dim(`${t.passed}/${t.runs} passed · flipped ${t.flips}×${t.retried ? ` · ${t.retried} retried` : ''} · last ${t.lastStatus}`)}`);
+        process.exitCode = rows.length ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
       } finally {
         store.close();
       }
