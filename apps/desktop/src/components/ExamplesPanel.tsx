@@ -1,10 +1,11 @@
 import { BookmarkPlus, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { asError, call } from '../api';
-import { confirmAction, promptText, useApp } from '../store';
+import { confirmAction, useApp } from '../store';
 import type { SavedExample } from '../types';
 import { CodeEditor } from './CodeEditor';
 import { Badge, cx, Empty, IconButton, statusTone } from './ui';
+import { focusRow, InlineRename } from './TreeParts';
 
 const languageOf = (ex: SavedExample) => {
   const ct = ex.headers.find((h) => h.key.toLowerCase() === 'content-type')?.value ?? '';
@@ -21,6 +22,8 @@ const languageOf = (ex: SavedExample) => {
 export function ExamplesPanel({ collectionId, requestId, examples, onChange }: { collectionId?: string; requestId?: string; examples: SavedExample[]; onChange(examples: SavedExample[]): void }) {
   const toast = useApp((s) => s.toast);
   const [selected, setSelected] = useState<string | undefined>(examples[0]?.id);
+  /** The example whose name is being edited in place (the pencil, or F2 on it in the list). */
+  const [renaming, setRenaming] = useState<string>();
   const current = examples.find((e) => e.id === selected) ?? examples[0];
 
   const persist = async (next: SavedExample[]) => {
@@ -54,6 +57,15 @@ export function ExamplesPanel({ collectionId, requestId, examples, onChange }: {
             role="option"
             aria-selected={ex.id === current?.id}
             onClick={() => setSelected(ex.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'F2') {
+                e.preventDefault();
+                setSelected(ex.id);
+                setRenaming(ex.id);
+              }
+            }}
+            data-rename-id={ex.id}
+            title="F2 renames"
             className={cx('w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm', ex.id === current?.id ? 'bg-accent/10 text-accent font-medium' : 'hover:bg-hover')}
           >
             <Badge tone={statusTone(ex.status)}>{ex.status}</Badge>
@@ -67,7 +79,21 @@ export function ExamplesPanel({ collectionId, requestId, examples, onChange }: {
             <Badge tone={statusTone(current.status)}>
               {current.status} {current.statusText}
             </Badge>
-            <span className="font-medium truncate">{current.name}</span>
+            {renaming === current.id ? (
+              <InlineRename
+                className="max-w-80"
+                value={current.name}
+                label="Example name"
+                onCommit={(name) => {
+                  setRenaming(undefined);
+                  void persist(examples.map((e) => (e.id === current.id ? { ...e, name } : e)));
+                  focusRow(current.id);
+                }}
+                onCancel={() => (setRenaming(undefined), focusRow(current.id))}
+              />
+            ) : (
+              <span className="font-medium truncate">{current.name}</span>
+            )}
             {current.request && (
               <span className="text-xs text-muted mono truncate" title={`${current.request.method} ${current.request.url}`}>
                 {current.request.method} {current.request.url}
@@ -75,11 +101,8 @@ export function ExamplesPanel({ collectionId, requestId, examples, onChange }: {
             )}
             <span className="ml-auto" />
             <IconButton
-              label="Rename example"
-              onClick={async () => {
-                const name = (await promptText('Rename example', { value: current.name, okLabel: 'Rename' }))?.trim();
-                if (name) await persist(examples.map((e) => (e.id === current.id ? { ...e, name } : e)));
-              }}
+              label="Rename example (F2)"
+              onClick={() => setRenaming(current.id)}
             >
               <Pencil size={14} />
             </IconButton>

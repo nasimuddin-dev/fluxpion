@@ -284,6 +284,7 @@ export function TestsView() {
           onClick={() => void openFile(n.path)}
           onRun={/\.(ya?ml|json)$/.test(n.name) ? () => void run([n.path], n.path) : undefined}
           menu={nodeMenu(n)}
+          onRename={() => void renameFile(n.path)}
         />
       ),
     );
@@ -521,7 +522,8 @@ function RunList({ runs, active, onSelect, onOverview }: { runs: RunRow[]; activ
 }
 
 /** A row of the test file tree, like the collection tree's: folder (chevron) or file, ▶ run and ⋯ (also on right-click). */
-function TestTreeRow({ depth, label, icon, expanded, active, onClick, onRun, menu }: { depth: number; label: string; icon: React.ReactNode; expanded?: boolean; active?: boolean; onClick(): void; onRun?(): void; menu: MenuItem[] }) {
+/** F2 renames a file: its path, in a dialog (a path can move it to another folder, which an in-place name can't). */
+function TestTreeRow({ depth, label, icon, expanded, active, onClick, onRun, menu, onRename }: { depth: number; label: string; icon: React.ReactNode; expanded?: boolean; active?: boolean; onClick(): void; onRun?(): void; menu: MenuItem[]; onRename?(): void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
@@ -532,7 +534,19 @@ function TestTreeRow({ depth, label, icon, expanded, active, onClick, onRun, men
         setMenuOpen(true);
       }}
     >
-      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={onClick} aria-expanded={expanded} data-tree-row>
+      <button
+        className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'F2' && onRename) {
+            e.preventDefault();
+            onRename();
+          }
+        }}
+        aria-expanded={expanded}
+        data-tree-row
+        title={onRename ? 'F2 renames' : undefined}
+      >
         {expanded !== undefined && (expanded ? <ChevronDown size={13} className="text-muted shrink-0 -mr-0.5" /> : <ChevronRight size={13} className="text-muted shrink-0 -mr-0.5" />)}
         {icon}
         <span className="truncate">{label}</span>
