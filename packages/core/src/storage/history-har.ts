@@ -3,6 +3,7 @@ import type { WorkspaceStore } from './workspace.js';
 import type { Redactor } from '../util/redact.js';
 import { historyResponse } from './history-compare.js';
 import { ENGINE_VERSION } from '../version.js';
+import type { timingSummary } from '../protocols/http/client.js';
 
 /**
  * Request history as a HAR 1.2 file (browser devtools, Charles, Fiddler, other API tools can open it).
@@ -70,10 +71,16 @@ export function historyToHar(store: WorkspaceStore, entries: HistoryEntry[], red
           bodySize: h.size ?? -1,
         },
         cache: {},
-        timings: { send: 0, wait: h.durationMs ?? 0, receive: 0 },
+        timings: harTimings(h.durationMs, (h.responseMeta as { timing?: ReturnType<typeof timingSummary> } | undefined)?.timing),
       };
     });
   return { log: { version: '1.2', creator: { name: 'TestPion', version: ENGINE_VERSION }, entries: har } };
+}
+
+/** HAR timings from the phases kept with the response: DNS, connect (TCP + TLS, as HAR counts it), SSL, wait and receive; -1 when not applicable. */
+function harTimings(durationMs: number | undefined, t: ReturnType<typeof timingSummary> | undefined) {
+  if (!t || t.ttfbMs === undefined) return { send: 0, wait: durationMs ?? 0, receive: 0 };
+  return { blocked: -1, dns: t.dnsMs ?? -1, connect: t.tcpMs !== undefined ? t.tcpMs + (t.tlsMs ?? 0) : -1, ssl: t.tlsMs ?? -1, send: 0, wait: t.ttfbMs, receive: t.downloadMs ?? 0 };
 }
 
 /** A HAR name/value pair, masked when the name is sensitive (Authorization, Cookie, X-Api-Key …). */

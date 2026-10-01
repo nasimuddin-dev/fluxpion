@@ -110,6 +110,7 @@ import {
   DEFAULT_CLAUDE_MODEL,
   appClaudeProvider,
   recordCertificate,
+  timingSummary,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -713,7 +714,7 @@ export class Backend {
         traceId: trace.traceId,
         collectionId: p.collectionId,
         requestId: p.requestId,
-        responseMeta: { headers: ctx.redactor.redact(response.headers), contentType: response.contentType, truncated: response.truncated },
+        responseMeta: { headers: ctx.redactor.redact(response.headers), contentType: response.contentType, truncated: response.truncated, timing: timingSummary(response) },
       });
       recordCertificate(this.ws, prepared.url, response.connection?.certificate);
       const clip = (t: string | undefined) => (t && t.length > CONSOLE_BODY_CHARS ? t.slice(0, CONSOLE_BODY_CHARS) + `… [${t.length - CONSOLE_BODY_CHARS} more characters]` : t);

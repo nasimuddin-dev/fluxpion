@@ -23,7 +23,7 @@ describe('history as HAR', () => {
         durationMs: 42,
         size: 34,
         request: { method: 'POST', url: '{{baseUrl}}/pets', headers: [{ key: 'Authorization', value: 'Bearer secret-token', enabled: true }, { key: 'Content-Type', value: 'application/json', enabled: true }], body: { type: 'json', content: '{"name":"Rex"}' } },
-        responseMeta: { headers: [['content-type', 'application/json'], ['set-cookie', 'sid=abc']] },
+        responseMeta: { headers: [['content-type', 'application/json'], ['set-cookie', 'sid=abc']], timing: { dnsMs: 3, tcpMs: 10, tlsMs: 20, ttfbMs: 7, downloadMs: 2, totalMs: 42, reusedConnection: false } },
         payloadPath: payload,
       });
       store.meta.addHistory({ id: 'h2', timestamp: '2026-09-30T01:01:00.000Z', kind: 'graphql', name: 'Who', method: 'POST', url: 'https://api.test/graphql', status: 200, durationMs: 5, request: { endpoint: '{{gql}}', query: '{ me { id } }', variables: '{"a":1}' } });
@@ -39,10 +39,13 @@ describe('history as HAR', () => {
       expect(e.request.headers).toContainEqual({ name: 'Authorization', value: '[REDACTED]' });
       expect(e.request.postData).toEqual({ mimeType: 'application/json', text: '{"name":"Rex"}' });
       expect(e.response.status).toBe(201);
+      // the phases kept with the response; HAR's connect includes the TLS time
+      expect(e.timings).toEqual({ blocked: -1, dns: 3, connect: 30, ssl: 20, send: 0, wait: 7, receive: 2 });
       expect(e.response.headers).toContainEqual({ name: 'set-cookie', value: '[REDACTED]' });
       expect(e.response.content.text).toBe('{"id":7,"token":"[REDACTED]"}');
       const g = har.log.entries.find((x) => x.comment === 'Who');
       expect(JSON.parse(g.request.postData.text)).toEqual({ query: '{ me { id } }', variables: { a: 1 } });
+      expect(g.timings).toEqual({ send: 0, wait: 5, receive: 0 });
 
       // the HAR importer reads it back as requests
       const back = importAny(JSON.stringify(har));
