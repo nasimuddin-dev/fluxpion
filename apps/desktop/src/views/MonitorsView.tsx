@@ -1,5 +1,5 @@
 import { RecentRuns } from '../components/charts';
-import { AlarmClock, ExternalLink, Folder, KeyRound, ListX, Pause, Pencil, Play, Plus, SquareX, Trash2, X } from 'lucide-react';
+import { AlarmClock, ExternalLink, Sparkles, Folder, KeyRound, ListX, Pause, Pencil, Play, Plus, SquareX, Trash2, X } from 'lucide-react';
 import { SidebarShell } from '../components/SidebarShell';
 import { MonitorCharts } from '../components/MonitorCharts';
 import { MonitorRequests } from '../components/MonitorRequests';
@@ -361,6 +361,32 @@ function MonitorDetail(p: {
         <Button size="sm" variant="primary" icon={<Play size={14} />} loading={p.busy} onClick={p.onRun}>
           Run now
         </Button>
+        {last && last.status !== 'passed' && (
+          <Button
+            size="sm"
+            icon={<Sparkles size={14} />}
+            title="Ask the AI assistant what is wrong and what to do (the monitor's results, reasons and per-request numbers are sent; no bodies or secrets)"
+            onClick={() =>
+              void call('monitor.requests', { id: m.id, runs: 20 }).then(
+                (requests) =>
+                  useApp.getState().set({
+                    assistant: {
+                      task: 'explain-monitor',
+                      title: `Why "${m.name}" is failing`,
+                      context: {
+                        monitor: { name: m.name, schedule: m.schedule, environment: m.environment, maxP95Ms: m.maxP95Ms, minCertDays: m.minCertDays },
+                        latestResults: results.slice(0, 15).map((r) => ({ when: r.startedAt, status: r.status, passed: r.passed, total: r.total, p95Ms: r.p95Ms, certDaysLeft: r.certDaysLeft, reason: r.reason, error: r.error })),
+                        requests,
+                      },
+                    },
+                  }),
+                () => undefined,
+              )
+            }
+          >
+            Explain with AI
+          </Button>
+        )}
         <Tooltip content={m.enabled ? 'Pause the schedule' : 'Resume the schedule'}>
           <Button size="sm" icon={m.enabled ? <Pause size={14} /> : <AlarmClock size={14} />} onClick={p.onToggle}>
             {m.enabled ? 'Pause' : 'Resume'}
