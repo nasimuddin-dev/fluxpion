@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import { create } from 'zustand';
 import type { ViewId } from '../store';
 import { dropDraft } from './draft-store';
+import { forgetStickyKeys } from './sticky';
 
 /**
  * Multi-document editors (Postman-style tabs for GraphQL, gRPC, WebSocket and MCP servers): each open document is its
@@ -72,8 +73,10 @@ export const useDocs = create<DocsState>((set, get) => ({
     const active = { ...get().active, [view]: get().active[view] === docId ? (rest[Math.min(i, rest.length - 1)] ?? '') : get().active[view] };
     set({ docs, active });
     persist({ docs, active });
-    // the closed document's draft goes with it
+    // the closed document's draft goes with it, and what it remembered (its saved item, its title)
     dropDraft(`${view}${docKey(docId)}`);
+    const short = view === 'websocket' ? 'ws' : view;
+    forgetStickyKeys([`${short}:saved:${docId}`, `${short}:title:${docId}`]);
   },
   setItem: (view, docId, item) => {
     const k = `${view}:${docId}`;
