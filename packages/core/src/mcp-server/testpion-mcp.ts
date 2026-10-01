@@ -23,6 +23,7 @@ import { listCertificates, recordCertificate } from '../storage/certificates.js'
 import { checkCertificate } from '../net/certificate-check.js';
 import { mcpToolUsage } from '../storage/mcp-usage.js';
 import { llmUsage } from '../storage/llm-usage.js';
+import { workspaceAttention } from '../storage/attention.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext } from '../engine.js';
 import { executeHttp, timingSummary } from '../protocols/http/client.js';
@@ -516,6 +517,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const limit = Math.min(Math.max(Number(a.limit) || 50, 1), 500);
         return responseTimeStats(store.meta.listHistory({ requestId: node.id, kind: 'http', limit }).items);
       },
+    },
+    {
+      name: 'what_needs_attention',
+      description: 'What needs attention in this workspace, most severe first: failing monitors, TLS certificates that expire within 30 days, the latest run if it failed, saved requests whose latest response failed, and flaky tests. Each item has a message and a ref (monitorId, host, runId, collectionId + requestId, testId). Start here to find out what to fix.',
+      inputSchema: { type: 'object', properties: { certDays: { type: 'number', description: 'Warn about certificates that expire within this many days (default 30)' } } },
+      run: (a) => workspaceAttention(store, { certDays: Number(a.certDays) || 30 }),
     },
     {
       name: 'workspace_activity',

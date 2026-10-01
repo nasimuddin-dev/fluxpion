@@ -1,0 +1,75 @@
+import { AlertTriangle, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { call, on } from '../api';
+import { useApp } from '../store';
+import { cx } from './ui';
+
+/** From `stats.attention` (workspaceAttention in core). */
+interface Item {
+  kind: 'monitor' | 'certificate' | 'flaky' | 'request' | 'run';
+  severity: 'high' | 'medium' | 'low';
+  message: string;
+  ref: { monitorId?: string; host?: string; testId?: string; collectionId?: string; requestId?: string; runId?: string };
+}
+
+const DOT = { high: 'bg-bad', medium: 'bg-warn', low: 'bg-muted/60' } as const;
+
+/** Where to go for an item: the monitor, the run, the request (certificates have no page of their own). */
+function openItem(i: Item) {
+  const s = useApp.getState();
+  if (i.kind === 'monitor' && i.ref.monitorId) s.openIntent('monitors', { monitorId: i.ref.monitorId });
+  else if ((i.kind === 'run' || i.kind === 'flaky') && i.ref.runId) s.openIntent('tests', { runId: i.ref.runId });
+  else if (i.kind === 'flaky') s.setView('tests');
+  else if (i.kind === 'request' && i.ref.collectionId && i.ref.requestId) s.openIntent('rest', { collectionId: i.ref.collectionId, requestId: i.ref.requestId });
+}
+
+/** What needs attention in the workspace, most severe first; nothing is shown when all is well. */
+export function AttentionCard() {
+  const [items, setItems] = useState<Item[]>([]);
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    const load = () => void call<Item[]>('stats.attention').then(setItems, () => setItems([]));
+    load();
+    const offs = [on('run.finished', load), on('monitor.result', load)];
+    return () => offs.forEach((off) => off());
+  }, []);
+  if (!items.length) return null;
+  const shown = all ? items : items.slice(0, 5);
+  return (
+    <section aria-label="Needs attention" className="rounded-2xl border border-line bg-bg shadow-sm">
+      <header className="flex items-center gap-2 px-4 h-12 border-b border-line text-sm font-semibold">
+        <span className="grid place-items-center h-7 w-7 rounded-lg bg-warn/15 text-warn">
+          <AlertTriangle size={15} />
+        </span>
+        Needs attention
+        <span className="ml-auto text-xs font-normal text-muted">
+          {items.length} item{items.length === 1 ? '' : 's'}
+        </span>
+      </header>
+      <div className="p-2">
+        {shown.map((i, n) => {
+          const clickable = i.kind !== 'certificate';
+          return (
+            <button
+              key={n}
+              disabled={!clickable}
+              onClick={() => openItem(i)}
+              className={cx('w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left', clickable ? 'hover:bg-hover' : 'cursor-default')}
+            >
+              <span className={cx('w-2 h-2 rounded-full shrink-0', DOT[i.severity])} aria-label={i.severity} />
+              <span className="flex-1 min-w-0 truncate" title={i.message}>
+                {i.message}
+              </span>
+              {clickable && <ChevronRight size={14} className="text-muted shrink-0" />}
+            </button>
+          );
+        })}
+        {items.length > 5 && (
+          <button className="px-2 pt-1 text-xs text-accent hover:underline" onClick={() => setAll(!all)}>
+            {all ? 'Show fewer' : `Show all ${items.length}`}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}

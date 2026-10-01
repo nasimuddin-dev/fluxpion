@@ -30,6 +30,7 @@ import {
   workspaceStorage,
   deleteRunsBefore,
   listCertificates,
+  workspaceAttention,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
@@ -90,6 +91,8 @@ export function requestsHandlers(be: Backend): Handlers {
     'stats.requests': ({ collectionId }: { collectionId: string }) => be.ws.meta.requestStats(collectionId),
     /** TLS certificates of the HTTPS hosts called, soonest to expire first. */
     'certificates.list': () => listCertificates(be.ws),
+    /** What needs attention: failing monitors, expiring certificates, the latest failed run, failing requests, flaky tests. */
+    'stats.attention': () => workspaceAttention(be.ws),
     'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
     'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
     'history.clear': () => be.ws.meta.clearHistory(),

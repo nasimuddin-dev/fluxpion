@@ -55,6 +55,7 @@ import {
   workspaceStorage,
   deleteRunsBefore,
   listCertificates,
+  workspaceAttention,
   recordCertificate,
   checkCertificate,
   certificateLint,
@@ -299,6 +300,24 @@ export function registerDataCommands(program: Command): void {
         for (const p of u.parts) console.log(`${p.label.padEnd(28)} ${(p.bytes / 1048576).toFixed(1).padStart(8)} MB  ${dim(`${p.files} files`)}`);
         console.log(`${'Total'.padEnd(28)} ${(u.totalBytes / 1048576).toFixed(1).padStart(8)} MB`);
         console.log(dim(`${u.runs} runs, ${u.history} history entries, ${u.traces} traces`));
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('attention')
+    .description('what needs attention in the workspace: failing monitors, expiring certificates, the latest failed run, failing requests, flaky tests (exit 1 on a high-severity item)')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--cert-days <days>', 'warn about certificates that expire within this many days', '30')
+    .option('--json', 'print as JSON')
+    .action(async (o: { workspace?: string; certDays: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const items = await workspaceAttention(store, { certDays: Number(o.certDays) || 30 });
+        if (o.json) console.log(JSON.stringify(items, null, 2));
+        else if (!items.length) console.log(green('Nothing needs attention.'));
+        else for (const i of items) console.log(`${i.severity === 'high' ? red('high  ') : i.severity === 'medium' ? yellow('medium') : dim('low   ')} ${i.message}`);
+        process.exitCode = items.some((i) => i.severity === 'high') ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
       } finally {
         store.close();
       }

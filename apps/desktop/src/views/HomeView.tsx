@@ -8,6 +8,7 @@ import type { Collection, CollectionNode, HttpRequestSpec } from '../types';
 import { timeAgo, uid, plural } from '../lib/format';
 import { Badge, cx, Empty, Kbd, statusTone } from '../components/ui';
 import { ActivityCharts, type Activity } from '../components/ActivityCharts';
+import { AttentionCard } from '../components/AttentionCard';
 import { RecentRuns } from '../components/charts';
 
 interface HistoryItem {
@@ -178,6 +179,8 @@ export function HomeView() {
           <Action icon={<Bot size={16} />} hue="indigo" title="Ask the assistant" text="Explain an error, draft tests or ask how to do something." onClick={() => useApp.getState().set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } })} />
           <Action icon={<BookOpen size={16} />} hue="slate" title="Read the docs" text="Guides for requests, scripts, the runner, mocks and the CLI." onClick={() => window.open(DOCS, '_blank', 'noopener')} />
         </div>
+
+        <AttentionCard />
 
         {activity && (
           <section aria-label="Activity" className="rounded-2xl border border-line bg-bg shadow-sm p-4 flex flex-col gap-3">
