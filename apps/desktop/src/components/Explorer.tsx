@@ -111,7 +111,7 @@ function Row({ icon, label, sub, onClick, title, active, menu, drag, indent }: {
         setMenuOpen(true);
       }}
     >
-      <button title={title ?? label} onClick={onClick} onKeyDown={menuKeys(menu)} data-tree-row className={cx('flex-1 min-w-0 flex items-center gap-2 h-7 pr-1 text-sm text-left', indent ? 'pl-10' : 'pl-6')}>
+      <button title={title ?? label} onClick={onClick} onKeyDown={menuKeys(menu)} data-tree-row className={cx('flex-1 min-w-0 flex items-center gap-2 h-8 pr-1 text-sm text-left', indent ? 'pl-10' : 'pl-6')}>
         {icon && <span className="text-muted shrink-0">{icon}</span>}
         <span className="truncate flex-1">{label}</span>
         {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}

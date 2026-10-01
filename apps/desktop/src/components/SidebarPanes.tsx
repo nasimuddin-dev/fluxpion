@@ -1,4 +1,5 @@
-import { Check, History, KeyRound, Plus } from 'lucide-react';
+import { Check, History, KeyRound, Pencil, Plus } from 'lucide-react';
+import { RowMenu } from './TreeParts';
 import { useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import { promptText, useApp } from '../store';
@@ -28,22 +29,26 @@ export function EnvironmentsPane() {
         </IconButton>
       </div>
       <div className="flex-1 overflow-auto">
-        <button className={cx('w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left', !env ? 'bg-accent/10 text-accent' : 'hover:bg-hover text-muted')} onClick={() => useApp.getState().setEnvironment(undefined)}>
+        <button className={cx('w-[calc(100%-0.5rem)] mx-1 rounded-md flex items-center gap-2 px-3 h-8 text-sm text-left transition-colors', !env ? 'bg-accent-soft text-accent' : 'hover:bg-hover text-muted')} onClick={() => useApp.getState().setEnvironment(undefined)}>
           <span className="w-2 h-2 rounded-full bg-[var(--line-strong)] shrink-0" />
           <span className="flex-1">No environment</span>
           {!env && <Check size={13} />}
         </button>
         {envs.map((e) => (
-          <div key={e.id} className={cx('group flex items-center gap-2 px-3 py-1.5 text-sm', e.name === env ? 'bg-accent/10 text-accent' : 'hover:bg-hover')}>
+          <div key={e.id} className={cx('group flex items-center gap-2 mx-1 rounded-md px-3 h-8 text-sm transition-colors', e.name === env ? 'bg-accent-soft text-accent' : 'hover:bg-hover')}>
             <button className="flex-1 flex items-center gap-2 text-left min-w-0" onClick={() => useApp.getState().setEnvironment(e.name)} title="Make this the active environment">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: e.color ?? (e.isProduction ? 'var(--bad)' : 'var(--ok)') }} />
               <span className="truncate">{e.name}</span>
               {e.isProduction && <Badge tone="bad">prod</Badge>}
               {e.name === env && <Check size={13} className="ml-auto shrink-0" />}
             </button>
-            <button className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-fg shrink-0" onClick={() => useApp.getState().openIntent('environments', { environmentId: e.id })}>
-              Edit
-            </button>
+            <RowMenu
+              label={e.name}
+              items={[
+                { label: 'Make active', icon: <Check size={14} />, disabled: e.name === env, onSelect: () => useApp.getState().setEnvironment(e.name) },
+                { label: 'Edit', icon: <Pencil size={14} />, onSelect: () => useApp.getState().openIntent('environments', { environmentId: e.id }) },
+              ]}
+            />
           </div>
         ))}
         {!ws?.environments.length && (
@@ -89,13 +94,13 @@ export function HistoryPane({ kind = 'http', onOpen, noun = 'Requests you send' 
       <div className="flex-1 overflow-auto">
         {rows.map((r, i) =>
           'header' in r ? (
-            <div key={`h-${i}`} className="px-3 pt-2 pb-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted">
+            <div key={`h-${i}`} className="px-3 pt-2.5 pb-1 text-xs font-semibold text-muted">
               {r.header}
             </div>
           ) : (
             <button
               key={r.item.id}
-              className="w-full flex items-center gap-2 px-3 py-1 text-sm text-left hover:bg-hover"
+              className="w-[calc(100%-0.5rem)] mx-1 rounded-md flex items-center gap-2 px-2 h-8 text-sm text-left hover:bg-hover transition-colors"
               title={r.item.url}
               onClick={() => (onOpen ? onOpen(r.item) : useApp.getState().openIntent('history', { historyId: r.item.id }))}
             >
