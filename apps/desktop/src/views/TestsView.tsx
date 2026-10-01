@@ -1,4 +1,4 @@
-import { BarChart3, ChevronDown, ChevronRight, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronRight, CopyPlus, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Pencil, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -9,10 +9,10 @@ import { CodeEditor } from '../components/CodeEditor';
 import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { RunPanel } from '../components/RunPanel';
 import { SidebarShell } from '../components/SidebarShell';
-import { TreeHeader } from '../components/TreeParts';
+import { RowMenu, TreeHeader } from '../components/TreeParts';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { finishSave, type SaveResult } from '../lib/files';
-import { Badge, Button, cx, Empty, IconButton, Input, SectionTitle, Split, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, IconButton, Input, rowActionClass, SectionTitle, Split, Tabs, type MenuItem } from '../components/ui';
 
 interface Node {
   name: string;
@@ -214,34 +214,77 @@ export function TestsView() {
 
   useSaveShortcut('tests', () => void save());
 
+  /** Rename or move a test file (its path inside tests/). */
+  const renameFile = async (path: string) => {
+    const to = (await promptText('Rename test file', { message: 'File path inside tests/', value: path, okLabel: 'Rename' }))?.trim();
+    if (!to || to === path) return;
+    try {
+      await call('tests.write', { path: to, content: await call<string>('tests.read', { path }) });
+      await call('tests.delete', { path });
+      if (file === path) {
+        setFile(to);
+      }
+      await loadTree();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+  const duplicateFile = async (path: string) => {
+    const to = path.replace(/(\.suite)?\.(ya?ml|json)$/i, (m) => ` copy${m}`);
+    await call('tests.write', { path: to, content: await call<string>('tests.read', { path }) });
+    await loadTree();
+  };
+  const deletePath = async (n: Node) => {
+    const dir = n.kind === 'dir';
+    if (!(await confirmAction({ title: dir ? 'Delete folder' : 'Delete test file', message: `Delete tests/${n.path}${dir ? ' and every file in it' : ''}?`, confirmLabel: 'Delete', danger: true }))) return;
+    await call('tests.delete', { path: n.path });
+    if (file && (file === n.path || file.startsWith(`${n.path}/`))) {
+      setFile(undefined);
+      setContent('');
+      setSaved('');
+    }
+    await loadTree();
+  };
+  const nodeMenu = (n: Node): MenuItem[] =>
+    n.kind === 'dir'
+      ? [
+          { label: 'Run folder', icon: <Play size={14} />, onSelect: () => void run([n.path], n.path) },
+          { label: 'Delete folder', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void deletePath(n) },
+        ]
+      : [
+          { label: 'Open', icon: <FileCode2 size={14} />, onSelect: () => void openFile(n.path) },
+          ...(/\.(ya?ml|json)$/.test(n.name) ? [{ label: 'Run', icon: <Play size={14} />, onSelect: () => void run([n.path], n.path) }] : []),
+          { label: 'Rename', icon: <Pencil size={14} />, separator: true, onSelect: () => void renameFile(n.path) },
+          { label: 'Duplicate', icon: <CopyPlus size={14} />, onSelect: () => void duplicateFile(n.path) },
+          { label: 'Delete', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void deletePath(n) },
+        ];
+
   const renderTree = (nodes: Node[], depth = 0): React.ReactNode =>
     nodes.map((n) =>
       n.kind === 'dir' ? (
         <div key={n.path}>
-          <div className="group flex items-center h-7 hover:bg-hover pr-1 text-sm" style={{ paddingLeft: 6 + depth * 12 }}>
-            <button className="flex items-center gap-1 flex-1 min-w-0" onClick={() => setOpen({ ...open, [n.path]: !(open[n.path] ?? true) })}>
-              {tf || (open[n.path] ?? true) ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
-              <Folder size={13} className="text-muted" />
-              <span className="truncate">{n.name}</span>
-            </button>
-            <IconButton label={`Run ${n.name}`} className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => run([n.path], n.path)}>
-              <Play size={11} />
-            </IconButton>
-          </div>
+          <TestTreeRow
+            depth={depth}
+            label={n.name}
+            icon={<Folder size={13} className="text-muted shrink-0" />}
+            expanded={!!tf || (open[n.path] ?? true)}
+            onClick={() => setOpen({ ...open, [n.path]: !(open[n.path] ?? true) })}
+            onRun={() => void run([n.path], n.path)}
+            menu={nodeMenu(n)}
+          />
           {(tf || (open[n.path] ?? true)) && renderTree(n.children ?? [], depth + 1)}
         </div>
       ) : (
-        <div key={n.path} className={cx('group flex items-center h-7 pr-1 text-sm', file === n.path ? 'bg-accent/10' : 'hover:bg-hover')} style={{ paddingLeft: 20 + depth * 12 }}>
-          <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => openFile(n.path)}>
-            {n.name.includes('.suite.') ? <Layers size={13} className="text-judge" /> : <FileCode2 size={13} className="text-muted" />}
-            <span className="truncate">{n.name}</span>
-          </button>
-          {/\.(ya?ml|json)$/.test(n.name) && (
-            <IconButton label={`Run ${n.name}`} className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => run([n.path], n.path)}>
-              <Play size={11} />
-            </IconButton>
-          )}
-        </div>
+        <TestTreeRow
+          key={n.path}
+          depth={depth}
+          label={n.name}
+          active={file === n.path}
+          icon={n.name.includes('.suite.') ? <Layers size={13} className="text-judge shrink-0" /> : <FileCode2 size={13} className="text-muted shrink-0" />}
+          onClick={() => void openFile(n.path)}
+          onRun={/\.(ya?ml|json)$/.test(n.name) ? () => void run([n.path], n.path) : undefined}
+          menu={nodeMenu(n)}
+        />
       ),
     );
 
@@ -403,7 +446,7 @@ export function TestsView() {
               </Split>
             ) : (
               <Empty icon={<FileCode2 size={28} />} title="Select a test file">
-                Pick a file on the left to edit it and preview its tests, or use <b>New</b> to create one.
+                Pick a file on the left to edit it and preview its tests, or use <b>+</b> beside Tests to create one.
               </Empty>
             )
           ) : runId ? (
@@ -473,6 +516,33 @@ function RunList({ runs, active, onSelect, onOverview }: { runs: RunRow[]; activ
         {!runs.length && <div className="p-3 text-sm text-muted">No runs yet</div>}
         {runs.length > 0 && !shown.length && <div className="p-3 text-sm text-muted">No runs match</div>}
       </div>
+    </div>
+  );
+}
+
+/** A row of the test file tree, like the collection tree's: folder (chevron) or file, ▶ run and ⋯ (also on right-click). */
+function TestTreeRow({ depth, label, icon, expanded, active, onClick, onRun, menu }: { depth: number; label: string; icon: React.ReactNode; expanded?: boolean; active?: boolean; onClick(): void; onRun?(): void; menu: MenuItem[] }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div
+      className={cx('group flex items-center gap-0.5 h-8 text-sm rounded-md mx-1 pr-1 transition-colors', active ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuOpen && !active && 'bg-hover')}
+      style={{ paddingLeft: (expanded === undefined ? 22 : 6) + depth * 12 }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuOpen(true);
+      }}
+    >
+      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={onClick} aria-expanded={expanded} data-tree-row>
+        {expanded !== undefined && (expanded ? <ChevronDown size={13} className="text-muted shrink-0 -mr-0.5" /> : <ChevronRight size={13} className="text-muted shrink-0 -mr-0.5" />)}
+        {icon}
+        <span className="truncate">{label}</span>
+      </button>
+      {onRun && (
+        <IconButton label={`Run ${label}`} className={rowActionClass()} onClick={onRun}>
+          <Play size={12} />
+        </IconButton>
+      )}
+      <RowMenu label={label} items={menu} open={menuOpen} onOpenChange={setMenuOpen} />
     </div>
   );
 }
