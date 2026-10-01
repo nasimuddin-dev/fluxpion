@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -325,6 +325,7 @@ export function Explorer() {
   };
   // Import and Export open here, without leaving the request editors
   const [importing, setImporting] = useState(false);
+  const [collapseAll, setCollapseAll] = useState(0);
   const [exporting, setExporting] = useState(false);
   const importDefinition = () => setImporting(true);
   /** Show a saved gRPC call / connection in another collection (or in none). */
@@ -479,8 +480,11 @@ export function Explorer() {
           <PanelLeftClose size={14} />
         </IconButton>
       </div>
-      <div className="p-2 shrink-0">
-        <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter" aria-label="Filter requests, connections, servers and definitions" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <div className="p-2 shrink-0 flex items-center gap-1">
+        <Input className="flex-1 min-w-0 h-7 min-h-7 text-sm" placeholder="Filter" aria-label="Filter requests, connections, servers and definitions" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <IconButton label="Collapse all" className="h-7 w-7 shrink-0" onClick={() => setCollapseAll((n) => n + 1)}>
+          <ChevronsDownUp size={14} />
+        </IconButton>
       </div>
       <div className="flex-1 overflow-auto">
         {collections.length ? (
@@ -492,6 +496,7 @@ export function Explorer() {
               extraGroups={extraGroups}
               onNewOfCategory={newOfCategory}
               onDropSaved={(kind, id, to) => void moveItem(kind, id, to)}
+              collapseAll={collapseAll}
               activeRequestId={openRequestId}
               onOpen={(c, n) => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
               onChange={(c) => void saveCollection(c)}

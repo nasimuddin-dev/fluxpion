@@ -1,5 +1,5 @@
 import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';
@@ -97,6 +97,7 @@ export function CollectionTree({
   extraGroups,
   onNewOfCategory,
   onDropSaved,
+  collapseAll,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -122,6 +123,8 @@ export function CollectionTree({
   onNewOfCategory?(c: Collection, cat: RequestCategory): void;
   /** A saved gRPC call or connection was dropped on a collection. */
   onDropSaved?(kind: 'grpc' | 'websocket', id: string, collectionId: string): void;
+  /** Changes (1, 2 …) fold every collection and folder. */
+  collapseAll?: number;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
@@ -314,6 +317,21 @@ export function CollectionTree({
     setOpen(next);
     localStorage.setItem('aps.tree.open', JSON.stringify(next));
   };
+  useEffect(() => {
+    if (!collapseAll) return;
+    // every folder and category closed, and every collection (some are open by default)
+    setOpen((o) => {
+      const next: Record<string, boolean> = Object.fromEntries(Object.keys(o).map((k) => [k, false]));
+      for (const c of collections) next[c.id] = false;
+      try {
+        localStorage.setItem('aps.tree.open', JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseAll]);
   const [editing, setEditing] = useState<{ c: Collection; folder: CollectionFolder }>();
   const f = filter?.toLowerCase();
   const matches = (n: CollectionNode) => matchesCollectionNode(n, filter, favoritesOnly);
