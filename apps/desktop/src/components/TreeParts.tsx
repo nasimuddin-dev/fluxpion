@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Folder, FolderInput, FolderOpen, FolderPlus, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState, type HTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { confirmAction, promptText } from '../store';
 import { cx, IconButton, Menu, rowActionClass, type MenuItem } from './ui';
 
@@ -211,3 +211,67 @@ export function moveToFolderItem({ folders, current, move }: { folders: string[]
     ],
   };
 }
+
+/**
+ * A name edited in place (rename in a tree, a list or a tab): the text is selected, Enter or clicking away saves,
+ * Esc cancels. A blank name (or what `validate` refuses) is not saved: the field shows why, and clicking away
+ * cancels. Keys stay in the field, so tree shortcuts (F2, Delete, arrows) don't fire while typing.
+ */
+export function InlineRename({ value, onCommit, onCancel, validate, label = 'Name', className }: { value: string; onCommit(name: string): void; onCancel(): void; validate?(name: string): string | undefined; label?: string; className?: string }) {
+  const [text, setText] = useState(value);
+  const [error, setError] = useState<string>();
+  const ref = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    // after a menu closes (Rename… in a ⋯ menu), so its focus handling can't take the field's focus away
+    const id = requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.select();
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const check = (t: string) => (!t.trim() ? 'A name is required' : validate?.(t.trim()));
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    const t = text.trim();
+    const problem = check(text);
+    if (save && problem) return setError(problem);
+    done.current = true;
+    if (save && t !== value) onCommit(t);
+    else onCancel();
+  };
+  return (
+    <span className={cx('relative flex-1 min-w-0', className)}>
+      <input
+        ref={ref}
+        aria-label={label}
+        aria-invalid={!!error}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (error) setError(check(e.target.value));
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            finish(true);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            finish(false);
+          }
+        }}
+        // clicking away saves a valid name and drops an invalid one
+        onBlur={() => (check(text) ? finish(false) : finish(true))}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onDragStart={(e) => (e.preventDefault(), e.stopPropagation())}
+        className={cx('w-full h-6 px-1.5 -ml-1.5 rounded-md bg-field text-fg text-sm border outline-none focus:ring-2', error ? 'border-bad focus:ring-bad/30' : 'border-accent focus:ring-accent/30')}
+      />
+      {error && <span role="alert" className="absolute left-0 top-full mt-1 z-20 rounded-md bg-bad text-white text-xs px-2 py-0.5 shadow whitespace-nowrap">{error}</span>}
+    </span>
+  );
+}
+
+/** Put the keyboard back on a row after an inline rename (rows carry data-rename-id). */
+export const focusRow = (id: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-rename-id="${CSS.escape(id)}"]`)?.focus());

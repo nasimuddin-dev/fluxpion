@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call, on } from '../api';
 import { Button, cx, IconButton, Menu, menuKeys, rowActionClass, type MenuItem } from './ui';
-import { CountPill } from './TreeParts';
+import { CountPill, focusRow, InlineRename } from './TreeParts';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
 import { closeTabsFor } from './EditorTabs';
@@ -176,6 +176,13 @@ export function CollectionTree({
   revealKey?: number;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
+  /** The collection, folder or request being renamed in place (F2, or Rename in its menu). */
+  const [renaming, setRenaming] = useState<string>();
+  const finishRename = (c: Collection, id: string, name?: string) => {
+    setRenaming(undefined);
+    if (name) onChange(id === c.id ? { ...c, name } : { ...c, items: mapNodes(c.items, (x) => (x.id === id ? { ...x, name } : x)) });
+    focusRow(id);
+  };
   const health = useCollectionsHealth();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
   /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
@@ -199,10 +206,7 @@ export function CollectionTree({
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
-  const renameNode = async (c: Collection, n: CollectionNode) => {
-    const name = await promptText(n.kind === 'folder' ? 'Rename folder' : 'Rename request', { value: n.name, okLabel: 'Rename' });
-    if (name) onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id ? { ...x, name } : x)) });
-  };
+  const renameNode = (_c: Collection, n: CollectionNode) => setRenaming(n.id);
   const deleteNode = async (c: Collection, n: CollectionNode) => {
     const ok =
       n.kind === 'folder'
@@ -426,8 +430,15 @@ export function CollectionTree({
         const isOpen = open[n.id] ?? (!!f || (!!activeRequestId && !!findNode(n.items, activeRequestId)));
         return (
           <div key={n.id}>
-            <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', menuFor === n.id && 'bg-hover', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })} onContextMenu={(e) => (e.preventDefault(), setMenuFor(n.id))}>
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id, isOpen)} onKeyDown={rowKeys(c, n)} data-tree-row aria-expanded={isOpen}>
+            <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', menuFor === n.id && 'bg-hover', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })} draggable={renaming === n.id ? false : undefined} onContextMenu={(e) => (e.preventDefault(), setMenuFor(n.id))}>
+              {renaming === n.id ? (
+                <div className="flex items-center gap-1 flex-1 min-w-0">
+                  {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+                  <Folder size={13} className="text-muted shrink-0" />
+                  <InlineRename value={n.name} label="Folder name" onCommit={(name) => finishRename(c, n.id, name)} onCancel={() => finishRename(c, n.id)} />
+                </div>
+              ) : (
+              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id, isOpen)} onKeyDown={rowKeys(c, n)} data-tree-row data-rename-id={n.id} aria-expanded={isOpen} title="F2 renames · Delete deletes">
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
                 <span className="truncate">{n.name}</span>
@@ -436,6 +447,7 @@ export function CollectionTree({
                   <CountPill n={requestCount(n.items)} />
                 </span>
               </button>
+              )}
               <NodeMenu
                 open={menuFor === n.id}
                 onOpenChange={(o) => setMenuFor(o ? n.id : undefined)}
@@ -471,6 +483,7 @@ export function CollectionTree({
           style={pad}
           {...dragProps(c, n)}
           {...dropProps(c, n.id, 'before', { beforeId: n.id })}
+          draggable={renaming === n.id ? false : undefined}
           onContextMenu={(e) => {
             e.preventDefault();
             setMenuFor(n.id);
@@ -481,10 +494,17 @@ export function CollectionTree({
               {examplesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
           )}
-          <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)} onKeyDown={rowKeys(c, n)} data-tree-row title="Enter opens · F2 renames · Delete deletes">
+          {renaming === n.id ? (
+            <div className="flex items-center gap-2 flex-1 min-w-0 pl-4">
+              <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
+              <InlineRename value={n.name} label="Request name" onCommit={(name) => finishRename(c, n.id, name)} onCancel={() => finishRename(c, n.id)} />
+            </div>
+          ) : (
+          <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)} onKeyDown={rowKeys(c, n)} data-tree-row data-rename-id={n.id} title="Enter opens · F2 renames · Delete deletes">
             <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
           </button>
+          )}
           <NodeMenu
             open={menuFor === n.id}
             onOpenChange={(o) => setMenuFor(o ? n.id : undefined)}
@@ -704,7 +724,26 @@ export function CollectionTree({
                 setMenuFor(c.id);
               }}
             >
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id, isOpen)} aria-expanded={isOpen} data-tree-row>
+              {renaming === c.id ? (
+                <div className="flex items-center gap-1 flex-1 min-w-0 font-medium">
+                  {isOpen ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
+                  <InlineRename value={c.name} label="Collection name" onCommit={(name) => finishRename(c, c.id, name)} onCancel={() => finishRename(c, c.id)} />
+                </div>
+              ) : (
+              <button
+                className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium"
+                onClick={() => toggle(c.id, isOpen)}
+                onKeyDown={(e) => {
+                  if (e.key === 'F2' && !c.problem) {
+                    e.preventDefault();
+                    setRenaming(c.id);
+                  }
+                }}
+                aria-expanded={isOpen}
+                data-tree-row
+                data-rename-id={c.id}
+                title={c.problem ? undefined : 'F2 renames'}
+              >
                 {isOpen ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
                   {c.name}
@@ -717,6 +756,7 @@ export function CollectionTree({
                 {/* two collections with one name (an import done twice): their ids tell them apart */}
                 {collections.some((x) => x !== c && x.name === c.name) && <span className="text-[0.7rem] text-muted font-normal mono truncate shrink-0 max-w-[40%]" title="Another collection has this name; this is its id">{c.id}</span>}
               </button>
+              )}
               {!c.problem && (
                 <IconButton label={`${newRequestLabel ?? 'New HTTP request'} in ${c.name}`} className={rowActionClass(true)} onClick={() => onNewRequest(c)}>
                   <Plus size={14} />
@@ -728,10 +768,7 @@ export function CollectionTree({
                   label={c.name}
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
-                  onRename={async () => {
-                    const name = (await promptText('Rename collection', { value: c.name, okLabel: 'Rename' }))?.trim();
-                    if (name) onChange({ ...c, name });
-                  }}
+                  onRename={() => setRenaming(c.id)}
                   onDuplicate={() => void duplicateCollection(c)}
                   onDelete={() => void deleteCollection(c)}
                   extraItems={[
