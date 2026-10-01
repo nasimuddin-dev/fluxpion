@@ -202,7 +202,7 @@ export function DailyUptime({ monitorId, refresh }: { monitorId: string; refresh
   const [days, setDays] = useState<MonitorDay[]>([]);
   useEffect(() => {
     let live = true;
-    void call<MonitorDay[]>('monitor.daily', { id: monitorId, days: 30, utcOffsetMinutes: -new Date().getTimezoneOffset() }).then(
+    void call<MonitorDay[]>('monitor.daily', { id: monitorId, days: 30, tzOffsetMin: new Date().getTimezoneOffset() }).then(
       (d) => live && setDays(d),
       () => live && setDays([]),
     );

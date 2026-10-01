@@ -1,7 +1,7 @@
 import type { WorkspaceStore } from '../storage/workspace.js';
 import type { ActivityDay } from '../storage/metastore.js';
 import { collectionRequests } from '../runner/collection-run.js';
-import { listMonitors, monitorResults } from '../runner/monitors.js';
+import { listMonitors, monitorDaily, monitorResults } from '../runner/monitors.js';
 import { ENGINE_VERSION } from '../version.js';
 
 const esc = (s: unknown) =>
@@ -70,7 +70,10 @@ export function workspaceReportHtml(store: WorkspaceStore, opts: { days?: number
     });
   const monitors = listMonitors(store).map((m) => {
     const recent = monitorResults(store, m.id, 20);
-    return { name: m.name, enabled: m.enabled, last: recent[0], passed: recent.filter((r) => r.status === 'passed').length, total: recent.length, strip: [...recent].reverse() };
+    const daily = monitorDaily(store, m.id, 30, opts.tzOffsetMin);
+    const dayRuns = daily.reduce((x, d) => x + d.runs, 0);
+    const dayPassed = daily.reduce((x, d) => x + d.passed, 0);
+    return { name: m.name, enabled: m.enabled, last: recent[0], passed: recent.filter((r) => r.status === 'passed').length, total: recent.length, strip: [...recent].reverse(), daily, uptime: dayRuns ? pct(dayPassed, dayRuns) : '—' };
   });
   const runs = store.meta.listRuns({ limit: 10 }).items;
 
@@ -88,7 +91,7 @@ h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:24px 0 8px}.muted{colo
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}.chart{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .chart h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}.chart svg{width:100%;height:auto;font-size:10px}.chart svg text{fill:var(--muted)}.chart svg line{stroke:var(--line)}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:500}td.n{text-align:right;font-variant-numeric:tabular-nums}
-.strip{display:inline-flex;gap:1px;vertical-align:middle}.strip i{display:inline-block;width:4px;height:12px;border-radius:1px}
+.strip{display:inline-flex;gap:1px;vertical-align:middle}.strip i{display:inline-block;width:4px;height:12px;border-radius:1px}.strip.days{gap:2px}.strip.days i{width:6px}
 </style></head><body>
 <h1>${esc(ws.name)}</h1>
 <div class="muted">Workspace report · last ${a.days.length} days · ${esc(new Date().toLocaleString())} · TestPion ${ENGINE_VERSION}</div>
@@ -111,11 +114,13 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px
   out.push(`</table>`);
 
   if (monitors.length) {
-    out.push(`<h2>Monitors</h2><table><tr><th>Monitor</th><th>Latest</th><th>Last ${Math.max(...monitors.map((m) => m.total), 1)} runs</th><th>Passed</th></tr>`);
+    out.push(`<h2>Monitors</h2><table><tr><th>Monitor</th><th>Latest</th><th>Last ${Math.max(...monitors.map((m) => m.total), 1)} runs</th><th>Passed</th><th>Uptime by day, 30 days</th><th>Uptime</th></tr>`);
     for (const m of monitors) {
       const strip = m.strip.map((r) => `<i style="background:${r.status === 'passed' ? 'var(--ok)' : 'var(--bad)'}" title="${esc(r.startedAt)}: ${esc(r.status)}"></i>`).join('');
       const latest = !m.enabled ? '<span class="muted">paused</span>' : !m.last ? '<span class="muted">not run yet</span>' : `<span class="${m.last.status === 'passed' ? 'ok' : 'bad'}">${esc(m.last.reason ?? m.last.status)}</span> <span class="muted">${esc(new Date(m.last.startedAt).toLocaleString())}</span>`;
-      out.push(`<tr><td>${esc(m.name)}</td><td>${latest}</td><td><span class="strip">${strip}</span></td><td class="n">${m.total ? pct(m.passed, m.total) : '—'}</td></tr>`);
+      // one block per day: all passed, 90% or more, less, or no runs
+      const days = m.daily.map((d) => `<i style="background:${!d.runs ? 'var(--line)' : d.uptime === 100 ? 'var(--ok)' : (d.uptime ?? 0) >= 90 ? 'var(--warn)' : 'var(--bad)'}" title="${esc(d.date)}: ${d.runs ? `${d.passed}/${d.runs} runs passed` : 'no runs'}"></i>`).join('');
+      out.push(`<tr><td>${esc(m.name)}</td><td>${latest}</td><td><span class="strip">${strip}</span></td><td class="n">${m.total ? pct(m.passed, m.total) : '—'}</td><td><span class="strip days">${days}</span></td><td class="n">${m.uptime}</td></tr>`);
     }
     out.push(`</table>`);
   }

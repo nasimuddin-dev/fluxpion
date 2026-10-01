@@ -195,12 +195,12 @@ export interface MonitorDay {
 
 /**
  * Uptime per day over the last `days` days (oldest first, today last), like a status page. Days without runs are
- * included with `runs: 0`. Days are calendar days at `utcOffsetMinutes` east of UTC (default: this machine's zone),
- * so a browser elsewhere sees its own days.
+ * included with `runs: 0`. Days follow the caller's calendar: `tzOffsetMin` is its Date#getTimezoneOffset (default:
+ * this machine's zone), so a browser elsewhere sees its own days.
  */
-export function monitorDaily(store: WorkspaceStore, id: string, days = 30, utcOffsetMinutes?: number, now = Date.now()): MonitorDay[] {
+export function monitorDaily(store: WorkspaceStore, id: string, days = 30, tzOffsetMin?: number, now = Date.now()): MonitorDay[] {
   const n = Math.min(Math.max(Math.floor(days) || 30, 1), 366);
-  const offset = (utcOffsetMinutes ?? -new Date(now).getTimezoneOffset()) * 60_000;
+  const offset = -(tzOffsetMin ?? new Date(now).getTimezoneOffset()) * 60_000;
   const key = (t: number) => new Date(t + offset).toISOString().slice(0, 10);
   const out: MonitorDay[] = [];
   const at = new Map<string, MonitorDay>();

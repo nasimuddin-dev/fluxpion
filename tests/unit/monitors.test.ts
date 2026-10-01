@@ -217,7 +217,7 @@ describe('monitor uptime by day', () => {
       ['2026-09-30', 1, 1, 100, 20],
       ['2026-10-01', 1, 1, 100, 30],
     ]);
-    const east = monitorDaily(store, 'mon-daily', 3, 120, now);
+    const east = monitorDaily(store, 'mon-daily', 3, -120, now); // UTC+2
     expect(east.map((d) => [d.date, d.runs])).toEqual([
       ['2026-09-29', 2],
       ['2026-09-30', 0],
