@@ -17,6 +17,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { JsonTree } from '../components/JsonView';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Input, Select, Split, Tabs, VirtualList } from '../components/ui';
+import { MessageRate } from '../components/MessageRate';
 import { saveAsTestFile } from '../lib/save-test';
 
 interface WsMessage {
@@ -201,7 +202,8 @@ export function WebSocketView() {
     if (session && status === 'open') void call('mqtt.unsubscribe', { id: session, topic, environment: env }).catch((e) => useApp.getState().toast(asError(e).message, 'error'));
     setD({ ...d, subscriptions: (d.subscriptions ?? []).filter((s) => s.topic !== topic) });
   };
-  const shown = filter ? messages.filter((m) => `${m.topic ?? ''} ${m.event ?? ''} ${m.data}`.toLowerCase().includes(filter.toLowerCase())) : messages;
+  const [direction, setDirection] = useState<'all' | 'sent' | 'received'>('all');
+  const shown = messages.filter((m) => (direction === 'all' || m.direction === direction) && (!filter || `${m.topic ?? ''} ${m.event ?? ''} ${m.data}`.toLowerCase().includes(filter.toLowerCase())));
   let parsed: unknown;
   try {
     parsed = selected ? JSON.parse(selected.data) : undefined;
@@ -454,8 +456,13 @@ export function WebSocketView() {
             <div className="h-full flex flex-col">
               <div className="flex items-center gap-2 px-2 h-9 border-b border-line">
                 <span className="text-sm font-medium">Messages</span>
-                <span className="text-xs text-muted">{messages.length}</span>
-                <Input className="ml-auto h-6 min-h-6 text-xs w-48" placeholder="Filter" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                <MessageRate messages={messages} />
+                <Select className="ml-auto h-6 min-h-6 py-0 text-xs w-28" aria-label="Direction" value={direction} onChange={(e) => setDirection(e.target.value as typeof direction)}>
+                  <option value="all">All</option>
+                  <option value="sent">Sent</option>
+                  <option value="received">Received</option>
+                </Select>
+                <Input className="h-6 min-h-6 text-xs w-40" placeholder="Filter" value={filter} onChange={(e) => setFilter(e.target.value)} />
                 <Button size="sm" variant="ghost" icon={<Trash2 size={12} />} onClick={() => setMessages([])}>
                   Clear
                 </Button>

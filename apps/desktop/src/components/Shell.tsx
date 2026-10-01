@@ -234,7 +234,7 @@ export function StatusBar() {
         {envObj?.isProduction && <Badge tone="bad">PRODUCTION</Badge>}
       </span>
       <span className="flex items-center gap-1" title="Connected MCP servers">
-        <Plug size={12} /> {mcp} connected
+        <Plug size={12} /> {mcp} MCP connected
       </span>
       <span className="flex items-center gap-1.5">
         {acts.length ? (
