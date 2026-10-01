@@ -89,6 +89,18 @@ export interface FlakyTest {
  */
 export async function flakyTests(store: WorkspaceStore, opts: { runs?: number } = {}): Promise<FlakyTest[]> {
   const runs = store.meta.listRuns({ limit: Math.min(Math.max(opts.runs ?? 30, 2), 300) }).items.reverse();
+  // reading the runs' results is the slow part: the answer only changes when a run is added or removed
+  const key = `${runs.length}:${runs[0]?.id ?? ''}:${runs[runs.length - 1]?.id ?? ''}`;
+  const cached = flakyCache.get(store);
+  if (cached?.key === key) return cached.value;
+  const value = await scanFlaky(store, runs);
+  flakyCache.set(store, { key, value });
+  return value;
+}
+
+const flakyCache = new WeakMap<WorkspaceStore, { key: string; value: FlakyTest[] }>();
+
+async function scanFlaky(store: WorkspaceStore, runs: Array<{ id: string; startedAt: string }>): Promise<FlakyTest[]> {
   const by = new Map<string, { id: string; name: string; statuses: string[]; retried: number; lastAt: string }>();
   for (const run of runs) {
     const seen = new Set<string>();
