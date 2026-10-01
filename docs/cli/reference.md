@@ -357,6 +357,7 @@ testpion history activity -w my-workspace --days 30 --json              # per-da
 ## `monitor`
 
 ```bash
+testpion monitor add "API health" --collection "My API" --every 5m --max-p95 800 -w my-workspace   # also fail when p95 > 800 ms
 testpion monitor add "API health" --collection "My API" --folder Smoke --every 15m -e Staging -w my-workspace
 testpion monitor run --due -w my-workspace      # for cron; exit 1 if a run failed
 testpion monitor start -w my-workspace          # keep running them until Ctrl+C
