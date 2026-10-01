@@ -302,6 +302,14 @@ testpion docs api.postman_collection.json > API.md
 | `-o, --out <file>` | Write to a file instead of standard output. |
 | `--no-examples` | Leave out saved examples. |
 
+## `feedback`
+
+Build a feedback or problem report as Markdown, and a link to a pre-filled GitHub issue (nothing is sent). `-k` is `bug`, `idea`, `ui` or `question`; `--diagnostics` adds the version and platform; home folders and secret-looking values are masked.
+
+```bash
+testpion feedback -k idea -t "Import Swagger 2 examples" -m "Examples in Swagger 2 files are not imported" --json
+```
+
 ## `agents-md`
 
 Write (or refresh) the TestPion section of `AGENTS.md` in the workspace folder, for coding agents (Claude Code, Codex, Cursor, Copilot): how to use the workspace over MCP and the CLI, the check types and the test file format. Text outside the section is kept. `--stdout` prints it instead. See [Use TestPion from AI agents](/ai-testing/mcp-server#agents-md).

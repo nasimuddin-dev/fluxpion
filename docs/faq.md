@@ -53,6 +53,10 @@ Run `testpion doctor -w <workspace>`: it checks Node.js, SQLite, the app folder,
 
 The installers aren't code-signed yet. The [Windows](/installation/windows) and [macOS](/installation/macos) guides show how to proceed safely.
 
-## How do I report a bug or request a feature?
+## How do I report a bug, suggest an idea or give feedback on the design?
 
-Open an issue on [GitHub](https://github.com/nasimuddin-dev/testpion/issues). Report security problems privately as described in [SECURITY.md](https://github.com/nasimuddin-dev/testpion/blob/main/SECURITY.md).
+In the app: **Help ▸ Send Feedback or Report a Problem…**, the **Feedback** button in the status bar, or the command palette. Choose *Problem*, *Idea*, *Design* or *Question*, describe it, and decide whether to include the versions and platform and the app's recent errors (home folders and secret-looking values are masked; your requests, responses, collections and environments are never included). **Show the report** shows exactly what will be sent. **Open on GitHub** opens a new issue with it filled in, for you to review and post; **Copy** and **Save as file** keep it for an email or later. The app itself sends nothing.
+
+When a view stops with an error, its error panel has **Report this problem**, with the error already in the report. Unexpected errors are also written to the app log (status bar ▸ Logs).
+
+From a terminal or an agent: `testpion feedback -k bug -t "…" -m "…" --diagnostics` prints the report and the link (`--json` for scripts). You can also open an issue on [GitHub](https://github.com/nasimuddin-dev/testpion/issues) directly. Report security problems privately as described in [SECURITY.md](https://github.com/nasimuddin-dev/testpion/blob/main/SECURITY.md).
