@@ -56,6 +56,7 @@ import {
   listCertificates,
   certificateLint,
   mcpToolUsage,
+  llmUsage,
   testHistory,
   summarizeTestHistory,
 } from '@testpion/core';
@@ -756,6 +757,24 @@ export function registerDataCommands(program: Command): void {
         const w = Math.min(48, Math.max(...rows.map((r) => `${r.server} · ${r.tool}`.length)));
         for (const r of rows)
           console.log(`${`${r.server} · ${r.tool}`.slice(0, w).padEnd(w)}  ${String(r.calls).padStart(5)} calls  ${r.failed ? red(`${r.failed} failed`.padEnd(10)) : dim('0 failed'.padEnd(10))}  ${dim(`median ${r.medianMs ?? '-'} ms · p95 ${r.p95Ms ?? '-'} ms`)}`);
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('llm')
+    .description('prompts run in the AI Lab, per provider and model: prompts, input / output tokens, estimated cost, median time')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const rows = llmUsage(store);
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        if (!rows.length) return console.log(dim('No prompts in the history.'));
+        const w = Math.min(48, Math.max(...rows.map((r) => `${r.provider} · ${r.model}`.length)));
+        for (const r of rows)
+          console.log(`${`${r.provider} · ${r.model}`.slice(0, w).padEnd(w)}  ${String(r.calls).padStart(5)} prompts  ${`${r.inputTokens} in / ${r.outputTokens} out`.padEnd(22)}  ${dim(`${r.costUsd !== undefined ? `$${r.costUsd.toFixed(4)}` : 'no price'} · median ${r.medianMs ?? '-'} ms`)}`);
       } finally {
         store.close();
       }

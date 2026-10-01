@@ -99,6 +99,7 @@ export * from './storage/metastore.js';
 export * from './storage/storage-usage.js';
 export * from './storage/certificates.js';
 export * from './storage/mcp-usage.js';
+export * from './storage/llm-usage.js';
 export * from './storage/workspace.js';
 export * from './storage/search.js';
 export * from './storage/current-values.js';

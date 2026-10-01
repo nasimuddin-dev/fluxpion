@@ -5,6 +5,7 @@ import { useLibrary } from '../lib/library';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
+import { AiUsage } from '../components/AiUsage';
 import { stringifyYaml } from '../lib/yaml';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
@@ -73,7 +74,7 @@ const drafts = persisted<Draft>('ai', {
 
 export function AiLabView() {
   // kept while the app runs, so switching tabs or views doesn't lose results
-  const [tab, setTab] = useSticky<'playground' | 'compare' | 'providers'>('ai:tab', 'playground');
+  const [tab, setTab] = useSticky<'playground' | 'compare' | 'providers' | 'usage'>('ai:tab', 'playground');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const load = useCallback(() => call<ProviderConfig[]>('ai.providers').then(setProviders), []);
   useEffect(() => {
@@ -94,12 +95,14 @@ export function AiLabView() {
           { id: 'playground', label: 'Playground' },
           { id: 'compare', label: 'Model comparison' },
           { id: 'providers', label: 'Providers', badge: providers.length },
+          { id: 'usage', label: 'Usage' },
         ]}
       />
       <div className="flex-1 min-h-0">
         {tab === 'playground' && <Playground providers={providers} />}
         {tab === 'compare' && <Compare providers={providers} />}
         {tab === 'providers' && <Providers providers={providers} onSaved={load} />}
+        {tab === 'usage' && <AiUsage />}
       </div>
     </div>
   );

@@ -64,6 +64,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `list_monitors` | Monitors (collections on a schedule) with their schedule, last result and next run. |
 | `monitor_results` | A monitor's recent results, newest first. |
 | `list_certificates` | TLS certificates of the HTTPS hosts the workspace called, soonest to expire first (optionally only those within N days). |
+| `llm_usage` | Prompts run in the AI Lab per provider and model: tokens in / out, estimated cost, median time. |
 | `mcp_tool_usage` | How the tools of the workspace's MCP servers were called from the app: calls, failures, median and p95 time per tool. |
 | `monitor_uptime` | A monitor's uptime per day over the last N days (runs, passed, uptime, slowest p95). |
 | `run_monitor` | Run a monitor now; returns the result and the failed requests. |

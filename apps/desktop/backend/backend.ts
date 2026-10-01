@@ -966,7 +966,7 @@ export class Backend {
         : [];
       const trace = tracer.finish();
       this.ws.saveTrace(trace, 'llm');
-      this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'llm', name: `${provider.config.name} · ${r.model || model}`, status: 'ok', durationMs: r.timing.totalMs, request: { provider: p.provider, model, prompt: p.prompt, system: p.system, input }, traceId: trace.traceId });
+      this.ws.meta.addHistory({ id: shortId('h-'), timestamp: new Date().toISOString(), kind: 'llm', name: `${provider.config.name} · ${r.model || model}`, status: 'ok', durationMs: r.timing.totalMs, request: { provider: p.provider, model, prompt: p.prompt, system: p.system, input }, responseMeta: { usage: r.usage, costUsd: cost.cost, firstTokenMs: r.timing.firstTokenMs }, traceId: trace.traceId });
       return {
         id,
         provider: provider.config.name,

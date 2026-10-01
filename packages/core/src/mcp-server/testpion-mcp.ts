@@ -19,6 +19,7 @@ import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { listCertificates, recordCertificate } from '../storage/certificates.js';
 import { mcpToolUsage } from '../storage/mcp-usage.js';
+import { llmUsage } from '../storage/llm-usage.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext } from '../engine.js';
 import { executeHttp, timingSummary } from '../protocols/http/client.js';
@@ -831,6 +832,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       description: 'TLS certificates of the HTTPS hosts this workspace has called (from the app, test runs, monitors and agents), soonest to expire first: host, subject, issuer, valid until, days left and when last seen. Use it to find certificates that expire soon.',
       inputSchema: { type: 'object', properties: { withinDays: { type: 'number', description: 'Only those that expire within this many days' } } },
       run: (a) => listCertificates(store).filter((c) => a.withinDays === undefined || (c.daysLeft !== undefined && c.daysLeft <= Number(a.withinDays))),
+    },
+    {
+      name: 'llm_usage',
+      description: 'What the prompts run in the TestPion AI Lab used, per provider and model, most tokens first: prompts run, input and output tokens, estimated cost (from the price table), median time and time to first token, last used.',
+      inputSchema: { type: 'object', properties: {} },
+      run: () => llmUsage(store),
     },
     {
       name: 'mcp_tool_usage',

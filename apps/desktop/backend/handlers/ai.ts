@@ -14,6 +14,7 @@ import {
   DEFAULT_CLAUDE_MODEL,
   appClaudeProvider,
   checkAnthropicKey,
+  llmUsage,
 } from '@testpion/core';
 import type { Backend, Handlers, AiChatParams } from '../backend.js';
 
@@ -48,6 +49,8 @@ export function aiHandlers(be: Backend): Handlers {
       be.ws.saveProviders(clean);
       return clean;
     },
+    // prompts run in the AI Lab: tokens, cost and time per model, from the history
+    'ai.usage': () => llmUsage(be.ws),
     'ai.models': async ({ providerId, environment }: { providerId: string; environment?: string }) => {
       const ctx = be.context({ environment });
       const p = ctx.services.providers.get(providerId);

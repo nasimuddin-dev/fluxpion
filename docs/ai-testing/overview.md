@@ -46,6 +46,10 @@ Latency, time to first token, mean time between tokens, input, output and total 
 
 Run the same prompt against several models and compare latency, tokens, cost, JSON and schema validity, and your evaluators side by side. The tool deliberately produces **no universal ranking**.
 
+## Usage
+
+The AI Lab's **Usage** tab adds up the prompts you ran: prompts, input and output tokens and estimated cost (from the price table) per model, with a bar per model and the median time and time to first token. `testpion history llm` prints the same, and agents use the `llm_usage` MCP tool.
+
 Next: [prompts](./prompts.md), [evaluations](./evaluations.md), [RAG](./rag.md), [agents](./agents.md), [safety](./safety.md).
 
 :::
