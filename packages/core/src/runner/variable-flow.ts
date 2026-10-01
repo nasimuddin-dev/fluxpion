@@ -1,0 +1,93 @@
+import type { Collection } from '../model/types.js';
+import { collectionRequests } from './collection-run.js';
+
+/** Where a variable is set or used: a request (in run order) or the collection / a folder (runs around every request inside). */
+export interface FlowPlace {
+  /** Request name, or the collection / folder name for their scripts. */
+  name: string;
+  requestId?: string;
+  /** Position of the request in a run (0-based); collection and folder scripts have -1 (they run for every request). */
+  index: number;
+  /** Folder names from the collection root. */
+  path: string[];
+}
+
+export interface VariableFlow {
+  name: string;
+  setBy: FlowPlace[];
+  usedBy: FlowPlace[];
+  /** Defined outside scripts: an environment, the workspace, the collection or a folder. */
+  defined: boolean;
+  /**
+   * used-before-set: a request uses it before the first request whose scripts set it (and nothing defines it);
+   * never-set: used, but no script sets it and nothing defines it; unused: set by a script, used nowhere.
+   */
+  issue?: 'used-before-set' | 'never-set' | 'unused';
+}
+
+// pm.environment.set('x', …), pm.collectionVariables.set("x"), pm.globals.set(`x`), pm.variables.set, bru.setVar / setEnvVar
+const SET_RE = /\b(?:pm\.(?:environment|collectionVariables|globals|variables)\.set|bru\.set(?:Env)?Var)\(\s*(['"`])([^'"`]+)\1/g;
+const GET_RE = /\b(?:pm\.(?:environment|collectionVariables|globals|variables)\.(?:get|replaceIn)|bru\.get(?:Env)?Var)\(\s*(['"`])([^'"`]+)\1/g;
+// {{name}}, not dynamic variables ({{$guid}}) or secret references ({{$secret.x}})
+const TOKEN_RE = /\{\{\s*([^{}$\s][^{}]*?)\s*\}\}/g;
+
+function strings(v: unknown, out: string[] = []): string[] {
+  if (typeof v === 'string') out.push(v);
+  else if (Array.isArray(v)) for (const x of v) strings(x, out);
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) strings(x, out);
+  return out;
+}
+const names = (re: RegExp, text: string, group: number) => [...text.matchAll(re)].map((m) => m[group]!.trim());
+
+/**
+ * How variables flow through a collection run: which requests' scripts set each variable and which requests
+ * use it (in `{{name}}` or a script's get), in run order, with the likely mistakes flagged. Static analysis:
+ * a variable built at run time (`set(prefix + id)`) is not seen.
+ */
+export function collectionVariableFlow(collection: Collection, definedElsewhere: Iterable<string> = []): VariableFlow[] {
+  const defined = new Set(definedElsewhere);
+  for (const v of collection.variables ?? []) if (v.key) defined.add(v.key);
+  const flows = new Map<string, VariableFlow>();
+  const flow = (name: string) => flows.get(name) ?? flows.set(name, { name, setBy: [], usedBy: [], defined: false }).get(name)!;
+  const addUnique = (list: FlowPlace[], p: FlowPlace) => !list.some((x) => x.name === p.name && x.index === p.index) && list.push(p);
+
+  // collection-level scripts run for every request
+  const colScripts = `${collection.preRequestScript ?? ''}\n${collection.testScript ?? ''}`;
+  const colPlace: FlowPlace = { name: collection.name, index: -1, path: [] };
+  for (const n of names(SET_RE, colScripts, 2)) addUnique(flow(n).setBy, colPlace);
+  for (const n of names(GET_RE, colScripts, 2)) addUnique(flow(n).usedBy, colPlace);
+
+  const folderSeen = new Set<string>();
+  collectionRequests(collection).forEach((r, index) => {
+    // folder scripts and variables, once per folder
+    for (const f of r.folders) {
+      if (folderSeen.has(f.id)) continue;
+      folderSeen.add(f.id);
+      for (const v of f.variables ?? []) if (v.key) defined.add(v.key);
+      const text = `${f.preRequestScript ?? ''}\n${f.testScript ?? ''}`;
+      const place: FlowPlace = { name: f.name, index: -1, path: r.path.slice(0, r.path.indexOf(f.name) + 1) };
+      for (const n of names(SET_RE, text, 2)) addUnique(flow(n).setBy, place);
+      for (const n of names(GET_RE, text, 2)) addUnique(flow(n).usedBy, place);
+    }
+    const place: FlowPlace = { name: r.name, requestId: r.id, index, path: r.path };
+    const { preRequestScript, testScript, ...rest } = r.node as typeof r.node & { preRequestScript?: string; testScript?: string };
+    const scripts = `${preRequestScript ?? ''}\n${testScript ?? ''}`;
+    for (const n of names(SET_RE, scripts, 2)) addUnique(flow(n).setBy, place);
+    for (const n of names(GET_RE, scripts, 2)) addUnique(flow(n).usedBy, place);
+    // {{tokens}} in the request itself (URL, headers, body, auth …) and in its scripts' strings
+    for (const s of strings({ request: (rest as { request?: unknown }).request, assertions: (rest as { assertions?: unknown }).assertions }))
+      for (const n of names(TOKEN_RE, s, 1)) addUnique(flow(n).usedBy, place);
+  });
+
+  for (const f of flows.values()) {
+    f.defined = defined.has(f.name);
+    const firstSet = Math.min(...f.setBy.map((p) => (p.index < 0 ? -1 : p.index)), Infinity);
+    const firstUse = Math.min(...f.usedBy.filter((p) => p.index >= 0).map((p) => p.index), Infinity);
+    if (!f.setBy.length && f.usedBy.length && !f.defined) f.issue = 'never-set';
+    else if (f.setBy.length && !f.usedBy.length) f.issue = 'unused';
+    // a request's own pre-request script may set what it then uses: only an earlier position counts as "before"
+    else if (!f.defined && firstUse < firstSet) f.issue = 'used-before-set';
+  }
+  // scripted variables first (the chain), then the rest by name
+  return [...flows.values()].sort((a, b) => Number(!a.setBy.length) - Number(!b.setBy.length) || a.name.localeCompare(b.name));
+}

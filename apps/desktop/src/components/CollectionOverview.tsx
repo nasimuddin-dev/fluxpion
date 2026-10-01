@@ -16,6 +16,66 @@ interface RequestStat {
   medianMs?: number;
 }
 
+/** From `col.variableFlow` (collectionVariableFlow in core). */
+interface FlowPlace {
+  name: string;
+  requestId?: string;
+  index: number;
+  path: string[];
+}
+interface VariableFlow {
+  name: string;
+  setBy: FlowPlace[];
+  usedBy: FlowPlace[];
+  defined: boolean;
+  issue?: 'used-before-set' | 'never-set' | 'unused';
+}
+const ISSUE: Record<NonNullable<VariableFlow['issue']>, string> = { 'used-before-set': 'used before it is set', 'never-set': 'never set', unused: 'set, never used' };
+
+/** Variables set by scripts (the request chain) and variables with a likely mistake: who sets them, who uses them. */
+function VariableFlowCard({ collectionId, onOpen }: { collectionId: string; onOpen(requestId: string): void }) {
+  const [flows, setFlows] = useState<VariableFlow[]>();
+  useEffect(() => {
+    void call<VariableFlow[]>('col.variableFlow', { collectionId }).then(setFlows, () => setFlows([]));
+  }, [collectionId]);
+  const rows = (flows ?? []).filter((f) => f.setBy.length || f.issue);
+  if (!flows || !rows.length) return null;
+  const place = (p: FlowPlace) =>
+    p.requestId ? (
+      <button key={p.name + p.index} className="text-fg hover:text-accent hover:underline truncate max-w-48" title={[...p.path, p.name].join(' / ')} onClick={() => onOpen(p.requestId!)}>
+        {p.name}
+      </button>
+    ) : (
+      <span key={p.name + p.index} className="text-muted truncate max-w-48" title="Collection or folder script (runs for every request inside)">
+        {p.name} (scripts)
+      </span>
+    );
+  return (
+    <ChartCard title="Variable flow" aside="set by scripts → used by requests, in run order">
+      <div className="flex flex-col">
+        {rows.map((f) => (
+          <div key={f.name} className="flex items-center gap-2 py-1 text-xs min-w-0 border-b border-line/40 last:border-0">
+            <span className="mono text-fg w-36 shrink-0 truncate" title={f.name}>{`{{${f.name}}}`}</span>
+            <span className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+              {f.setBy.length ? f.setBy.slice(0, 3).map(place) : <span className="text-muted">{f.defined ? 'environment / collection' : 'nothing sets it'}</span>}
+              {f.setBy.length > 3 && <span className="text-muted">+{f.setBy.length - 3}</span>}
+              <span className="text-muted">→</span>
+              {f.usedBy.length ? (
+                <span className="text-muted" title={f.usedBy.map((p) => [...p.path, p.name].join(' / ')).join('\n')}>
+                  {plural(f.usedBy.length, 'use')}
+                </span>
+              ) : (
+                <span className="text-muted">no uses</span>
+              )}
+            </span>
+            {f.issue && <Badge tone={f.issue === 'unused' ? 'default' : 'warn'}>{ISSUE[f.issue]}</Badge>}
+          </div>
+        ))}
+      </div>
+    </ChartCard>
+  );
+}
+
 type Saved = Exclude<CollectionNode, { kind: 'folder' }>;
 interface Row {
   node: Saved;
@@ -122,6 +182,13 @@ export function CollectionOverview({ collection, onOpen }: { collection: Collect
           )}
         </ChartCard>
       </div>
+      <VariableFlowCard
+        collectionId={collection.id}
+        onOpen={(id) => {
+          const n = rows.find((r) => r.node.id === id)?.node;
+          if (n) onOpen(n);
+        }}
+      />
     </div>
   );
 }

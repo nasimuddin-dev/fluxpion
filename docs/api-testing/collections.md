@@ -15,6 +15,8 @@ Each collection is a versioned JSON file under `collections/` in the workspace, 
 
 A collection's **Overview** tab shows it at a glance: how many requests and folders it has, how many have checks (assertions or a test script), how many REST requests are documented, and how many are failing now (their latest response failed). *By method* counts the requests per HTTP method. *Request health* lists every request with its latest status, median response time (of the latest 50), how many of its responses failed and when it was last sent from the app: failing requests first, then the slowest, then those never sent. Click a request to open it.
 
+*Variable flow* shows how requests chain: each variable a script sets (`pm.environment.set`, `pm.collectionVariables.set` …), which request or collection / folder script sets it and how many requests use it (`{{name}}` or a script `get`), in run order. It flags variables *used before they are set* (a request uses one before any earlier script sets it and no environment defines it), *never set* and *set, never used*. The `variable_flow` MCP tool returns the same.
+
 For scripts and agents: `testpion requests "My API" --health --json` in the CLI and the `collection_health` MCP tool return the same numbers.
 
 ## Favorites

@@ -24,6 +24,7 @@ import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtim
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { listWorkspaceDatasets, readDataset, type DatasetRecord } from '../runner/datasets.js';
+import { collectionVariableFlow } from '../runner/variable-flow.js';
 import { collectionRealtimeTests, collectionSavedItems } from '../runner/collection-realtime.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -1012,6 +1013,17 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const after = summaryOf(String(a.after));
         const baseline = await createBaseline(`run ${before.runId}`, before, await readResultsFile(join(store.runDir(before.runId), 'results.jsonl')));
         return compareToBaseline(baseline, after, await readResultsFile(join(store.runDir(after.runId), 'results.jsonl')), { latencyPct: Number(a.latencyPct) || 25, tokensPct: 20, scoreDrop: 0.05 });
+      },
+    },
+    {
+      name: 'variable_flow',
+      description:
+        'How variables flow through a collection run: for each variable, the requests (or collection / folder scripts) that set it with pm.environment.set etc., and the requests that use it ({{name}} or a script get), in run order. Flags used-before-set (a request uses it before any script sets it and no environment defines it), never-set and unused. Use it to debug request chaining.',
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id') }, required: ['collection'] },
+      run: (a) => {
+        const c = findCollection(a.collection);
+        const defined = [...store.listEnvironments().flatMap((e) => e.variables.map((v) => v.key)), ...(store.workspace.variables ?? []).map((v) => v.key), ...(settings.globalVariables ?? []).map((v) => v.key)];
+        return collectionVariableFlow(c, defined);
       },
     },
     {

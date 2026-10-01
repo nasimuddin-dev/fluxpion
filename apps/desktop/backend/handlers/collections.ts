@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 import {
   ApsError,
   isSqliteDataset,
+  collectionVariableFlow,
   listWorkspaceDatasets,
   readDataset,
   sqliteTables,
@@ -219,6 +220,11 @@ export function collectionsHandlers(be: Backend): Handlers {
       if (!r.ids.length) throw new ApsError('ValidationError', 'Nothing failed in that run');
       const c = be.ws.getCollection(collectionId);
       return be.startCollectionRun({ collectionId, selection: r.ids, environment, name: `Failed requests of ${c.name}` });
+    },
+    /** Which requests set and use each variable of a collection, in run order, with likely mistakes flagged. */
+    'col.variableFlow': ({ collectionId }: { collectionId: string }) => {
+      const defined = [...be.ws.listEnvironments().flatMap((e) => e.variables.map((v) => v.key)), ...(be.ws.workspace.variables ?? []).map((v) => v.key), ...(be.settings.globalVariables ?? []).map((v) => v.key)];
+      return collectionVariableFlow(be.ws.getCollection(collectionId), defined);
     },
     /** Data files in the workspace's datasets/ folder (for the Collection Runner and tests), newest first. */
     'datasets.list': () =>
