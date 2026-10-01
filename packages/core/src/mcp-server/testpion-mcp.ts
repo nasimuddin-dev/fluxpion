@@ -24,6 +24,7 @@ import { checkCertificate } from '../net/certificate-check.js';
 import { mcpToolUsage } from '../storage/mcp-usage.js';
 import { llmUsage } from '../storage/llm-usage.js';
 import { workspaceAttention } from '../storage/attention.js';
+import { collectionTiming } from '../storage/collection-timing.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext } from '../engine.js';
 import { executeHttp, timingSummary } from '../protocols/http/client.js';
@@ -221,6 +222,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const rank = (r: (typeof rows)[number]) => (!r.responses ? 2 : 'lastOk' in r && !r.lastOk ? 0 : 1);
         return rows.sort((x, y) => rank(x) - rank(y) || ((y as { medianMs?: number }).medianMs ?? 0) - ((x as { medianMs?: number }).medianMs ?? 0));
       },
+    },
+    {
+      name: 'collection_timing',
+      description: "Where the time of a collection's HTTP requests went, over the responses sent in the TestPion app: totals of DNS lookup, TCP connect, TLS handshake (new connections only), waiting for the server (TTFB) and download, and how many requests opened a new connection or reused one. Use it to tell a slow server from slow connections.",
+      inputSchema: { type: 'object', properties: { collection: str('Collection name or id') }, required: ['collection'] },
+      run: (a) => collectionTiming(store, findCollection(a.collection).id) ?? { requests: 0, note: 'No responses with timing yet: send requests of this collection from the app.' },
     },
     {
       name: 'get_request',

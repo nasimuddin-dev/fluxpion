@@ -31,6 +31,7 @@ import {
   deleteRunsBefore,
   listCertificates,
   workspaceAttention,
+  collectionTiming,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
@@ -93,6 +94,8 @@ export function requestsHandlers(be: Backend): Handlers {
     'certificates.list': () => listCertificates(be.ws),
     /** What needs attention: failing monitors, expiring certificates, the latest failed run, failing requests, flaky tests. */
     'stats.attention': () => workspaceAttention(be.ws),
+    /** Where the time of a collection's requests went (DNS, TCP, TLS, server, download), from responses sent in the app. */
+    'stats.collectionTiming': ({ collectionId }: { collectionId: string }) => collectionTiming(be.ws, collectionId) ?? null,
     'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
     'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
     'history.clear': () => be.ws.meta.clearHistory(),

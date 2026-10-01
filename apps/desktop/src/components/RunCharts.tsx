@@ -37,7 +37,7 @@ const PHASES = [
 ] as const;
 
 /** Where the time of the run's HTTP and GraphQL requests went: one bar per phase, its share of the whole. */
-function TimeByPhase({ p }: { p: NonNullable<Breakdown['phases']> }) {
+export function TimeByPhase({ p }: { p: NonNullable<Breakdown['phases']> }) {
   const total = PHASES.reduce((n, [k]) => n + p[k], 0) || 1;
   const max = Math.max(...PHASES.map(([k]) => p[k]), 1);
   return (

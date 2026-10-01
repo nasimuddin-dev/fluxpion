@@ -3,6 +3,7 @@ import { call } from '../api';
 import type { Collection, CollectionNode } from '../types';
 import { formatMs, plural, timeAgo } from '../lib/format';
 import { BarRow, ChartCard, RecentRuns, StatTile } from './charts';
+import { TimeByPhase } from './RunCharts';
 import { useApp } from '../store';
 import { Badge, cx, statusTone } from './ui';
 
@@ -133,8 +134,10 @@ const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whol
  */
 export function CollectionOverview({ collection, onOpen }: { collection: Collection; onOpen(node: Saved): void }) {
   const [stats, setStats] = useState<RequestStat[]>([]);
+  const [timing, setTiming] = useState<Parameters<typeof TimeByPhase>[0]['p'] | null>(null);
   useEffect(() => {
     void call<RequestStat[]>('stats.requests', { collectionId: collection.id }).then(setStats, () => setStats([]));
+    void call<Parameters<typeof TimeByPhase>[0]['p'] | null>('stats.collectionTiming', { collectionId: collection.id }).then(setTiming, () => setTiming(null));
   }, [collection.id]);
   const { rows, folders } = useMemo(() => {
     const out = { rows: [] as Row[], folders: 0 };
@@ -170,6 +173,11 @@ export function CollectionOverview({ collection, onOpen }: { collection: Collect
         <StatTile label="Failing now" value={sent.length ? String(failing.length) : '—'} sub={sent.length ? `latest response of ${plural(sent.length, 'sent request')}` : 'nothing sent from the app yet'} tone={!sent.length ? undefined : failing.length ? 'bad' : 'ok'} />
       </div>
       <RecentCollectionRuns name={collection.name} />
+      {timing && (
+        <div className="max-w-2xl">
+          <TimeByPhase p={timing} />
+        </div>
+      )}
       <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_3fr]">
         <ChartCard title="By method">
           <div className="flex flex-col gap-1.5">
