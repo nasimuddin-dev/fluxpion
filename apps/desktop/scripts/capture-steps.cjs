@@ -13,7 +13,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const HELPERS = `
 window.__cap = {
   byText(text, tag = 'button') {
-    return [...document.querySelectorAll(tag)].find((e) => e.textContent.trim() === text || e.textContent.trim().startsWith(text));
+    // views stay mounted while hidden: prefer the element that is on screen
+    const all = [...document.querySelectorAll(tag)].filter((e) => e.textContent.trim() === text || e.textContent.trim().startsWith(text));
+    return all.find((e) => e.offsetParent !== null) ?? all[0];
   },
   click(text, tag) {
     const el = this.byText(text, tag);
@@ -90,6 +92,12 @@ module.exports = async function run(win) {
   }
   await sleep(1500);
   await shot('rest');
+  // the response's timeline: connection set-up, waiting and download
+  await js(`__cap.click('Timeline'); true`);
+  await sleep(800);
+  await shot('rest-timeline');
+  await js(`__cap.click('Body'); true`);
+  await sleep(300);
 
   // GraphQL: introspect, run, show autocomplete-ready editor
   await js(`__cap.nav('GraphQL'); true`);
@@ -114,13 +122,23 @@ module.exports = async function run(win) {
   await sleep(1000);
   await js(`document.querySelectorAll('.overflow-auto button')[6]?.click(); true`);
   await shot('mcp-trace');
+  // calls, failures and time per tool
+  await js(`__cap.click('Usage'); true`);
+  await sleep(1200);
+  await shot('mcp-usage');
 
   // AI Lab playground
   await js(`__cap.nav('AI Lab'); true`);
   await sleep(1500);
-  await js(`document.querySelector('button[title^="Run"]').click(); true`);
+  await js(`[...document.querySelectorAll('button[title^="Run"]')].find((b) => b.offsetParent !== null)?.click(); true`);
   await sleep(2500);
   await shot('ai-lab');
+  // tokens, cost and time per model
+  await js(`__cap.click('Usage'); true`);
+  await sleep(1200);
+  await shot('ai-usage');
+  await js(`__cap.click('Playground'); true`);
+  await sleep(300);
 
   // Evaluations
   await js(`__cap.nav('Evaluations'); true`);

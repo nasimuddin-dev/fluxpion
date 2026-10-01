@@ -50,6 +50,10 @@ Run the same prompt against several models and compare latency, tokens, cost, JS
 
 The AI Lab's **Usage** tab adds up the prompts you ran: prompts, input and output tokens and estimated cost (from the price table) per model, with a bar per model and the median time and time to first token. `testpion history llm` prints the same, and agents use the `llm_usage` MCP tool.
 
+<figure class="aps-screenshot">
+  <img src="/images/ai-usage.jpg" alt="The AI Lab Usage tab: prompts run, input and output tokens, estimated cost, tokens per model and a table with median time and time to first token" width="1440" height="900" loading="lazy">
+</figure>
+
 Next: [prompts](./prompts.md), [evaluations](./evaluations.md), [RAG](./rag.md), [agents](./agents.md), [safety](./safety.md).
 
 :::

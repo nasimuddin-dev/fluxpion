@@ -107,6 +107,10 @@ Open tabs, including pins, are restored when the app starts. You can close every
 
 The status, duration, size, headers, cookies and a timeline are always shown. The timeline is a waterfall of prepare, DNS lookup, TCP connect and TLS handshake (on a new connection), waiting for the first byte (TTFB) and download, with the server's address, the TLS version and cipher, the certificate (subject, issuer, valid until, days left), or *Reused connection* when the request went over an open one. The Trace tab (and OpenTelemetry export) shows the phases as spans of the request. `testpion send <url> -i` prints the same phases, `--json` and the `send_request` MCP tool return them as `timing` (`dnsMs`, `tcpMs`, `tlsMs`, `ttfbMs`, `downloadMs`, `reusedConnection`). **Save as example** keeps the response with the request (see [Examples](/api-testing/collections#examples)). For the body:
 
+<figure class="aps-screenshot">
+  <img src="/images/rest-timeline.jpg" alt="The Timeline of a response: a new connection, TCP connect, waiting for the first byte and download as a waterfall, with Explain with AI" width="1440" height="900" loading="lazy">
+</figure>
+
 - **Pretty** is a virtualised JSON tree. Click a key to copy its JSONPath.
 - **Table** appears when the JSON is an array of objects, or holds one up to three levels deep (such as `items`, `data.users`; the largest is used; GraphQL responses have it too): a column per key, click a header to sort (again to reverse), and filter rows by any cell. The first 500 rows are shown; **Copy CSV** copies every matching row. **Chart** (when a column holds numbers) draws one bar per row: choose the number and the label column; sorting and filtering apply. **Save as dataset** writes the rows to `datasets/<name>.csv` in the workspace (never overwriting), where the Collection Runner lists them next to *Select file* (agents use the same file with `run_collection`'s `data`).
 - **Raw** is a virtualised text view with search.
