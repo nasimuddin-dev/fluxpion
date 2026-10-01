@@ -40,7 +40,7 @@ export interface SendResult {
 
 export const blankRequest = (): RestTab => ({
   id: uid('tab-'),
-  name: 'Untitled request',
+  name: 'New HTTP request',
   request: { method: 'GET', url: '{{baseUrl}}/', params: [], headers: [], auth: { type: 'inherit' }, body: { type: 'none' } },
   assertions: [{ type: 'status', expected: 200 }],
 });

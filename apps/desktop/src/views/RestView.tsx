@@ -10,7 +10,7 @@ import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { SidebarShell } from '../components/SidebarShell';
-import { NoOpenTabs, useEditorTabs } from '../components/EditorTabs';
+import { NEW_TAB_TITLE, NoOpenTabs, tabTitle, useEditorTabs } from '../components/EditorTabs';
 import { uid } from '../lib/format';
 
 /** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
@@ -471,7 +471,7 @@ export function RestView() {
     ordered.map((t) => ({
       key: `rest:${t.id}`,
       view: 'rest' as const,
-      title: t.name,
+      title: tabTitle(t.name, NEW_TAB_TITLE.rest),
       badge: t.request.method,
       badgeClass: `method-${t.request.method}`,
       item: t.requestId,

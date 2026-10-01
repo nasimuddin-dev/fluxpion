@@ -4,7 +4,7 @@ import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
-import { useSingleEditorTab } from '../components/EditorTabs';
+import { NEW_TAB_TITLE, useSingleEditorTab } from '../components/EditorTabs';
 import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
@@ -223,7 +223,8 @@ export function WebSocketView() {
     void saveAsTestFile(`${hostOf(d.url)} replies`, { kind: 'websocket', mode: d.mode ?? 'websocket', url: d.url, send, subscribe: mqtt ? (d.subscriptions ?? []).map((s) => s.topic) : undefined, headers: mqtt ? undefined : d.headers, username: mqtt ? d.username : undefined, password: mqtt ? d.password : undefined });
   };
   const [tabTitle, setTabTitle] = useSticky<string | undefined>(`ws:title:${docId ?? 'main'}`, undefined);
-  const title = current?.name ?? tabTitle ?? (d.url || 'WebSocket');
+  // a new tab is "New WebSocket / Socket.IO / MQTT request", not its URL (often a {{variable}})
+  const title = current?.name ?? tabTitle ?? NEW_TAB_TITLE[d.mode === 'mqtt' ? 'mqtt' : d.mode === 'socketio' ? 'socketio' : 'websocket'];
   const renameTab = async () => {
     const name = (await promptText('Rename', { message: 'Name', value: title, okLabel: 'Rename' }))?.trim();
     if (!name) return;

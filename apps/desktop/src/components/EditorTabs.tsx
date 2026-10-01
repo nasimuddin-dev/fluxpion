@@ -262,6 +262,20 @@ export function NoOpenTabs({ onDescribe }: { onDescribe?(): void }) {
   );
 }
 
+/** The title of a tab that isn't saved yet (nor renamed): the same wording in every editor, as in the New request menu. */
+export const NEW_TAB_TITLE = {
+  rest: 'New HTTP request',
+  graphql: 'New GraphQL request',
+  grpc: 'New gRPC request',
+  websocket: 'New WebSocket request',
+  socketio: 'New Socket.IO request',
+  mqtt: 'New MQTT request',
+  mcp: 'New MCP server',
+} as const;
+/** Names earlier versions gave new tabs: shown as today's name. */
+const OLD_DEFAULTS = new Set(['Untitled request', 'GraphQL query', 'gRPC request', 'WebSocket', 'MCP server']);
+export const tabTitle = (name: string | undefined, fallback: string) => (name && !OLD_DEFAULTS.has(name) ? name : fallback);
+
 /** "New request" everywhere (tab strip +, empty editor, explorer): every kind of request, the same list. */
 export function newRequestItems(): MenuItem[] {
   const s = useApp.getState();

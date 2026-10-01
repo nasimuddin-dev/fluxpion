@@ -16,7 +16,7 @@ import { SaveModal } from './rest/dialogs';
 import { useSticky } from '../lib/sticky';
 import { useDoc } from '../lib/docs';
 import { SidebarShell } from '../components/SidebarShell';
-import { useSingleEditorTab } from '../components/EditorTabs';
+import { NEW_TAB_TITLE, tabTitle, useSingleEditorTab } from '../components/EditorTabs';
 import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { KeyValueEditor } from '../components/KeyValueEditor';
@@ -85,7 +85,7 @@ function variablesText(v: unknown): string {
   return JSON.stringify(v, null, 2);
 }
 
-const store = persisted<Draft>('graphql', { endpoint: '{{graphqlEndpoint}}', query: DEFAULT_QUERY, variables: '{\n  "id": "123"\n}', headers: [], auth: { type: 'inherit' }, assertions: [{ type: 'graphql-no-errors' }], name: 'GraphQL query' });
+const store = persisted<Draft>('graphql', { endpoint: '{{graphqlEndpoint}}', query: DEFAULT_QUERY, variables: '{\n  "id": "123"\n}', headers: [], auth: { type: 'inherit' }, assertions: [{ type: 'graphql-no-errors' }], name: NEW_TAB_TITLE.graphql });
 
 export function GraphQLView() {
   // this document's draft (each tab of this editor is its own document)
@@ -273,7 +273,7 @@ export function GraphQLView() {
   };
 
   useIntent('graphql', async (p) => {
-    if (p?.reset) setD({ ...docDrafts.load(), query: DEFAULT_QUERY, collectionId: undefined, requestId: undefined, name: 'GraphQL query' });
+    if (p?.reset) setD({ ...docDrafts.load(), query: DEFAULT_QUERY, collectionId: undefined, requestId: undefined, name: NEW_TAB_TITLE.graphql });
     if (p?.collectionId) {
       const cols = await call<Collection[]>('col.list');
       const c = cols.find((x) => x.id === p.collectionId);
@@ -329,14 +329,14 @@ export function GraphQLView() {
     void saveAsTestFile(d.name || selectedOp?.name || 'GraphQL query', { kind: 'graphql', endpoint: d.endpoint, query: d.query, variables, operationName: operations.length > 1 ? selectedOp?.name : undefined, headers: d.headers, auth: d.auth }, d.assertions);
   };
   const renameTab = async () => {
-    const name = await promptText('Rename', { message: 'Name', value: d.name || 'GraphQL query', okLabel: 'Rename' });
+    const name = await promptText('Rename', { message: 'Name', value: tabTitle(d.name, NEW_TAB_TITLE.graphql), okLabel: 'Rename' });
     if (name?.trim()) setD((x) => ({ ...x, name: name.trim() }));
   };
-  useSingleEditorTab('graphql', { title: d.name || 'GraphQL query', badge: 'GQL', badgeClass: 'text-[#e535ab]', item: d.requestId, onRename: () => void renameTab(), onSaveAsTest: saveTest });
+  useSingleEditorTab('graphql', { title: tabTitle(d.name, NEW_TAB_TITLE.graphql), badge: 'GQL', badgeClass: 'text-[#e535ab]', item: d.requestId, onRename: () => void renameTab(), onSaveAsTest: saveTest });
   return (
     <div className="h-full flex flex-col">
       {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}
-      <RequestBreadcrumb collectionId={d.collectionId} requestId={d.requestId} name={d.name || 'GraphQL query'} onSave={() => void save()} />
+      <RequestBreadcrumb collectionId={d.collectionId} requestId={d.requestId} name={tabTitle(d.name, NEW_TAB_TITLE.graphql)} onSave={() => void save()} />
       <div className="@container flex items-center gap-2 p-2 border-b border-line shrink-0">
         <Badge tone="accent">{isSubscription ? 'WS' : 'POST'}</Badge>
         <VarInput ariaLabel="GraphQL endpoint" className="flex-1 min-w-40 h-8" value={d.endpoint} onChange={(endpoint) => set({ endpoint })} placeholder="https://api.example.com/graphql" />

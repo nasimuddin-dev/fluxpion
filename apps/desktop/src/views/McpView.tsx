@@ -17,7 +17,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { FolderList, type FolderListOps } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
-import { closeTabsFor, useSingleEditorTab } from '../components/EditorTabs';
+import { closeTabsFor, NEW_TAB_TITLE, useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { McpUsage } from '../components/McpUsage';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
@@ -97,7 +97,7 @@ export function McpView() {
     );
   }, [load]);
   const addServer = (folder?: string) => {
-    setDraft({ id: uid('mcp-'), name: 'New server', transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) });
+    setDraft({ id: uid('mcp-'), name: NEW_TAB_TITLE.mcp, transport: 'stdio', command: 'node', args: [], ...(folder ? { folder } : {}) });
     setTab('settings');
   };
   const selectServer = (id: string) => {
@@ -236,7 +236,7 @@ export function McpView() {
     'mcp',
     current && form
       ? {
-          title: form.name || 'MCP server',
+          title: form.name || NEW_TAB_TITLE.mcp,
           badge: 'MCP',
           badgeClass: 'text-accent',
           dirty,

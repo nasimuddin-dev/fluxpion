@@ -5,7 +5,7 @@ import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
-import { useSingleEditorTab } from '../components/EditorTabs';
+import { NEW_TAB_TITLE, useSingleEditorTab } from '../components/EditorTabs';
 import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
@@ -235,7 +235,8 @@ export function GrpcView() {
     void saveAsTestFile(`${d.method.split('/').pop() ?? 'gRPC call'} works`, { kind: 'grpc', target: d.target, method: d.method, message, metadata: d.metadata, tls: d.tls });
   };
   const [tabTitle, setTabTitle] = useSticky<string | undefined>(`grpc:title:${docId ?? 'main'}`, undefined);
-  const title = currentSaved?.name ?? tabTitle ?? (d.method ? d.method.split('/').pop()! : 'gRPC request');
+  // a new tab is "New gRPC request" (the save dialog suggests the method's name)
+  const title = currentSaved?.name ?? tabTitle ?? NEW_TAB_TITLE.grpc;
   const renameTab = async () => {
     const name = (await promptText('Rename', { message: 'Name', value: title, okLabel: 'Rename' }))?.trim();
     if (!name) return;
