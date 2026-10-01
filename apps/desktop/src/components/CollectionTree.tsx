@@ -354,9 +354,25 @@ export function CollectionTree({
     );
   };
 
-  const categoryRow = (c: Collection, cat: RequestCategory, count: number, isOpen: boolean) => (
-    <div className="group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors" style={{ paddingLeft: 20 }} {...(cat === 'rest' || cat === 'soap' || cat === 'graphql' ? dropProps(c, `${c.id}:${cat}`, 'into', {}) : {})}>
-      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(`${c.id}:cat:${cat}`)} aria-expanded={isOpen}>
+  const categoryRow = (c: Collection, cat: RequestCategory, count: number, isOpen: boolean) => {
+    const key = `${c.id}:cat:${cat}`;
+    // the same menu as every other row (right-click or ⋯): create here, run the collection, fold
+    const items: MenuItem[] = [
+      ...(onNewOfCategory ? [{ label: `New ${CATEGORY_META[cat].label} request`, icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }] : []),
+      ...(onRun ? [{ label: 'Run collection', icon: <Play size={14} />, onSelect: () => onRun(c) }] : []),
+      { label: isOpen ? 'Collapse' : 'Expand', icon: isOpen ? <ChevronRight size={14} /> : <ChevronDown size={14} />, separator: true, onSelect: () => toggle(key) },
+    ];
+    return (
+    <div
+      className={cx('group flex items-center h-8 text-sm rounded-md mx-1 pr-1 transition-colors', menuFor === key ? 'bg-hover' : 'hover:bg-hover')}
+      style={{ paddingLeft: 20 }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuFor(key);
+      }}
+      {...(cat === 'rest' || cat === 'soap' || cat === 'graphql' ? dropProps(c, `${c.id}:${cat}`, 'into', {}) : {})}
+    >
+      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(key)} aria-expanded={isOpen}>
         {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
         <span className={cx('mono text-[0.6rem] font-bold w-8 shrink-0', CATEGORY_META[cat].cls)}>{CATEGORY_META[cat].badge}</span>
         <span className="truncate font-medium">{CATEGORY_META[cat].label}</span>
@@ -372,8 +388,20 @@ export function CollectionTree({
           <FilePlus2 size={13} />
         </button>
       )}
+      <Menu
+        width={230}
+        open={menuFor === key}
+        onOpenChange={(o) => setMenuFor(o ? key : undefined)}
+        items={items}
+        trigger={
+          <button aria-label={`More actions for ${CATEGORY_META[cat].label}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
+            <MoreHorizontal size={14} />
+          </button>
+        }
+      />
     </div>
-  );
+    );
+  };
   const renderExtra = (g: ExtraGroup, depth: number) => {
     const shown = g.items.filter((i) => !f || i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f));
     const folders = [...new Set(shown.map((i) => i.folder ?? ''))].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
