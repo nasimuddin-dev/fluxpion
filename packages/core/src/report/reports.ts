@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import type { RunSummary, TestResult } from '../model/types.js';
 import { formatDuration } from '../util/stats.js';
 import { endAndClose } from '../storage/fsutil.js';
+import { runBreakdown, type RunBreakdown } from '../runner/breakdown.js';
 
 export type ReportFormat = 'json' | 'junit' | 'html' | 'markdown';
 
@@ -134,6 +135,69 @@ export async function writeMarkdownReport(path: string, summary: RunSummary, res
   });
 }
 
+/** Passed / failed / errors / skipped as one proportional bar (static HTML, no script). */
+function resultBarHtml(s: RunSummary): string {
+  const parts: Array<[string, number, string]> = [
+    ['passed', s.passed, 'var(--ok)'],
+    ['failed', s.failed, 'var(--bad)'],
+    ['errors', s.errors, 'var(--bad)'],
+    ['skipped', s.skipped, 'var(--warn)'],
+  ];
+  if (!s.total) return '';
+  const pct = (n: number) => Math.round((n / s.total) * 1000) / 10;
+  return (
+    `<div class="bar" role="img" aria-label="${parts.map(([k, n]) => `${n} ${k}`).join(', ')}">` +
+    parts
+      .filter(([, n]) => n > 0)
+      .map(([k, n, c]) => `<span style="flex:${n};background:${c}${k === 'errors' ? ';opacity:.7' : ''}" title="${n} ${k} (${pct(n)}%)"></span>`)
+      .join('') +
+    `</div><div class="legend">${parts
+      .filter(([, n]) => n > 0)
+      .map(([k, n, c]) => `<span><i style="background:${c}${k === 'errors' ? ';opacity:.7' : ''}"></i>${n} ${k} · ${pct(n)}%</span>`)
+      .join('')}</div>`
+  );
+}
+
+/** Response-time histogram (passed and failed per range), slowest tests and most failed checks, as static SVG and HTML. */
+export function breakdownHtml(b: RunBreakdown): string {
+  const out: string[] = [];
+  if (b.timed) {
+    const W = 560;
+    const H = 170;
+    const pad = { l: 36, r: 6, t: 8, b: 24 };
+    const max = Math.max(2, ...b.histogram.map((x) => x.passed + x.failed));
+    const slot = (W - pad.l - pad.r) / b.histogram.length;
+    const bw = Math.min(56, slot * 0.72);
+    const base = H - pad.b;
+    const h = (v: number) => (v / max) * (base - pad.t);
+    const bound = (ms: number) => (ms < 1000 ? `${ms} ms` : `${ms / 1000} s`);
+    const label = (x: (typeof b.histogram)[number]) => (x.toMs === undefined ? `≥ ${bound(x.fromMs)}` : x.fromMs === 0 ? `< ${bound(x.toMs)}` : `${bound(x.fromMs)}–${bound(x.toMs)}`);
+    const bars = b.histogram
+      .map((x, i) => {
+        const cx = pad.l + slot * i + slot / 2;
+        const okH = h(x.passed);
+        const badH = h(x.failed);
+        return (
+          `<g><title>${html(label(x))}: ${x.passed} passed, ${x.failed} failed</title>` +
+          `<rect x="${pad.l + slot * i}" y="${pad.t}" width="${slot}" height="${base - pad.t}" fill="transparent"/>` +
+          (okH ? `<rect x="${cx - bw / 2}" y="${base - okH}" width="${bw}" height="${okH}" rx="2" fill="var(--ok)"/>` : '') +
+          (badH ? `<rect x="${cx - bw / 2}" y="${base - okH - badH - (okH ? 2 : 0)}" width="${bw}" height="${badH}" rx="2" fill="var(--bad)"/>` : '') +
+          `<text x="${cx}" y="${H - 8}" text-anchor="middle">${html(label(x))}</text></g>`
+        );
+      })
+      .join('');
+    const grid = [0, Math.round(max / 2), max].map((t) => `<line x1="${pad.l}" x2="${W - pad.r}" y1="${base - h(t)}" y2="${base - h(t)}"/><text x="${pad.l - 6}" y="${base - h(t) + 3}" text-anchor="end">${t}</text>`).join('');
+    out.push(
+      `<section class="chart"><h3>Response time <span class="muted" style="text-transform:none;font-weight:400;margin-left:6px">tests per range</span></h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tests per response-time range">${grid}${bars}</svg><div class="legend"><span><i style="background:var(--ok)"></i>Passed</span><span><i style="background:var(--bad)"></i>Failed</span></div></section>`,
+    );
+  }
+  if (b.slowest.length)
+    out.push(`<section class="chart"><h3>Slowest tests</h3><table>${b.slowest.map((r) => `<tr><td class="${r.status}">${r.status}</td><td>${html(r.name)}</td><td style="text-align:right">${r.latencyMs} ms</td></tr>`).join('')}</table></section>`);
+  if (b.failingChecks.length)
+    out.push(`<section class="chart"><h3>Checks that failed most</h3><table>${b.failingChecks.map((c) => `<tr><td>${html(c.name)}</td><td class="failed" style="text-align:right">${c.count}×</td></tr>`).join('')}</table></section>`);
+  return out.length ? `<div class="charts" id="charts">${out.join('')}</div>` : '';
+}
+
 export async function writeHtmlReport(path: string, summary: RunSummary, results: AsyncIterable<TestResult>): Promise<void> {
   await writeAll(path, async (w) => {
     const ok = summary.failed + summary.errors === 0;
@@ -149,6 +213,8 @@ h1{font-size:20px;margin:0 0 4px}.muted{color:var(--muted)}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{position:sticky;top:0;background:var(--card)}.passed{color:var(--ok)}.failed,.error{color:var(--bad)}.skipped{color:var(--warn)}
 details summary{cursor:pointer}pre{white-space:pre-wrap;word-break:break-word;background:var(--card);padding:8px;border-radius:6px;max-height:300px;overflow:auto}
+.bar{display:flex;gap:2px;height:14px;margin:4px 0 6px}.bar span{border-radius:3px;min-width:3px}.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin:0 0 16px}.chart{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}.chart h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}.chart svg{width:100%;height:auto;font-size:10px}.chart svg text{fill:var(--muted)}.chart svg line{stroke:var(--line)}.chart table{font-size:12px}.chart td{padding:3px 6px}
 .tag{font-size:11px;border:1px solid var(--line);border-radius:10px;padding:0 6px;margin-left:4px}.judge{border-color:#8250df;color:#8250df}
 input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:280px}
 </style></head><body>
@@ -158,12 +224,17 @@ input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:
     for (const [k, v] of summaryLines(summary)) await w(`<div class="card"><span class="muted">${html(k)}</span><b>${html(v)}</b></div>`);
     for (const [k, v] of Object.entries(summary.scores)) await w(`<div class="card"><span class="muted">score: ${html(k)}</span><b>${v.mean}</b><span class="muted">${v.count} checks</span></div>`);
     await w(`</div>
+${resultBarHtml(summary)}
+<div id="charts-slot"></div>
 <p><input id="q" placeholder="Filter tests…" oninput="f()"> <label><input type="checkbox" id="fo" onchange="f()" style="width:auto"> failures only</label></p>
 <p class="muted">Checks tagged <span class="tag judge">ai-judge</span> are model-generated judgements; <span class="tag">heuristic</span> checks are approximate. Costs are estimates from configured prices.</p>
 <table><thead><tr><th>Status</th><th>Test</th><th>Type</th><th>Model</th><th>Latency ms</th><th>Tokens</th><th>Cost</th><th>Checks</th></tr></thead><tbody id="rows">\n`);
     let n = 0;
     let omitted = 0;
+    // the charts need every result; they are written after the table and moved above it (below without scripts)
+    const breakdown = runBreakdown();
     for await (const r of results) {
+      breakdown.add(r);
       if (n >= MAX_DETAILED && r.status === 'passed') {
         omitted++;
         continue;
@@ -178,6 +249,8 @@ input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:
       );
     }
     await w(`</tbody></table>${omitted ? `<p class="muted">${omitted} further passing tests omitted — see the JSON report.</p>` : ''}
+${breakdownHtml(breakdown.result())}
+<script>{const c=document.getElementById('charts');if(c)document.getElementById('charts-slot').replaceWith(c)}</script>
 <script>function f(){const q=document.getElementById('q').value.toLowerCase(),fo=document.getElementById('fo').checked;for(const tr of document.querySelectorAll('#rows tr')){const s=tr.dataset.s;tr.style.display=(!q||tr.textContent.toLowerCase().includes(q))&&(!fo||s==='failed'||s==='error')?'':'none'}}</script>
 <p class="muted">Generated by TestPion</p></body></html>\n`);
   });
