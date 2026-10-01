@@ -130,7 +130,7 @@ function RunDurations({ runs, onSelect }: { runs: RunRow[]; onSelect?(id: string
 }
 
 /** The runs at a glance (shown when no run is selected): pass rate and duration of the last 40 runs. */
-export function RunsOverview({ runs, onSelect }: { runs: RunRow[]; onSelect?(id: string): void }) {
+export function RunsOverview({ runs, onSelect, hint = 'Click a bar or point, or a run in the list, to see its results.' }: { runs: RunRow[]; onSelect?(id: string): void; hint?: string }) {
   const last = runs.slice(0, 40).reverse();
   if (!last.length) return <Empty title="No runs yet">Run tests, a suite or a collection; each run is listed here with its results and charts.</Empty>;
   return (
@@ -139,7 +139,7 @@ export function RunsOverview({ runs, onSelect }: { runs: RunRow[]; onSelect?(id:
         <PassRate runs={last} onSelect={onSelect} />
         <RunDurations runs={last} onSelect={onSelect} />
       </div>
-      <p className="text-xs text-muted mt-3">Click a bar or point, or a run in the list, to see its results.</p>
+      <p className="text-xs text-muted mt-3">{hint}</p>
     </div>
   );
 }

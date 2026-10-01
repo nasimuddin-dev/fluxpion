@@ -5,6 +5,7 @@ import { useApp } from '../store';
 import type { Collection, CollectionNode, Library } from '../types';
 import { timeAgo, plural } from '../lib/format';
 import { RunPanel } from './RunPanel';
+import { RunsOverview, type RunRow } from './RunsOverview';
 import { hasNativeDialogs, pickTextFile } from '../lib/files';
 import { Badge, Button, cx, Empty, Field, Input, Modal, Select, Split, Toggle } from './ui';
 
@@ -27,16 +28,6 @@ interface DataFile {
   query?: string;
 }
 
-interface RunRow {
-  id: string;
-  name: string;
-  startedAt: string;
-  passed: number;
-  failed: number;
-  errors: number;
-  total: number;
-  environment?: string;
-}
 
 function flatten(nodes: CollectionNode[], path: string[] = [], scope?: string, inScope = !scope): RunnableRequest[] {
   return nodes.flatMap((n) => {
@@ -377,6 +368,9 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
                 )
               }
             />
+          ) : runs.length ? (
+            // earlier runs of this collection: pass rate and duration, click one to open it
+            <RunsOverview runs={runs} onSelect={setRunId} hint="Click a bar or point, or pick a run above, to see its results. Run the collection again with the button on the left." />
           ) : (
             <Empty icon={<Play size={26} />} title="Run this collection">
               Requests run one at a time, in order. Variables set by scripts carry over to later requests, and <span className="mono">pm.execution.setNextRequest()</span> changes the order. Results, traces and reports are saved with the run.
