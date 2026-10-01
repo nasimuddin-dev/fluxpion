@@ -2,7 +2,7 @@
 
     python scripts/release.py OLD NEW entry.md
 
-entry.md holds the body of the changelog entry (the "## NEW — date" heading is added). See .claude/skills/release.
+entry.md holds the body of the changelog entry (the "## NEW — date" heading is added). See .claude/skills/cut-release.
 """
 import datetime
 import os
