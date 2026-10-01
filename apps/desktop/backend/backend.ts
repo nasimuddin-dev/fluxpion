@@ -1094,8 +1094,9 @@ export class Backend {
     const events = this.batched<RunEvent>('run.events', 100);
     const started = Date.now();
     void (async () => {
+      let summary: RunSummary | undefined;
       try {
-        const summary = await exec({
+        summary = await exec({
           name,
           runId,
           tests,
@@ -1127,7 +1128,8 @@ export class Backend {
         events.flush();
         this.runs.get(runId)!.done = true;
         await ctx.dispose();
-        this.host.emit('run.finished', { runId });
+        // the counts let the app say how it went (a desktop notification when it's in the background)
+        this.host.emit('run.finished', { runId, name, total: summary?.total, passed: summary?.passed, failed: summary?.failed, errors: summary?.errors, durationMs: Date.now() - started, cancelled: ctrl.signal.aborted });
       }
     })();
     return { runId };

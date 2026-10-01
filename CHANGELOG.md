@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Desktop notification when a run finishes in the background**: a test, collection or evaluation run that ends while TestPion isn't in front shows how it went (passed, failed, errors, time); clicking it opens the run. *Settings ▸ General* turns it off. The `run.finished` event now carries the counts.
 - **CLI: `testpion collections` and `testpion requests <collection>`** list a workspace's collections and what each holds (requests, gRPC calls, connections), as text or `--json`, the same as the MCP tools.
 - **AI agents see the whole collection**: the MCP tools `list_collections` (counts of gRPC calls and connections) and `list_requests` (each gRPC call's target and method, each connection's URL and mode) include a collection's gRPC calls and connections, which `run_collection` runs.
 - **Drag gRPC calls and connections onto a collection**: from another collection or from *Not in a collection*, drop one on a collection in the sidebar to move it there, like requests.

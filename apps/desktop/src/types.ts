@@ -328,6 +328,8 @@ export interface AppSettings {
   workspacePaths: string[];
   globalVariables: KeyValue[];
   checkForUpdates: boolean;
+  /** Desktop notification when a run finishes in the background (default on). */
+  notifyRunFinished?: boolean;
   proxy?: { mode: 'env' | 'custom' | 'off'; url?: string; bypass?: string; username?: string };
   tls?: { systemCa?: boolean; extraCa?: string };
 }

@@ -71,6 +71,7 @@ export function SettingsView() {
                 <input type="range" min={11} max={20} value={s.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
               </Field>
               <Toggle checked={s.reducedMotion} onChange={(reducedMotion) => set({ reducedMotion })} label="Reduce motion" />
+              <Toggle checked={s.notifyRunFinished !== false} onChange={(notifyRunFinished) => set({ notifyRunFinished })} label="Notify me when a run finishes while TestPion is in the background" />
               <p className="text-xs text-muted">
                 Keyboard: Ctrl/Cmd+K commands · Ctrl/Cmd+Shift+F search · Ctrl/Cmd+Enter send/run · Ctrl/Cmd+S save · Ctrl/Cmd+Alt+1…9 switch views · Ctrl/Cmd+, settings.
               </p>

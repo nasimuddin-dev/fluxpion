@@ -9,6 +9,7 @@ import { isRequestView } from './store';
 import { Explorer } from './components/Explorer';
 import { EditorTabStrip, useEditorTabsStore } from './components/EditorTabs';
 import { DOC_VIEWS, DocContext, isDocView, useDocs } from './lib/docs';
+import { watchRunNotifications } from './lib/run-notifications';
 import { watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
 import { loadMonaco } from './components/CodeEditor';
@@ -154,6 +155,7 @@ export default function App() {
     })();
     const off = on('run.error', (p: { error: { message: string } }) => useApp.getState().toast(`Run failed: ${p.error.message}`, 'error'));
     const offMonitors = watchMonitorAlerts();
+    const offRuns = watchRunNotifications();
     const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
     // application menu (File ▸ New, Import, Export, Save …)
     const offMenu = on<{ command: MenuCommand }>('menu.command', ({ command }) => void runMenuCommand(command));
@@ -165,6 +167,7 @@ export default function App() {
       offTabs();
       offMenu();
       offMonitors();
+      offRuns();
     };
   }, []);
 

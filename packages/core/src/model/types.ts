@@ -695,6 +695,8 @@ export interface AppSettings {
   globalVariables: KeyValue[];
   /** Check GitHub for a newer version when the desktop app starts. */
   checkForUpdates: boolean;
+  /** Show a desktop notification when a run (tests, collection, evaluation) finishes while the app isn't in front. Default on. */
+  notifyRunFinished?: boolean;
   /** Outbound proxy: environment variables (default), a custom proxy, or none. The password is in the secret store. */
   proxy?: { mode: 'env' | 'custom' | 'off'; url?: string; bypass?: string; username?: string };
   /** Certificate authorities HTTPS trusts besides the built-in list: the OS store and/or extra PEM certificates. */
