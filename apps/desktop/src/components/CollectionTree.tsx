@@ -362,7 +362,16 @@ export function CollectionTree({
         {shown
           .filter((i) => (i.folder ?? '') === folder)
           .map((i) => (
-            <div key={i.id} className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === i.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover')} style={{ paddingLeft: 8 + (depth + (folder ? 1 : 0)) * 12 }}>
+            <div
+              key={i.id}
+              className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === i.id ? 'bg-accent-soft text-fg' : menuFor === i.id ? 'bg-hover' : 'hover:bg-hover')}
+              style={{ paddingLeft: 8 + (depth + (folder ? 1 : 0)) * 12 }}
+              onContextMenu={(e) => {
+                if (!g.menu) return;
+                e.preventDefault();
+                setMenuFor(i.id);
+              }}
+            >
               <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} title={i.name}>
                 <span className={cx('mono text-[0.64rem] font-bold w-10 shrink-0', CATEGORY_META[g.cat].cls)}>{i.badge ?? CATEGORY_META[g.cat].badge}</span>
                 <span className="truncate">{i.name}</span>
@@ -370,6 +379,8 @@ export function CollectionTree({
               {g.menu && (
                 <Menu
                   width={230}
+                  open={menuFor === i.id}
+                  onOpenChange={(o) => setMenuFor(o ? i.id : undefined)}
                   trigger={
                     <button aria-label={`More actions for ${i.name}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
                       <MoreHorizontal size={14} />

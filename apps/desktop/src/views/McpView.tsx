@@ -106,6 +106,8 @@ export function McpView() {
   useIntent('mcp', (p) => {
     if (p?.serverId) selectServer(p.serverId);
     if (p?.addServer) addServer();
+    if (p?.tab) setTab(p.tab as Tab);
+    if (p?.serverId && p.connect) void connect(p.serverId as string);
   });
 
   const server = servers.find((s) => s.id === selected);

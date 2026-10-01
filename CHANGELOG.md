@@ -6,6 +6,7 @@ Highlights: MCP servers and API definitions open in their own tabs like every re
 
 - **One tab per MCP server**: clicking servers in the sidebar opens each in its own tab (clicking one again selects its tab), and the tab menu's close items (Close other / to the right / all) close MCP tabs too. Discarding a new server or removing one closes its tab.
 - **API definitions open in a tab**: clicking an OpenAPI document under *API definitions* opens it like a request, with its title, version and OpenAPI version, and three tabs: **Definition** (the document, editable, Save / Ctrl+S), **Coverage** (the API coverage report, inline) and **Compare versions** (this document against another one, a link or a file). The command palette still offers both as dialogs.
+- **Right-click menus for every sidebar item**: gRPC calls and WebSocket / MQTT connections get *Open in tab, Rename, Duplicate, Move to ▸ (collection), Remove from the collection, Delete*; MCP servers *Open in tab, Connect / Disconnect, Settings, Rename, Duplicate, Delete*; API definitions *Open in tab, API coverage, Compare versions*. Right-click works on them like on REST requests, and menus can now have submenus.
 - **Ctrl+S everywhere**: Ctrl+S saves the tab on screen in every editor: REST, GraphQL, gRPC and WebSocket (new; asks for a name the first time), MCP servers and API definitions. With several tabs of one editor open, only the one on screen is saved.
 
 ## 0.14.1 — 2026-09-30

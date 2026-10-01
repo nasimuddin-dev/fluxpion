@@ -3,7 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as MenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { Loader2, X } from 'lucide-react';
+import { ChevronRight, Loader2, X } from 'lucide-react';
 
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ');
@@ -238,6 +238,8 @@ export interface MenuItem {
   disabled?: boolean;
   /** Draw a separator above this item. */
   separator?: boolean;
+  /** A submenu (e.g. Move to ▸ each collection); `onSelect` is then unused. */
+  items?: MenuItem[];
 }
 
 /**
@@ -269,28 +271,53 @@ export function Menu({
           style={{ minWidth: width }}
           className="z-[70] rounded-xl border border-line bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150"
         >
-          {items.map((it, i) => (
-            <div key={`${i}-${it.label}`}>
-              {it.separator && i > 0 && <MenuPrimitive.Separator className="my-1 h-px bg-line" />}
-              <MenuPrimitive.Item
-                disabled={it.disabled}
-                onSelect={it.onSelect}
-                className={cx(
-                  'flex items-center gap-2.5 rounded-md px-2 h-8 text-sm cursor-default select-none outline-none transition-colors',
-                  'data-[highlighted]:bg-hover data-[disabled]:opacity-50 data-[disabled]:pointer-events-none',
-                  it.danger ? 'text-bad data-[highlighted]:bg-bad/10' : 'text-fg',
-                )}
-              >
-                {/* every row keeps the icon column so labels line up */}
-                {(it.icon || items.some((x) => x.icon)) && <span className={cx('shrink-0 grid place-items-center w-4', it.danger ? 'text-bad' : 'text-muted')}>{it.icon}</span>}
-                <span className="flex-1 truncate">{it.label}</span>
-                {it.shortcut && <span className="text-xs text-muted">{it.shortcut}</span>}
-              </MenuPrimitive.Item>
-            </div>
-          ))}
+          <MenuItems items={items} />
         </MenuPrimitive.Content>
       </MenuPrimitive.Portal>
     </MenuPrimitive.Root>
+  );
+}
+
+const MENU_ROW = cx('flex items-center gap-2.5 rounded-md px-2 h-8 text-sm cursor-default select-none outline-none transition-colors', 'data-[highlighted]:bg-hover data-[state=open]:bg-hover data-[disabled]:opacity-50 data-[disabled]:pointer-events-none');
+
+/** A menu's rows (and submenus, opened on hover or →). */
+function MenuItems({ items }: { items: MenuItem[] }) {
+  const icons = items.some((x) => x.icon);
+  return (
+    <>
+      {items.map((it, i) => {
+        const content = (
+          <>
+            {/* every row keeps the icon column so labels line up */}
+            {(it.icon || icons) && <span className={cx('shrink-0 grid place-items-center w-4', it.danger ? 'text-bad' : 'text-muted')}>{it.icon}</span>}
+            <span className="flex-1 truncate">{it.label}</span>
+            {it.shortcut && <span className="text-xs text-muted">{it.shortcut}</span>}
+          </>
+        );
+        return (
+          <div key={`${i}-${it.label}`}>
+            {it.separator && i > 0 && <MenuPrimitive.Separator className="my-1 h-px bg-line" />}
+            {it.items ? (
+              <MenuPrimitive.Sub>
+                <MenuPrimitive.SubTrigger disabled={it.disabled || !it.items.length} className={cx(MENU_ROW, 'text-fg')}>
+                  {content}
+                  <ChevronRight size={13} className="text-muted shrink-0" />
+                </MenuPrimitive.SubTrigger>
+                <MenuPrimitive.Portal>
+                  <MenuPrimitive.SubContent sideOffset={6} className="z-[71] min-w-[200px] max-w-[320px] max-h-[60vh] overflow-auto rounded-xl border border-line bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95 duration-150">
+                    <MenuItems items={it.items} />
+                  </MenuPrimitive.SubContent>
+                </MenuPrimitive.Portal>
+              </MenuPrimitive.Sub>
+            ) : (
+              <MenuPrimitive.Item disabled={it.disabled} onSelect={it.onSelect} className={cx(MENU_ROW, it.danger ? 'text-bad data-[highlighted]:bg-bad/10' : 'text-fg')}>
+                {content}
+              </MenuPrimitive.Item>
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }
 

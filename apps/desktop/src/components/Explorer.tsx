@@ -1,12 +1,12 @@
-import { ChevronDown, ChevronRight, Download, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Plug, Plus, RefreshCw, ScanSearch, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
-import { promptText, useApp, type ViewId } from '../store';
+import { confirmAction, promptText, useApp, type ViewId } from '../store';
 import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
 import { uid } from '../lib/format';
 import { addToFolder, CATEGORY_META, CollectionTree, type ExtraGroup } from './CollectionTree';
 import type { RequestCategory } from '../lib/collection-filter';
-import { newRequestItems, useEditorTabsStore } from './EditorTabs';
+import { closeTabsFor, newRequestItems, useEditorTabsStore } from './EditorTabs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
 
@@ -85,8 +85,16 @@ function Section({
 }
 
 function Row({ icon, label, sub, onClick, title, active, menu }: { icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string; active?: boolean; menu?: MenuItem[] }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <div className={cx('group mx-1 flex items-center rounded-md pr-1 transition-colors', active ? 'bg-accent-soft' : 'hover:bg-hover')}>
+    <div
+      className={cx('group mx-1 flex items-center rounded-md pr-1 transition-colors', active ? 'bg-accent-soft' : menuOpen ? 'bg-hover' : 'hover:bg-hover')}
+      onContextMenu={(e) => {
+        if (!menu) return;
+        e.preventDefault();
+        setMenuOpen(true);
+      }}
+    >
       <button title={title ?? label} onClick={onClick} className="flex-1 min-w-0 flex items-center gap-2 h-7 pl-6 pr-1 text-sm text-left">
         {icon && <span className="text-muted shrink-0">{icon}</span>}
         <span className="truncate flex-1">{label}</span>
@@ -95,6 +103,8 @@ function Row({ icon, label, sub, onClick, title, active, menu }: { icon?: ReactN
       {menu && (
         <Menu
           width={230}
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
           trigger={
             <button aria-label={`More actions for ${label}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
               <MoreHorizontal size={14} />
@@ -302,12 +312,89 @@ export function Explorer() {
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
+  /** Change a saved gRPC call / connection list (rename, duplicate, delete). */
+  const editLibrary = async (kind: 'grpc' | 'websocket', fn: (items: Array<LibraryItem<unknown>>) => Array<LibraryItem<unknown>>) => {
+    try {
+      const lib = await call<Library<unknown>>('lib.get', { kind });
+      await call('lib.save', { kind, library: { folders: lib.folders, items: fn(lib.items) } });
+      await load();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+  /** The menu of a gRPC call or connection: the same actions as a request's (open, rename, duplicate, move, delete). */
   const moveMenu = (kind: 'grpc' | 'websocket', item: SavedItem): MenuItem[] => [
-    { label: 'Open', onSelect: () => intent(kind, { savedId: item.id }) },
-    ...collections
-      .filter((c) => c.id !== item.collectionId)
-      .map((c, i) => ({ label: `Move to ${c.name}`, icon: <FolderInput size={14} />, separator: i === 0, onSelect: () => void moveItem(kind, item.id, c.id) })),
-    ...(item.collectionId && colIds.has(item.collectionId) ? [{ label: 'Remove from the collection', icon: <FolderX size={14} />, separator: true, onSelect: () => void moveItem(kind, item.id, undefined) }] : []),
+    { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(kind, { savedId: item.id }) },
+    {
+      label: 'Rename',
+      icon: <Pencil size={14} />,
+      onSelect: async () => {
+        const name = (await promptText(`Rename ${kind === 'grpc' ? 'gRPC call' : 'connection'}`, { value: item.name, okLabel: 'Rename' }))?.trim();
+        if (name) await editLibrary(kind, (items) => items.map((i) => (i.id === item.id ? { ...i, name } : i)));
+      },
+    },
+    {
+      label: 'Duplicate',
+      icon: <CopyPlus size={14} />,
+      onSelect: () => void editLibrary(kind, (items) => items.flatMap((i) => (i.id === item.id ? [i, { ...i, id: uid('lib-'), name: `${i.name} copy`, updatedAt: new Date().toISOString() }] : [i]))),
+    },
+    {
+      label: 'Move to',
+      icon: <FolderInput size={14} />,
+      onSelect: () => undefined,
+      items: collections.filter((c) => c.id !== item.collectionId).map((c) => ({ label: c.name, onSelect: () => void moveItem(kind, item.id, c.id) })),
+    },
+    ...(item.collectionId && colIds.has(item.collectionId) ? [{ label: 'Remove from the collection', icon: <FolderX size={14} />, onSelect: () => void moveItem(kind, item.id, undefined) }] : []),
+    {
+      label: 'Delete',
+      icon: <Trash2 size={14} />,
+      danger: true,
+      separator: true,
+      onSelect: async () => {
+        if (!(await confirmAction({ title: kind === 'grpc' ? 'Delete gRPC call' : 'Delete connection', message: `Delete "${item.name}"?`, confirmLabel: 'Delete', danger: true }))) return;
+        closeTabsFor([item.id]);
+        await editLibrary(kind, (items) => items.filter((i) => i.id !== item.id));
+      },
+    },
+  ];
+  /** Change the MCP server list (rename, duplicate, delete). */
+  const editServers = async (fn: (list: McpServerConfig[]) => McpServerConfig[]) => {
+    try {
+      await call('mcp.saveServers', { servers: fn(servers.map(({ connected: _c, ...s }) => s as McpServerConfig)) });
+      await load();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+  /** The menu of an MCP server: open, connect, rename, duplicate, delete. */
+  const serverMenu = (s: McpServerConfig & { connected?: boolean }): MenuItem[] => [
+    { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent('mcp', { serverId: s.id }) },
+    s.connected
+      ? { label: 'Disconnect', icon: <Unplug size={14} />, onSelect: () => void call('mcp.disconnect', { serverId: s.id }).then(load) }
+      : { label: 'Connect', icon: <Plug size={14} />, onSelect: () => intent('mcp', { serverId: s.id, connect: true }) },
+    { label: 'Settings', icon: <Pencil size={14} />, onSelect: () => intent('mcp', { serverId: s.id, tab: 'settings' }) },
+    {
+      label: 'Rename',
+      icon: <Pencil size={14} />,
+      separator: true,
+      onSelect: async () => {
+        const name = (await promptText('Rename MCP server', { value: s.name, okLabel: 'Rename' }))?.trim();
+        if (name) await editServers((list) => list.map((x) => (x.id === s.id ? { ...x, name } : x)));
+      },
+    },
+    { label: 'Duplicate', icon: <CopyPlus size={14} />, onSelect: () => void editServers((list) => list.flatMap((x) => (x.id === s.id ? [x, { ...x, id: uid('mcp-'), name: `${x.name} copy` }] : [x]))) },
+    {
+      label: 'Delete',
+      icon: <Trash2 size={14} />,
+      danger: true,
+      separator: true,
+      onSelect: async () => {
+        if (!(await confirmAction({ title: 'Remove MCP server', message: `Remove the MCP server "${s.name}"?`, detail: 'Saved tests that call it will fail until you add it again.', confirmLabel: 'Remove server', danger: true }))) return;
+        closeTabsFor([s.id]);
+        if (s.connected) await call('mcp.disconnect', { serverId: s.id }).catch(() => undefined);
+        await editServers((list) => list.filter((x) => x.id !== s.id));
+      },
+    },
   ];
   /** Saved before items could belong to a collection: put gRPC calls and connections in a collection each. */
   const organizeLoose = async () => {
@@ -452,7 +539,9 @@ export function Explorer() {
                 label={s.name}
                 sub={s.connected ? 'connected' : s.transport}
                 title={`${s.name} (${s.connected ? 'connected' : 'not connected'})`}
+                active={openRequestId === s.id}
                 onClick={() => intent('mcp', { serverId: s.id })}
+                menu={serverMenu(s)}
               />
             ))
           ) : (
@@ -471,7 +560,7 @@ export function Explorer() {
                 active={openRequestId === s}
                 onClick={() => intent('apidef', { spec: s })}
                 menu={[
-                  { label: 'Open', icon: <FileCode2 size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'definition' }) },
+                  { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'definition' }) },
                   { label: 'API coverage', icon: <ScanSearch size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'coverage' }) },
                   { label: 'Compare versions', icon: <GitCompare size={14} />, onSelect: () => intent('apidef', { spec: s, tab: 'compare' }) },
                 ]}
