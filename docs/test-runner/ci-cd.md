@@ -99,7 +99,7 @@ To run a collection instead, use `run-collection "My API" -w . -e Staging -r con
 83.3% of operations covered (5/6) · 35.7% of documented responses seen (5/14) · minimum 80%
 ```
 
-In the app, open **API coverage** from a finished run (or the command palette). **Suggest tests with AI** drafts tests for the gaps for you to review. AI agents get the same report from the `api_coverage` MCP tool.
+In the app, open **API coverage** from a finished run, an API definition's **Coverage** tab or the command palette; *By tag* shows how many operations of each tag were called, least covered first. **Suggest tests with AI** drafts tests for the gaps for you to review. AI agents get the same report from the `api_coverage` MCP tool.
 
 ## Catch breaking API changes
 

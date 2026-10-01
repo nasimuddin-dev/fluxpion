@@ -5,12 +5,14 @@ import { useApp } from '../store';
 import { download } from '../lib/format';
 import { SidePicker, type Side } from './OpenApiDiffDialog';
 import { Badge, Button, cx, Field, Input, Metric, MetricGrid, ModalOrPanel, Select, Toggle } from './ui';
+import { ChartCard, Swatch } from './charts';
 
 interface OperationCoverage {
   method: string;
   path: string;
   operationId?: string;
   summary?: string;
+  tags: string[];
   deprecated: boolean;
   calls: number;
   statuses: Record<string, number>;
@@ -137,6 +139,7 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose, inline }:
               <Metric label="Documented responses seen" value={`${s.statusPct}%`} tone={tone(s.statusPct)} sub={`${s.testedStatuses} of ${s.documentedStatuses}`} />
               <Metric label="Requests analysed" value={s.observations} sub={s.unmatched ? `${s.unmatched} not in the document` : 'all in the document'} />
             </MetricGrid>
+            <CoverageByTag operations={result.report.operations} />
             <div className="flex items-center gap-2 text-xs text-muted">
               <span className="truncate">
                 From {[result.sources.runs.map((r) => r.name).join(', '), result.sources.historyEntries ? `${result.sources.historyEntries} history entries` : ''].filter(Boolean).join(' + ') || 'no requests'}
@@ -222,5 +225,36 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose, inline }:
         )}
       </div>
     </ModalOrPanel>
+  );
+}
+
+/** Operations covered per tag (the first tag of each operation), as a proportional bar per tag, least covered first. */
+function CoverageByTag({ operations }: { operations: OperationCoverage[] }) {
+  const tags = new Map<string, { covered: number; total: number }>();
+  for (const o of operations) {
+    const t = o.tags[0] ?? 'untagged';
+    const e = tags.get(t) ?? tags.set(t, { covered: 0, total: 0 }).get(t)!;
+    e.total++;
+    if (o.covered) e.covered++;
+  }
+  if (tags.size < 2) return null;
+  const rows = [...tags].sort((a, b) => a[1].covered / a[1].total - b[1].covered / b[1].total || b[1].total - a[1].total);
+  return (
+    <ChartCard title="By tag" aside="operations covered" legend={<><Swatch color="var(--ok)" label="Called" /><Swatch color="var(--bad)" label="Never called" /></>}>
+      <div className="flex flex-col gap-1.5">
+        {rows.map(([t, v]) => (
+          <div key={t} className="flex items-center gap-2 text-xs" title={`${t}: ${v.covered} of ${v.total} operations called`}>
+            <span className="w-32 shrink-0 truncate text-muted">{t}</span>
+            <span className="flex-1 h-3 flex gap-0.5">
+              {v.covered > 0 && <span className="h-full rounded-sm bg-ok" style={{ flex: v.covered }} />}
+              {v.total - v.covered > 0 && <span className="h-full rounded-sm bg-bad/80" style={{ flex: v.total - v.covered }} />}
+            </span>
+            <span className="w-16 text-right tabular-nums text-fg">
+              {v.covered}/{v.total}
+            </span>
+          </div>
+        ))}
+      </div>
+    </ChartCard>
   );
 }
