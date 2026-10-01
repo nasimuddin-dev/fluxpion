@@ -13,7 +13,7 @@ The **WebSocket** view connects to a `ws://` or `wss://` server, sends messages 
 2. Click **Connect**. Cookies from the [cookie jar](./cookies.md) for the URL's domain are sent with the handshake.
 3. Write a message (JSON or any text) and click **Send**.
 
-The message log lists sent (↗), received (↙) and connection (ⓘ) messages with their time. Filter it, and click a message to see it in full (JSON as a tree). Connecting, sending and closing also appear in the [console](./rest.md#console).
+The message log lists sent (↗), received (↙) and connection (ⓘ) messages with their time. Its header counts the messages and bytes in each direction and draws a sparkline of messages per second over the last minute. Filter it by text or direction, and click a message to see it in full (JSON as a tree). Connecting, sending and closing also appear in the [console](./rest.md#console).
 
 ## Socket.IO
 
