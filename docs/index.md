@@ -31,7 +31,7 @@ features:
     link: /mcp/overview
     linkText: MCP debugging
   - title: AI Lab
-    details: Test prompts on OpenAI-compatible, Azure, Anthropic, Gemini and Ollama models — or an offline mock. Streaming, time to first token, tokens, cost and side-by-side comparison.
+    details: Test prompts on OpenAI-compatible, Azure, Anthropic, Gemini, Amazon Bedrock and Ollama models — or an offline mock. Streaming, time to first token, tokens, cost and side-by-side comparison.
     link: /ai-testing/overview
     linkText: AI testing
   - title: Evaluations

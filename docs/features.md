@@ -86,7 +86,7 @@ See [WebSocket](./api-testing/websocket.md).
   <img src="/images/ai-lab.jpg" alt="The AI Lab playground with a streaming response and metrics" width="1440" height="900" loading="lazy">
 </figure>
 
-Prompt templates with variables, JSON mode and JSON Schema outputs, and streaming with time to first token. Token counts and estimated cost from a price table you control. Compare models side by side without a one-size-fits-all ranking. Providers include OpenAI-compatible, Azure OpenAI, Anthropic, Gemini, Ollama and an offline mock.
+Prompt templates with variables, JSON mode and JSON Schema outputs, and streaming with time to first token. Token counts and estimated cost from a price table you control. Compare models side by side without a one-size-fits-all ranking. Providers include OpenAI-compatible, Azure OpenAI, Anthropic, Gemini, Amazon Bedrock, Ollama and an offline mock.
 
 [AI testing guide](/ai-testing/overview)
 
