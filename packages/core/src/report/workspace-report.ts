@@ -114,14 +114,14 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px
     out.push(`<h2>Monitors</h2><table><tr><th>Monitor</th><th>Latest</th><th>Last ${Math.max(...monitors.map((m) => m.total), 1)} runs</th><th>Passed</th></tr>`);
     for (const m of monitors) {
       const strip = m.strip.map((r) => `<i style="background:${r.status === 'passed' ? 'var(--ok)' : 'var(--bad)'}" title="${esc(r.startedAt)}: ${esc(r.status)}"></i>`).join('');
-      const latest = !m.enabled ? '<span class="muted">paused</span>' : !m.last ? '<span class="muted">not run yet</span>' : `<span class="${m.last.status === 'passed' ? 'ok' : 'bad'}">${esc(m.last.reason ?? m.last.status)}</span> <span class="muted">${esc(m.last.startedAt.slice(0, 16).replace('T', ' '))}</span>`;
+      const latest = !m.enabled ? '<span class="muted">paused</span>' : !m.last ? '<span class="muted">not run yet</span>' : `<span class="${m.last.status === 'passed' ? 'ok' : 'bad'}">${esc(m.last.reason ?? m.last.status)}</span> <span class="muted">${esc(new Date(m.last.startedAt).toLocaleString())}</span>`;
       out.push(`<tr><td>${esc(m.name)}</td><td>${latest}</td><td><span class="strip">${strip}</span></td><td class="n">${m.total ? pct(m.passed, m.total) : '—'}</td></tr>`);
     }
     out.push(`</table>`);
   }
 
   out.push(`<h2>Latest runs</h2><table><tr><th>Run</th><th>When</th><th>Passed</th><th>Duration</th></tr>`);
-  for (const r of runs) out.push(`<tr><td>${esc(r.name)}</td><td>${esc(r.startedAt.slice(0, 16).replace('T', ' '))}</td><td class="n ${r.failed + r.errors ? 'bad' : 'ok'}">${r.passed}/${r.total}</td><td class="n">${ms(r.durationMs)}</td></tr>`);
+  for (const r of runs) out.push(`<tr><td>${esc(r.name)}</td><td>${esc(new Date(r.startedAt).toLocaleString())}</td><td class="n ${r.failed + r.errors ? 'bad' : 'ok'}">${r.passed}/${r.total}</td><td class="n">${ms(r.durationMs)}</td></tr>`);
   if (!runs.length) out.push(`<tr><td colspan="4" class="muted">No runs yet</td></tr>`);
   out.push(`</table>`);
 
