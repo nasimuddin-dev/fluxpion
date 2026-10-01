@@ -15,7 +15,10 @@ describe('test history across runs', () => {
       const d = store.runDir(runId);
       mkdirSync(d, { recursive: true });
       writeFileSync(join(d, 'results.jsonl'), results.map((r) => JSON.stringify({ type: 'http', startedAt: '', durationMs: 10, attempts: 1, checks: [], ...r })).join('\n') + '\n');
-      store.meta.addRun({ runId, name: 'API', startedAt: `2026-10-0${n}T10:00:00.000Z`, durationMs: 100, total: results.length, passed: 0, failed: 0, skipped: 0, errors: 0, environment: 'Staging' } as RunSummary, d);
+      store.meta.addRun(
+        { runId, name: 'API', startedAt: `2026-10-0${n}T10:00:00.000Z`, durationMs: 100, total: results.length, passed: 0, failed: 0, skipped: 0, errors: 0, environment: 'Staging' } as RunSummary,
+        d,
+      );
     };
     run(1, [{ id: 'login', name: 'Login', status: 'passed', latencyMs: 40 }]);
     run(2, [{ id: 'login', name: 'Login', status: 'failed', latencyMs: 90, checks: [{ type: 'status', name: 'status is 200', passed: false, source: 'deterministic', message: '' }] }]);
