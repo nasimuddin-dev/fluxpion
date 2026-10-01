@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.4 — 2026-09-30
+
+- **Monitors in folders**: the monitor list works like every other saved list: a new-folder button and **+** in its header, folders (drag or *Move to folder…*), a filter, and menus to rename, duplicate, move or delete a monitor or folder, plus *Edit*, *Run now* and *Pause / Resume*. Monitors saved elsewhere (the CLI, an AI agent) appear straight away.
+
 ## 0.20.3 — 2026-09-30
 
 - **Monitors are created and edited inline**: *New monitor* and *Edit* open in the main area with **Create monitor / Save** and **Cancel** in its header, like MCP servers and API definitions, instead of a dialog. The API definition's *Coverage* and *Compare versions* tabs get the same header.
