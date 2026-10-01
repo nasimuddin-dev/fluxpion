@@ -433,7 +433,11 @@ export function SearchDialog() {
     else if (h.kind === 'history') openIntent('history', { historyId: h.ref.historyId });
     else if (h.kind === 'trace') openIntent('traces', { traceId: h.ref.traceId });
     else if (h.kind === 'run') openIntent('tests', { runId: h.ref.runId });
-    else if (h.kind === 'saved') openIntent(h.ref.library === 'grpc' ? 'grpc' : h.ref.library === 'ai-prompts' ? 'ai' : 'websocket', { savedId: h.ref.itemId });
+    else if (h.kind === 'saved') {
+      const lib = h.ref.library;
+      if (lib === 'monitors') openIntent('monitors', { monitorId: h.ref.itemId });
+      else openIntent(lib === 'grpc' ? 'grpc' : lib === 'ai-prompts' ? 'ai' : lib === 'load-tests' ? 'load' : lib === 'evaluations' ? 'evaluations' : 'websocket', { savedId: h.ref.itemId });
+    }
   };
   const icons: Record<string, ReactNode> = {
     request: <Network size={14} />,

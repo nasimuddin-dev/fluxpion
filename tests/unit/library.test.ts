@@ -43,3 +43,24 @@ describe('workspace library (saved items with folders)', () => {
     }
   });
 });
+
+describe('global search', () => {
+  it('finds monitors and saved load tests', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tp-search-'));
+    const store = WorkspaceStore.create(dir, 'search');
+    try {
+      store.saveLibrary('monitors', { folders: [], items: [{ id: 'm', name: 'Checkout health', data: { everyMinutes: 15 } }] });
+      store.saveLibrary('load-tests', { folders: [], items: [{ id: 'l', name: 'Checkout under load', data: { url: 'http://localhost/checkout' } }] });
+      const found = new WorkspaceSearch(store).search('checkout');
+      expect(found.filter((h) => h.kind === 'saved').map((h) => [h.title, h.ref.library])).toEqual(
+        expect.arrayContaining([
+          ['Checkout health', 'monitors'],
+          ['Checkout under load', 'load-tests'],
+        ]),
+      );
+    } finally {
+      store.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
