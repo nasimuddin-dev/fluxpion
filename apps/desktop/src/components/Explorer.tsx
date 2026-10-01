@@ -4,7 +4,7 @@ import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
 import { uid } from '../lib/format';
-import { addToFolder, CATEGORY_META, CollectionTree, type ExtraGroup } from './CollectionTree';
+import { addToFolder, CATEGORY_META, CollectionTree, savedItemDragProps, type ExtraGroup } from './CollectionTree';
 import type { RequestCategory } from '../lib/collection-filter';
 import { closeTabsFor, newRequestItems, useEditorTabsStore } from './EditorTabs';
 import { isDocView, useDocs } from '../lib/docs';
@@ -84,10 +84,11 @@ function Section({
   );
 }
 
-function Row({ icon, label, sub, onClick, title, active, menu }: { icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string; active?: boolean; menu?: MenuItem[] }) {
+function Row({ icon, label, sub, onClick, title, active, menu, drag }: { icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string; active?: boolean; menu?: MenuItem[]; drag?: ReturnType<typeof savedItemDragProps> }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
+      {...drag}
       className={cx('group mx-1 flex items-center rounded-md pr-1 transition-colors', active ? 'bg-accent-soft' : menuOpen ? 'bg-hover' : 'hover:bg-hover')}
       onContextMenu={(e) => {
         if (!menu) return;
@@ -433,8 +434,8 @@ export function Explorer() {
     }
   };
   const extraGroups = (c: Collection): ExtraGroup[] => [
-    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!), onMoveTo: (id, to) => void moveItem('grpc', id, to) },
-    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!), onMoveTo: (id, to) => void moveItem('websocket', id, to) },
+    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
+    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
   ];
   const newOfCategory = (c: Collection, cat: RequestCategory) => {
     if (cat === 'grpc' || cat === 'websocket') return intent(cat, { newDoc: true, collectionId: c.id });
@@ -488,6 +489,7 @@ export function Explorer() {
               categorize
               extraGroups={extraGroups}
               onNewOfCategory={newOfCategory}
+              onDropSaved={(kind, id, to) => void moveItem(kind, id, to)}
               activeRequestId={openRequestId}
               onOpen={(c, n) => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
               onChange={(c) => void saveCollection(c)}
@@ -530,7 +532,7 @@ export function Explorer() {
                     <div key={`${kind}:${g.folder ?? ''}`}>
                       {g.folder && <FolderLabel name={g.folder} />}
                       {g.items.map((i) => (
-                        <Row key={i.id} icon={<span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', CATEGORY_META[kind].cls)}>{i.badge ?? CATEGORY_META[kind].badge}</span>} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} />
+                        <Row key={i.id} icon={<span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', CATEGORY_META[kind].cls)}>{i.badge ?? CATEGORY_META[kind].badge}</span>} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} drag={savedItemDragProps(kind, i.id, i.name)} />
                       ))}
                     </div>
                   )),

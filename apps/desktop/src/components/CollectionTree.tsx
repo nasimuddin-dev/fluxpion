@@ -64,8 +64,20 @@ export interface ExtraGroup {
   items: Array<{ id: string; name: string; folder?: string; badge?: string }>;
   onOpen(id: string): void;
   menu?(id: string): MenuItem[];
-  /** Show the item in another collection (dragged onto it). */
-  onMoveTo?(id: string, collectionId: string): void;
+}
+
+/** Drag data of a saved gRPC call or connection (from the tree or "Not in a collection"): `{ kind, id, from? }`. */
+export const SAVED_ITEM_MIME = 'application/x-testpion-saved-item';
+export function savedItemDragProps(kind: 'grpc' | 'websocket', id: string, name: string, from?: string) {
+  return {
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', name);
+      e.dataTransfer.setData(SAVED_ITEM_MIME, JSON.stringify({ kind, id, from }));
+    },
+  };
 }
 
 /** Tree of collections → folders → requests with inline actions. */
@@ -84,6 +96,7 @@ export function CollectionTree({
   categorize = false,
   extraGroups,
   onNewOfCategory,
+  onDropSaved,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -107,6 +120,8 @@ export function CollectionTree({
   extraGroups?(c: Collection): ExtraGroup[];
   /** Create a request of this category in a collection (the + of a category, the collection menu). */
   onNewOfCategory?(c: Collection, cat: RequestCategory): void;
+  /** A saved gRPC call or connection was dropped on a collection. */
+  onDropSaved?(kind: 'grpc' | 'websocket', id: string, collectionId: string): void;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
@@ -190,27 +205,29 @@ export function CollectionTree({
     },
     onDragEnd: () => (setDrag(undefined), setDropAt(undefined)),
   });
-  // a gRPC call or connection dragged onto another collection moves there
-  const [dragExtra, setDragExtra] = useState<{ g: ExtraGroup; id: string; from: string }>();
+  // a gRPC call or connection (from the tree or "Not in a collection") dropped on a collection moves there
   const collectionDropProps = (c: Collection) => {
     const nodes = dropProps(c, c.id, 'into', {});
-    const extraHere = () => !!dragExtra?.g.onMoveTo && dragExtra.from !== c.id;
+    const saved = (e: React.DragEvent) => !!onDropSaved && e.dataTransfer.types.includes(SAVED_ITEM_MIME);
     return {
       onDragOver: (e: React.DragEvent) => {
-        if (!extraHere()) return nodes.onDragOver(e);
+        if (!saved(e)) return nodes.onDragOver(e);
         e.preventDefault();
         e.stopPropagation();
         if (dropAt?.id !== c.id) setDropAt({ id: c.id, mode: 'into' });
       },
       onDragLeave: nodes.onDragLeave,
       onDrop: (e: React.DragEvent) => {
-        if (!extraHere()) return nodes.onDrop(e);
+        if (!saved(e)) return nodes.onDrop(e);
         e.preventDefault();
         e.stopPropagation();
-        const d = dragExtra!;
-        setDragExtra(undefined);
         setDropAt(undefined);
-        d.g.onMoveTo!(d.id, c.id);
+        try {
+          const d = JSON.parse(e.dataTransfer.getData(SAVED_ITEM_MIME)) as { kind: 'grpc' | 'websocket'; id: string; from?: string };
+          if (d.from !== c.id) onDropSaved!(d.kind, d.id, c.id);
+        } catch {
+          /* not ours */
+        }
       },
     };
   };
@@ -479,14 +496,8 @@ export function CollectionTree({
           .map((i) => (
             <div
               key={i.id}
-              draggable={!!g.onMoveTo}
-              onDragStart={(e) => {
-                e.stopPropagation();
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', i.name);
-                setDragExtra({ g, id: i.id, from: from ?? '' });
-              }}
-              onDragEnd={() => (setDragExtra(undefined), setDropAt(undefined))}
+              {...(onDropSaved ? savedItemDragProps(g.cat, i.id, i.name, from) : {})}
+              onDragEnd={() => setDropAt(undefined)}
               className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === i.id ? 'bg-accent-soft text-fg' : menuFor === i.id ? 'bg-hover' : 'hover:bg-hover')}
               style={{ paddingLeft: 8 + (depth + (folder ? 1 : 0)) * 12 }}
               onContextMenu={(e) => {
