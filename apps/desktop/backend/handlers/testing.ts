@@ -96,9 +96,16 @@ export function testingHandlers(be: Backend): Handlers {
       be.ws.saveBaseline(b);
       return { name, tests: Object.keys(b.tests).length };
     },
-    'baselines.compare': async ({ runId, name, thresholds }: { runId: string; name: string; thresholds?: { latencyPct: number; tokensPct: number; scoreDrop: number } }) => {
+    /** Compare a run with a saved baseline (`name`) or with an earlier run (`withRun`, used as the baseline). */
+    'baselines.compare': async ({ runId, name, withRun, thresholds }: { runId: string; name?: string; withRun?: string; thresholds?: { latencyPct: number; tokensPct: number; scoreDrop: number } }) => {
       const summary = await be.handlers['runs.summary']!({ runId });
-      return compareToBaseline(be.ws.getBaseline(name), summary as never, be.results(runId), thresholds);
+      let baseline;
+      if (withRun) {
+        const before = await be.handlers['runs.summary']!({ runId: withRun });
+        if (!before) throw new ApsError('ValidationError', `No finished run ${withRun}`);
+        baseline = await createBaseline(`run ${withRun}`, before as never, be.results(withRun));
+      } else baseline = be.ws.getBaseline(String(name));
+      return compareToBaseline(baseline, summary as never, be.results(runId), thresholds);
     },
 
     'traces.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listTraces(q),

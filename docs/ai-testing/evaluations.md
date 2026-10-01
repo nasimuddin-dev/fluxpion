@@ -52,7 +52,7 @@ Each record's fields are available as variables in both the prompt and the evalu
 
 ## Regression
 
-Save a run as a **baseline**, then compare later runs against it using thresholds for latency (+%), tokens (+%) and score drop. New failures, score drops and metric regressions are highlighted. In CI:
+Save a run as a **baseline**, then compare later runs against it using thresholds for latency (+%), tokens (+%) and score drop. New failures, score drops and metric regressions are highlighted. In the app (**Baselines** on a finished run), *Compare with* also lists earlier runs, to see what changed since then without saving a baseline; AI agents do the same with the `compare_runs` MCP tool. In CI:
 
 ```bash
 testpion test tests/ai --baseline main --fail-on-regression

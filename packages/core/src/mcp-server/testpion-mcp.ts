@@ -1,4 +1,5 @@
-import { runTests } from '../runner/runner.js';
+import { readResultsFile, runTests } from '../runner/runner.js';
+import { compareToBaseline, createBaseline } from '../report/regression.js';
 import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
 import { testFromRequest } from '../runner/test-from.js';
@@ -8,7 +9,7 @@ import { ENGINE_VERSION } from '../version.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { AppSettings, Collection, CollectionNode, HttpRequestSpec, TestResult } from '../model/types.js';
+import type { AppSettings, Collection, CollectionNode, HttpRequestSpec, RunSummary, TestResult } from '../model/types.js';
 import type { RunEvent } from '../runner/runner.js';
 import { ApsError, normalizeError } from '../errors.js';
 import { Redactor } from '../util/redact.js';
@@ -976,6 +977,31 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         } finally {
           await ctx.dispose();
         }
+      },
+    },
+    {
+      name: 'compare_runs',
+      description:
+        'What changed between two finished runs (ids from run_tests, run_collection results in the app, or list of runs): tests that started failing, tests that were fixed, tests that got slower beyond latencyPct (and, for AI tests, more tokens or a lower score), new and removed tests, and the change of totals (pass rate, latency percentiles, tokens, cost). `passed` is false when something regressed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          before: str('Run id of the earlier run (the reference)'),
+          after: str('Run id of the later run'),
+          latencyPct: { type: 'number', description: 'A test counts as slower above this % (default 25)' },
+        },
+        required: ['before', 'after'],
+      },
+      run: async (a) => {
+        const summaryOf = (id: string) => {
+          const f = join(store.runDir(String(id)), 'summary.json');
+          if (!existsSync(f)) throw new ApsError('ValidationError', `No finished run ${String(id)}`);
+          return JSON.parse(readFileSync(f, 'utf8')) as RunSummary;
+        };
+        const before = summaryOf(String(a.before));
+        const after = summaryOf(String(a.after));
+        const baseline = await createBaseline(`run ${before.runId}`, before, await readResultsFile(join(store.runDir(before.runId), 'results.jsonl')));
+        return compareToBaseline(baseline, after, await readResultsFile(join(store.runDir(after.runId), 'results.jsonl')), { latencyPct: Number(a.latencyPct) || 25, tokensPct: 20, scoreDrop: 0.05 });
       },
     },
     {

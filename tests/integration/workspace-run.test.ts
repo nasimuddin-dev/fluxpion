@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_health', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_datasets', 'list_environments', 'list_evaluations', 'list_monitors', 'list_requests', 'list_tests', 'load_history', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages', 'workspace_activity']);
+      expect(names).toEqual(['api_coverage', 'ci_config', 'collection_docs', 'collection_health', 'collection_openapi', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'compare_runs', 'export_traces', 'get_request', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_collections', 'list_datasets', 'list_environments', 'list_evaluations', 'list_monitors', 'list_requests', 'list_tests', 'load_history', 'load_test', 'monitor_results', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'security_review', 'send_request', 'set_environment_variable', 'variable_usages', 'workspace_activity']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -275,6 +275,11 @@ describe('example workspace (end-to-end)', () => {
       expect(ran.total).toBeGreaterThan(0);
       const again = JSON.parse((await text('run_tests', { rerunFailed: ran.runId })).text) as { total: number; message?: string };
       expect(again.total === 0 ? again.message : 'ran').toBeTruthy();
+      // a run compared with itself: nothing regressed
+      const same = JSON.parse((await text('compare_runs', { before: ran.runId, after: ran.runId })).text) as { passed: boolean; regressions: unknown[] };
+      expect(same.passed).toBe(true);
+      expect(same.regressions).toEqual([]);
+      expect((await text('compare_runs', { before: 'run-nope', after: ran.runId })).isError).toBe(true);
       expect((await text('list_requests', { collection: 'Veterinary API' })).text).toContain('Get patient');
       const envs = await text('list_environments');
       expect(envs.text).toContain('clientSecret');

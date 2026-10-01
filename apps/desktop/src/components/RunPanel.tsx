@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
 import type { RunSummary, TestResult, Trace } from '../types';
-import { formatCost, formatMs, plural } from '../lib/format';
+import { formatCost, formatMs, plural, timeAgo } from '../lib/format';
 import { CheckList, ErrorPanel, StatusIcon } from './Results';
 import { TraceView } from './TraceView';
 import { RunCharts } from './RunCharts';
@@ -364,10 +364,14 @@ function BaselineModal({ runId, onClose }: { runId: string; onClose(): void }) {
   const [compareWith, setCompareWith] = useState('');
   const [th, setTh] = useState({ latencyPct: 25, tokensPct: 20, scoreDrop: 0.05 });
   const [report, setReport] = useState<RegressionReport>();
+  // earlier runs can be compared too (value "run:<id>"): what changed since then
+  const [earlier, setEarlier] = useState<Array<{ id: string; name: string; startedAt: string }>>([]);
   const load = () =>
-    call('baselines.list').then((b) => {
+    Promise.all([call<Array<{ name: string; createdAt: string; tests: number }>>('baselines.list'), call<{ items: Array<{ id: string; name: string; startedAt: string }> }>('runs.list', { limit: 30 })]).then(([b, r]) => {
+      const runs = r.items.filter((x) => x.id !== runId);
       setBaselines(b);
-      setCompareWith((c) => c || b[0]?.name || '');
+      setEarlier(runs);
+      setCompareWith((c) => c || b[0]?.name || (runs[0] ? `run:${runs[0].id}` : ''));
     });
   useEffect(() => {
     void load();
@@ -386,11 +390,24 @@ function BaselineModal({ runId, onClose }: { runId: string; onClose(): void }) {
         <div className="flex items-end gap-2 flex-wrap">
           <Field label="Compare with">
             <Select value={compareWith} onChange={(e) => setCompareWith(e.target.value)}>
-              {baselines.map((b) => (
-                <option key={b.name} value={b.name}>
-                  {b.name} ({plural(b.tests, 'test')})
-                </option>
-              ))}
+              {baselines.length > 0 && (
+                <optgroup label="Baselines">
+                  {baselines.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name} ({plural(b.tests, 'test')})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {earlier.length > 0 && (
+                <optgroup label="Earlier runs">
+                  {earlier.map((r) => (
+                    <option key={r.id} value={`run:${r.id}`}>
+                      {r.name} · {timeAgo(r.startedAt)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </Select>
           </Field>
           <Field label="Latency +%">
@@ -402,7 +419,7 @@ function BaselineModal({ runId, onClose }: { runId: string; onClose(): void }) {
           <Field label="Score drop">
             <Input className="w-20" type="number" step="0.01" value={th.scoreDrop} onChange={(e) => setTh({ ...th, scoreDrop: Number(e.target.value) })} />
           </Field>
-          <Button variant="primary" disabled={!compareWith} onClick={() => call<RegressionReport>('baselines.compare', { runId, name: compareWith, thresholds: th }).then(setReport)}>
+          <Button variant="primary" disabled={!compareWith} onClick={() => call<RegressionReport>('baselines.compare', compareWith.startsWith('run:') ? { runId, withRun: compareWith.slice(4), thresholds: th } : { runId, name: compareWith, thresholds: th }).then(setReport)}>
             Compare
           </Button>
         </div>
