@@ -310,11 +310,13 @@ export function registerDataCommands(program: Command): void {
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('--cert-days <days>', 'warn about certificates that expire within this many days', '30')
     .option('--json', 'print as JSON')
-    .action(async (o: { workspace?: string; certDays: string; json?: boolean }) => {
+    .option('--markdown', 'print a Markdown list (to post to a chat or a pull request)')
+    .action(async (o: { workspace?: string; certDays: string; json?: boolean; markdown?: boolean }) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         const items = await workspaceAttention(store, { certDays: Number(o.certDays) || 30 });
         if (o.json) console.log(JSON.stringify(items, null, 2));
+        else if (o.markdown) console.log(items.length ? ['**Needs attention**', ...items.map((i) => `- ${i.severity === 'high' ? '🔴' : i.severity === 'medium' ? '🟠' : '⚪'} ${i.message}`)].join('\n') : '✅ Nothing needs attention.');
         else if (!items.length) console.log(green('Nothing needs attention.'));
         else for (const i of items) console.log(`${i.severity === 'high' ? red('high  ') : i.severity === 'medium' ? yellow('medium') : dim('low   ')} ${i.message}`);
         process.exitCode = items.some((i) => i.severity === 'high') ? EXIT.TEST_FAILURE : EXIT.SUCCESS;
