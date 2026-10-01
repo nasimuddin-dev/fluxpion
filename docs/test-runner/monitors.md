@@ -41,6 +41,8 @@ A **Response time limit** (or `--max-p95 <ms>`) makes a run fail when the p95 re
 
 To be warned before a certificate expires, set the monitor's **Certificate warning** (or `--min-cert-days 21`): a run fails, and alerts, when the certificate of any host it calls expires within that many days, and the monitor shows the days left on the first to expire. For one request only, use the **Certificate valid for (days)** check (`type: certificate`, `min: 21`). Every HTTPS response also records its host's certificate: Home lists the ones that expire first, `testpion certificates --warn 21` prints them all (and exits 1 when one expires within 21 days, for cron or CI; `--check host …` connects and checks hosts directly, including whether they are trusted), and agents use the `list_certificates` MCP tool.
 
+**Requests** lists each request of the monitor over its latest runs, slowest first: the median time as a bar, the p95, and how often it failed (red), so you see which request makes a monitor slow or fail. `testpion monitor requests "API health"` and the `monitor_requests` MCP tool give the same.
+
 **Uptime by day** shows the last 30 days like a status page: one block per day, green when every run passed, amber at 90% or more, red below that and grey when nothing ran; hover a day for its runs and its slowest p95. `testpion monitor uptime "API health" -w my-workspace [--days 90] [--json]` prints the same, and the `monitor_uptime` MCP tool returns it to agents.
 
 ```json

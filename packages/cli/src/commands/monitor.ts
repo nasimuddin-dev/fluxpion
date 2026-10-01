@@ -17,6 +17,7 @@ import {
   lastMonitorResult,
   listMonitors,
   monitorDaily,
+  monitorRequestStats,
   monitorResults,
   monitorStatus,
   parseEvery,
@@ -186,6 +187,29 @@ export function registerMonitorCommands(program: Command): void {
         for (const r of rows) console.log(`  ${r.startedAt}  ${statusText(r)}  ${dim(`${formatDuration(r.durationMs)} · ${r.trigger} · ${r.runId}`)}`);
       }),
     );
+
+  mon
+    .command('requests')
+    .description("each request of a monitor over its latest runs, slowest first: median / p95 time and failures")
+    .argument('<nameOrId>')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-n, --runs <n>', 'how many of the latest runs', '20')
+    .option('--json', 'print as JSON')
+    .action(async (ref: string, o) => {
+      // not withStore: the results are read asynchronously, so the store closes after them
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const m = findMonitor(store, ref);
+        const rows = await monitorRequestStats(store, m.id, { runs: Number(o.runs) || 20 });
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        if (!rows.length) return console.log(dim('No results yet.'));
+        const w = Math.min(56, Math.max(...rows.map((r) => r.name.length)));
+        for (const r of rows)
+          console.log(`${r.name.slice(0, w).padEnd(w)}  ${dim(`median ${r.medianMs ?? '-'} ms · p95 ${r.p95Ms ?? '-'} ms · ${r.runs} runs`)}${r.failed ? red(`  ${r.failed} failed: ${r.lastFailure ?? ''}`) : ''}`);
+      } finally {
+        store.close();
+      }
+    });
 
   mon
     .command('uptime')

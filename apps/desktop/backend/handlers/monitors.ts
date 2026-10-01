@@ -6,6 +6,7 @@ import {
   findMonitor,
   listMonitors,
   monitorDaily,
+  monitorRequestStats,
   monitorResults,
   monitorStatus,
   notifyMonitorWebhook,
@@ -51,6 +52,8 @@ export function monitorHandlers(be: Backend): Handlers {
       }
     },
     'monitor.results': ({ id, limit }: { id: string; limit?: number }) => monitorResults(be.ws, id, Math.min(limit ?? 50, 500)),
+    // each request of the monitor over its latest runs: median / p95 time and failures
+    'monitor.requests': ({ id, runs }: { id: string; runs?: number }) => monitorRequestStats(be.ws, id, { runs }),
     // uptime per day, in the caller's time zone (its Date#getTimezoneOffset)
     'monitor.daily': ({ id, days, tzOffsetMin }: { id: string; days?: number; tzOffsetMin?: number }) => monitorDaily(be.ws, id, days ?? 30, tzOffsetMin),
     'monitor.run': async ({ id }: { id: string }) => {

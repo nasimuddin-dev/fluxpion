@@ -2,6 +2,7 @@ import { readResultsFile, runTests } from '../runner/runner.js';
 import { compareToBaseline, createBaseline } from '../report/regression.js';
 import { runBreakdown } from '../runner/breakdown.js';
 import { summarizeTestHistory, testHistory } from '../runner/test-history.js';
+import { monitorRequestStats } from '../runner/monitor-requests.js';
 import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
 import { testFromRequest } from '../runner/test-from.js';
@@ -872,6 +873,12 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       description: "A monitor's recent results, newest first: status, passed / failed / errors, duration, median response time, what started it and the run id. Use it to see when a check started failing.",
       inputSchema: { type: 'object', properties: { monitor: str('Monitor name or id'), limit: { type: 'number', description: 'How many (default 20, max 200)' } }, required: ['monitor'] },
       run: (a) => monitorResults(store, findMonitor(store, String(a.monitor)).id, Math.min(Math.max(Number(a.limit) || 20, 1), 200)),
+    },
+    {
+      name: 'monitor_requests',
+      description: "Each request of a monitor over its latest runs, slowest first: runs, failures, median and p95 time and the latest failure. Use it to find which request makes a monitor slow or fail.",
+      inputSchema: { type: 'object', properties: { monitor: str('Monitor name or id'), runs: { type: 'number', description: 'How many of the latest runs (default 20, max 200)' } }, required: ['monitor'] },
+      run: (a) => monitorRequestStats(store, findMonitor(store, String(a.monitor)).id, { runs: Number(a.runs) || 20 }),
     },
     {
       name: 'monitor_uptime',

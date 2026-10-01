@@ -2,6 +2,7 @@ import { RecentRuns } from '../components/charts';
 import { AlarmClock, ExternalLink, Folder, KeyRound, ListX, Pause, Pencil, Play, Plus, SquareX, Trash2, X } from 'lucide-react';
 import { SidebarShell } from '../components/SidebarShell';
 import { MonitorCharts } from '../components/MonitorCharts';
+import { MonitorRequests } from '../components/MonitorRequests';
 import { FolderList, type FolderListOps } from '../components/FolderList';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -384,6 +385,7 @@ function MonitorDetail(p: {
 
       {/* charts: availability, run time, requests per run (hover any of them for the run) */}
       <MonitorCharts runs={results} p95Limit={m.maxP95Ms} monitorId={m.id} />
+      <MonitorRequests monitorId={m.id} refresh={results[0]?.runId} />
 
       <div>
         <div className="text-xs font-medium text-muted uppercase tracking-wide mb-1">Runs</div>

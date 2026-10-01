@@ -62,6 +62,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `compare_request_across_environments` | Send a saved request with two environments and diff the responses (status, time, headers, JSON fields); masked; production refused unless allowed. |
 | `ci_config` | A CI pipeline file (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) that runs a suite, collection or tests, with the CI secrets to create. |
 | `list_monitors` | Monitors (collections on a schedule) with their schedule, last result and next run. |
+| `monitor_requests` | Each request of a monitor over its latest runs: median / p95 time, failures and the latest failure. |
 | `monitor_results` | A monitor's recent results, newest first. |
 | `check_certificate` | Connect to a host and read its TLS certificate now: subject, issuer, days left, trusted or why not, protocol. |
 | `list_certificates` | TLS certificates of the HTTPS hosts the workspace called, soonest to expire first (optionally only those within N days). |
