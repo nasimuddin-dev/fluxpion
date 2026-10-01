@@ -2,7 +2,7 @@ import { Plus, AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wa
 import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call, on } from '../api';
-import { Button, cx, IconButton, Menu, menuKeys, rowActionClass, type MenuItem } from './ui';
+import { Button, cx, Menu, menuKeys, rowActionClass, type MenuItem } from './ui';
 import { CountPill, focusRow, InlineRename } from './TreeParts';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
@@ -571,16 +571,6 @@ export function CollectionTree({
         <span className="truncate font-medium">{CATEGORY_META[cat].label}</span>
         <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{count}</span>
       </button>
-      {onNewOfCategory && (
-        <button
-          aria-label={`${newRequestOf(cat)} in ${c.name}`}
-          title={newRequestOf(cat)}
-          className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100"
-          onClick={() => onNewOfCategory(c, cat)}
-        >
-          <FilePlus2 size={13} />
-        </button>
-      )}
       <Menu
         width={230}
         open={menuFor === key}
@@ -758,13 +748,7 @@ export function CollectionTree({
               </button>
               )}
               {!c.problem && (
-                <IconButton label={`${newRequestLabel ?? 'New HTTP request'} in ${c.name}`} className={rowActionClass(true)} onClick={() => onNewRequest(c)}>
-                  <Plus size={14} />
-                </IconButton>
-              )}
-              {!c.problem && (
                 <NodeMenu
-                  header
                   label={c.name}
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
@@ -866,13 +850,15 @@ function NodeMenu({
 }) {
   const items: MenuItem[] = [];
   const add = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}) => fn && items.push({ label, icon, onSelect: fn, ...extra });
+  // what you can create here comes first (this menu is also the row's only button)
+  add(newRequestLabel, <FilePlus2 size={14} />, onNewRequest);
+  add('New folder', <FolderPlus size={14} />, onNewFolder);
+  const created = !!(onNewRequest || onNewFolder);
   add('Open in tab', <ExternalLink size={14} />, onOpen);
-  add(runLabel, <Play size={14} />, onRun);
+  add(runLabel, <Play size={14} />, onRun, { separator: created });
   add('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor);
   add('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit, { separator: !!onRun });
-  add(newRequestLabel, <FilePlus2 size={14} />, onNewRequest, { separator: !!onRun });
-  add('New folder', <FolderPlus size={14} />, onNewFolder);
-  add('Rename', <Pencil size={14} />, onRename, { separator: !!(onNewRequest || onNewFolder) });
+  add('Rename', <Pencil size={14} />, onRename, { separator: true });
   add('Duplicate', <CopyPlus size={14} />, onDuplicate);
   add('Move to…', <FolderInput size={14} />, onMove);
   add(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite);

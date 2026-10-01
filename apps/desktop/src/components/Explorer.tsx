@@ -12,7 +12,7 @@ import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, menuKeys, type MenuItem } from './ui';
-import { askFolderName, folderMenuItems, moveToFolderItem, RowAdd, RowMenu, TreeFolderRow } from './TreeParts';
+import { askFolderName, folderMenuItems, moveToFolderItem, RowMenu, TreeFolderRow } from './TreeParts';
 
 /**
  * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
@@ -91,7 +91,6 @@ function Section({
           <span className="text-[0.82rem] font-semibold truncate">{title}</span>
           {count !== undefined && count > 0 && <span className="text-[0.7rem] px-1.5 rounded-full bg-panel2 text-muted tabular-nums">{count}</span>}
         </button>
-        {onAdd && <RowAdd label={addLabel ?? 'New'} onClick={onAdd} header />}
         <RowMenu label={title} items={items} open={menuOpen} onOpenChange={setMenuOpen} header />
       </div>
       {open && <div className="pb-2">{children}</div>}

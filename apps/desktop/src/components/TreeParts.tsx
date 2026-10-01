@@ -96,7 +96,6 @@ export function TreeHeader({
         </span>
       )}
       <span className="flex-1" />
-      {(onAdd || addItems) && <RowAdd label={addLabel ?? 'New'} onClick={onAdd} items={addItems} header />}
       {items.length > 0 && <RowMenu label={title} items={items} open={open} onOpenChange={setOpen} header />}
     </div>
   );
@@ -223,12 +222,24 @@ export function InlineRename({ value, onCommit, onCancel, validate, label = 'Nam
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
   useEffect(() => {
-    // after a menu closes (Rename… in a ⋯ menu), so its focus handling can't take the field's focus away
-    const id = requestAnimationFrame(() => {
-      ref.current?.focus();
-      ref.current?.select();
-    });
-    return () => cancelAnimationFrame(id);
+    // after a menu closes (Rename in a ⋯ menu) its focus handling may run late and take the focus: take it back
+    const grab = () => {
+      if (ref.current && document.activeElement !== ref.current) {
+        ref.current.focus();
+        ref.current.select();
+      }
+    };
+    const id = requestAnimationFrame(grab);
+    const timers = [setTimeout(grab, 60), setTimeout(grab, 200)];
+    return () => (cancelAnimationFrame(id), timers.forEach(clearTimeout));
+  }, []);
+  // a click anywhere else ends the rename, even if the field lost the focus to something else
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) ref.current.blur(), finishRef.current();
+    };
+    document.addEventListener('pointerdown', away, true);
+    return () => document.removeEventListener('pointerdown', away, true);
   }, []);
   const check = (t: string) => (!t.trim() ? 'A name is required' : validate?.(t.trim()));
   const finish = (save: boolean) => {
@@ -240,6 +251,9 @@ export function InlineRename({ value, onCommit, onCancel, validate, label = 'Nam
     if (save && t !== value) onCommit(t);
     else onCancel();
   };
+  // what clicking away does, with the latest text
+  const finishRef = useRef(() => {});
+  finishRef.current = () => (check(text) ? finish(false) : finish(true));
   return (
     <span className={cx('relative flex-1 min-w-0', className)}>
       <input
