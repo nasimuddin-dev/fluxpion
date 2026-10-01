@@ -290,6 +290,8 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             durationMs: response.durationMs,
             // DNS / TCP / TLS (on a new connection), time to first byte and download
             timing: timingSummary(response),
+            // HTTPS: the server's certificate (subject, issuer, validity, days left)
+            ...(response.connection?.certificate ? { certificate: { subject: response.connection.certificate.subject, issuer: response.connection.certificate.issuer, validTo: response.connection.certificate.validTo, daysLeft: response.connection.certificate.daysLeft } } : {}),
             size: response.size,
             url: response.url,
             headers: Object.fromEntries(ctx.redactor.redact(response.headers)),

@@ -39,6 +39,8 @@ Give a monitor an **Alert webhook** (or `testpion monitor add … --webhook <url
 
 A **Response time limit** (or `--max-p95 <ms>`) makes a run fail when the p95 response time of its requests is over it, even when every check passes: the run shows *Too slow* with the reason (for example "p95 830 ms is over the 500 ms limit") and alerts like any other failure. The *Response p95* chart shows each run's p95 with the limit as a dashed line.
 
+To be warned before a certificate expires, give a request of the monitored collection the **Certificate valid for (days)** check (`type: certificate`, `min: 21`): the run fails, and alerts, when fewer days are left.
+
 **Uptime by day** shows the last 30 days like a status page: one block per day, green when every run passed, amber at 90% or more, red below that and grey when nothing ran; hover a day for its runs and its slowest p95. `testpion monitor uptime "API health" -w my-workspace [--days 90] [--json]` prints the same, and the `monitor_uptime` MCP tool returns it to agents.
 
 ```json

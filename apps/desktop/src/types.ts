@@ -117,7 +117,14 @@ export interface HttpResponseData {
   durationMs: number;
   timeline: Array<{ name: string; startMs: number; durationMs: number }>;
   /** The connection the request went over (reused, or new with DNS / TCP / TLS in the timeline). */
-  connection?: { reused: boolean; remoteAddress?: string; remotePort?: number; tlsProtocol?: string; cipher?: string };
+  connection?: {
+    reused: boolean;
+    remoteAddress?: string;
+    remotePort?: number;
+    tlsProtocol?: string;
+    cipher?: string;
+    certificate?: { subject?: string; issuer?: string; validFrom?: string; validTo?: string; daysLeft?: number; altNames?: string[]; fingerprint256?: string };
+  };
   url: string;
   json?: unknown;
   /** Server-Sent Events of a text/event-stream response. */

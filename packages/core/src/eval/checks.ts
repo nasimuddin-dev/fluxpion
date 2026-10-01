@@ -30,6 +30,8 @@ export interface CheckContext {
   isError?: boolean;
   /** HTTP: cookies for `pm.cookies` (name → value). */
   cookies?: Record<string, string>;
+  /** HTTPS: the server's certificate (for the `certificate` check). */
+  certificate?: { subject?: string; issuer?: string; validTo?: string; daysLeft?: number; altNames?: string[] };
   /** HTTP: the request that was sent (for contract checks such as `openapi`). */
   request?: { method: string; url: string };
   /** Reads a workspace file (relative to the workspace root), e.g. an OpenAPI document. */
@@ -265,6 +267,21 @@ registerCheck('snapshot', (cfg, ctx) => {
   const diffs = compareSnapshot(cfg.expected, actual, { mode, ignore: Array.isArray(cfg.ignore) ? (cfg.ignore as unknown[]).map(String) : undefined, strict: cfg.strict === true });
   return res(cfg, !diffs.length, diffs.length ? `${diffs.length === 50 ? '50+' : diffs.length} difference${diffs.length === 1 ? '' : 's'} from the snapshot: ${diffs.slice(0, 5).map(describeDifference).join('; ')}` : `matches the snapshot (${mode})`, {
     metadata: { differences: diffs.slice(0, 50), path: cfg.path || '$' },
+  });
+});
+
+// HTTPS: the server's certificate is still valid for at least `min` days (default 14): catches expiry before users do
+registerCheck('certificate', (cfg, ctx) => {
+  const min = Number(cfg.min ?? cfg.expected ?? 14);
+  const c = ctx.certificate;
+  if (!c || c.daysLeft === undefined) return res(cfg, false, ctx.request && !/^https:/i.test(ctx.request.url) ? 'not an HTTPS request: no certificate to check' : 'no TLS certificate was seen for this response');
+  const until = c.validTo ? c.validTo.slice(0, 10) : '?';
+  const ok = c.daysLeft >= min;
+  const who = `${c.subject ?? 'certificate'}${c.issuer ? `, issued by ${c.issuer}` : ''}`;
+  return res(cfg, ok, c.daysLeft < 0 ? `expired on ${until} (${who})` : ok ? `valid for ${c.daysLeft} more days, until ${until} (${who})` : `expires in ${c.daysLeft} day${c.daysLeft === 1 ? '' : 's'}, on ${until}: less than ${min} (${who})`, {
+    expected: `≥ ${min} days`,
+    actual: c.daysLeft,
+    metadata: { subject: c.subject, issuer: c.issuer, validTo: c.validTo, altNames: c.altNames },
   });
 });
 

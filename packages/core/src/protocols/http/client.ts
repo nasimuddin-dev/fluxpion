@@ -351,7 +351,7 @@ async function executeHttpOnce(spec: HttpRequestSpec, opts: HttpExecOptions = {}
       phase('TCP connect', t.lookup ?? t.created, t.connect);
       if (t.connect !== undefined) phase('TLS handshake', t.connect, t.secure);
     }
-    connection = { reused: !fresh, remoteAddress: sent.remoteAddress, remotePort: sent.remotePort, tlsProtocol: sent.tlsProtocol, cipher: sent.cipher };
+    connection = { reused: !fresh, remoteAddress: sent.remoteAddress, remotePort: sent.remotePort, tlsProtocol: sent.tlsProtocol, cipher: sent.cipher, certificate: sent.certificate };
     timeline.push({ name: 'waiting (TTFB)', startMs: round(sent.sentAt - t0), durationMs: round(performance.now() - sent.sentAt) });
   } else mark('waiting (TTFB)', tSend);
   opts.onResponseStart?.(res.status, res.headers);
@@ -498,9 +498,9 @@ function round(n: number): number {
 
 /** Generate a cURL command for a prepared request (secrets already redacted). */
 /** Where a response's time went, in ms per phase (DNS / TCP / TLS only on a new connection), for agents and scripts. */
-export function timingSummary(r: Pick<HttpResponseData, 'timeline' | 'connection' | 'durationMs'>): { dnsMs?: number; tcpMs?: number; tlsMs?: number; ttfbMs?: number; downloadMs?: number; totalMs: number; reusedConnection?: boolean; tlsProtocol?: string } {
+export function timingSummary(r: Pick<HttpResponseData, 'timeline' | 'connection' | 'durationMs'>): { dnsMs?: number; tcpMs?: number; tlsMs?: number; ttfbMs?: number; downloadMs?: number; totalMs: number; reusedConnection?: boolean; tlsProtocol?: string; certificateDaysLeft?: number } {
   const ms = (name: string) => r.timeline?.find((p) => p.name === name)?.durationMs;
-  const out = { dnsMs: ms('DNS lookup'), tcpMs: ms('TCP connect'), tlsMs: ms('TLS handshake'), ttfbMs: ms('waiting (TTFB)'), downloadMs: ms('download'), totalMs: r.durationMs, reusedConnection: r.connection?.reused, tlsProtocol: r.connection?.tlsProtocol };
+  const out = { dnsMs: ms('DNS lookup'), tcpMs: ms('TCP connect'), tlsMs: ms('TLS handshake'), ttfbMs: ms('waiting (TTFB)'), downloadMs: ms('download'), totalMs: r.durationMs, reusedConnection: r.connection?.reused, tlsProtocol: r.connection?.tlsProtocol, certificateDaysLeft: r.connection?.certificate?.daysLeft };
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined)) as typeof out;
 }
 

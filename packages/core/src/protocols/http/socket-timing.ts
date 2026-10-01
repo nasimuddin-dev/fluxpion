@@ -12,8 +12,22 @@ interface SocketTimes {
   secure?: number;
 }
 
+/** The server's TLS certificate, as far as checks and people need it. */
+export interface PeerCertificate {
+  subject?: string;
+  issuer?: string;
+  /** ISO dates. */
+  validFrom?: string;
+  validTo?: string;
+  /** Whole days until it expires (negative once it has). */
+  daysLeft?: number;
+  altNames?: string[];
+  fingerprint256?: string;
+}
+
 /** What the request was sent over: when its headers were written and the socket's timings and peer. */
 export interface SentOver {
+  certificate?: PeerCertificate;
   sentAt: number;
   times?: SocketTimes;
   remoteAddress?: string;
@@ -28,7 +42,45 @@ type Sock = {
   remotePort?: number;
   getProtocol?: () => string | null;
   getCipher?: () => { name?: string } | undefined;
+  getPeerCertificate?: (
+    detailed?: boolean,
+  ) => { subject?: Record<string, string>; issuer?: Record<string, string>; valid_from?: string; valid_to?: string; subjectaltname?: string; fingerprint256?: string } | null;
 };
+
+const certs = new WeakMap<object, PeerCertificate | undefined>();
+/** The certificate of a TLS socket (read once per socket: a reused connection has the same one). */
+function peerCertificate(socket: Sock): PeerCertificate | undefined {
+  if (certs.has(socket)) return certs.get(socket);
+  let out: PeerCertificate | undefined;
+  try {
+    const c = socket.getPeerCertificate?.(false);
+    if (c && (c.subject || c.valid_to)) {
+      const name = (n?: Record<string, string>) => (n ? n.CN || n.O || Object.values(n)[0] : undefined);
+      const to = c.valid_to ? new Date(c.valid_to) : undefined;
+      const from = c.valid_from ? new Date(c.valid_from) : undefined;
+      out = {
+        subject: name(c.subject),
+        issuer: [c.issuer?.CN, c.issuer?.O].filter(Boolean).join(', ') || undefined,
+        validFrom: from && !isNaN(+from) ? from.toISOString() : undefined,
+        validTo: to && !isNaN(+to) ? to.toISOString() : undefined,
+        altNames: c.subjectaltname
+          ?.split(/,\s*/)
+          .map((s) => s.replace(/^DNS:/, ''))
+          .slice(0, 20),
+        fingerprint256: c.fingerprint256,
+      };
+    }
+  } catch {
+    /* not a TLS socket */
+  }
+  certs.set(socket, out);
+  return out;
+}
+
+/** Days until a certificate expires, from now. */
+export function certificateDaysLeft(c: PeerCertificate | undefined, now = Date.now()): number | undefined {
+  return c?.validTo ? Math.floor((Date.parse(c.validTo) - now) / 864e5) : undefined;
+}
 
 const times = new WeakMap<object, SocketTimes>();
 subscribe('net.client.socket', (m) => {
@@ -63,7 +115,16 @@ subscribe('undici:client:sendHeaders', (m) => {
     } catch {
       /* a plain socket, or already closed */
     }
-    w.sent = { sentAt: performance.now(), times: times.get(socket), remoteAddress: socket.remoteAddress, remotePort: socket.remotePort, tlsProtocol, cipher };
+    const cert = tlsProtocol ? peerCertificate(socket) : undefined;
+    w.sent = {
+      sentAt: performance.now(),
+      times: times.get(socket),
+      remoteAddress: socket.remoteAddress,
+      remotePort: socket.remotePort,
+      tlsProtocol,
+      cipher,
+      certificate: cert && { ...cert, daysLeft: certificateDaysLeft(cert) },
+    };
     waiters.delete(w);
     return;
   }

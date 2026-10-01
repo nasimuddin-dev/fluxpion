@@ -145,7 +145,15 @@ export interface HttpResponseData {
   durationMs: number;
   timeline: TimelinePhase[];
   /** The connection the request went over: reused from the pool or new (then the timeline has DNS / TCP / TLS), its peer and TLS version. */
-  connection?: { reused: boolean; remoteAddress?: string; remotePort?: number; tlsProtocol?: string; cipher?: string };
+  connection?: {
+    reused: boolean;
+    remoteAddress?: string;
+    remotePort?: number;
+    tlsProtocol?: string;
+    cipher?: string;
+    /** HTTPS: the server's certificate (subject, issuer, validity and days left). */
+    certificate?: { subject?: string; issuer?: string; validFrom?: string; validTo?: string; daysLeft?: number; altNames?: string[]; fingerprint256?: string };
+  };
   /** Final URL (after redirects) with secrets redacted. */
   url: string;
   redirected: boolean;

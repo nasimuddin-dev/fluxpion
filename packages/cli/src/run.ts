@@ -548,6 +548,7 @@ export async function executeSend(
       if (t) {
         const parts = [t.dnsMs !== undefined && `DNS ${formatDuration(t.dnsMs)}`, t.tcpMs !== undefined && `TCP ${formatDuration(t.tcpMs)}`, t.tlsMs !== undefined && `TLS ${formatDuration(t.tlsMs)}`, t.reusedConnection && 'reused connection', t.ttfbMs !== undefined && `first byte ${formatDuration(t.ttfbMs)}`, t.downloadMs !== undefined && `download ${formatDuration(t.downloadMs)}`].filter(Boolean);
         if (parts.length) console.log(dim(`timing: ${parts.join(' · ')}`));
+        if (t.certificateDaysLeft !== undefined) console.log(dim(`certificate: ${t.tlsProtocol ?? 'TLS'} · `) + (t.certificateDaysLeft < 0 ? red('expired') : t.certificateDaysLeft < 14 ? yellow(`${t.certificateDaysLeft} days left`) : dim(`${t.certificateDaysLeft} days left`)));
       }
       for (const [k, v] of response.headers) console.log(`${dim(k + ':')} ${v}`);
       console.log('');

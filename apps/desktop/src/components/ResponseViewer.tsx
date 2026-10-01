@@ -261,6 +261,26 @@ export function KvTable({ rows }: { rows: Array<[string, string]> }) {
 /** Phases of setting up the connection (shown lighter than the request's own wait and download). */
 const CONNECT_PHASES = new Set(['DNS lookup', 'TCP connect', 'TLS handshake']);
 
+/** The server's certificate: who it is for, who issued it and how long it is still valid (amber under 30 days, red under 7). */
+function CertificateLine({ c }: { c: NonNullable<NonNullable<HttpResponseData['connection']>['certificate']> }) {
+  const days = c.daysLeft;
+  const tone = days === undefined ? 'text-muted' : days < 7 ? 'text-bad' : days < 30 ? 'text-warn' : 'text-ok';
+  return (
+    <div className="text-xs text-muted flex flex-wrap gap-x-3 gap-y-1" title={[c.altNames?.length ? `Also valid for: ${c.altNames.join(', ')}` : '', c.fingerprint256 ? `SHA-256 ${c.fingerprint256}` : ''].filter(Boolean).join('\n')}>
+      <span>
+        <b className="text-fg font-medium">Certificate</b> {c.subject}
+        {c.issuer && <> · issued by {c.issuer}</>}
+      </span>
+      {c.validTo && (
+        <span>
+          valid until {new Date(c.validTo).toLocaleDateString()}
+          {days !== undefined && <b className={'font-medium ml-1 ' + tone}>{days < 0 ? `expired ${-days} day${days === -1 ? '' : 's'} ago` : `${days} day${days === 1 ? '' : 's'} left`}</b>}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Timeline({ phases, url, connection }: { phases: Array<{ name: string; startMs: number; durationMs: number }>; url: string; connection?: HttpResponseData['connection'] }) {
   const total = phases.find((p) => p.name === 'total')?.durationMs ?? 1;
   const connect = phases.filter((p) => CONNECT_PHASES.has(p.name)).reduce((n, p) => n + p.durationMs, 0);
@@ -291,6 +311,7 @@ function Timeline({ phases, url, connection }: { phases: Array<{ name: string; s
           )}
         </div>
       )}
+      {connection?.certificate && <CertificateLine c={connection.certificate} />}
       {phases.map((p) => (
         <div key={p.name} className="grid grid-cols-[140px_1fr_80px] items-center gap-3">
           <span className={cx(p.name === 'total' && 'font-semibold')}>{p.name}</span>
