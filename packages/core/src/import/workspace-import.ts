@@ -89,6 +89,9 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
     }
   }
   if (collection) {
+    // an import never replaces a collection the workspace already has (a file exported from it, imported again)
+    const ids = new Set(store.listCollections().map((c) => c.id));
+    if (ids.has(collection.id) || ids.has(slugify(collection.id))) collection = { ...collection, id: `${slugify(collection.name) || 'collection'}-${shortId().slice(-4)}` };
     out.collection = store.saveCollection(collection);
     // a TestPion collection file can carry the collection's gRPC calls and connections
     if (r.format === 'aps-collection') out.savedItems = restoreSavedItems(store, text, out.collection.id);

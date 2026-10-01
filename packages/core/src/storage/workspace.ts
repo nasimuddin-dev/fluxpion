@@ -159,9 +159,16 @@ export class WorkspaceStore {
   listCollections(): Array<Collection & { problem?: string }> {
     const dir = this.path('collections');
     const out: Array<Collection & { problem?: string }> = [];
+    const seen = new Set<string>();
     for (const f of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
       try {
-        out.push(readJson<Collection>(join(dir, f)));
+        const c = readJson<Collection>(join(dir, f));
+        // two files with the same id (a copied file, an older import): the second gets its file name as id,
+        // so each one opens, saves and expands on its own (see collectionFile)
+        const base = f.slice(0, -'.json'.length);
+        if (!c.id || seen.has(c.id)) c.id = base;
+        seen.add(c.id);
+        out.push(c);
       } catch (e) {
         out.push({ schemaVersion: SCHEMA_VERSION, id: f.replace(/\.json$/, ''), name: `${f} (corrupted)`, version: 0, variables: [], items: [], updatedAt: '', problem: (e as Error).message });
       }
@@ -169,8 +176,29 @@ export class WorkspaceStore {
     return out;
   }
 
+  /**
+   * The file of a collection: collections/<id>.json, or else the file that holds this id (a file named
+   * otherwise, e.g. by hand or by an older version). Saving then updates that file instead of adding a
+   * second one with the same id.
+   */
+  private collectionFile(id: string): string {
+    const named = this.path('collections', `${slugify(id)}.json`);
+    if (existsSync(named)) return named;
+    const dir = this.path('collections');
+    for (const f of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
+      try {
+        if (readJson<Collection>(join(dir, f)).id === id) return join(dir, f);
+      } catch {
+        /* unreadable: not this one */
+      }
+    }
+    return named;
+  }
+
   getCollection(id: string): Collection {
-    return readJson<Collection>(this.path('collections', `${slugify(id)}.json`));
+    const c = readJson<Collection>(this.collectionFile(id));
+    // a de-duplicated id (see listCollections) is the file name: the copy says so too
+    return c.id === id ? c : { ...c, id };
   }
 
   /* Script packages (pm.require): packages/<name>.js, e.g. packages/@clinic/auth.js for "@clinic/auth". */
@@ -205,13 +233,13 @@ export class WorkspaceStore {
 
   saveCollection(c: Collection): Collection {
     const next: Collection = { ...c, schemaVersion: SCHEMA_VERSION, version: (c.version ?? 0) + 1, updatedAt: new Date().toISOString() };
-    writeJson(this.path('collections', `${slugify(c.id)}.json`), next);
+    writeJson(this.collectionFile(c.id), next);
     return next;
   }
 
   /** Moves the collection to the trash (restorable for 30 days; see trash.ts). */
   deleteCollection(id: string): void {
-    moveToTrash(this, 'collection', this.path('collections', `${slugify(id)}.json`));
+    moveToTrash(this, 'collection', this.collectionFile(id));
   }
 
   /* environments */

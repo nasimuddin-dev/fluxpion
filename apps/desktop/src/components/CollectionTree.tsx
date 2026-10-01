@@ -308,8 +308,9 @@ export function CollectionTree({
       return {};
     }
   });
-  const toggle = (id: string) => {
-    const next = { ...open, [id]: !open[id] };
+  // flips what is shown: an item open by default (a category, the collection of the open request) closes on the first click
+  const toggle = (id: string, shown: boolean) => {
+    const next = { ...open, [id]: !shown };
     setOpen(next);
     localStorage.setItem('aps.tree.open', JSON.stringify(next));
   };
@@ -339,7 +340,7 @@ export function CollectionTree({
         return (
           <div key={n.id}>
             <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })}>
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id)} onKeyDown={rowKeys(c, n)}>
+              <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(n.id, isOpen)} onKeyDown={rowKeys(c, n)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
                 <Folder size={13} className="text-muted shrink-0" />
                 <span className="truncate">{n.name}</span>
@@ -382,7 +383,7 @@ export function CollectionTree({
           }}
         >
           {examples.length > 0 && (
-            <button className="shrink-0 -mr-3.5 w-3.5 text-muted hover:text-fg" aria-label={examplesOpen ? 'Hide examples' : `Show ${examples.length} examples`} aria-expanded={examplesOpen} onClick={() => toggle(exKey)}>
+            <button className="shrink-0 -mr-3.5 w-3.5 text-muted hover:text-fg" aria-label={examplesOpen ? 'Hide examples' : `Show ${examples.length} examples`} aria-expanded={examplesOpen} onClick={() => toggle(exKey, examplesOpen)}>
               {examplesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
           )}
@@ -438,7 +439,7 @@ export function CollectionTree({
     const items: MenuItem[] = [
       ...(onNewOfCategory ? [{ label: `New ${CATEGORY_META[cat].label} request`, icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }] : []),
       ...(onRun ? [{ label: 'Run collection', icon: <Play size={14} />, onSelect: () => onRun(c) }] : []),
-      { label: isOpen ? 'Collapse' : 'Expand', icon: isOpen ? <ChevronRight size={14} /> : <ChevronDown size={14} />, separator: true, onSelect: () => toggle(key) },
+      { label: isOpen ? 'Collapse' : 'Expand', icon: isOpen ? <ChevronRight size={14} /> : <ChevronDown size={14} />, separator: true, onSelect: () => toggle(key, isOpen) },
     ];
     return (
     <div
@@ -450,7 +451,7 @@ export function CollectionTree({
       }}
       {...(cat === 'rest' || cat === 'soap' || cat === 'graphql' ? dropProps(c, `${c.id}:${cat}`, 'into', {}) : {})}
     >
-      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(key)} aria-expanded={isOpen}>
+      <button className="flex items-center gap-1.5 flex-1 min-w-0 text-left" onClick={() => toggle(key, isOpen)} aria-expanded={isOpen}>
         {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
         <span className={cx('mono text-[0.6rem] font-bold w-8 shrink-0', CATEGORY_META[cat].cls)}>{CATEGORY_META[cat].badge}</span>
         <span className="truncate font-medium">{CATEGORY_META[cat].label}</span>
@@ -598,7 +599,7 @@ export function CollectionTree({
                 setMenuFor(c.id);
               }}
             >
-              <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id)}>
+              <button className="flex items-center gap-1 flex-1 min-w-0 text-left font-medium" onClick={() => toggle(c.id, isOpen)}>
                 {isOpen ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
                   {c.name}
