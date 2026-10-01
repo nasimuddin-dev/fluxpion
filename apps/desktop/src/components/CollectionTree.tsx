@@ -792,12 +792,14 @@ export function CollectionTree({
                   onRename={() => setRenaming(c.id)}
                   onDuplicate={() => void duplicateCollection(c)}
                   onDelete={() => void deleteCollection(c)}
-                  extraItems={[
-                    ...(onNewOfCategory
+                  otherNew={
+                    onNewOfCategory
                       ? (['graphql', 'soap', 'grpc', 'websocket'] as const).map((cat) => ({ label: newRequestOf(cat), icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }))
-                      : []),
+                      : undefined
+                  }
+                  runItems={[{ label: 'Run in CI…', icon: <Workflow size={14} />, onSelect: () => useApp.getState().set({ ci: { collection: c.id } }) }]}
+                  configItems={[
                     ...(onSettings ? [{ label: 'Settings, runner & docs', icon: <Settings2 size={14} />, onSelect: () => onSettings(c) }] : []),
-                    { label: 'Run in CI…', icon: <Workflow size={14} />, onSelect: () => useApp.getState().set({ ci: { collection: c.id } }) },
                     { label: 'Convert scripts to tp.*', icon: <Wand2 size={14} />, onSelect: () => void convertScripts(c, 'tp') },
                     { label: 'Convert scripts to pm.*', icon: <Undo2 size={14} />, onSelect: () => void convertScripts(c, 'pm') },
                   ]}
@@ -858,7 +860,9 @@ function NodeMenu({
   onMonitor,
   onOpen,
   copyItems,
-  extraItems,
+  otherNew,
+  runItems,
+  configItems,
   open,
   onOpenChange,
   newRequestLabel = 'New HTTP request',
@@ -888,29 +892,34 @@ function NodeMenu({
   onOpen?(): void;
   /** Copy URL / Copy as cURL … (requests only). */
   copyItems?: MenuItem[];
-  /** More items (e.g. collection tools), after a separator. */
-  extraItems?: MenuItem[];
+  /** The other kinds of request it can create (after the first New item). */
+  otherNew?: MenuItem[];
+  /** More ways to run it (after Run and Monitor). */
+  runItems?: MenuItem[];
+  /** Its settings and tools (after Edit folder). */
+  configItems?: MenuItem[];
   /** Controlled open state, so a right-click on the row can open the menu. */
   open?: boolean;
   onOpenChange?(open: boolean): void;
 }) {
-  const items: MenuItem[] = [];
-  const add = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}) => fn && items.push({ label, icon, onSelect: fn, ...extra });
-  // what you can create here comes first (this menu is also the row's only button)
-  add(newRequestLabel, <FilePlus2 size={14} />, onNewRequest);
-  add('New folder', <FolderPlus size={14} />, onNewFolder);
-  const created = !!(onNewRequest || onNewFolder);
-  add('Open in tab', <ExternalLink size={14} />, onOpen);
-  add(runLabel, <Play size={14} />, onRun, { separator: created });
-  add('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor);
-  add('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit, { separator: !!onRun });
-  add('Rename', <Pencil size={14} />, onRename, { separator: true });
-  add('Duplicate', <CopyPlus size={14} />, onDuplicate);
-  add('Move to…', <FolderInput size={14} />, onMove);
-  add(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite);
-  copyItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));
-  extraItems?.forEach((it, i) => items.push(i === 0 ? { ...it, separator: true } : it));
-  add('Delete', <Trash2 size={14} />, onDelete, { danger: true, separator: true });
+  // groups, each after a separator, in one order for every row: create (first: this menu is also the row's only
+  // button) · open · run · configure · copy · organize · delete
+  const groups: MenuItem[][] = [];
+  const group = (...g: Array<MenuItem | undefined>) => groups.push(g.filter((x): x is MenuItem => !!x));
+  const item = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}): MenuItem | undefined => (fn ? { label, icon, onSelect: fn, ...extra } : undefined);
+  group(item(newRequestLabel, <FilePlus2 size={14} />, onNewRequest), ...(otherNew ?? []), item('New folder', <FolderPlus size={14} />, onNewFolder));
+  group(item('Open in tab', <ExternalLink size={14} />, onOpen));
+  group(item(runLabel, <Play size={14} />, onRun), item('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor), ...(runItems ?? []));
+  group(item('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit), ...(configItems ?? []));
+  group(...(copyItems ?? []));
+  group(
+    item('Rename', <Pencil size={14} />, onRename),
+    item('Duplicate', <CopyPlus size={14} />, onDuplicate),
+    item('Move to…', <FolderInput size={14} />, onMove),
+    item(favorite ? 'Remove from favorites' : 'Add to favorites', <Star size={14} />, onToggleFavorite),
+  );
+  group(item('Delete', <Trash2 size={14} />, onDelete, { danger: true }));
+  const items = groups.filter((g) => g.length).flatMap((g, i) => g.map((it, j) => (i > 0 && j === 0 ? { ...it, separator: true } : it)));
   return (
     <Menu
       items={items}
