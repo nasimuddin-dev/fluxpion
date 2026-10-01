@@ -3,6 +3,7 @@ import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
 import { testFromRequest } from '../runner/test-from.js';
 import { evaluateThresholds, parseThreshold } from '../load/thresholds.js';
+import { loadHistory, loadRunRecord, recordLoadRun } from '../load/history.js';
 import { ENGINE_VERSION } from '../version.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -978,6 +979,13 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       },
     },
     {
+      name: 'load_history',
+      description:
+        'Earlier load tests of this workspace, newest first (from the app and from load_test): when, what was tested, virtual users, duration, requests, throughput (req/s), error rate, p50 / p95 / p99 in ms, status codes and pass/fail rules. Use it to see whether an API got slower or less reliable between runs.',
+      inputSchema: { type: 'object', properties: { query: str('Only load tests whose name or target contains this'), limit: { type: 'number', description: 'How many (default 20, max 200)' } } },
+      run: (a) => loadHistory(store, { query: a.query ? String(a.query) : undefined, limit: Math.min(Math.max(Number(a.limit) || 20, 1), 200) }),
+    },
+    {
       name: 'load_test',
       write: true,
       description:
@@ -1028,12 +1036,21 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
             const descriptorSet = (await reflectServer(parseGrpcTarget(gt))).descriptorSet;
             target = { kind: 'grpc', request: { target: gt, method: String(g.method), message: JSON.stringify(ctx.vars.resolveDeep(g.message ?? {})), descriptorSet } };
           } else target = { kind: 'http', request: { method: 'GET', url: ctx.vars.resolve(String(a.url)) } };
+          const startedAt = new Date().toISOString();
           const s = await runLoadTest(
             { target, virtualUsers: vus, durationSec: duration, allowRemoteHosts: false, environmentIsProduction: !!ctx.environment?.isProduction, maxVirtualUsers: 50 },
             { redactor: ctx.redactor },
           );
           const { series: _series, ...summary } = s;
           const checked = thresholds.length ? evaluateThresholds(thresholds, s) : undefined;
+          // kept in the workspace's load history like the app's load tests (load_history reads it)
+          if (s.requests) {
+            const targetText = c ? `collection ${c.name}${a.folder ? ` / ${String(a.folder)}` : ''}` : g ? `gRPC ${String(g.target)} ${String(g.method)}` : `GET ${redactor.redactUrl(String(a.url))}`;
+            recordLoadRun(
+              store,
+              loadRunRecord(s, { id: shortId('load-'), startedAt, name: targetText, target: targetText, environment, virtualUsers: vus, durationSec: duration, thresholds: checked?.map((t) => ({ expr: t.expr, passed: t.passed, actual: t.actual })) }),
+            );
+          }
           return { ...prep, ...summary, ...(checked ? { thresholds: checked, passed: checked.every((t) => t.passed) } : {}) };
         } finally {
           await ctx.dispose();

@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   evaluationTests,
+  loadHistory,
   type SavedEvaluation,
   ApsError,
   compareToBaseline,
@@ -117,6 +118,8 @@ export function testingHandlers(be: Backend): Handlers {
 
     'load.start': (p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean } }) => be.startLoad(p),
     'load.stop': ({ id }: { id: string }) => be.controllers.get(id)?.abort(),
+    /** Finished load tests, newest first (one saved load test's with savedId). */
+    'load.history': (q: { savedId?: string; query?: string; limit?: number } = {}) => loadHistory(be.ws, q),
     /** Pass/fail rules ("p95<500", "errors<1%") against a finished load test's numbers. */
     'load.thresholds': ({ rules, snapshot }: { rules: string[]; snapshot: Parameters<typeof evaluateThresholds>[1] }) => evaluateThresholds(rules, snapshot),
     'load.parseThreshold': ({ rule }: { rule: string }) => parseThreshold(rule),

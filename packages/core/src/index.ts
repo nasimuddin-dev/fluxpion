@@ -82,6 +82,7 @@ export * from './report/collection-docs.js';
 export * from './load/load.js';
 export * from './load/collection-load.js';
 export * from './load/thresholds.js';
+export * from './load/history.js';
 export * from './runner/test-from.js';
 export * from './mock/mock-server.js';
 export * from './mock/graphql-mock.js';

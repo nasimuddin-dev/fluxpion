@@ -42,6 +42,11 @@ import {
   readResultsFile,
   runChecks,
   runLoadTest,
+  buildUrl,
+  evaluateThresholds,
+  recordLoadRun,
+  loadRunRecord,
+  type LoadRunRecord,
   type Recorder,
   type GraphQLSubscription,
   collectionLoadTarget,
@@ -1209,7 +1214,7 @@ export class Backend {
     return this.startRun(p.name ?? String(p.template.name ?? 'Evaluation'), tests, { environment: p.environment, concurrency: p.concurrency, retries: p.retries, traceMode: 'all' });
   }
 
-  async startLoad(p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean } }) {
+  async startLoad(p: { config: LoadTestConfig; environment?: string; collection?: { collectionId: string; selection?: string[]; warmUp?: boolean }; name?: string; savedId?: string; thresholds?: string[] }) {
     const id = shortId('load-');
     const ctrl = new AbortController();
     this.controllers.set(id, ctrl);
@@ -1250,9 +1255,33 @@ export class Backend {
       maxVirtualUsers: this.settings.loadTesting.maxVirtualUsers,
     };
     // validate safeguards synchronously so the UI gets an immediate error
-    const { checkLoadSafeguards, buildUrl } = await import('@testpion/core');
+    const { checkLoadSafeguards } = await import('@testpion/core');
     checkLoadSafeguards(cfg, cfg.target.kind === 'http' ? buildUrl(cfg.target.request.url, cfg.target.request.params).toString() : undefined);
+    // what was tested, for the history (URLs with secrets masked)
+    const t = cfg.target;
+    const targetText =
+      t.kind === 'http'
+        ? `${t.request.method} ${ctx.redactor.redactUrl(buildUrl(t.request.url, t.request.params).toString())}`
+        : t.kind === 'grpc'
+          ? `gRPC ${t.request.target} ${t.request.method}`
+          : t.kind === 'llm'
+            ? `LLM ${t.model.provider}${t.model.name ? `/${t.model.name}` : ''}`
+            : `collection ${this.ws.getCollection(p.collection!.collectionId).name}${info ? ` (${info.requests.length} requests)` : ''}`;
+    const startedAt = new Date().toISOString();
+    const ws = this.ws;
     void runLoadTest(cfg, { providers: ctx.services.providers, pricing: this.settings.pricing, redactor: ctx.redactor, signal: ctrl.signal, onSnapshot: (s) => this.host.emit('load.snapshot', { id, snapshot: s }) })
+      .then((snap) => {
+        // every finished load test is kept in the workspace history (runs/load/history.jsonl)
+        if (!snap.requests) return;
+        let thresholds: LoadRunRecord['thresholds'];
+        try {
+          thresholds = p.thresholds?.length ? evaluateThresholds(p.thresholds, snap).map((r) => ({ expr: r.expr, passed: r.passed, actual: r.actual })) : undefined;
+        } catch {
+          thresholds = undefined;
+        }
+        recordLoadRun(ws, loadRunRecord(snap, { id, startedAt, savedId: p.savedId, name: p.name || targetText, target: targetText, environment: p.environment, virtualUsers: cfg.virtualUsers, durationSec: cfg.durationSec, stopped: ctrl.signal.aborted || undefined, thresholds }));
+        this.host.emit('load.recorded', { id });
+      })
       .catch((e) => this.host.emit('load.error', { id, error: normalizeError(e) }))
       .finally(() => {
         this.controllers.delete(id);

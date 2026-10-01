@@ -15,6 +15,7 @@ import { useIntent } from '../hooks';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
 import { LoadTimeline, StatusCodes } from '../components/LoadCharts';
+import { LoadHistory } from '../components/LoadHistory';
 import type { NormalizedError } from '../api';
 
 interface Snapshot {
@@ -173,6 +174,10 @@ export function LoadView() {
             : { kind: 'sequence', requests: [] };
       const r = await call<{ id: string; requests?: string[]; unresolved?: string[]; warmUp?: { passed: number; failed: number } }>('load.start', {
         environment: env,
+        // for the history: which saved load test, and its pass/fail rules
+        savedId: current ? savedId : undefined,
+        name: current?.name,
+        thresholds: rules.length ? rules : undefined,
         collection: d.kind === 'collection' ? { collectionId, selection: d.folderId ? [d.folderId] : undefined, warmUp: d.warmUp } : undefined,
         config: {
           target,
@@ -480,12 +485,18 @@ export function LoadView() {
                 </table>
               </div>
             )}
+            {s.done && <LoadHistory savedId={current ? savedId : undefined} />}
           </div>
         ) : (
           !error && (
-            <Empty icon={<Gauge size={28} />} title="Configure and start a load test">
-              Reports throughput, p50/p90/p95/p99 latency, error rate, status distribution and — for LLM targets — tokens/sec, time to first token and cost.
-            </Empty>
+            <div className="flex flex-col gap-4">
+              <Empty icon={<Gauge size={28} />} title="Configure and start a load test">
+                Reports throughput, p50/p90/p95/p99 latency, error rate, status distribution and — for LLM targets — tokens/sec, time to first token and cost.
+              </Empty>
+              <div className="px-3">
+                <LoadHistory savedId={current ? savedId : undefined} />
+              </div>
+            </div>
           )
         )}
       </div>
