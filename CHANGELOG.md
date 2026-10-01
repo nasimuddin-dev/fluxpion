@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.27.0 — 2026-10-01
+
+Highlights: storage clean-up, flaky tests, unused variables.
+
+- **Settings ▸ Storage**: how much the open workspace keeps besides its definitions (runs, traces, response bodies, history, the index) with a bar per part, and clean-up: delete runs older than N days, clear the history. Also `testpion storage --delete-runs-older-than 30`.
+- **Flaky tests**: tests that passed only after a retry are listed in a run's Charts tab and in the HTML report.
+- **Unused variables**: under an environment's variables, the ones nothing in the workspace reads; `testpion vars unused` and the `unused_variables` MCP tool.
+- **Collection Overview**: a strip of the collection's recent runs with the last result and a link to it.
+- **Load history**: click a run to compare the others with it (change in requests per second and p95).
+- **Mock server**: hits per route and a summary of requests served from examples, forwarded or unmatched.
+- **For agents and scripts**: the `run_breakdown` MCP tool (a run's latency ranges, slowest and flaky tests, failing checks, scores) and `testpion load-history`.
+- **Accessibility**: every field of the key / value tables (variables, headers, parameters) has a name for screen readers; the UI test plan now checks all main views for unnamed controls.
+- **Fixes**: the workspace report and `load-history` show local times.
+
 ## 0.26.0 — 2026-10-01
 
 Highlights: snapshot checks, variable flow, a shareable workspace report.
