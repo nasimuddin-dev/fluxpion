@@ -406,7 +406,7 @@ export function registerDataCommands(program: Command): void {
         if (!rows.length) return console.log(dim('No load tests yet.'));
         for (const r of rows)
           console.log(
-            `${new Date(r.startedAt).toLocaleString()}  ${r.name}  ${dim(`${r.virtualUsers} VUs, ${r.durationSec}s`)}  ${Math.round(r.throughput)} req/s  p95 ${formatDuration(r.p95)}  ${r.errorRate > 0.01 ? red(`${(r.errorRate * 100).toFixed(1)}% errors`) : `${(r.errorRate * 100).toFixed(1)}% errors`}${r.passed === undefined ? '' : r.passed ? green('  passed') : red('  failed')}`,
+            `${new Date(r.startedAt).toLocaleString()}  ${r.name}  ${dim(`${r.virtualUsers} VUs, ${r.durationSec}s`)}  ${Math.round(r.throughput)} req/s  p95 ${formatDuration(r.p95)}${r.ttfbP95 !== undefined ? dim(` (server ${formatDuration(r.ttfbP95)})`) : ''}  ${r.errorRate > 0.01 ? red(`${(r.errorRate * 100).toFixed(1)}% errors`) : `${(r.errorRate * 100).toFixed(1)}% errors`}${r.passed === undefined ? '' : r.passed ? green('  passed') : red('  failed')}`,
           );
       } finally {
         store.close();

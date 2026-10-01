@@ -24,6 +24,9 @@ export interface LoadRunRecord {
   p95: number;
   p99: number;
   statusCodes: Record<string, number>;
+  /** HTTP: the server's time to first byte (p95) and the share of requests that opened a new connection. */
+  ttfbP95?: number;
+  newConnectionShare?: number;
   /** Pass/fail rules and whether each held. */
   thresholds?: Array<{ expr: string; passed: boolean; actual?: number }>;
   passed?: boolean;
@@ -33,7 +36,7 @@ const KEEP = 500;
 const file = (store: Pick<WorkspaceStore, 'path'>) => store.path('runs', 'load', 'history.jsonl');
 
 /** The record of a finished load test from its last snapshot. */
-export function loadRunRecord(snap: LoadSnapshot, info: Omit<LoadRunRecord, 'requests' | 'throughput' | 'errorRate' | 'p50' | 'p95' | 'p99' | 'statusCodes'>): LoadRunRecord {
+export function loadRunRecord(snap: LoadSnapshot, info: Omit<LoadRunRecord, 'requests' | 'throughput' | 'errorRate' | 'p50' | 'p95' | 'p99' | 'statusCodes' | 'ttfbP95' | 'newConnectionShare'>): LoadRunRecord {
   return {
     ...info,
     requests: snap.requests,
@@ -43,6 +46,7 @@ export function loadRunRecord(snap: LoadSnapshot, info: Omit<LoadRunRecord, 'req
     p95: Math.round(snap.latency.p95),
     p99: Math.round(snap.latency.p99),
     statusCodes: snap.statusCodes,
+    ...(snap.http ? { ttfbP95: Math.round(snap.http.ttfb.p95), newConnectionShare: Math.round((snap.http.newConnections / Math.max(1, snap.http.newConnections + snap.http.reused)) * 1000) / 1000 } : {}),
     ...(info.thresholds ? { passed: info.thresholds.every((t) => t.passed) } : {}),
   };
 }

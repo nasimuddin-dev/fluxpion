@@ -21,6 +21,8 @@ export interface LoadRun {
   p50: number;
   p95: number;
   p99: number;
+  ttfbP95?: number;
+  newConnectionShare?: number;
   passed?: boolean;
 }
 
@@ -99,6 +101,7 @@ export function LoadHistory({ savedId }: { savedId?: string }) {
             <th className="font-medium text-right">VUs</th>
             <th className="font-medium text-right">Req/s</th>
             <th className="font-medium text-right">p95</th>
+            <th className="font-medium text-right" title="Server time: p95 time to the first byte">Server p95</th>
             <th className="font-medium text-right">Errors</th>
             <th className="font-medium text-right">Result</th>
           </tr>
@@ -121,6 +124,10 @@ export function LoadHistory({ savedId }: { savedId?: string }) {
               <td className="text-right whitespace-nowrap">
                 {formatMs(r.p95)}
                 {ref && r.id !== ref.id && <Delta value={r.p95} base={ref.p95} higherIsBetter={false} />}
+              </td>
+              <td className="text-right whitespace-nowrap" title={r.newConnectionShare !== undefined ? `${Math.round(r.newConnectionShare * 100)}% of the requests opened a new connection` : undefined}>
+                {r.ttfbP95 !== undefined ? formatMs(r.ttfbP95) : <span className="text-muted">—</span>}
+                {ref && r.id !== ref.id && r.ttfbP95 !== undefined && ref.ttfbP95 !== undefined && <Delta value={r.ttfbP95} base={ref.ttfbP95} higherIsBetter={false} />}
               </td>
               <td className={cx('text-right', r.errorRate > 0.01 && 'text-bad')}>{pct(r.errorRate)}</td>
               <td className="text-right">{r.passed === undefined ? (r.stopped ? <Badge tone="warn">stopped</Badge> : <span className="text-muted">—</span>) : <Badge tone={r.passed ? 'ok' : 'bad'}>{r.passed ? 'passed' : 'failed'}</Badge>}</td>
