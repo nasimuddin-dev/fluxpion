@@ -3,7 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as MenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { ChevronRight, Loader2, MoreHorizontal, X } from 'lucide-react';
+import { ChevronRight, ChevronsRight, Loader2, MoreHorizontal, X } from 'lucide-react';
 
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ');
@@ -126,12 +126,40 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 }
 
 export function Tabs<T extends string>({ tabs, value, onChange, className, right }: { tabs: Array<{ id: NoInfer<T>; label: ReactNode; badge?: ReactNode }>; value: T; onChange(v: NoInfer<T>): void; className?: string; right?: ReactNode }) {
+  // tabs that don't fit (a narrow pane, side by side) stay reachable: » lists them, the wheel scrolls, the chosen one is in view
+  const listRef = useRef<HTMLDivElement>(null);
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>([]);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const measure = () => {
+      const box = el.getBoundingClientRect();
+      setHiddenTabs([...el.querySelectorAll<HTMLElement>('[role=tab]')].filter((b) => { const r = b.getBoundingClientRect(); return r.right > box.right + 1 || r.left < box.left - 1; }).map((b) => b.dataset.tabId ?? ''));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    el.addEventListener('scroll', measure, { passive: true });
+    return () => (ro.disconnect(), el.removeEventListener('scroll', measure));
+  }, [tabs.length]);
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(value)}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [value]);
   return (
-    <div role="tablist" className={cx('flex items-center gap-1 border-b border-line px-2 min-h-10 shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}>
+    <div className={cx('flex items-center border-b border-line min-h-10 shrink-0 min-w-0', className)}>
+    <div
+      ref={listRef}
+      role="tablist"
+      onWheel={(e) => {
+        if (e.deltaY && listRef.current && listRef.current.scrollWidth > listRef.current.clientWidth) listRef.current.scrollLeft += e.deltaY;
+      }}
+      className={cx('flex items-center gap-1 px-2 min-h-10 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', hiddenTabs.length > 0 && '[mask-image:linear-gradient(to_right,black_calc(100%-24px),transparent)]')}
+    >
       {tabs.map((t) => (
         <button
           key={t.id}
           role="tab"
+          data-tab-id={t.id}
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
           className={cx(
@@ -146,7 +174,21 @@ export function Tabs<T extends string>({ tabs, value, onChange, className, right
           )}
         </button>
       ))}
-      {right && <div className="ml-auto flex items-center gap-1 pl-2">{right}</div>}
+    </div>
+      {hiddenTabs.length > 0 && (
+        <Menu
+          align="end"
+          width={220}
+          items={tabs.map((t) => ({ label: `${value === t.id ? '✓ ' : ''}${typeof t.label === 'string' ? t.label : t.id}${t.badge ? ` (${t.badge})` : ''}`, onSelect: () => onChange(t.id) }))}
+          trigger={
+            <button aria-label={`All tabs (${hiddenTabs.length} not shown)`} title={`${hiddenTabs.length} more`} className="shrink-0 mx-1 h-7 px-1.5 rounded-md text-xs text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover inline-flex items-center gap-0.5">
+              <ChevronsRight size={14} />
+              {hiddenTabs.length}
+            </button>
+          }
+        />
+      )}
+      {right && <div className="ml-auto flex items-center gap-1 pl-2 pr-2 shrink-0">{right}</div>}
     </div>
   );
 }
@@ -362,6 +404,12 @@ function MenuItems({ items }: { items: MenuItem[] }) {
 /** Resizable two-pane split. Size is persisted per `id`. `sidebar` gives the first pane the sidebar surface. */
 export function Split({ id, direction = 'horizontal', initial = 50, min = 15, sidebar, collapsed, collapsedSecond, children }: { id: string; direction?: 'horizontal' | 'vertical'; initial?: number; min?: number; sidebar?: boolean; /** Leave the first pane out (the request editors' old sidebars, replaced by the Collections sidebar): it isn't rendered at all. */ collapsed?: boolean; /** Hide the second pane (the first takes the room). */ collapsedSecond?: boolean; children: [ReactNode, ReactNode] }) {
   const [pct, setPct] = useState(() => Number(localStorage.getItem(`aps.split.${id}`)) || initial);
+  // another id (the same panes in another layout): its own remembered size, the panes stay mounted
+  const [shownId, setShownId] = useState(id);
+  if (shownId !== id) {
+    setShownId(id);
+    setPct(Number(localStorage.getItem(`aps.split.${id}`)) || initial);
+  }
   const ref = useRef<HTMLDivElement>(null);
   const onDown = useCallback(
     (e: React.PointerEvent) => {
