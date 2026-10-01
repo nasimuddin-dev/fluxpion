@@ -54,6 +54,8 @@ import {
   workspaceStorage,
   deleteRunsBefore,
   listCertificates,
+  recordCertificate,
+  checkCertificate,
   certificateLint,
   mcpToolUsage,
   llmUsage,
@@ -303,8 +305,45 @@ export function registerDataCommands(program: Command): void {
     .description('TLS certificates of the HTTPS hosts the workspace has called (app, runs, monitors, agents), soonest to expire first; with --warn, exit 1 when one expires within that many days')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
     .option('--warn <days>', 'exit 1 when a certificate expires within this many days (for cron or CI)')
+    .option('--check <hosts...>', 'connect to these hosts (host, host:port or https URL) and check their certificates now, instead of listing the recorded ones')
     .option('--json', 'print as JSON')
-    .action((o: { workspace?: string; warn?: string; json?: boolean }) => {
+    .action(async (o: { workspace?: string; warn?: string; check?: string[]; json?: boolean }) => {
+      if (o.check?.length) {
+        // direct TLS handshakes; also recorded in the workspace when there is one
+        const warn = o.warn === undefined ? undefined : Number(o.warn);
+        const out: Array<Record<string, unknown>> = [];
+        let bad = false;
+        for (const t of o.check) {
+          try {
+            const c = await checkCertificate(t);
+            out.push({ target: t, ...c });
+            if (!c.trusted || (c.daysLeft ?? 0) < 0 || (warn !== undefined && c.daysLeft !== undefined && c.daysLeft <= warn)) bad = true;
+          } catch (e) {
+            out.push({ target: t, error: (e as Error).message });
+            bad = true;
+          }
+        }
+        try {
+          const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+          for (const c of out) if (!c.error) recordCertificate(store, `https://${c.host}:${c.port}/`, c as { validTo?: string });
+          store.close();
+        } catch {
+          /* no workspace here: nothing to record */
+        }
+        if (o.json) console.log(JSON.stringify(out, null, 2));
+        else
+          for (const c of out) {
+            if (c.error) {
+              console.log(`${String(c.target)}  ${red(String(c.error))}`);
+              continue;
+            }
+            const d = c.daysLeft as number | undefined;
+            const left = d === undefined ? dim('?') : d < 0 ? red(`expired ${-d} days ago`) : d < 14 || (warn !== undefined && d <= warn) ? red(`${d} days left`) : d < 30 ? yellow(`${d} days left`) : green(`${d} days left`);
+            console.log(`${String(c.host)}:${c.port}  ${left}  ${c.trusted ? green('trusted') : red(`not trusted (${c.trustError})`)}  ${dim(`${c.subject ?? ''} · ${c.issuer ?? ''} · ${c.protocol ?? ''} · until ${String(c.validTo ?? '?').slice(0, 10)}`)}`);
+          }
+        if (bad) process.exitCode = EXIT.TEST_FAILURE;
+        return;
+      }
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         const list = listCertificates(store);

@@ -18,6 +18,7 @@ import { Redactor } from '../util/redact.js';
 import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { listCertificates, recordCertificate } from '../storage/certificates.js';
+import { checkCertificate } from '../net/certificate-check.js';
 import { mcpToolUsage } from '../storage/mcp-usage.js';
 import { llmUsage } from '../storage/llm-usage.js';
 import type { SecretStore } from '../storage/secrets.js';
@@ -848,6 +849,16 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         if (!a.server) return all;
         const q = String(a.server).toLowerCase();
         return all.filter((u) => u.serverId === a.server || u.server.toLowerCase() === q);
+      },
+    },
+    {
+      name: 'check_certificate',
+      description: "Connect to a host (host, host:port or https URL) and read its TLS certificate now: subject, issuer, valid until, days left, whether this machine trusts it (and why not), TLS protocol. The result is also recorded for list_certificates.",
+      inputSchema: { type: 'object', properties: { target: str('host, host:port or https URL') }, required: ['target'] },
+      run: async (a) => {
+        const c = await checkCertificate(String(a.target));
+        recordCertificate(store, `https://${c.host}:${c.port}/`, c);
+        return c;
       },
     },
     {
