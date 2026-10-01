@@ -288,6 +288,13 @@ export function ActivityCharts({ activity }: { activity: Activity }) {
   const runs = sum((d) => d.runs);
   const tests = sum((d) => d.tests);
   const failedTests = sum((d) => d.failedTests);
+  // nothing yet: one line instead of empty charts
+  if (!requests && !runs)
+    return (
+      <p className="text-sm text-muted px-1 py-2">
+        Nothing in the last {days.length} days. Send requests or run tests and collections, and this shows how many worked, how fast they were and what failed, day by day.
+      </p>
+    );
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

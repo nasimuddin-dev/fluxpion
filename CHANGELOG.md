@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.0 — 2026-10-01
+
+Highlights: charts across the app — a Home activity dashboard, a Charts tab on every run, better load-test charts and a richer HTML report.
+
+- **Home activity dashboard**: requests sent, request success, median response and tests passed for the last 7, 14 or 30 days, then per-day charts (requests succeeded and failed, median response time, tests passed and failed) with hover details, requests by type and the slowest requests. The same numbers for scripts and agents: `testpion history activity --json` and the `workspace_activity` MCP tool.
+- **Run charts**: a finished test, collection or monitor run has a *Charts* tab next to its results: tests per response-time range (passed and failed), results per type, the five slowest tests (click one to find it) and the checks that failed most.
+- **Load test charts**: requests per second, p95 latency, errors per second and virtual users now have axes and a crosshair shared by all four charts; hover for every value at that second. Status codes are a proportional bar with counts and shares.
+- **HTML report**: a pass/fail bar, a response-time histogram, the slowest tests and the checks that failed most (static SVG, fine as a CI artifact).
+- **Fixes**: a load test whose URL uses an unset variable now says which variable is missing (it used to report a "remote host {{baseurl}}"); the monitor availability legend says "the last run" for a single run.
+
 ## 0.21.0 — 2026-10-01
 
 Highlights: monitors open in tabs and show charts.
