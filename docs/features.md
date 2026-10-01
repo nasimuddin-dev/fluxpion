@@ -106,7 +106,7 @@ Stream JSONL, CSV, JSON or Markdown datasets through evaluators. **Deterministic
   <img src="/images/tests.jpg" alt="The Tests view with test files, a completed run and the checks of an agent test" width="1440" height="900" loading="lazy">
 </figure>
 
-YAML tests in your repository, with parallel workers, backpressure, retries, timeouts, dependencies, setup and teardown, and runs you can cancel and resume. Every run writes JUnit, JSON, HTML and Markdown reports. The CLI returns CI-friendly exit codes.
+YAML tests in your repository, with parallel workers, backpressure, retries, timeouts, dependencies, setup and teardown, and runs you can cancel and resume. Every run writes JUnit, JSON, HTML and Markdown reports. The CLI returns CI-friendly exit codes. A test file's preview shows each test's latest result; a result's **History** shows the test across runs, and the runs overview lists the flaky tests of the workspace and, for evaluations, each evaluator's score by run.
 
 [Test runner](/test-runner/overview) · [CI/CD](/test-runner/ci-cd)
 
