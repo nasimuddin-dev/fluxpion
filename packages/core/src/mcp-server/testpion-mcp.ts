@@ -1,6 +1,7 @@
 import { readResultsFile, runTests } from '../runner/runner.js';
 import { compareToBaseline, createBaseline } from '../report/regression.js';
 import { runBreakdown } from '../runner/breakdown.js';
+import { summarizeTestHistory, testHistory } from '../runner/test-history.js';
 import { streamTests } from '../runner/loader.js';
 import { join, relative } from 'node:path';
 import { testFromRequest } from '../runner/test-from.js';
@@ -465,6 +466,17 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         return store.meta
           .listHistory({ requestId: node.id, kind: 'http', limit })
           .items.map((h) => ({ id: h.id, timestamp: h.timestamp, status: h.status, durationMs: h.durationMs, size: h.size, url: h.url && redactor.redactUrl(h.url) }));
+      },
+    },
+    {
+      name: 'test_history',
+      description:
+        "One test (or saved request) across the latest runs, newest first: status, latency, attempts and the checks that failed, with a summary (runs, passed, failed, how often the result flipped: a sign of a flaky test, and the median latency). Give the test's name as in run results, or its id.",
+      inputSchema: { type: 'object', properties: { name: str('Test name (as in run results)'), id: str('Or the test / request id'), limit: { type: 'number', description: 'How many runs (default 20, max 200)' } } },
+      run: async (a) => {
+        if (!a.name && !a.id) throw new ApsError('ValidationError', 'Give the name or id of a test');
+        const points = await testHistory(store, { id: a.id ? String(a.id) : undefined, name: a.name ? String(a.name) : undefined }, { limit: Math.min(Math.max(Number(a.limit) || 20, 1), 200) });
+        return { summary: summarizeTestHistory(points), runs: points };
       },
     },
     {

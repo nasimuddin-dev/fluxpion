@@ -34,7 +34,7 @@ testpion env list|order|diff -w  List environments; set their order; compare two
 testpion monitor list|add|remove|run|results|uptime|start -w  Collections on a schedule (monitors)
 testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
 testpion trash list|restore|empty -w  Recently deleted collections and environments (30 days)
-testpion history list|stats|diff|export-har -w  Response history of saved requests; response times; compare two responses; HAR export
+testpion history list|stats|diff|test|export-har -w  Response history of saved requests; response times; compare two responses; a test across runs; HAR export
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
@@ -357,6 +357,7 @@ testpion history list -w my-workspace --request "List patients" --json   # newes
 testpion history stats -w my-workspace --request "List patients" --json  # median, p95, slowest, failed
 testpion history diff h-abc h-def -w my-workspace --json                  # older id first
 testpion history activity -w my-workspace --days 30 --json              # per-day requests, failures, runs
+testpion history test "Authentication / Basic auth" -w my-workspace     # one test across the latest runs; flags flaky ones
 ```
 
 `history list` shows recent responses of requests sent in the app (`--collection`, `--request`, `--failed`, `-n/--limit`). `history stats` summarises the response times of a request's recent responses (`-n/--limit`, default 50): count, failed (no status or 400+), fastest, mean, median, p95 and slowest. `history diff` compares two of them: the status, timing, header changes (volatile ones such as `date` are flagged) and a field-by-field JSON body diff, or a line diff for text. Values of sensitive fields and headers are masked. `history activity` is the Home dashboard as data: per local day, requests sent and how many failed (4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors), the median response time, test runs and failed tests; plus requests per type and the slowest requests on average (`-d/--days`, default 14, up to 90).

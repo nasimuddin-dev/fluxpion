@@ -54,6 +54,8 @@ import {
   workspaceStorage,
   deleteRunsBefore,
   listCertificates,
+  testHistory,
+  summarizeTestHistory,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -708,6 +710,29 @@ export function registerDataCommands(program: Command): void {
           const kinds = Object.entries(a.byKind).map(([k, n]) => `${k} ${n}`).join(', ');
           if (kinds) console.log(dim(`By kind: ${kinds}`));
         }
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('test')
+    .description('one test (or saved request) across the latest runs, newest first: status, latency and the checks that failed, with how often the result flipped (flaky)')
+    .argument('<name>', 'test name as in run results (or its id with --id)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--id', 'the argument is the test / request id')
+    .option('-n, --limit <n>', 'how many runs', '20')
+    .option('--json', 'print as JSON')
+    .action(async (name: string, o: { workspace: string; id?: boolean; limit: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const points = await testHistory(store, o.id ? { id: name } : { name }, { limit: Number(o.limit) || 20 });
+        const sum = summarizeTestHistory(points);
+        if (o.json) return console.log(JSON.stringify({ summary: sum, runs: points }, null, 2));
+        if (!points.length) return console.log(dim(`"${name}" is in none of the latest runs.`));
+        console.log(`${bold(name)}  ${sum.failed ? red(`${sum.failed} of ${sum.runs} failed`) : green(`passed ${sum.passed} of ${sum.runs}`)}${sum.flips > 1 ? yellow(`  flipped ${sum.flips} times (flaky?)`) : ''}${sum.medianMs !== undefined ? dim(`  median ${formatDuration(sum.medianMs)}`) : ''}`);
+        console.log('  ' + [...points].reverse().map((p) => (p.status === 'passed' ? green('█') : p.status === 'skipped' ? dim('·') : red('█'))).join('') + dim('  oldest → newest'));
+        for (const p of points)
+          console.log(`  ${p.startedAt.slice(0, 16).replace('T', ' ')}  ${p.status === 'passed' ? green('passed') : p.status === 'skipped' ? dim('skipped') : red(p.status)}  ${dim(`${p.latencyMs !== undefined ? formatDuration(p.latencyMs) : ''} · ${p.runName}${p.environment ? ` · ${p.environment}` : ''}`)}${p.failures.length ? red(`  ${p.failures.join('; ')}`) : ''}`);
       } finally {
         store.close();
       }

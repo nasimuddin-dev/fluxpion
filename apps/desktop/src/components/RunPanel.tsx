@@ -7,6 +7,7 @@ import { formatCost, formatMs, plural, timeAgo } from '../lib/format';
 import { CheckList, ErrorPanel, StatusIcon } from './Results';
 import { TraceView } from './TraceView';
 import { RunCharts } from './RunCharts';
+import { TestHistory } from './TestHistory';
 import { finishSave, viewContent, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Modal, Select, Split, Tabs, VirtualList, Menu, MetricGrid } from './ui';
 
@@ -230,7 +231,7 @@ export function RunPanel({ runId, expectedTotal, onRerunFailed }: { runId: strin
                 <Empty title={done ? 'No results match' : 'Waiting for results…'} />
               )}
             </div>
-            <div className="h-full min-h-0">{sel ? <ResultDetail r={sel} /> : <Empty icon={<Target size={24} />} title="Select a result to inspect checks, output and trace" />}</div>
+            <div className="h-full min-h-0">{sel ? <ResultDetail r={sel} runId={runId} /> : <Empty icon={<Target size={24} />} title="Select a result to inspect checks, output and trace" />}</div>
           </Split>
         </div>
       )}
@@ -259,8 +260,8 @@ function ExportMenu({ runId }: { runId: string }) {
   );
 }
 
-export function ResultDetail({ r }: { r: TestResult }) {
-  const [tab, setTab] = useState<'checks' | 'io' | 'trace' | 'meta'>('checks');
+export function ResultDetail({ r, runId }: { r: TestResult; runId?: string }) {
+  const [tab, setTab] = useState<'checks' | 'io' | 'trace' | 'history' | 'meta'>('checks');
   const [trace, setTrace] = useState<Trace | null>();
   useEffect(() => {
     setTrace(undefined);
@@ -293,6 +294,7 @@ export function ResultDetail({ r }: { r: TestResult }) {
           { id: 'checks', label: 'Checks', badge: r.checks.length },
           { id: 'io', label: 'Input / output' },
           { id: 'trace', label: 'Trace' },
+          ...(runId ? [{ id: 'history' as const, label: 'History' }] : []),
           { id: 'meta', label: 'Metadata' },
         ]}
       />
@@ -344,6 +346,7 @@ export function ResultDetail({ r }: { r: TestResult }) {
           </div>
         )}
         {tab === 'trace' && (trace ? <TraceView trace={trace} /> : trace === null ? <Empty title="No trace stored for this result" /> : <Empty title="Loading…" />)}
+        {tab === 'history' && runId && <TestHistory id={r.id} name={r.name} runId={runId} />}
         {tab === 'meta' && <pre className="p-3 mono text-xs whitespace-pre-wrap">{JSON.stringify(r.metadata ?? {}, null, 2)}</pre>}
       </div>
     </div>

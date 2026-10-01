@@ -21,6 +21,7 @@ import {
   type TestSource,
   evaluateThresholds,
   parseThreshold,
+  testHistory,
 } from '@testpion/core';
 import type { Backend, Handlers, EvalRunParams } from '../backend.js';
 
@@ -69,6 +70,8 @@ export function testingHandlers(be: Backend): Handlers {
     'runs.cancel': ({ runId }: { runId: string }) => be.runs.get(runId)?.ctrl.abort(),
     'runs.list': (q: { query?: string; limit?: number; offset?: number }) => be.ws.meta.listRuns(q),
     'runs.breakdown': ({ runId }: { runId: string }) => be.runBreakdown(runId),
+    // one test across the latest runs (by id, or by name), newest first
+    'runs.testHistory': ({ id, name, limit }: { id?: string; name?: string; limit?: number }) => testHistory(be.ws, { id, name }, { limit }),
     'runs.summary': ({ runId }: { runId: string }) => {
       const f = join(be.ws.runDir(runId), 'summary.json');
       return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null;

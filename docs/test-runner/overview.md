@@ -34,6 +34,8 @@ environment: Staging
 
 Every run writes `junit.xml`, `report.json`, `report.html` and `report.md`, containing totals, duration, errors, latency percentiles, AI metrics, tokens, cost estimates, and per-test AI details (prompt, model, input, output, evaluator, score, explanation). The HTML report also has a pass/fail bar, a response-time histogram, the slowest tests and the checks that failed most and, for AI evaluations, the scores of each evaluator (plain SVG and HTML, so it works as a CI artifact). See [assertions](./assertions.md), [datasets](./datasets.md) and [CI/CD](./ci-cd.md).
 
+Select a result and open **History** to see the same test in the latest runs: whether it passed, its time per run (with the median) and the checks that failed, flagged as *flaky?* when the result keeps flipping; click a run to open it. `testpion history test "<name>"` and the `test_history` MCP tool give the same.
+
 In the app, a finished run has a **Charts** tab next to its results: how many tests fell in each response-time range (passed and failed), results per test type, the five slowest tests (click one to find it in the results), flaky tests (passed only after a retry), where the time of HTTP and GraphQL requests went (DNS lookup, TCP connect and TLS handshake on new connections, waiting for the server, download; also in the `run_breakdown` MCP tool), the checks that failed most and, for AI evaluations, how the scores of each evaluator spread from 0 to 1 with their mean.
 
 <figure class="aps-screenshot">

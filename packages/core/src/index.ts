@@ -59,6 +59,7 @@ export * from './runner/loader.js';
 export * from './runner/datasets.js';
 export * from './runner/collection-run.js';
 export * from './runner/breakdown.js';
+export * from './runner/test-history.js';
 export * from './runner/variable-flow.js';
 export * from './runner/collection-realtime.js';
 export * from './runner/saved-evaluations.js';
