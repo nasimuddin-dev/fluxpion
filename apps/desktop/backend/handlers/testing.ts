@@ -128,7 +128,7 @@ export function testingHandlers(be: Backend): Handlers {
       return compareToBaseline(baseline, summary as never, be.results(runId), thresholds);
     },
 
-    'traces.list': (q: { query?: string; kind?: string; limit?: number; offset?: number }) => be.ws.meta.listTraces(q),
+    'traces.list': (q: { query?: string; kind?: string; failed?: boolean; limit?: number; offset?: number }) => be.ws.meta.listTraces(q),
     'traces.get': ({ id }: { id: string }) => be.ws.loadTrace(id),
     /** Send traces to an OpenTelemetry collector (OTLP/HTTP JSON). Header values may use {{variables}} (e.g. a secret API key). */
     'traces.exportOtlp': async ({ ids, endpoint, headers, environment }: { ids: string[]; endpoint: string; headers?: Array<{ key: string; value: string; enabled?: boolean }>; environment?: string }) => {

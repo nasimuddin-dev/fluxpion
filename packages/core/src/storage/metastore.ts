@@ -442,7 +442,11 @@ class SqliteMetaStore implements MetaStore {
   }
 
   listTraces(q: ListQuery = {}): Page<TraceMeta> {
-    const w = this.where(q, ['name', 'status']);
+    const w = this.where({ ...q, failed: undefined }, ['name', 'status']);
+    // traces that ended in an error
+    if (q.failed) {
+      w.sql = (w.sql ? w.sql + ' AND ' : 'WHERE ') + "status <> 'ok'";
+    }
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM traces ${w.sql}`).get(...w.args) as { n: number }).n;
     const rows = this.db.prepare(`SELECT * FROM traces ${w.sql} ORDER BY start DESC LIMIT ? OFFSET ?`).all(...w.args, q.limit ?? 100, q.offset ?? 0) as Array<Record<string, unknown>>;
     return { total, items: rows.map(traceRow) };
@@ -588,7 +592,7 @@ class JsonlMetaStore implements MetaStore {
     this.log('traces', t);
   }
   listTraces(q: ListQuery = {}) {
-    return this.page(this.data.traces, q, (t, s) => `${t.name} ${t.status}`.toLowerCase().includes(s), (t) => t.startTime);
+    return this.page(q.failed ? this.data.traces.filter((t) => t.status !== 'ok') : this.data.traces, q, (t, s) => `${t.name} ${t.status}`.toLowerCase().includes(s), (t) => t.startTime);
   }
   getTrace(id: string) {
     return this.data.traces.find((t) => t.id === id);

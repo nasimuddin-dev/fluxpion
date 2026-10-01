@@ -76,21 +76,22 @@ export function TracesView() {
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('');
+  const [errorsOnly, setErrorsOnly] = useState(false);
   const [sel, setSel] = useState<string>();
   const [trace, setTrace] = useState<Trace | null>();
   const load = useCallback(
     async (reset = true) => {
-      const r = await call<{ items: TraceMeta[]; total: number }>('traces.list', { query: query || undefined, kind: kind || undefined, limit: 200, offset: reset ? 0 : items.length });
+      const r = await call<{ items: TraceMeta[]; total: number }>('traces.list', { query: query || undefined, kind: kind || undefined, failed: errorsOnly || undefined, limit: 200, offset: reset ? 0 : items.length });
       setItems((x) => (reset ? r.items : [...x, ...r.items]));
       setTotal(r.total);
     },
-    [query, kind, items.length],
+    [query, kind, errorsOnly, items.length],
   );
   useEffect(() => {
     const t = setTimeout(() => void load(true), 200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, kind]);
+  }, [query, kind, errorsOnly]);
   useEffect(() => {
     if (!sel) return;
     setTrace(undefined);
@@ -108,6 +109,9 @@ export function TracesView() {
               <option key={k}>{k}</option>
             ))}
           </Select>
+          <label className="flex items-center gap-1 text-xs text-muted whitespace-nowrap" title="Only traces that ended in an error">
+            <input type="checkbox" checked={errorsOnly} onChange={(e) => setErrorsOnly(e.target.checked)} /> Errors
+          </label>
           <IconButton label="Refresh" onClick={() => load(true)}>
             <RefreshCw size={14} />
           </IconButton>
