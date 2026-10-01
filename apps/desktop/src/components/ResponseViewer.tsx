@@ -11,6 +11,7 @@ import { JsonTree, RawView, type TreeAssertion, type TreeVariable } from './Json
 import { TraceView } from './TraceView';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
+import { JsonTable, tableRowsOf } from './JsonTable';
 
 type Tab = 'body' | 'events' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream' | 'history';
 
@@ -57,7 +58,7 @@ export function ResponseViewer({
   // an event stream opens on its events
   const [tab, setTab] = useState<Tab>(() => (checks?.some((c) => !c.passed) ? 'tests' : response.events ? 'events' : 'body'));
   // a response with a visualization opens on it, like Postman's Visualize view
-  const [mode, setMode] = useState<'pretty' | 'raw' | 'preview' | 'visualize'>(() => (visualizer ? 'visualize' : 'pretty'));
+  const [mode, setMode] = useState<'pretty' | 'table' | 'raw' | 'preview' | 'visualize'>(() => (visualizer ? 'visualize' : 'pretty'));
   useEffect(() => {
     if (visualizer) setMode('visualize');
     else setMode((m) => (m === 'visualize' ? 'pretty' : m));
@@ -65,6 +66,8 @@ export function ResponseViewer({
   const visualHtml = useMemo(() => (visualizer?.html !== undefined ? visualPage(visualizer.html) : undefined), [visualizer]);
   const [trace, setTrace] = useState<Trace>();
   const isJson = response.json !== undefined;
+  // an array of objects (or a body holding one) can also be read as a table
+  const table = useMemo(() => (isJson ? tableRowsOf(response.json) : undefined), [isJson, response.json]);
   const isHtml = /html/i.test(response.contentType);
   const prettyText = useMemo(() => (isJson ? JSON.stringify(response.json, null, 2) : response.bodyPreview), [response, isJson]);
   useEffect(() => {
@@ -143,7 +146,7 @@ export function ResponseViewer({
         right={
           tab === 'body' && (
             <div className="flex rounded-md border border-line overflow-hidden text-xs">
-              {(['pretty', 'raw', ...(isHtml ? ['preview'] : []), ...(visualizer ? ['visualize'] : [])] as const).map((m) => (
+              {(['pretty', ...(table ? ['table'] : []), 'raw', ...(isHtml ? ['preview'] : []), ...(visualizer ? ['visualize'] : [])] as const).map((m) => (
                 <button key={m} className={cx('px-2 h-6 capitalize', mode === m ? 'bg-accent text-white' : 'hover:bg-hover')} onClick={() => setMode(m as typeof mode)}>
                   {m}
                 </button>
@@ -158,6 +161,8 @@ export function ResponseViewer({
             <Empty title="Empty body" />
           ) : mode === 'pretty' && isJson ? (
             <JsonTree data={response.json} onAssert={onAddAssertion} onSaveVariable={onSaveVariable} />
+          ) : mode === 'table' && table ? (
+            <JsonTable rows={table.rows} path={table.path} />
           ) : mode === 'visualize' && visualizer ? (
             <div className="h-full flex flex-col">
               {visualizer.error && <div className="px-3 py-2 text-sm text-bad border-b border-line">{visualizer.error}</div>}
