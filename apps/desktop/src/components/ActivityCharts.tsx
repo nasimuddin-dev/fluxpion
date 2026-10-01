@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, ChartCard, ChartTip, niceMax, StackedColumns, Swatch, useWidth } from './charts';
+import { axisMs, BarRow, ChartCard, ChartTip, niceMax, StackedColumns, Swatch, useWidth } from './charts';
 import { cx } from './ui';
 
 /** Workspace activity from `stats.activity` (see summarizeActivity in core). */
@@ -214,13 +214,7 @@ function ByKind({ byKind }: { byKind: Record<string, number> }) {
       {rows.length ? (
         <div className="flex flex-col gap-1.5">
           {rows.map(([k, n]) => (
-            <div key={k} className="flex items-center gap-2 text-xs" title={plural(n, `${KIND_LABEL[k] ?? k} request`)}>
-              <span className="w-20 shrink-0 text-muted">{KIND_LABEL[k] ?? k}</span>
-              <span className="flex-1 h-3 rounded bg-hover/60 overflow-hidden">
-                <span className="block h-full rounded bg-accent" style={{ width: `${(n / max) * 100}%` }} />
-              </span>
-              <span className="w-10 text-right tabular-nums text-fg">{n}</span>
-            </div>
+            <BarRow key={k} label={KIND_LABEL[k] ?? k} segments={[{ value: n, color: 'var(--accent)' }]} of={max} right={n} title={plural(n, `${KIND_LABEL[k] ?? k} request`)} />
           ))}
         </div>
       ) : (

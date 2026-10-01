@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { call } from '../api';
 import { formatMs, plural } from '../lib/format';
-import { ChartCard, StackedColumns, Swatch } from './charts';
+import { BarRow, ChartCard, StackedColumns, Swatch } from './charts';
 import { StatusIcon } from './Results';
 import { Empty } from './ui';
 
@@ -128,19 +128,18 @@ function ByType({ byType }: { byType: Breakdown['byType'] }) {
         {rows.map(([t, v]) => {
           const total = v.passed + v.failed + v.skipped;
           return (
-            <div key={t} className="flex items-center gap-2 text-xs" title={`${TYPE_LABEL[t] ?? t}: ${v.passed} passed, ${v.failed} failed, ${v.skipped} skipped`}>
-              <span className="w-20 shrink-0 text-muted truncate">{TYPE_LABEL[t] ?? t}</span>
-              <span className="flex-1 h-3 flex gap-0.5">
-                <span className="flex h-full gap-0.5" style={{ width: `${(total / max) * 100}%` }}>
-                  {v.passed > 0 && <span className="h-full rounded-sm bg-ok" style={{ flex: v.passed }} />}
-                  {v.failed > 0 && <span className="h-full rounded-sm bg-bad" style={{ flex: v.failed }} />}
-                  {v.skipped > 0 && <span className="h-full rounded-sm bg-warn" style={{ flex: v.skipped }} />}
-                </span>
-              </span>
-              <span className="w-16 text-right tabular-nums text-fg">
-                {v.passed}/{total}
-              </span>
-            </div>
+            <BarRow
+              key={t}
+              label={TYPE_LABEL[t] ?? t}
+              segments={[
+                { value: v.passed, color: 'var(--ok)' },
+                { value: v.failed, color: 'var(--bad)' },
+                { value: v.skipped, color: 'var(--warn)' },
+              ]}
+              of={max}
+              right={`${v.passed}/${total}`}
+              title={`${TYPE_LABEL[t] ?? t}: ${v.passed} passed, ${v.failed} failed, ${v.skipped} skipped`}
+            />
           );
         })}
       </div>

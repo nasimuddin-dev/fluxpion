@@ -5,7 +5,7 @@ import { useApp } from '../store';
 import { download } from '../lib/format';
 import { SidePicker, type Side } from './OpenApiDiffDialog';
 import { Badge, Button, cx, Field, Input, Metric, MetricGrid, ModalOrPanel, Select, Toggle } from './ui';
-import { ChartCard, Swatch } from './charts';
+import { BarRow, ChartCard, Swatch } from './charts';
 
 interface OperationCoverage {
   method: string;
@@ -243,16 +243,18 @@ function CoverageByTag({ operations }: { operations: OperationCoverage[] }) {
     <ChartCard title="By tag" aside="operations covered" legend={<><Swatch color="var(--ok)" label="Called" /><Swatch color="var(--bad)" label="Never called" /></>}>
       <div className="flex flex-col gap-1.5">
         {rows.map(([t, v]) => (
-          <div key={t} className="flex items-center gap-2 text-xs" title={`${t}: ${v.covered} of ${v.total} operations called`}>
-            <span className="w-32 shrink-0 truncate text-muted">{t}</span>
-            <span className="flex-1 h-3 flex gap-0.5">
-              {v.covered > 0 && <span className="h-full rounded-sm bg-ok" style={{ flex: v.covered }} />}
-              {v.total - v.covered > 0 && <span className="h-full rounded-sm bg-bad/80" style={{ flex: v.total - v.covered }} />}
-            </span>
-            <span className="w-16 text-right tabular-nums text-fg">
-              {v.covered}/{v.total}
-            </span>
-          </div>
+          <BarRow
+            key={t}
+            label={t}
+            labelClass="w-32"
+            segments={[
+              { value: v.covered, color: 'var(--ok)' },
+              { value: v.total - v.covered, color: 'var(--bad)' },
+            ]}
+            of={v.total}
+            right={`${v.covered}/${v.total}`}
+            title={`${t}: ${v.covered} of ${v.total} operations called`}
+          />
         ))}
       </div>
     </ChartCard>

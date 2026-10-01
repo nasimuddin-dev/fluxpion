@@ -260,3 +260,26 @@ export function StackedColumns<T>({
     </div>
   );
 }
+
+/**
+ * A labelled horizontal bar: segments (e.g. passed / failed / skipped, or one magnitude) side by side,
+ * scaled to `of` (the largest row) so rows compare; the label left, a number right.
+ */
+export function BarRow({ label, segments, of, right, title, labelClass = 'w-20' }: { label: ReactNode; segments: Array<{ value: number; color: string }>; of: number; right: ReactNode; title?: string; labelClass?: string }) {
+  const total = segments.reduce((a, s) => a + s.value, 0);
+  return (
+    <div className="flex items-center gap-2 text-xs" title={title}>
+      <span className={'shrink-0 truncate text-muted ' + labelClass}>{label}</span>
+      <span className="flex-1 h-3 rounded bg-hover/60 overflow-hidden">
+        <span className="flex h-full gap-0.5" style={{ width: `${of > 0 ? (total / of) * 100 : 0}%` }}>
+          {segments
+            .filter((s) => s.value > 0)
+            .map((s, i) => (
+              <span key={i} className="h-full rounded-sm" style={{ flex: s.value, background: s.color }} />
+            ))}
+        </span>
+      </span>
+      <span className="w-16 text-right tabular-nums text-fg shrink-0">{right}</span>
+    </div>
+  );
+}
