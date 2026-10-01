@@ -35,7 +35,7 @@ Every check result carries its **source**, and the UI and reports label AI-judge
 
 ## Datasets
 
-JSON, JSONL, CSV and Markdown tables, from a file or a URL (API response). JSONL and CSV are streamed line by line, so datasets of any size never need to fit in memory.
+JSON, JSONL, CSV and Markdown tables, from a file or a URL (API response), or the rows of a SQLite query ([Datasets](/test-runner/datasets#sqlite-databases)). JSONL and CSV are streamed line by line, so datasets of any size never need to fit in memory; quoted CSV fields may contain commas and line breaks. In the app, the dataset editor loads a file with **Load file…**, or one of the workspace's `datasets/` files from the list next to it (a response's **Table ▸ Save as dataset** puts one there).
 
 ```yaml
 name: Intent dataset
