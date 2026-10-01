@@ -242,6 +242,19 @@ export interface MenuItem {
   items?: MenuItem[];
 }
 
+/** F2 and Delete on a row run its menu's Rename and Delete items, the same as in a file tree. */
+export function menuKeys(items: MenuItem[] | undefined) {
+  return (e: React.KeyboardEvent) => {
+    if (!items || (e.key !== 'F2' && e.key !== 'Delete')) return;
+    // Delete deletes (it asks first); "Remove …" only when a row has no Delete (never "Remove from the collection")
+    const usable = items.filter((i) => !i.disabled);
+    const it = e.key === 'F2' ? usable.find((i) => /^Rename/.test(i.label)) : (usable.find((i) => i.label === 'Delete' || i.label.startsWith('Delete ')) ?? usable.find((i) => i.label.startsWith('Remove ') && !i.label.includes(' from ')));
+    if (!it) return;
+    e.preventDefault();
+    it.onSelect();
+  };
+}
+
 /**
  * Dropdown menu (keyboard navigable, animated). `trigger` must be a single focusable element.
  * Pass `open` / `onOpenChange` to control it, e.g. to open it from a right-click.

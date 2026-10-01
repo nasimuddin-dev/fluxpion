@@ -11,7 +11,7 @@ import { ExportDialog } from './ExportDialog';
 import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
-import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
+import { Button, cx, IconButton, Input, Menu, menuKeys, type MenuItem } from './ui';
 
 /**
  * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
@@ -99,7 +99,7 @@ function Row({ icon, label, sub, onClick, title, active, menu, drag }: { icon?: 
         setMenuOpen(true);
       }}
     >
-      <button title={title ?? label} onClick={onClick} data-tree-row className="flex-1 min-w-0 flex items-center gap-2 h-7 pl-6 pr-1 text-sm text-left">
+      <button title={title ?? label} onClick={onClick} onKeyDown={menuKeys(menu)} data-tree-row className="flex-1 min-w-0 flex items-center gap-2 h-7 pl-6 pr-1 text-sm text-left">
         {icon && <span className="text-muted shrink-0">{icon}</span>}
         <span className="truncate flex-1">{label}</span>
         {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}

@@ -2,7 +2,7 @@ import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, C
 import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
-import { cx, Menu, type MenuItem } from './ui';
+import { cx, Menu, menuKeys, type MenuItem } from './ui';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
 import { closeTabsFor } from './EditorTabs';
@@ -570,7 +570,7 @@ export function CollectionTree({
                 setMenuFor(i.id);
               }}
             >
-              <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} title={i.name} data-tree-row>
+              <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} onKeyDown={g.menu ? menuKeys(g.menu(i.id)) : undefined} title={i.name} data-tree-row>
                 <span className={cx('mono text-[0.64rem] font-bold w-10 shrink-0', CATEGORY_META[g.cat].cls)}>{i.badge ?? CATEGORY_META[g.cat].badge}</span>
                 <span className="truncate">{i.name}</span>
               </button>
