@@ -83,7 +83,7 @@ export function KeyValueEditor({
                   {!isNew && <input type="checkbox" aria-label="Enabled" checked={r.enabled !== false} onChange={(e) => update(i, { enabled: e.target.checked })} />}
                 </td>
                 <td className="border-l border-line">
-                  <input className="cell-input mono" list={listId} readOnly={fixedKeys} placeholder={isNew ? keyPlaceholder : ''} value={r.key} onChange={(e) => update(i, { key: e.target.value })} />
+                  <input className="cell-input mono" list={listId} readOnly={fixedKeys} aria-label={isNew ? `New ${keyPlaceholder.toLowerCase()}` : `${keyPlaceholder} ${i + 1}`} placeholder={isNew ? keyPlaceholder : ''} value={r.key} onChange={(e) => update(i, { key: e.target.value })} />
                 </td>
                 <td className="border-l border-line">
                   <div className="flex items-center">
@@ -91,6 +91,7 @@ export function KeyValueEditor({
                       <input
                         className="cell-input mono"
                         type={masked ? 'password' : 'text'}
+                        aria-label={r.key ? `Value of ${r.key}` : valuePlaceholder}
                         placeholder={r.secret && secretStatus?.[r.key] ? '•••••• stored in OS keychain (type to replace)' : r.kind === 'file' ? 'File path' : ''}
                         value={r.value}
                         onChange={(e) => update(i, { value: e.target.value })}
@@ -109,7 +110,7 @@ export function KeyValueEditor({
                 {allowFile && (
                   <td className="border-l border-line">
                     {!isNew && (
-                      <select className="cell-input text-xs" value={r.kind ?? 'text'} onChange={(e) => update(i, { kind: e.target.value as 'text' | 'file' })}>
+                      <select className="cell-input text-xs" aria-label={`Kind of ${r.key || 'field'}`} value={r.kind ?? 'text'} onChange={(e) => update(i, { kind: e.target.value as 'text' | 'file' })}>
                         <option value="text">Text</option>
                         <option value="file">File</option>
                       </select>
