@@ -1,0 +1,40 @@
+window.__t = (() => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const aside = () => document.querySelector('aside[aria-label="Collections explorer"]');
+  const rows = () => [...(aside()?.querySelectorAll('[data-tree-row]') ?? [])];
+  const row = (text) => rows().find((b) => b.textContent.trim() === text) ?? rows().find((b) => b.textContent.trim().endsWith(text)) ?? rows().find((b) => b.textContent.includes(text));
+  const esc = async () => {
+    for (let i = 0; i < 3; i++) {
+      const el = document.querySelector('[role=menu]') || document.querySelector('[role=dialog]');
+      if (!el) break;
+      (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await sleep(350);
+    }
+  };
+  return {
+    sleep,
+    esc,
+    view: async (label) => { await esc(); document.querySelector(`nav [aria-label="${label}"]`)?.click(); await sleep(1200); return !!document.querySelector(`nav [aria-label="${label}"][aria-current="page"]`); },
+    requests: async () => { await esc(); window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, altKey: true, bubbles: true })); await sleep(1200); return !!aside(); },
+    expand: async (text) => { const r = row(text); if (!r) return `NO ROW ${text}`; if (r.getAttribute('aria-expanded') === 'false') r.click(); await sleep(500); return 'ok'; },
+    open: async (text) => { const r = row(text); if (!r) return `NO ROW ${text}`; r.click(); await sleep(1800); return 'ok'; },
+    menu: async (text) => {
+      await esc();
+      const r = row(text);
+      if (!r) return `NO ROW ${text}`;
+      (r.closest('[draggable]') || r.parentElement).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 160, clientY: Math.min(500, r.getBoundingClientRect().top + 10) }));
+      await sleep(600);
+      return [...document.querySelectorAll('[role=menu]:last-of-type [role=menuitem]')].map((m) => m.textContent.trim()).join(' | ') || 'NO MENU';
+    },
+    header: async (label) => { await esc(); aside()?.querySelector(`button[aria-label^="${label}"]`)?.click(); await sleep(1000); return (document.querySelector('[role=dialog]')?.innerText ?? document.querySelector('[role=menu]')?.innerText ?? 'NOTHING').slice(0, 80); },
+    tab: async (label) => { const all = [...document.querySelectorAll('main [role=tab]')].filter((x) => x.textContent.trim().startsWith(label)); const t = all.find((x) => x.offsetParent !== null) ?? all[0]; t?.click(); await sleep(900); return !!t; },
+    button: async (label) => { const b = [...document.querySelectorAll('main button')].find((x) => x.offsetParent && (x.textContent.trim() === label || x.getAttribute('aria-label') === label)); b?.click(); await sleep(1200); return !!b; },
+    key: async (k, mods = {}) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, ...mods })); await sleep(900); return (document.querySelector('[role=dialog]')?.innerText ?? 'NONE').slice(0, 60); },
+    tabMenu: async () => { await esc(); const t = document.querySelector('[role=tablist][aria-label="Open requests"] [role=tab][aria-selected="true"]'); t?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 400, clientY: 60 })); await sleep(600); return [...document.querySelectorAll('[role=menuitem]')].map((m) => m.textContent.trim()).join(' | ') || 'NO MENU'; },
+    crumb: () => [...document.querySelectorAll('nav[aria-label="Where this request is saved"]')].filter((n) => n.offsetParent).map((n) => n.innerText.replace(/\n/g, ' › ')).join(''),
+    visibleText: () => { const c = document.querySelector('main > div.relative'); const v = c && [...c.children].find((d) => d.style.display !== 'none'); return (v?.innerText ?? document.querySelector('main')?.innerText ?? '').slice(0, 120).replace(/\n/g, ' · '); },
+    varPopover: async () => { const inp = [...document.querySelectorAll('main input')].find((i) => i.offsetParent && /\{\{/.test(i.value)); if (!inp) return 'NO VAR FIELD'; const m = /\{\{/.exec(inp.value); inp.focus(); inp.setSelectionRange(m.index + 3, m.index + 3); inp.dispatchEvent(new MouseEvent('click', { bubbles: true })); await sleep(800); return (document.querySelector('[role=dialog][aria-label^="Variable"]')?.innerText ?? 'NONE').slice(0, 80).replace(/\n/g, ' '); },
+  };
+})();
+'ready'

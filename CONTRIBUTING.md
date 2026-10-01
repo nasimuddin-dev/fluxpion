@@ -26,7 +26,19 @@ Follow the engineering rules in the SRS (§72). The most important are:
 
 ## Definition of done
 
-Each feature ships with its implementation, unit tests, integration tests, documentation in `docs/`, and an example. Reviewers enforce this.
+Each feature ships with its implementation, unit tests, integration tests, documentation in `docs/`, and an example. A change to the desktop UI also adds or updates steps in the UI regression suite. Reviewers enforce this.
+
+## UI regression suite
+
+`apps/desktop/e2e` drives the real app: each plan in `e2e/plans` starts TestPion with a fresh copy of the examples workspace, runs its steps in the window, screenshots each one and checks the result.
+
+```bash
+npm run build -w @testpion/desktop
+npm run e2e -w @testpion/desktop                       # every plan
+npm run e2e -w @testpion/desktop -- --only keyboard    # one plan
+```
+
+It runs before every release and against the installed app after one. How to read the report and write a plan: `.claude/skills/ui-regression/SKILL.md`.
 
 ## Commits and PRs
 
