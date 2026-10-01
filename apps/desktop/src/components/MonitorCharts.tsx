@@ -14,6 +14,7 @@ export interface RunPoint {
   failed: number;
   errors: number;
   p50Ms?: number;
+  p95Ms?: number;
   reason?: string;
 }
 
@@ -155,7 +156,35 @@ export function RequestsChart({ runs }: { runs: RunPoint[] }) {
 }
 
 /** The monitor's charts: availability across the top, run time and requests side by side. */
-export function MonitorCharts({ runs }: { runs: RunPoint[] }) {
+/** p95 response time of each run's requests, with the monitor's limit dashed (points over it in red). */
+export function ResponseP95Chart({ runs, limit }: { runs: RunPoint[]; limit?: number }) {
+  const ordered = useMemo(() => [...runs].filter((r) => typeof r.p95Ms === 'number').slice(0, 60).reverse(), [runs]);
+  if (ordered.length < 2 && limit === undefined) return null;
+  if (!ordered.length) return null;
+  const over = limit === undefined ? 0 : ordered.filter((r) => r.p95Ms! > limit).length;
+  return (
+    <Card title="Response p95" aside={limit !== undefined ? <span>limit <b className="text-fg">{formatMs(limit)}</b>{over ? <span className="text-bad"> · {over} over</span> : ''}</span> : undefined}>
+      <PointLine
+        items={ordered}
+        value={(r) => r.p95Ms!}
+        color={(r) => (limit !== undefined ? (r.p95Ms! > limit ? 'var(--bad)' : 'var(--ok)') : statusColor(r.status))}
+        keyOf={(r) => r.runId}
+        axis={axisMs}
+        reference={limit}
+        ends={(r) => timeAgo(r.startedAt)}
+        tip={(r) => (
+          <>
+            <div className="font-medium text-fg">p95 {formatMs(r.p95Ms!)} · {timeAgo(r.startedAt)}</div>
+            {limit !== undefined && <div className={r.p95Ms! > limit ? 'text-bad' : 'text-muted'}>{r.p95Ms! > limit ? `over the ${formatMs(limit)} limit` : `within the ${formatMs(limit)} limit`}</div>}
+          </>
+        )}
+        label={`p95 response time of the last ${ordered.length} runs`}
+      />
+    </Card>
+  );
+}
+
+export function MonitorCharts({ runs, p95Limit }: { runs: RunPoint[]; p95Limit?: number }) {
   if (!runs.length) return null;
   return (
     <div className="flex flex-col gap-3">
@@ -163,6 +192,7 @@ export function MonitorCharts({ runs }: { runs: RunPoint[] }) {
       <div className={cx('grid gap-3', '@container')} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
         <RunTimeChart runs={runs} />
         <RequestsChart runs={runs} />
+        <ResponseP95Chart runs={runs} limit={p95Limit} />
       </div>
     </div>
   );
