@@ -25,6 +25,47 @@ interface Entry {
   traceId?: string;
 }
 
+const MIX = [
+  { key: 'ok', label: '2xx / OK', color: 'var(--ok)' },
+  { key: '3xx', label: '3xx', color: 'var(--accent)' },
+  { key: '4xx', label: '4xx', color: 'var(--warn)' },
+  { key: '5xx', label: '5xx', color: 'var(--bad)' },
+  { key: 'error', label: 'Errors', color: 'color-mix(in oklab, var(--bad) 55%, transparent)' },
+] as const;
+
+/** A response's outcome bucket: 2xx (and OK results), 3xx, 4xx, 5xx, or an error (transport, gRPC, tool). */
+function bucket(status: Entry['status']): (typeof MIX)[number]['key'] {
+  if (typeof status === 'number') return status < 300 ? 'ok' : status < 400 ? '3xx' : status < 500 ? '4xx' : '5xx';
+  // as the history's own Failed filter counts them (historyOk in core)
+  return status === undefined || status === '' || /^(ok|passed|success|connected|closed)$/i.test(status) ? 'ok' : 'error';
+}
+
+/** The outcomes of the entries shown, as one bar with a count per kind (hover a part for its share). */
+function StatusMix({ items }: { items: Entry[] }) {
+  if (items.length < 2) return null;
+  const counts = Object.fromEntries(MIX.map((m) => [m.key, 0])) as Record<(typeof MIX)[number]['key'], number>;
+  for (const e of items) counts[bucket(e.status)]++;
+  const shown = MIX.filter((m) => counts[m.key] > 0);
+  return (
+    <div className="px-3 pb-2" aria-label={`Outcomes of the ${items.length} entries shown: ${shown.map((m) => `${counts[m.key]} ${m.label}`).join(', ')}`} role="img">
+      <div className="flex h-2 rounded overflow-hidden gap-0.5">
+        {shown.map((m) => (
+          <span key={m.key} style={{ flex: counts[m.key], background: m.color }} title={`${m.label}: ${counts[m.key]} (${Math.round((counts[m.key] / items.length) * 100)}%)`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[0.7rem] text-muted">
+        {shown.map((m) => (
+          <span key={m.key} className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-sm" style={{ background: m.color }} />
+            {m.label} <b className="text-fg font-medium tabular-nums">{counts[m.key]}</b>
+          </span>
+        ))}
+        <span className="ml-auto">of the {items.length} loaded</span>
+      </div>
+    </div>
+  );
+}
+
 export function HistoryView() {
   const [items, setItems] = useState<Entry[]>([]);
   const [total, setTotal] = useState(0);
@@ -112,6 +153,7 @@ export function HistoryView() {
           </Button>
         </div>
         <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} {total === 1 ? 'entry' : 'entries'} · grouped by day · double-click to open · Ctrl+click another to compare</div>
+        <StatusMix items={items} />
         {items.length ? (
           <VirtualList
             className="flex-1"
