@@ -35,6 +35,8 @@ export interface MonitorData {
   webhook?: string;
   /** Fail a run whose requests' p95 response time is over this many ms (even when every check passed). */
   maxP95Ms?: number;
+  /** Fail a run when the TLS certificate of a host it calls expires in fewer than this many days. */
+  minCertDays?: number;
 }
 
 /** Whether a result changes the monitor's state (first failure, or passing again after failing). */
@@ -51,7 +53,7 @@ export function monitorStateChanged(result: MonitorResult, previous?: MonitorRes
 export async function notifyMonitorWebhook(url: string, monitor: Pick<Monitor, 'id' | 'name'>, result: MonitorResult, opts: { signal?: AbortSignal } = {}): Promise<{ ok: boolean; status?: number; error?: string }> {
   const bad = result.status !== 'passed';
   const text = bad
-    ? `🔴 Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error ?? 'error'}` : result.reason && !(result.failed + result.errors) ? 'is too slow' : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
+    ? `🔴 Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error ?? 'error'}` : result.reason && !(result.failed + result.errors) ? (result.reason.startsWith('p95') ? 'is too slow' : 'needs attention') : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
     : `🟢 Monitor "${monitor.name}" passes again (${result.passed} of ${result.total} requests)`;
   const why = bad && result.reason ? ` (${result.reason})` : '';
   try {
@@ -89,6 +91,8 @@ export interface MonitorResult {
   p50Ms?: number;
   /** 95th percentile response time of the run's requests. */
   p95Ms?: number;
+  /** Days left on the certificate that expires first among the run's HTTPS hosts (monitors with a certificate warning). */
+  certDaysLeft?: number;
   /** Why a run whose checks passed still failed (e.g. too slow). */
   reason?: string;
   /** Why the run could not run (status "error"). */
@@ -143,6 +147,7 @@ export function validateMonitor(store: WorkspaceStore, m: Pick<Monitor, 'name'> 
   if (m.environment && !store.getEnvironment(m.environment)) throw invalid(`No environment "${m.environment}"`);
   if (m.webhook && !/^https?:\/\//i.test(m.webhook.trim()) && !/^\{\{[^}]+\}\}/.test(m.webhook.trim())) throw invalid('The alert webhook must be an http(s) URL or a {{variable}}');
   if (m.maxP95Ms !== undefined && !(m.maxP95Ms > 0)) throw invalid('The response time limit must be a positive number of milliseconds');
+  if (m.minCertDays !== undefined && !(Number.isInteger(m.minCertDays) && m.minCertDays >= 1 && m.minCertDays <= 365)) throw invalid('The certificate warning must be 1 to 365 days');
 }
 
 /** Add or replace a monitor (by id). */
@@ -312,20 +317,46 @@ export async function executeMonitor(o: ExecuteMonitorOptions): Promise<MonitorR
   const p95 = summary.latency?.p95;
   // too slow: the checks passed, but the p95 response time is over the monitor's limit
   const slow = monitor.maxP95Ms !== undefined && summary.total > 0 && p95 !== undefined && p95 > monitor.maxP95Ms;
+  // the certificate of a host it calls expires sooner than the monitor allows
+  const cert = monitor.minCertDays !== undefined ? await soonestCertificate(join(store.runDir(runId), 'results.jsonl')) : undefined;
+  const certSoon = !!cert && cert.daysLeft < monitor.minCertDays!;
+  const reasons = [
+    slow ? `p95 ${Math.round(p95!)} ms is over the ${monitor.maxP95Ms} ms limit` : '',
+    certSoon ? (cert!.daysLeft < 0 ? `the certificate of ${cert!.host} has expired` : `the certificate of ${cert!.host} expires in ${cert!.daysLeft} day${cert!.daysLeft === 1 ? '' : 's'} (warning at ${monitor.minCertDays})`) : '',
+  ].filter(Boolean);
   const r: MonitorResult = {
     ...base,
     durationMs: summary.durationMs,
-    status: summary.failed || summary.errors || summary.cancelled || slow ? 'failed' : 'passed',
+    status: summary.failed || summary.errors || summary.cancelled || slow || certSoon ? 'failed' : 'passed',
     total: summary.total,
     passed: summary.passed,
     failed: summary.failed,
     errors: summary.errors,
     p50Ms: summary.latency?.p50,
     p95Ms: p95,
-    ...(slow ? { reason: `p95 ${Math.round(p95!)} ms is over the ${monitor.maxP95Ms} ms limit` } : {}),
+    ...(cert ? { certDaysLeft: cert.daysLeft } : {}),
+    ...(reasons.length ? { reason: reasons.join('; ') } : {}),
   };
   recordResult(store, r);
   return r;
+}
+
+/** The certificate that expires first among the HTTPS requests of a run (from each result's timing). */
+async function soonestCertificate(file: string): Promise<{ host: string; daysLeft: number } | undefined> {
+  let best: { host: string; daysLeft: number } | undefined;
+  for await (const r of await readResultsFile(file)) {
+    const m = r.metadata as { url?: string; timing?: { certificateDaysLeft?: number } } | undefined;
+    const d = m?.timing?.certificateDaysLeft;
+    if (d === undefined || (best && best.daysLeft <= d)) continue;
+    let host = '?';
+    try {
+      host = new URL(m!.url!).host;
+    } catch {
+      /* keep ? */
+    }
+    best = { host, daysLeft: d };
+  }
+  return best;
 }
 
 async function* readResults(file: string) {

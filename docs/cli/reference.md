@@ -367,6 +367,7 @@ testpion history test "Authentication / Basic auth" -w my-workspace     # one te
 ```bash
 testpion monitor add "API health" --collection "My API" --folder Smoke --every 15m -e Staging -w my-workspace
 testpion monitor add "API health" --collection "My API" --every 5m --max-p95 800 -w my-workspace   # also fail when p95 > 800 ms
+testpion monitor add "API health" --collection "My API" --every 1h --min-cert-days 21 -w my-workspace   # and when a certificate expires within 21 days
 testpion monitor run --due -w my-workspace      # for cron; exit 1 if a run failed
 testpion monitor uptime "API health" -w my-workspace --days 90   # uptime per day, like a status page
 testpion monitor start -w my-workspace          # keep running them until Ctrl+C

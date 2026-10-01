@@ -92,6 +92,7 @@ export function registerMonitorCommands(program: Command): void {
     .option('--bail', 'stop a run at the first failure')
     .option('--webhook <url>', 'POST an alert here when the monitor starts failing or recovers (Slack / Teams / Discord webhook or any URL; {{variables}} work)')
     .option('--max-p95 <ms>', 'fail a run whose p95 response time is over this many milliseconds (even when its checks pass)')
+    .option('--min-cert-days <days>', 'fail a run when the TLS certificate of a host it calls expires within this many days')
     .option('--paused', 'save it paused')
     .option('--json', 'print the monitor as JSON')
     .action((name: string, o) =>
@@ -112,6 +113,7 @@ export function registerMonitorCommands(program: Command): void {
           bail: o.bail || undefined,
           webhook: o.webhook || existing?.webhook,
           maxP95Ms: o.maxP95 !== undefined ? Number(o.maxP95) : existing?.maxP95Ms,
+          minCertDays: o.minCertDays !== undefined ? Number(o.minCertDays) : existing?.minCertDays,
         });
         console.log(o.json ? JSON.stringify(m, null, 2) : green(`${existing ? 'Updated' : 'Added'} monitor "${m.name}": ${collection.name}, ${m.enabled ? formatEvery(m.everyMinutes) : 'paused'}`));
       }),

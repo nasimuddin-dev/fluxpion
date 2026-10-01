@@ -26,6 +26,7 @@ interface MonitorDraft {
   webhook?: string;
   /** Fail runs whose p95 response time is over this (ms). */
   maxP95Ms?: number;
+  minCertDays?: number;
   folder?: string;
 }
 
@@ -377,6 +378,7 @@ function MonitorDetail(p: {
         <Metric label="Success rate" value={stats.uptime === undefined ? '—' : `${stats.uptime}%`} tone={stats.uptime === undefined ? undefined : stats.uptime === 100 ? 'ok' : stats.uptime >= 90 ? 'warn' : 'bad'} sub={results.length === 1 ? 'the last run' : `last ${results.length} runs`} />
         <Metric label="Median run time" value={stats.median === undefined ? '—' : formatMs(stats.median)} />
         <Metric label="Median response" value={!last?.p50Ms || !last.passed ? '—' : formatMs(last.p50Ms)} sub="last run's requests" />
+        {last?.certDaysLeft !== undefined && <Metric label="Certificate" value={last.certDaysLeft < 0 ? 'Expired' : `${last.certDaysLeft} days`} tone={last.certDaysLeft < (m.minCertDays ?? 14) ? 'bad' : last.certDaysLeft < 30 ? 'warn' : 'ok'} sub="left on the first to expire" />}
         <Metric label="Next run" value={!m.enabled ? 'Paused' : next === undefined ? '—' : next <= 0 ? 'Due now' : `in ${formatWait(next)}`} sub={m.enabled ? 'while TestPion is open' : undefined} />
       </MetricGrid>
 
@@ -593,6 +595,12 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
               The last {recentP95.length === 1 ? 'run' : `${recentP95.length} runs`} measured p95 {recentP95.length === 1 ? formatMs(recentP95[0]!) : `${formatMs(recentP95[Math.floor((recentP95.length - 1) / 2)]!)} (median), ${formatMs(recentP95[recentP95.length - 1]!)} at worst`}.
             </p>
           )}
+        </Field>
+        <Field label="Certificate warning (optional)" hint="A run fails when the TLS certificate of a host it calls expires within this many days, so you hear about it before clients do.">
+          <div className="flex items-center gap-2 max-w-xs">
+            <Input type="number" min={1} max={365} placeholder="e.g. 14" value={d.minCertDays ?? ''} onChange={(e) => setD({ ...d, minCertDays: e.target.value ? Math.min(365, Math.max(1, Math.round(Number(e.target.value)))) : undefined })} aria-label="Certificate warning in days" />
+            <span className="text-sm text-muted shrink-0">days</span>
+          </div>
         </Field>
         <Field label="Alert webhook (optional)" hint="Posted when the monitor starts failing or passes again: a Slack, Teams or Discord incoming webhook, or any URL. {{variables}} of the environment work, so the URL can be a secret.">
           <div className="flex gap-2">

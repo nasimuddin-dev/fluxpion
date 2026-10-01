@@ -14,6 +14,7 @@ export interface MonitorResult {
   errors: number;
   p50Ms?: number;
   p95Ms?: number;
+  certDaysLeft?: number;
   /** Why a run whose checks passed still failed (too slow). */
   reason?: string;
   error?: string;
