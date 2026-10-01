@@ -13,6 +13,9 @@ export interface MonitorResult {
   failed: number;
   errors: number;
   p50Ms?: number;
+  p95Ms?: number;
+  /** Why a run whose checks passed still failed (too slow). */
+  reason?: string;
   error?: string;
   trigger: 'schedule' | 'manual';
 }
@@ -27,7 +30,7 @@ export function watchMonitorAlerts(): () => void {
     const wasBad = previous ? previous.status !== 'passed' : false;
     if (bad === wasBad) return;
     const text = bad
-      ? `Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error}` : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
+      ? `Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error}` : result.reason && !(result.failed + result.errors) ? `is too slow: ${result.reason}` : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
       : `Monitor "${monitor.name}" passes again`;
     useApp.getState().toast(text, bad ? 'error' : 'success');
     if (bad && document.hidden && 'Notification' in window && Notification.permission === 'granted') new Notification('TestPion monitor', { body: text });

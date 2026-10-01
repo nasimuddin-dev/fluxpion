@@ -24,6 +24,8 @@ interface MonitorDraft {
   iterations?: number;
   bail?: boolean;
   webhook?: string;
+  /** Fail runs whose p95 response time is over this (ms). */
+  maxP95Ms?: number;
   folder?: string;
 }
 
@@ -45,7 +47,7 @@ const UNITS = [
 ] as const;
 
 const tone = (s?: MonitorResult['status']) => (s === 'passed' ? 'ok' : s ? 'bad' : 'default');
-const statusLabel = (r?: MonitorResult) => (!r ? 'Never ran' : r.status === 'passed' ? 'Passed' : r.status === 'failed' ? 'Failed' : 'Could not run');
+const statusLabel = (r?: MonitorResult) => (!r ? 'Never ran' : r.status === 'passed' ? 'Passed' : r.status === 'failed' ? (r.reason && !(r.failed + r.errors) ? 'Too slow' : 'Failed') : 'Could not run');
 
 export function MonitorsView() {
   const [rows, setRows] = useState<MonitorRow[]>([]);
@@ -371,7 +373,7 @@ function MonitorDetail(p: {
       </div>
 
       <MetricGrid compact>
-        <Metric label="Last result" value={statusLabel(last)} tone={last ? (last.status === 'passed' ? 'ok' : 'bad') : undefined} sub={last ? timeAgo(last.startedAt) : undefined} />
+        <Metric label="Last result" value={statusLabel(last)} tone={last ? (last.status === 'passed' ? 'ok' : 'bad') : undefined} sub={last ? (last.reason ?? timeAgo(last.startedAt)) : undefined} />
         <Metric label="Success rate" value={stats.uptime === undefined ? '—' : `${stats.uptime}%`} tone={stats.uptime === undefined ? undefined : stats.uptime === 100 ? 'ok' : stats.uptime >= 90 ? 'warn' : 'bad'} sub={results.length === 1 ? 'the last run' : `last ${results.length} runs`} />
         <Metric label="Median run time" value={stats.median === undefined ? '—' : formatMs(stats.median)} />
         <Metric label="Median response" value={!last?.p50Ms || !last.passed ? '—' : formatMs(last.p50Ms)} sub="last run's requests" />
@@ -403,7 +405,7 @@ function MonitorDetail(p: {
                   </td>
                   <td>
                     <Badge tone={tone(r.status)}>{statusLabel(r)}</Badge>
-                    {r.error && <span className="text-xs text-bad ml-2">{r.error}</span>}
+                    {(r.error || r.reason) && <span className="text-xs text-bad ml-2">{r.error ?? r.reason}</span>}
                   </td>
                   <td className="text-right tabular-nums">{r.total ? `${r.passed}/${r.total}` : '—'}</td>
                   <td className="text-right tabular-nums">{formatMs(r.durationMs)}</td>
@@ -571,6 +573,12 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
           <Toggle checked={d.enabled} onChange={(v) => setD({ ...d, enabled: v })} label="Enabled" />
           <Toggle checked={!!d.bail} onChange={(v) => setD({ ...d, bail: v || undefined })} label="Stop at the first failure" />
         </div>
+        <Field label="Response time limit (optional)" hint="A run fails when the p95 response time of its requests is over this, even when every check passes (and alerts like any failure).">
+          <div className="flex items-center gap-2 max-w-xs">
+            <Input type="number" min={1} placeholder="e.g. 800" value={d.maxP95Ms ?? ''} onChange={(e) => setD({ ...d, maxP95Ms: e.target.value ? Math.max(1, Number(e.target.value)) : undefined })} aria-label="p95 response time limit in milliseconds" />
+            <span className="text-sm text-muted shrink-0">ms (p95)</span>
+          </div>
+        </Field>
         <Field label="Alert webhook (optional)" hint="Posted when the monitor starts failing or passes again: a Slack, Teams or Discord incoming webhook, or any URL. {{variables}} of the environment work, so the URL can be a secret.">
           <div className="flex gap-2">
             <Input className="mono flex-1" placeholder="https://hooks.slack.com/services/…  or  {{alertWebhook}}" value={d.webhook ?? ''} onChange={(e) => setD({ ...d, webhook: e.target.value || undefined })} aria-label="Alert webhook" />

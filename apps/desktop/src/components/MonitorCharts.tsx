@@ -14,6 +14,7 @@ export interface RunPoint {
   failed: number;
   errors: number;
   p50Ms?: number;
+  reason?: string;
 }
 
 const STATUS_LABEL = { passed: 'Passed', failed: 'Failed', error: 'Could not run' } as const;
@@ -40,6 +41,7 @@ function TipBody({ r }: { r: RunPoint }) {
         {formatMs(r.durationMs)}
         {r.p50Ms !== undefined ? ` · median response ${formatMs(r.p50Ms)}` : ''}
       </div>
+      {r.reason && <div className="text-bad">{r.reason}</div>}
       <div className="text-muted">{new Date(r.startedAt).toLocaleString()}</div>
     </>
   );

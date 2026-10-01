@@ -33,6 +33,8 @@ export interface MonitorData {
    * URL (POST JSON with `text`, `content` and the details). May be a {{variable}} of the environment.
    */
   webhook?: string;
+  /** Fail a run whose requests' p95 response time is over this many ms (even when every check passed). */
+  maxP95Ms?: number;
 }
 
 /** Whether a result changes the monitor's state (first failure, or passing again after failing). */
@@ -49,15 +51,16 @@ export function monitorStateChanged(result: MonitorResult, previous?: MonitorRes
 export async function notifyMonitorWebhook(url: string, monitor: Pick<Monitor, 'id' | 'name'>, result: MonitorResult, opts: { signal?: AbortSignal } = {}): Promise<{ ok: boolean; status?: number; error?: string }> {
   const bad = result.status !== 'passed';
   const text = bad
-    ? `🔴 Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error ?? 'error'}` : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
+    ? `🔴 Monitor "${monitor.name}" ${result.status === 'error' ? `could not run: ${result.error ?? 'error'}` : result.reason && !(result.failed + result.errors) ? 'is too slow' : `failed: ${result.failed + result.errors} of ${result.total} requests`}`
     : `🟢 Monitor "${monitor.name}" passes again (${result.passed} of ${result.total} requests)`;
+  const why = bad && result.reason ? ` (${result.reason})` : '';
   try {
     if (!/^https?:\/\//i.test(url)) throw new Error('the webhook must be an http(s) URL');
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       // Slack and Teams show `text`, Discord shows `content`; the rest is for any other receiver
-      body: JSON.stringify({ text, content: text, monitor: { id: monitor.id, name: monitor.name }, status: result.status, total: result.total, passed: result.passed, failed: result.failed, errors: result.errors, p50Ms: result.p50Ms, startedAt: result.startedAt, runId: result.runId, error: result.error }),
+      body: JSON.stringify({ text: text + why, content: text + why, reason: result.reason, p95Ms: result.p95Ms, monitor: { id: monitor.id, name: monitor.name }, status: result.status, total: result.total, passed: result.passed, failed: result.failed, errors: result.errors, p50Ms: result.p50Ms, startedAt: result.startedAt, runId: result.runId, error: result.error }),
       signal: opts.signal ?? AbortSignal.timeout(15_000),
     });
     return { ok: res.ok, status: res.status };
@@ -84,6 +87,10 @@ export interface MonitorResult {
   errors: number;
   /** Median response time of the run's requests. */
   p50Ms?: number;
+  /** 95th percentile response time of the run's requests. */
+  p95Ms?: number;
+  /** Why a run whose checks passed still failed (e.g. too slow). */
+  reason?: string;
   /** Why the run could not run (status "error"). */
   error?: string;
   /** What started it. */
@@ -135,6 +142,7 @@ export function validateMonitor(store: WorkspaceStore, m: Pick<Monitor, 'name'> 
   if (!collectionRequests(collection, m.selection).length && !collectionRealtimeTests(store, collection, m.selection).length) throw invalid(`Nothing to run: the selection has no requests in "${collection.name}"`);
   if (m.environment && !store.getEnvironment(m.environment)) throw invalid(`No environment "${m.environment}"`);
   if (m.webhook && !/^https?:\/\//i.test(m.webhook.trim()) && !/^\{\{[^}]+\}\}/.test(m.webhook.trim())) throw invalid('The alert webhook must be an http(s) URL or a {{variable}}');
+  if (m.maxP95Ms !== undefined && !(m.maxP95Ms > 0)) throw invalid('The response time limit must be a positive number of milliseconds');
 }
 
 /** Add or replace a monitor (by id). */
@@ -263,15 +271,20 @@ export async function executeMonitor(o: ExecuteMonitorOptions): Promise<MonitorR
     recordResult(store, r);
     return r;
   }
+  const p95 = summary.latency?.p95;
+  // too slow: the checks passed, but the p95 response time is over the monitor's limit
+  const slow = monitor.maxP95Ms !== undefined && summary.total > 0 && p95 !== undefined && p95 > monitor.maxP95Ms;
   const r: MonitorResult = {
     ...base,
     durationMs: summary.durationMs,
-    status: summary.failed || summary.errors || summary.cancelled ? 'failed' : 'passed',
+    status: summary.failed || summary.errors || summary.cancelled || slow ? 'failed' : 'passed',
     total: summary.total,
     passed: summary.passed,
     failed: summary.failed,
     errors: summary.errors,
     p50Ms: summary.latency?.p50,
+    p95Ms: p95,
+    ...(slow ? { reason: `p95 ${Math.round(p95!)} ms is over the ${monitor.maxP95Ms} ms limit` } : {}),
   };
   recordResult(store, r);
   return r;

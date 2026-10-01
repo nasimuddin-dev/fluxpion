@@ -119,6 +119,18 @@ describe('monitors in a workspace', () => {
     expect(readFileSync(join(store.runDir(ok.runId), 'report.html'), 'utf8')).toContain('Monitor · Health check');
   });
 
+  it('fails a run that is slower than its p95 limit, with the reason, even when every check passed', async () => {
+    healthy = true;
+    const slow = await executeMonitor({ store, monitor: { ...monitor, id: 'mon-slow', maxP95Ms: 0.001 }, context });
+    expect(slow).toMatchObject({ status: 'failed', passed: 1, failed: 0 });
+    expect(slow.p95Ms).toBeGreaterThan(0);
+    expect(slow.reason).toMatch(/^p95 \d+ ms is over the 0.001 ms limit$/);
+    const fine = await executeMonitor({ store, monitor: { ...monitor, id: 'mon-fast', maxP95Ms: 60_000 }, context });
+    expect(fine.status).toBe('passed');
+    expect(fine.reason).toBeUndefined();
+    expect(() => saveMonitor(store, { ...monitor, id: 'mon-bad-limit', maxP95Ms: -1 })).toThrow(/positive number/);
+  });
+
   it('records a run that cannot start as an error instead of throwing', async () => {
     const r = await executeMonitor({ store, monitor: { ...monitor, id: 'mon-broken', collectionId: 'gone' }, context });
     expect(r.status).toBe('error');

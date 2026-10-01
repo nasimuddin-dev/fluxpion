@@ -40,7 +40,7 @@ function withStore<T>(workspace: string, fn: (store: WorkspaceStore) => T): T {
 }
 
 const statusText = (r?: MonitorResult) =>
-  !r ? dim('never ran') : r.status === 'passed' ? green(`passed ${r.passed}/${r.total}`) : r.status === 'failed' ? red(`failed ${r.failed + r.errors}/${r.total}`) : red(`error: ${r.error}`);
+  !r ? dim('never ran') : r.status === 'passed' ? green(`passed ${r.passed}/${r.total}`) : r.status === 'failed' ? red(r.reason && !(r.failed + r.errors) ? `too slow: ${r.reason}` : `failed ${r.failed + r.errors}/${r.total}`) : red(`error: ${r.error}`);
 
 function runner(store: WorkspaceStore) {
   const mgr = new WorkspaceManager();
@@ -90,6 +90,7 @@ export function registerMonitorCommands(program: Command): void {
     .option('-n, --iteration-count <n>', 'iterations per run')
     .option('--bail', 'stop a run at the first failure')
     .option('--webhook <url>', 'POST an alert here when the monitor starts failing or recovers (Slack / Teams / Discord webhook or any URL; {{variables}} work)')
+    .option('--max-p95 <ms>', 'fail a run whose p95 response time is over this many milliseconds (even when its checks pass)')
     .option('--paused', 'save it paused')
     .option('--json', 'print the monitor as JSON')
     .action((name: string, o) =>
@@ -109,6 +110,7 @@ export function registerMonitorCommands(program: Command): void {
           iterations: o.iterationCount ? Number(o.iterationCount) : undefined,
           bail: o.bail || undefined,
           webhook: o.webhook || existing?.webhook,
+          maxP95Ms: o.maxP95 !== undefined ? Number(o.maxP95) : existing?.maxP95Ms,
         });
         console.log(o.json ? JSON.stringify(m, null, 2) : green(`${existing ? 'Updated' : 'Added'} monitor "${m.name}": ${collection.name}, ${m.enabled ? formatEvery(m.everyMinutes) : 'paused'}`));
       }),
