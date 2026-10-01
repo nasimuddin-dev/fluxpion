@@ -1,5 +1,5 @@
 import { Activity as ActivityIcon, AlarmClock, BookOpen, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { call, modKey } from '../api';
 import { promptText, useApp } from '../store';
 import { runMenuCommand } from '../menu-commands';
@@ -99,7 +99,10 @@ export function HomeView() {
       return 14;
     }
   });
-  const loadActivity = (n = days) => void call<Activity>('stats.activity', { days: n, tzOffsetMin: new Date().getTimezoneOffset() }).then(setActivity, () => setActivity(undefined));
+  // the reload on returning to Home runs from a subscription made once: read the period from a ref
+  const daysRef = useRef(days);
+  daysRef.current = days;
+  const loadActivity = (n = daysRef.current) => void call<Activity>('stats.activity', { days: n, tzOffsetMin: new Date().getTimezoneOffset() }).then(setActivity, () => setActivity(undefined));
   const pickDays = (n: number) => {
     setDays(n);
     loadActivity(n);
