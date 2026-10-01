@@ -19,6 +19,7 @@ import { FolderList, type FolderListOps } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
 import { closeTabsFor, useSingleEditorTab } from '../components/EditorTabs';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
+import { McpUsage } from '../components/McpUsage';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
 
 interface Tool {
@@ -52,7 +53,7 @@ interface McpEvent {
   metadata?: Record<string, unknown>;
 }
 
-type Tab = 'tools' | 'resources' | 'prompts' | 'trace' | 'info' | 'settings';
+type Tab = 'tools' | 'resources' | 'prompts' | 'usage' | 'trace' | 'info' | 'settings';
 
 /** Merge event lists by id — the connect snapshot and the live stream overlap. */
 function mergeEvents(a: McpEvent[], b: McpEvent[]): McpEvent[] {
@@ -342,15 +343,18 @@ export function McpView() {
                 { id: 'tools', label: 'Tools', badge: disc?.tools.length },
                 { id: 'resources', label: 'Resources', badge: disc ? disc.resources.length + disc.resourceTemplates.length : undefined },
                 { id: 'prompts', label: 'Prompts', badge: disc?.prompts.length },
+                ...(draft ? [] : [{ id: 'usage' as const, label: 'Usage' }]),
                 { id: 'trace', label: 'Protocol trace', badge: draft ? undefined : events[current.id]?.length },
                 { id: 'info', label: 'Server info' },
                 { id: 'settings', label: 'Settings' },
               ]}
             />
             <div className="flex-1 min-h-0">
-              {connError && tab !== 'trace' && tab !== 'settings' && <ErrorPanel error={connError} context={{ server }} />}
+              {connError && tab !== 'trace' && tab !== 'settings' && tab !== 'usage' && <ErrorPanel error={connError} context={{ server }} />}
               {tab === 'settings' ? (
                 <ServerSettings s={form} onChange={setForm} folders={folders} />
+              ) : tab === 'usage' ? (
+                <McpUsage serverId={current.id} />
               ) : tab === 'trace' ? (
                 <McpTrace events={draft ? [] : events[current.id] ?? []} error={connError} />
               ) : !disc ? (

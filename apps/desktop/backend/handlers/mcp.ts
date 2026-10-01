@@ -13,6 +13,7 @@ import {
   mockFromDiscovery,
   type CheckConfig,
   type McpServerConfig,
+  mcpToolUsage,
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
@@ -58,6 +59,8 @@ export function mcpHandlers(be: Backend): Handlers {
     /** Draft a reply to a sampling request with the AI assistant's model (the user reviews it before it is sent). */
     'mcp.sampleDraft': async ({ params, environment }: { params: { systemPrompt?: string; maxTokens?: number; messages: Array<{ role: 'user' | 'assistant'; content: { type: string; text?: string } }> }; environment?: string }) =>
       be.sampleWithAssistant(params, environment),
+    // calls, failures and times per tool of a server, from the history
+    'mcp.toolUsage': ({ serverId }: { serverId?: string }) => mcpToolUsage(be.ws, { serverId }),
     'mcp.servers': () => be.ws.getMcpServers().map((s) => ({ ...s, connected: !!be.mcpSessions.get(s.id)?.connected })),
     'mcp.saveServers': ({ servers }: { servers: McpServerConfig[] }) => {
       be.ws.saveMcpServers(servers);

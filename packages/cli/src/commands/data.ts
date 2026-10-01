@@ -55,6 +55,7 @@ import {
   deleteRunsBefore,
   listCertificates,
   certificateLint,
+  mcpToolUsage,
   testHistory,
   summarizeTestHistory,
 } from '@testpion/core';
@@ -736,6 +737,25 @@ export function registerDataCommands(program: Command): void {
         console.log('  ' + [...points].reverse().map((p) => (p.status === 'passed' ? green('█') : p.status === 'skipped' ? dim('·') : red('█'))).join('') + dim('  oldest → newest'));
         for (const p of points)
           console.log(`  ${p.startedAt.slice(0, 16).replace('T', ' ')}  ${p.status === 'passed' ? green('passed') : p.status === 'skipped' ? dim('skipped') : red(p.status)}  ${dim(`${p.latencyMs !== undefined ? formatDuration(p.latencyMs) : ''} · ${p.runName}${p.environment ? ` · ${p.environment}` : ''}`)}${p.failures.length ? red(`  ${p.failures.join('; ')}`) : ''}`);
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
+    .command('mcp-tools')
+    .description('MCP tool calls made in the app, per tool: calls, failures, median and p95 time, last used')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-s, --server <name>', 'only this MCP server')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace: string; server?: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const rows = mcpToolUsage(store).filter((u) => !o.server || u.server.toLowerCase() === o.server.toLowerCase() || u.serverId === o.server);
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        if (!rows.length) return console.log(dim('No MCP tool calls in the history.'));
+        const w = Math.min(48, Math.max(...rows.map((r) => `${r.server} · ${r.tool}`.length)));
+        for (const r of rows)
+          console.log(`${`${r.server} · ${r.tool}`.slice(0, w).padEnd(w)}  ${String(r.calls).padStart(5)} calls  ${r.failed ? red(`${r.failed} failed`.padEnd(10)) : dim('0 failed'.padEnd(10))}  ${dim(`median ${r.medianMs ?? '-'} ms · p95 ${r.p95Ms ?? '-'} ms`)}`);
       } finally {
         store.close();
       }

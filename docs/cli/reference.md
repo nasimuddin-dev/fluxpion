@@ -358,6 +358,7 @@ testpion history stats -w my-workspace --request "List patients" --json  # media
 testpion history diff h-abc h-def -w my-workspace --json                  # older id first
 testpion history activity -w my-workspace --days 30 --json              # per-day requests, failures, runs
 testpion history test "Authentication / Basic auth" -w my-workspace     # one test across the latest runs; flags flaky ones
+testpion history mcp-tools -w my-workspace --server weather            # MCP tool calls per tool: count, failures, median / p95
 ```
 
 `history list` shows recent responses of requests sent in the app (`--collection`, `--request`, `--failed`, `-n/--limit`). `history stats` summarises the response times of a request's recent responses (`-n/--limit`, default 50): count, failed (no status or 400+), fastest, mean, median, p95 and slowest. `history diff` compares two of them: the status, timing, header changes (volatile ones such as `date` are flagged) and a field-by-field JSON body diff, or a line diff for text. Values of sensitive fields and headers are masked. `history activity` is the Home dashboard as data: per local day, requests sent and how many failed (4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors), the median response time, test runs and failed tests; plus requests per type and the slowest requests on average (`-d/--days`, default 14, up to 90).

@@ -7,6 +7,8 @@ description: "Use the MCP protocol trace to inspect requests, responses, notific
 
 # Debugging
 
+The **Usage** tab shows how the server's tools have been called from the app: calls and failures per tool as bars, with the median and p95 time and when each was last used (also `testpion history mcp-tools` and the `mcp_tool_usage` MCP tool).
+
 The **Protocol trace** records every event with:
 
 - timestamp and direction (outgoing, incoming, local lifecycle)

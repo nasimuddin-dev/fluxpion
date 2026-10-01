@@ -18,6 +18,7 @@ import { Redactor } from '../util/redact.js';
 import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { listCertificates, recordCertificate } from '../storage/certificates.js';
+import { mcpToolUsage } from '../storage/mcp-usage.js';
 import type { SecretStore } from '../storage/secrets.js';
 import { createEngineContext } from '../engine.js';
 import { executeHttp, timingSummary } from '../protocols/http/client.js';
@@ -830,6 +831,17 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       description: 'TLS certificates of the HTTPS hosts this workspace has called (from the app, test runs, monitors and agents), soonest to expire first: host, subject, issuer, valid until, days left and when last seen. Use it to find certificates that expire soon.',
       inputSchema: { type: 'object', properties: { withinDays: { type: 'number', description: 'Only those that expire within this many days' } } },
       run: (a) => listCertificates(store).filter((c) => a.withinDays === undefined || (c.daysLeft !== undefined && c.daysLeft <= Number(a.withinDays))),
+    },
+    {
+      name: 'mcp_tool_usage',
+      description: "How the tools of the workspace's MCP servers have been called from the TestPion app, most called first: server, tool, calls, failed (isError or no result), median and p95 time, last used. Use it to see which tools are used, slow or failing.",
+      inputSchema: { type: 'object', properties: { server: str('Only this MCP server (name or id)') } },
+      run: (a) => {
+        const all = mcpToolUsage(store);
+        if (!a.server) return all;
+        const q = String(a.server).toLowerCase();
+        return all.filter((u) => u.serverId === a.server || u.server.toLowerCase() === q);
+      },
     },
     {
       name: 'list_monitors',
