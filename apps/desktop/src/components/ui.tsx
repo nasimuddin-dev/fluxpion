@@ -489,7 +489,7 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
 
 /** An even grid of Metric cards (equal widths, wraps cleanly) instead of ragged flex rows. */
 export function MetricGrid({ children, className, compact }: { children: ReactNode; className?: string; compact?: boolean }) {
-  return <div className={cx('grid gap-2', compact ? 'grid-cols-[repeat(auto-fill,minmax(118px,1fr))] [&>div]:px-3 [&>div]:py-2 [&>div>div:nth-child(2)]:text-base' : 'grid-cols-[repeat(auto-fill,minmax(150px,1fr))]', className)}>{children}</div>;
+  return <div className={cx('grid gap-2', compact ? 'grid-cols-[repeat(auto-fit,minmax(118px,1fr))] [&>div]:px-3 [&>div]:py-2 [&>div>div:nth-child(2)]:text-base' : 'grid-cols-[repeat(auto-fit,minmax(150px,1fr))]', className)}>{children}</div>;
 }
 
 export function Metric({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: 'ok' | 'bad' | 'warn'; sub?: ReactNode }) {
