@@ -4,7 +4,8 @@ import { useApp } from '../store';
 import { formatMs, plural, timeAgo } from '../lib/format';
 import { axisMs, ChartCard, PointLine, Swatch } from './charts';
 import { StatusIcon } from './Results';
-import { Empty, Spinner } from './ui';
+import { Sparkles } from 'lucide-react';
+import { Button, Empty, Spinner } from './ui';
 
 /** From `runs.testHistory` (testHistory in core). */
 interface Point {
@@ -53,6 +54,26 @@ export function TestHistory({ id, name, runId }: { id: string; name: string; run
         {flips > 1 && <span className="text-warn"> · the result flipped {flips} times: flaky?</span>}
         <span className="text-muted"> · {name}</span>
       </div>
+      {(flips > 0 || passed < counted.length) && (
+        <div>
+          <Button
+            size="sm"
+            icon={<Sparkles size={12} />}
+            title="Ask the AI assistant whether this test is flaky or broken, and why (statuses, times and failed check names are sent)"
+            onClick={() =>
+              useApp.getState().set({
+                assistant: {
+                  task: 'explain-test-history',
+                  title: `History of "${name}"`,
+                  context: { test: name, summary: { runs: counted.length, passed, failed: counted.length - passed, flips, medianMs: median }, runs: points.map((p) => ({ when: p.startedAt, status: p.status, latencyMs: p.latencyMs, attempts: p.attempts, environment: p.environment, failedChecks: p.failures })) },
+                },
+              })
+            }
+          >
+            Explain with AI
+          </Button>
+        </div>
+      )}
       {timed.length > 1 && (
         <ChartCard
           title="Time per run"

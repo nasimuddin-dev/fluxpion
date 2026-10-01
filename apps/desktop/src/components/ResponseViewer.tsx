@@ -11,6 +11,7 @@ import { JsonTree, RawView, type TreeAssertion, type TreeVariable } from './Json
 import { TraceView } from './TraceView';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
+import { useApp } from '../store';
 import { JsonTable, tableRowsOf } from './JsonTable';
 
 type Tab = 'body' | 'events' | 'headers' | 'cookies' | 'timeline' | 'tests' | 'trace' | 'code' | 'stream' | 'history';
@@ -321,9 +322,27 @@ function Timeline({ phases, url, connection }: { phases: Array<{ name: string; s
           <span className="text-right tabular-nums">{formatMs(p.durationMs)}</span>
         </div>
       ))}
-      <p className="text-xs text-muted mt-2 flex items-center gap-1">
-        <ExternalLink size={11} /> Full span details are available in the Trace tab.
-      </p>
+      <div className="mt-2 flex items-center gap-3 flex-wrap">
+        <Button
+          size="sm"
+          icon={<Sparkles size={12} />}
+          title="Ask the AI assistant where the time went and what to try (the URL, phases, connection and certificate are sent; no bodies or headers)"
+          onClick={() =>
+            useApp.getState().set({
+              assistant: {
+                task: 'explain-timing',
+                title: 'Where the time went',
+                context: { url, phases, connection: connection && { ...connection, certificate: connection.certificate && { subject: connection.certificate.subject, issuer: connection.certificate.issuer, validTo: connection.certificate.validTo, daysLeft: connection.certificate.daysLeft } } },
+              },
+            })
+          }
+        >
+          Explain with AI
+        </Button>
+        <p className="text-xs text-muted flex items-center gap-1">
+          <ExternalLink size={11} /> Full span details are available in the Trace tab.
+        </p>
+      </div>
     </div>
   );
 }
