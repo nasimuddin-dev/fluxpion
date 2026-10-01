@@ -6,7 +6,7 @@ import { asError, call, on } from '../api';
 import type { MonitorResult } from '../lib/monitor-alerts';
 import { useIntent } from '../hooks';
 import { confirmAction, useApp } from '../store';
-import type { Collection, CollectionNode } from '../types';
+import type { Collection, CollectionNode, Library } from '../types';
 import { formatMs, timeAgo } from '../lib/format';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, MetricGrid, Modal, Select, Split, Toggle, Tooltip } from '../components/ui';
 
@@ -384,6 +384,21 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
     if (!d.collectionId && collections[0]) setD((x) => ({ ...x, collectionId: collections[0]!.id }));
   }, [collections, d.collectionId]);
   const col = collections.find((c) => c.id === d.collectionId);
+  const [realtime, setRealtime] = useState<Array<{ id: string; label: string; depth: number; folder: boolean }>>([]);
+  useEffect(() => {
+    let live = true;
+    void Promise.all(
+      (['grpc', 'websocket'] as const).map((kind) =>
+        call<Library<unknown>>('lib.get', { kind }).then(
+          (lib) => lib.items.filter((i) => i.collectionId === d.collectionId).map((i) => ({ id: i.id, label: `${kind === 'grpc' ? 'gRPC' : 'WebSocket'} · ${i.name}`, depth: 0, folder: false })),
+          () => [],
+        ),
+      ),
+    ).then((lists) => live && setRealtime(lists.flat()));
+    return () => {
+      live = false;
+    };
+  }, [d.collectionId]);
   const folders = useMemo(() => {
     const out: Array<{ id: string; label: string; depth: number; folder: boolean }> = [];
     const walk = (nodes: CollectionNode[], depth: number) =>
@@ -392,8 +407,10 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
         if (n.kind === 'folder') walk(n.items, depth + 1);
       });
     if (col) walk(col.items, 0);
+    // then its gRPC calls and connections, which a monitor runs too
+    for (const r of realtime) out.push(r);
     return out;
-  }, [col]);
+  }, [col, realtime]);
   const minutes = Math.round(Number(every) * (UNITS.find((u) => u.id === unit)?.f ?? 1));
   const submit = async () => {
     setError(undefined);
