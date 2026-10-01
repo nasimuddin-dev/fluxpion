@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.16.1 — 2026-09-30
+
+A security and performance review of the code; these are its fixes.
+
+- **Security**
+  - **Saving a response body** (`http.saveBody`) checked its path with a plain prefix test, which `payloads/../…` passed: any file could be read through it. The path is now resolved and must be inside the workspace's `payloads/` folder.
+  - **Run ids** (`runs.summary`, reports, re-running failed tests, the `run_*` MCP tools) were joined into a path unchecked; an id like `../..` is now refused.
+  - **Show in folder** (`app.openPath`) opened any path it was given, and opening a program runs it. It now opens folders of known workspaces only.
+  - **MCP mock files** had to be "inside the workspace" by a prefix test that a sibling folder (`workspace-other/`) passed; fixed.
+  - **Bruno export** of a collection named `..` wrote one folder above the chosen one; the folder name is now sanitised.
+  - **RPC**: only the backend's own methods can be called (`constructor`, `toString` … are refused), and the desktop app answers calls from its own page's top frame only, never an embedded frame.
+  - **Content security policy**: the packaged app no longer allows connections to the development servers (`localhost:5173`, `127.0.0.1:5174`).
+  - **Clear history really clears**: deleting or clearing history now deletes the saved response bodies too (they stayed on disk).
+- **Performance and growth**
+  - **Disk use is bounded**: when history (20,000 entries) and traces (50,000) are trimmed, their files (response bodies, trace JSON) are deleted with them; before, only the index rows went and the files accumulated for ever.
+  - **Faster runs**: trimming ran a full scan after every single history entry and trace; it now runs once per 200 inserts, with prepared statements reused.
+  - **Typing stays fast with many tabs**: editor drafts were serialised and written to storage on every keystroke (all open REST tabs each time); they are now written 0.4 s after the last change, and when the window is hidden or closed.
+  - **Sidebar**: a burst of saves (an import, a run) reloads the lists once instead of once per save.
+
 ## 0.16.0 — 2026-09-30
 
 Highlights: click a `{{variable}}` to see, copy, edit or add its value; a faster, leaner editor after a refactoring pass.
