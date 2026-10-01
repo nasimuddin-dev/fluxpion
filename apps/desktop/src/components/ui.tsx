@@ -192,10 +192,13 @@ export function ModalOrPanel({ inline, title, onClose, width, footer, children }
       </Modal>
     );
   return (
-    <div className="h-full overflow-auto">
-      <div className="p-4 flex flex-col gap-3 max-w-6xl">
-        {footer && <div className="flex flex-wrap items-center justify-end gap-2">{footer}</div>}
-        {children}
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-line shrink-0">
+        <h2 className="font-semibold text-base mr-auto">{title}</h2>
+        {footer}
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        <div className="p-4 flex flex-col gap-3 max-w-3xl">{children}</div>
       </div>
     </div>
   );

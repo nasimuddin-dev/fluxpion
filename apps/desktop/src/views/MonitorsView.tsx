@@ -8,7 +8,7 @@ import { useIntent } from '../hooks';
 import { confirmAction, useApp } from '../store';
 import type { Collection, CollectionNode, Library } from '../types';
 import { formatMs, timeAgo } from '../lib/format';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, MetricGrid, Modal, Select, Split, Toggle, Tooltip } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, MetricGrid, ModalOrPanel, Select, Split, Toggle, Tooltip } from '../components/ui';
 
 interface MonitorDraft {
   id?: string;
@@ -193,7 +193,10 @@ export function MonitorsView() {
         ]}
       />
       <div className="h-full min-h-0 overflow-auto">
-        {current ? (
+        {/* a monitor is created and edited here, like any item in its editor, not in a dialog */}
+        {editing ? (
+          <MonitorEditor key={editing.id ?? 'new'} draft={editing} collections={collections} onCancel={() => setEditing(undefined)} onSave={save} />
+        ) : current ? (
           <MonitorDetail
             m={current}
             results={results}
@@ -223,7 +226,6 @@ export function MonitorsView() {
             </Empty>
           ))
         )}
-        {editing && <MonitorEditor draft={editing} collections={collections} onCancel={() => setEditing(undefined)} onSave={save} />}
       </div>
     </Split>
   );
@@ -427,8 +429,9 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
   };
   const sel = new Set(d.selection ?? []);
   return (
-    <Modal
-      title={draft.id ? 'Edit monitor' : 'New monitor'}
+    <ModalOrPanel
+      inline
+      title={draft.id ? `Edit monitor · ${draft.name}` : 'New monitor'}
       onClose={onCancel}
       width={560}
       footer={
@@ -520,6 +523,6 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
           </div>
         </Field>
       </div>
-    </Modal>
+    </ModalOrPanel>
   );
 }
