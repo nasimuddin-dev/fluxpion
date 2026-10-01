@@ -1,5 +1,6 @@
-import { AlarmClock, Folder, KeyRound, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { AlarmClock, ExternalLink, Folder, KeyRound, ListX, Pause, Pencil, Play, Plus, SquareX, Trash2, X } from 'lucide-react';
 import { SidebarShell } from '../components/SidebarShell';
+import { MonitorCharts } from '../components/MonitorCharts';
 import { FolderList, type FolderListOps } from '../components/FolderList';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -9,7 +10,7 @@ import { useIntent } from '../hooks';
 import { confirmAction, useApp } from '../store';
 import type { Collection, CollectionNode, Library } from '../types';
 import { formatMs, timeAgo } from '../lib/format';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, MetricGrid, ModalOrPanel, Select, Split, Toggle, Tooltip } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, IconButton, Input, Metric, Menu, MetricGrid, ModalOrPanel, Select, Split, Toggle, Tooltip } from '../components/ui';
 
 interface MonitorDraft {
   id?: string;
@@ -47,10 +48,40 @@ export function MonitorsView() {
   const [rows, setRows] = useState<MonitorRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [sel, setSel] = useState<string>();
-  const [results, setResults] = useState<MonitorResult[]>([]);
+  const [resultsById, setResultsById] = useState<Record<string, MonitorResult[]>>({});
   const [collections, setCollections] = useState<Collection[]>([]);
   const [editing, setEditing] = useState<MonitorDraft>();
-  const [busy, setBusy] = useState<string>();
+  const [busy, setBusy] = useState<string[]>([]);
+  // monitors open in tabs, like requests (several can be open and running at once); remembered
+  const [openIds, setOpenIds] = useState<string[]>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('aps.monitorTabs') ?? '[]');
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('aps.monitorTabs', JSON.stringify(openIds));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [openIds]);
+  /** Open a monitor in its tab (or bring its tab forward). */
+  const openTab = (id: string) => {
+    setEditing(undefined);
+    setOpenIds((ids) => (ids.includes(id) ? ids : [...ids, id]));
+    setSel(id);
+  };
+  const closeTabs = (ids: string[]) => {
+    const rest = openIds.filter((x) => !ids.includes(x));
+    setOpenIds(rest);
+    if (sel && ids.includes(sel)) {
+      const i = openIds.indexOf(sel);
+      setSel(rest[Math.min(i, rest.length - 1)]);
+    }
+  };
   const toast = useApp((s) => s.toast);
 
   // folders of the list (empty ones included) live in the workspace library "monitors"
@@ -61,9 +92,15 @@ export function MonitorsView() {
     setFolders(lib.folders);
     setCollections(cols);
     setLoaded(true);
+    // deleted monitors leave their tabs
+    setOpenIds((ids) => ids.filter((id) => list.some((m) => m.id === id)));
     setSel((s) => (s && list.some((m) => m.id === s) ? s : list[0]?.id));
   }, []);
-  const loadResults = useCallback(async (id?: string) => setResults(id ? await call<MonitorResult[]>('monitor.results', { id, limit: 100 }) : []), []);
+  const loadResults = useCallback(async (id?: string) => {
+    if (!id) return;
+    const list = await call<MonitorResult[]>('monitor.results', { id, limit: 100 });
+    setResultsById((r) => ({ ...r, [id]: list }));
+  }, []);
 
   useEffect(() => void load(), [load]);
   // monitors saved elsewhere (the sidebar, the CLI, an AI agent through MCP) show up here
@@ -73,11 +110,17 @@ export function MonitorsView() {
   useEffect(() => {
     const offResult = on<{ result: MonitorResult }>('monitor.result', ({ result }) => {
       void load();
-      if (result.monitorId === sel) void loadResults(sel);
+      // every open tab keeps its runs up to date, not only the one on screen
+      if (openIds.includes(result.monitorId) || result.monitorId === sel) void loadResults(result.monitorId);
     });
     const offStart = on('monitor.started', () => void load());
     return () => (offResult(), offStart());
-  }, [load, loadResults, sel]);
+  }, [load, loadResults, sel, openIds]);
+  // the monitor on screen always has a tab
+  useEffect(() => {
+    if (sel && !openIds.includes(sel)) setOpenIds((ids) => (ids.includes(sel) ? ids : [...ids, sel]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel]);
   // "next run in …" stays current
   const [, tick] = useState(0);
   useEffect(() => {
@@ -88,7 +131,7 @@ export function MonitorsView() {
   useIntent(
     'monitors',
     (p?: { create?: { collectionId: string; selection?: string[] }; monitorId?: string }) => {
-      if (p?.monitorId) setSel(p.monitorId);
+      if (p?.monitorId) openTab(p.monitorId);
       if (p?.create) setEditing({ name: '', collectionId: p.create.collectionId, selection: p.create.selection, everyMinutes: 15, enabled: true, environment: useApp.getState().environment });
     },
     'monitors',
@@ -98,14 +141,14 @@ export function MonitorsView() {
   const colName = (id: string) => collections.find((c) => c.id === id)?.name ?? 'missing collection';
 
   const run = async (m: MonitorRow) => {
-    setBusy(m.id);
+    setBusy((b) => [...b, m.id]);
     try {
       const r = await call<MonitorResult>('monitor.run', { id: m.id });
       toast(`${m.name}: ${statusLabel(r).toLowerCase()} (${r.passed}/${r.total})`, r.status === 'passed' ? 'success' : 'error');
     } catch (e) {
       toast(asError(e).message, 'error');
     } finally {
-      setBusy(undefined);
+      setBusy((b) => b.filter((x) => x !== m.id));
       await load();
       await loadResults(m.id);
     }
@@ -183,10 +226,7 @@ export function MonitorsView() {
                 addLabel={collections.length ? 'New monitor' : 'Create a collection first'}
                 folders={folders}
                 selected={editing ? undefined : sel}
-                onSelect={(id) => {
-                  setEditing(undefined);
-                  setSel(id);
-                }}
+                onSelect={openTab}
                 onAdd={(folder) => collections.length && setEditing({ ...newDraft(), ...(folder ? { folder } : {}) })}
                 items={rows.map((m) => ({
                   id: m.id,
@@ -199,8 +239,9 @@ export function MonitorsView() {
                 itemMenu={(id) => {
                   const m = rows.find((x) => x.id === id)!;
                   return [
-                    { label: 'Edit', icon: <Pencil size={14} />, onSelect: () => (setSel(id), setEditing(m)) },
-                    { label: 'Run now', icon: <Play size={14} />, disabled: busy === id || m.running, onSelect: () => void run(m) },
+                    { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => openTab(id) },
+                    { label: 'Edit', icon: <Pencil size={14} />, onSelect: () => (openTab(id), setEditing(m)) },
+                    { label: 'Run now', icon: <Play size={14} />, disabled: busy.includes(id) || m.running, onSelect: () => void run(m) },
                     { label: m.enabled ? 'Pause' : 'Resume', icon: <AlarmClock size={14} />, onSelect: () => void toggle(m) },
                   ];
                 }}
@@ -216,17 +257,31 @@ export function MonitorsView() {
           { id: 'environments', label: 'Environments', icon: <KeyRound size={13} />, render: () => <EnvironmentsPane /> },
         ]}
       />
-      <div className="h-full min-h-0 overflow-auto">
+      <div className="h-full min-h-0 flex flex-col">
+        <MonitorTabs
+          tabs={openIds.map((id) => rows.find((m) => m.id === id)).filter((m): m is MonitorRow => !!m)}
+          active={editing && !editing.id ? undefined : sel}
+          busy={busy}
+          extra={editing && !editing.id ? 'New monitor' : undefined}
+          onSelect={(id) => {
+            setEditing(undefined);
+            setSel(id);
+          }}
+          onClose={(ids) => closeTabs(ids)}
+          onRun={(m) => void run(m)}
+          onCancelNew={() => setEditing(undefined)}
+        />
+        <div className="flex-1 min-h-0 overflow-auto">
         {/* a monitor is created and edited here, like any item in its editor, not in a dialog */}
         {editing ? (
           <MonitorEditor key={editing.id ?? 'new'} draft={editing} collections={collections} onCancel={() => setEditing(undefined)} onSave={save} />
         ) : current ? (
           <MonitorDetail
             m={current}
-            results={results}
+            results={resultsById[current.id] ?? []}
             collectionName={colName(current.collectionId)}
             folderNames={names(collections.find((c) => c.id === current.collectionId), current.selection)}
-            busy={busy === current.id || current.running}
+            busy={busy.includes(current.id) || current.running}
             onRun={() => void run(current)}
             onEdit={() => setEditing(current)}
             onToggle={() => void toggle(current)}
@@ -250,6 +305,7 @@ export function MonitorsView() {
             </Empty>
           ))
         )}
+        </div>
       </div>
     </Split>
   );
@@ -315,10 +371,12 @@ function MonitorDetail(p: {
         <Metric label="Last result" value={statusLabel(last)} tone={last ? (last.status === 'passed' ? 'ok' : 'bad') : undefined} sub={last ? timeAgo(last.startedAt) : undefined} />
         <Metric label="Success rate" value={stats.uptime === undefined ? '—' : `${stats.uptime}%`} tone={stats.uptime === undefined ? undefined : stats.uptime === 100 ? 'ok' : stats.uptime >= 90 ? 'warn' : 'bad'} sub={`last ${results.length} runs`} />
         <Metric label="Median run time" value={stats.median === undefined ? '—' : formatMs(stats.median)} />
+        <Metric label="Median response" value={!last?.p50Ms || !last.passed ? '—' : formatMs(last.p50Ms)} sub="last run's requests" />
         <Metric label="Next run" value={!m.enabled ? 'Paused' : next === undefined ? '—' : next <= 0 ? 'Due now' : `in ${formatWait(next)}`} sub={m.enabled ? 'while TestPion is open' : undefined} />
       </MetricGrid>
 
-      {results.length > 0 && <ResultStrip results={results} />}
+      {/* charts: availability, run time, requests per run (hover any of them for the run) */}
+      <MonitorCharts runs={results} />
 
       <div>
         <div className="text-xs font-medium text-muted uppercase tracking-wide mb-1">Runs</div>
@@ -376,26 +434,6 @@ function formatWait(ms: number): string {
   return h < 24 ? `${h} h ${min % 60 ? `${min % 60} min` : ''}`.trim() : `${Math.round(h / 24)} d`;
 }
 
-/** Oldest → newest, one bar per run: height is the run time, colour the result. Hover for details. */
-function ResultStrip({ results }: { results: MonitorResult[] }) {
-  const runs = [...results].slice(0, 60).reverse();
-  const max = Math.max(...runs.map((r) => r.durationMs), 1);
-  return (
-    <div>
-      <div className="text-xs font-medium text-muted uppercase tracking-wide mb-1">Recent runs</div>
-      <div className="flex items-end gap-0.5 h-12" role="img" aria-label={`${runs.filter((r) => r.status === 'passed').length} of the last ${runs.length} runs passed`}>
-        {runs.map((r) => (
-          <Tooltip key={r.runId} content={`${statusLabel(r)} · ${r.total ? `${r.passed}/${r.total} · ` : ''}${formatMs(r.durationMs)} · ${timeAgo(r.startedAt)}`}>
-            <div
-              className={cx('flex-1 max-w-3 min-w-1 rounded-t-sm', r.status === 'passed' ? 'bg-ok/70 hover:bg-ok' : 'bg-bad/80 hover:bg-bad')}
-              style={{ height: `${Math.max(12, (r.durationMs / max) * 100)}%` }}
-            />
-          </Tooltip>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: MonitorDraft; collections: Collection[]; onCancel(): void; onSave(d: MonitorDraft): Promise<void> }) {
   const environments = useApp((s) => s.workspace?.environments ?? []);
@@ -548,5 +586,68 @@ function MonitorEditor({ draft, collections, onCancel, onSave }: { draft: Monito
         </Field>
       </div>
     </ModalOrPanel>
+  );
+}
+
+/** Open monitors as tabs, like the request editors' tabs: middle-click or ✕ closes, right-click for more. */
+function MonitorTabs({ tabs, active, busy, extra, onSelect, onClose, onRun, onCancelNew }: { tabs: MonitorRow[]; active?: string; busy: string[]; extra?: string; onSelect(id: string): void; onClose(ids: string[]): void; onRun(m: MonitorRow): void; onCancelNew(): void }) {
+  const [menuFor, setMenuFor] = useState<string>();
+  if (!tabs.length && !extra) return null;
+  const tabClass = (on: boolean) =>
+    cx(
+      'group relative flex items-center gap-1.5 h-9 px-3 border-r border-line text-sm cursor-pointer shrink-0 w-[190px]',
+      on ? 'bg-bg text-fg after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:bg-[image:var(--brand-gradient)]' : 'text-muted hover:bg-hover hover:text-fg',
+    );
+  return (
+    <div role="tablist" aria-label="Open monitors" className="flex items-end h-9 border-b border-line bg-panel/40 shrink-0 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {tabs.map((m) => {
+        const running = busy.includes(m.id) || m.running;
+        return (
+          <div
+            key={m.id}
+            role="tab"
+            aria-selected={m.id === active}
+            title={m.name}
+            className={tabClass(m.id === active)}
+            onClick={() => onSelect(m.id)}
+            onAuxClick={(e) => e.button === 1 && onClose([m.id])}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenuFor(m.id);
+            }}
+          >
+            <span className={cx('w-2 h-2 rounded-full shrink-0', running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
+            <span className="truncate flex-1 min-w-0">{m.name}</span>
+            <button aria-label={`Close ${m.name}`} className={cx('shrink-0 rounded p-0.5 hover:text-fg hover:bg-hover', m.id === active ? 'opacity-60' : 'opacity-0 group-hover:opacity-100')} onClick={(e) => (e.stopPropagation(), onClose([m.id]))}>
+              <X size={12} />
+            </button>
+            {menuFor === m.id && (
+              <Menu
+                open
+                onOpenChange={(o) => !o && setMenuFor(undefined)}
+                align="start"
+                width={210}
+                trigger={<span aria-hidden className="absolute left-2 bottom-0 w-0 h-0" />}
+                items={[
+                  { label: 'Run now', icon: <Play size={13} />, disabled: running, onSelect: () => onRun(m) },
+                  { label: 'Close tab', icon: <X size={13} />, separator: true, shortcut: 'Middle-click', onSelect: () => onClose([m.id]) },
+                  { label: 'Close other tabs', icon: <SquareX size={13} />, disabled: tabs.length < 2, onSelect: () => onClose(tabs.filter((t) => t.id !== m.id).map((t) => t.id)) },
+                  { label: 'Close all tabs', icon: <ListX size={13} />, onSelect: () => onClose(tabs.map((t) => t.id)) },
+                ]}
+              />
+            )}
+          </div>
+        );
+      })}
+      {extra && (
+        <div role="tab" aria-selected className={tabClass(true)}>
+          <span className="w-2 h-2 rounded-full shrink-0 bg-muted/50" />
+          <span className="truncate flex-1 min-w-0">{extra}</span>
+          <button aria-label="Cancel the new monitor" className="shrink-0 rounded p-0.5 opacity-60 hover:text-fg hover:bg-hover" onClick={onCancelNew}>
+            <X size={12} />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
