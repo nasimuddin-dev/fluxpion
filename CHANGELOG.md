@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.31.0 — 2026-10-01
+
+Highlights: usage of MCP tools and AI models, timing in traces, direct certificate checks.
+
+- **MCP**: a **Usage** tab per server: calls and failures per tool as bars, with median and p95 time and when each was last used. Also `testpion history mcp-tools` and the `mcp_tool_usage` MCP tool.
+- **AI Lab**: a **Usage** tab: prompts run, input and output tokens, estimated cost, tokens per model, median time and time to first token. Also `testpion history llm` and the `llm_usage` MCP tool.
+- **Traces**: DNS lookup, TCP connect, TLS handshake, waiting and download are child spans of each HTTP and GraphQL request, in the Trace tab and in OpenTelemetry exports.
+- **Certificates**: `testpion certificates --check host …` and the `check_certificate` MCP tool connect to a host and report days left, whether it is trusted here (and why not) and the TLS protocol.
+- **History**: a bar of the outcomes of the entries shown (2xx, 3xx, 4xx, 5xx, errors).
+- **Command palette**: AI usage and MCP tool usage.
+- **Docs**: screenshots of the response timeline, MCP usage and AI usage; the AI Lab screenshot shows a run again.
+
 ## 0.30.0 — 2026-10-01
 
 Highlights: certificates across the workspace, test history, server time in load tests.
