@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Keyboard in the sidebar**: F2 renames and Delete deletes the focused request or folder (with Undo), Enter opens it; listed in Keyboard Shortcuts.
 - **Category rows have a menu**: right-click (or **⋯** on) *REST*, *SOAP*, *GraphQL*, *gRPC* or *WebSocket & MQTT* under a collection for *New … request*, *Run collection* and *Collapse / Expand*, like every other row in the sidebar.
 - **Running a collection runs everything it holds**: its gRPC calls and WebSocket / Socket.IO / MQTT connections now run after its requests, in the Collection Runner (listed with the requests, each can be unticked), `testpion run-collection`, monitors and the `run_collection` MCP tool. A gRPC call passes when the server answers OK, using the call's saved `.proto` files or its server-reflection descriptor; a connection passes when the server accepts it, and its saved message, Socket.IO event or MQTT publish is sent. gRPC tests in test files can also carry `.proto` files inline (`protoFiles`) or a `descriptorSet`.
 

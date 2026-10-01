@@ -32,6 +32,14 @@ const GROUPS: Array<{ title: string; items: Array<{ keys: string[][]; text: stri
     ],
   },
   {
+    title: 'Collections sidebar',
+    items: [
+      { keys: [['F2']], text: 'Rename the focused request or folder' },
+      { keys: [['Delete']], text: 'Delete the focused request or folder (Undo in the message)' },
+      { keys: [['Enter']], text: 'Open the focused request' },
+    ],
+  },
+  {
     title: 'Code editors',
     items: [
       { keys: [['{{']], text: 'Suggest variables' },
