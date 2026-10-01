@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatMs, timeAgo } from '../lib/format';
 import { cx } from './ui';
-import { axisMs, ChartCard as Card, ChartTip, niceMax as nice, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard as Card, ChartTip, PointLine, Swatch, useWidth } from './charts';
 
 /** A monitor run, as the charts need it. */
 export interface RunPoint {
@@ -23,6 +23,14 @@ const statusColor = (s: RunPoint['status']) => (s === 'passed' ? 'var(--ok)' : '
 function Tip({ r, x, width }: { r: RunPoint; x: number; width: number }) {
   return (
     <ChartTip x={x} width={width}>
+      <TipBody r={r} />
+    </ChartTip>
+  );
+}
+
+function TipBody({ r }: { r: RunPoint }) {
+  return (
+    <>
       <div className="flex items-center gap-1.5 font-medium text-fg">
         <span className="w-2 h-2 rounded-full" style={{ background: statusColor(r.status) }} />
         {STATUS_LABEL[r.status]} · {timeAgo(r.startedAt)}
@@ -33,7 +41,7 @@ function Tip({ r, x, width }: { r: RunPoint; x: number; width: number }) {
         {r.p50Ms !== undefined ? ` · median response ${formatMs(r.p50Ms)}` : ''}
       </div>
       <div className="text-muted">{new Date(r.startedAt).toLocaleString()}</div>
-    </ChartTip>
+    </>
   );
 }
 
@@ -95,56 +103,21 @@ export function AvailabilityStrip({ runs }: { runs: RunPoint[] }) {
 /** Run time over the last runs: one line (one axis), each point coloured by its result, the median dashed. */
 export function RunTimeChart({ runs }: { runs: RunPoint[] }) {
   const ordered = useMemo(() => [...runs].slice(0, 60).reverse(), [runs]);
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number>();
-  const H = 150;
-  const pad = { l: 44, r: 8, t: 8, b: 20 };
-  const max = nice(Math.max(...ordered.map((r) => r.durationMs), 1));
-  const sorted = [...ordered.map((r) => r.durationMs)].sort((a, b) => a - b);
+  const sorted = ordered.map((r) => r.durationMs).sort((a, b) => a - b);
   const median = sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)]! : 0;
-  const innerW = Math.max(0, width - pad.l - pad.r);
-  const x = (i: number) => pad.l + (ordered.length < 2 ? innerW / 2 : (i / (ordered.length - 1)) * innerW);
-  const y = (v: number) => pad.t + (1 - v / max) * (H - pad.t - pad.b);
-  const path = ordered.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(r.durationMs).toFixed(1)}`).join(' ');
-  const onMove = (e: React.MouseEvent) => {
-    if (!ordered.length) return;
-    const bx = e.currentTarget.getBoundingClientRect().left;
-    const px = e.clientX - bx;
-    let best = 0;
-    for (let i = 1; i < ordered.length; i++) if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    setHover(best);
-  };
   return (
     <Card title="Run time" aside={ordered.length ? <span>median <b className="text-fg">{formatMs(median)}</b></span> : undefined}>
-      <div ref={ref} className="relative" onMouseMove={onMove} onMouseLeave={() => setHover(undefined)}>
-        <svg width={width} height={H} role="img" aria-label={`Run time of the last ${ordered.length} runs, median ${formatMs(median)}`}>
-          {[0, max / 2, max].map((t) => (
-            <g key={t}>
-              <line x1={pad.l} x2={width - pad.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeWidth={1} />
-              <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
-                {t === 0 ? '0' : axisMs(t)}
-              </text>
-            </g>
-          ))}
-          {ordered.length > 1 && <line x1={pad.l} x2={width - pad.r} y1={y(median)} y2={y(median)} stroke="var(--muted)" strokeDasharray="4 4" strokeWidth={1} />}
-          <path d={path} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          {hover !== undefined && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={H - pad.b} stroke="var(--muted)" strokeWidth={1} />}
-          {ordered.map((r, i) => (
-            <circle key={r.runId} cx={x(i)} cy={y(r.durationMs)} r={hover === i ? 5 : 4} fill={statusColor(r.status)} stroke="var(--bg)" strokeWidth={2} />
-          ))}
-          {ordered.length > 0 && (
-            <>
-              <text x={pad.l} y={H - 4} fontSize={10} fill="var(--muted)">
-                {timeAgo(ordered[0]!.startedAt)}
-              </text>
-              <text x={width - pad.r} y={H - 4} fontSize={10} fill="var(--muted)" textAnchor="end">
-                {timeAgo(ordered[ordered.length - 1]!.startedAt)}
-              </text>
-            </>
-          )}
-        </svg>
-        {hover !== undefined && ordered[hover] && <Tip r={ordered[hover]!} x={x(hover)} width={width} />}
-      </div>
+      <PointLine
+        items={ordered}
+        value={(r) => r.durationMs}
+        color={(r) => statusColor(r.status)}
+        keyOf={(r) => r.runId}
+        axis={axisMs}
+        reference={median}
+        ends={(r) => timeAgo(r.startedAt)}
+        tip={(r) => <TipBody r={r} />}
+        label={`Run time of the last ${ordered.length} runs, median ${formatMs(median)}`}
+      />
     </Card>
   );
 }

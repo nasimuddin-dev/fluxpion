@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatMs, plural } from '../lib/format';
-import { axisMs, ChartCard, ChartTip, niceMax, Swatch, useWidth } from './charts';
+import { axisMs, ChartCard, ChartTip, PointLine, Swatch, useWidth } from './charts';
 import { Empty } from './ui';
 
 /** A run in a list of runs (runs.list). */
@@ -33,13 +33,21 @@ export function RunMiniBar({ r }: { r: RunRow }) {
 function RunTip({ r, x, width }: { r: RunRow; x: number; width: number }) {
   return (
     <ChartTip x={x} width={width}>
+      <RunTipBody r={r} />
+    </ChartTip>
+  );
+}
+
+function RunTipBody({ r }: { r: RunRow }) {
+  return (
+    <>
       <div className="font-medium text-fg max-w-[240px] truncate">{r.name}</div>
       <div className="text-muted mt-0.5">
         {r.passed}/{r.total} passed{r.durationMs !== undefined ? ` · ${formatMs(r.durationMs)}` : ''}
         {r.environment ? ` · ${r.environment}` : ''}
       </div>
       <div className="text-muted">{new Date(r.startedAt).toLocaleString()}</div>
-    </ChartTip>
+    </>
   );
 }
 
@@ -103,44 +111,20 @@ function PassRate({ runs, onSelect }: { runs: RunRow[]; onSelect?(id: string): v
 
 /** Duration of each of the last runs (oldest left): one line, points coloured by result. */
 function RunDurations({ runs, onSelect }: { runs: RunRow[]; onSelect?(id: string): void }) {
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number>();
   const timed = runs.filter((r) => typeof r.durationMs === 'number');
-  const H = 150;
-  const pad = { l: 48, r: 8, t: 8, b: 18 };
-  const max = niceMax(Math.max(1, ...timed.map((r) => r.durationMs!)));
-  const innerW = Math.max(0, width - pad.l - pad.r);
-  const x = (i: number) => pad.l + (timed.length < 2 ? innerW / 2 : (i / (timed.length - 1)) * innerW);
-  const y = (v: number) => pad.t + (1 - v / max) * (H - pad.t - pad.b);
-  const path = timed.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(r.durationMs!).toFixed(1)}`).join(' ');
-  const onMove = (e: React.MouseEvent) => {
-    if (!timed.length) return;
-    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
-    let best = 0;
-    for (let i = 1; i < timed.length; i++) if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    setHover(best);
-  };
   if (!timed.length) return null;
   return (
     <ChartCard title="Run duration">
-      <div ref={ref} className={'relative' + (onSelect ? ' cursor-pointer' : '')} onMouseMove={onMove} onMouseLeave={() => setHover(undefined)} onClick={() => hover !== undefined && onSelect?.(timed[hover]!.id)}>
-        <svg width={width} height={H} role="img" aria-label="Duration of each run">
-          {[0, max / 2, max].map((t) => (
-            <g key={t}>
-              <line x1={pad.l} x2={width - pad.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeWidth={1} />
-              <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
-                {t === 0 ? '0' : axisMs(t)}
-              </text>
-            </g>
-          ))}
-          {timed.length > 1 && <path d={path} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
-          {hover !== undefined && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={H - pad.b} stroke="var(--muted)" strokeWidth={1} />}
-          {timed.map((r, i) => (
-            <circle key={r.id} cx={x(i)} cy={y(r.durationMs!)} r={hover === i ? 5 : 4} fill={r.failed + r.errors ? 'var(--bad)' : 'var(--ok)'} stroke="var(--bg)" strokeWidth={2} />
-          ))}
-        </svg>
-        {hover !== undefined && timed[hover] && <RunTip r={timed[hover]!} x={x(hover)} width={width} />}
-      </div>
+      <PointLine
+        items={timed}
+        value={(r) => r.durationMs!}
+        color={(r) => (r.failed + r.errors ? 'var(--bad)' : 'var(--ok)')}
+        keyOf={(r) => r.id}
+        axis={axisMs}
+        tip={(r) => <RunTipBody r={r} />}
+        label="Duration of each run"
+        onPick={onSelect && ((r) => onSelect(r.id))}
+      />
     </ChartCard>
   );
 }

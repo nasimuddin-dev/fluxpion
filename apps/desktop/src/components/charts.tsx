@@ -88,3 +88,87 @@ export function RecentRuns({ statuses, className }: { statuses: string[]; classN
     </span>
   );
 }
+
+/**
+ * A metric across items (oldest left): one line, each point coloured by its item (e.g. passed / failed),
+ * a crosshair and tooltip on hover, an optional dashed reference line (a median), labels under the ends.
+ * One axis; the item under the mouse can be picked with a click.
+ */
+export function PointLine<T>({
+  items,
+  value,
+  color,
+  keyOf,
+  axis,
+  tip,
+  ends,
+  reference,
+  label,
+  height = 150,
+  onPick,
+}: {
+  items: T[];
+  value(d: T): number;
+  color(d: T): string;
+  keyOf(d: T): string;
+  axis(v: number): string;
+  tip(d: T): ReactNode;
+  /** Text under the first and last point (e.g. "2h ago"). */
+  ends?(d: T): string;
+  reference?: number;
+  label: string;
+  height?: number;
+  onPick?(d: T): void;
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number>();
+  const H = height;
+  const pad = { l: 48, r: 8, t: 8, b: ends ? 20 : 12 };
+  const max = niceMax(Math.max(1, ...items.map(value)));
+  const innerW = Math.max(0, width - pad.l - pad.r);
+  const x = (i: number) => pad.l + (items.length < 2 ? innerW / 2 : (i / (items.length - 1)) * innerW);
+  const y = (v: number) => pad.t + (1 - v / max) * (H - pad.t - pad.b);
+  const path = items.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(value(d)).toFixed(1)}`).join(' ');
+  const onMove = (e: React.MouseEvent) => {
+    if (!items.length) return;
+    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    let best = 0;
+    for (let i = 1; i < items.length; i++) if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
+    setHover(best);
+  };
+  return (
+    <div ref={ref} className={'relative' + (onPick ? ' cursor-pointer' : '')} onMouseMove={onMove} onMouseLeave={() => setHover(undefined)} onClick={() => hover !== undefined && items[hover] && onPick?.(items[hover]!)}>
+      <svg width={width} height={H} role="img" aria-label={label}>
+        {[0, max / 2, max].map((t) => (
+          <g key={t}>
+            <line x1={pad.l} x2={width - pad.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeWidth={1} />
+            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">
+              {t === 0 ? '0' : axis(t)}
+            </text>
+          </g>
+        ))}
+        {reference !== undefined && items.length > 1 && <line x1={pad.l} x2={width - pad.r} y1={y(reference)} y2={y(reference)} stroke="var(--muted)" strokeDasharray="4 4" strokeWidth={1} />}
+        {items.length > 1 && <path d={path} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
+        {hover !== undefined && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={H - pad.b} stroke="var(--muted)" strokeWidth={1} />}
+        {items.map((d, i) => (
+          <circle key={keyOf(d)} cx={x(i)} cy={y(value(d))} r={hover === i ? 5 : 4} fill={color(d)} stroke="var(--bg)" strokeWidth={2} />
+        ))}
+        {ends && items.length > 0 && (
+          <>
+            <text x={pad.l} y={H - 4} fontSize={10} fill="var(--muted)">
+              {ends(items[0]!)}
+            </text>
+            <text x={width - pad.r} y={H - 4} fontSize={10} fill="var(--muted)" textAnchor="end">
+              {ends(items[items.length - 1]!)}
+            </text>
+          </>
+        )}
+      </svg>
+      {hover !== undefined && items[hover] && (
+        <ChartTip x={x(hover)} width={width}>
+          {tip(items[hover]!)}
+        </ChartTip>
+      )}
+    </div>
+  );
+}
