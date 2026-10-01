@@ -111,6 +111,7 @@ import {
   appClaudeProvider,
   recordCertificate,
   timingSummary,
+  timingSpans,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -639,6 +640,7 @@ export class Backend {
       spec.settings = { timeoutMs: this.settings.defaultTimeoutMs, ...spec.settings };
       const timeout = setTimeout(() => ctrl.abort(new ApsError('TimeoutError', `Request timed out after ${spec.settings!.timeoutMs} ms`)), spec.settings.timeoutMs);
       let result;
+      const sentAt = Date.now();
       try {
         result = await executeHttp(spec, {
           signal: ctrl.signal,
@@ -661,6 +663,8 @@ export class Backend {
       }
       const { response, prepared } = result;
       root.setAttributes({ status: response.status, url: prepared.url, size: response.size });
+      // DNS, TCP, TLS, waiting and download as child spans (the Traces waterfall, OTLP export)
+      timingSpans(root, response.timeline, sentAt);
       root.span.input = { method: prepared.method, headers: prepared.headers, body: prepared.bodyPreview };
       // the body is kept (redacted, up to 48 KB) for the trace's Payload tab; the full body is in the payload file
       const tracedBody = response.bodyPreview.length > 48_000 ? `${response.bodyPreview.slice(0, 48_000)}…` : response.bodyPreview;

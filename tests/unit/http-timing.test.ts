@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { executeHttp, timingSummary } from '../../packages/core/src/index.js';
+import { Tracer, executeHttp, timingSpans, timingSummary } from '../../packages/core/src/index.js';
 
 let server: Server;
 let base: string;
@@ -32,5 +32,28 @@ describe('HTTP timing phases', () => {
     expect(second.connection?.reused).toBe(true);
     expect(second.timeline.map((p) => p.name)).toEqual(['prepare', 'waiting (TTFB)', 'download', 'total']);
     expect(timingSummary(second)).not.toHaveProperty('tcpMs');
+  });
+
+  it('the phases become child spans of the request span, at their own times', () => {
+    const tracer = new Tracer('send');
+    const root = tracer.start('GET /', 'http');
+    timingSpans(
+      root,
+      [
+        { name: 'prepare', startMs: 0, durationMs: 1 },
+        { name: 'TCP connect', startMs: 2, durationMs: 10 },
+        { name: 'waiting (TTFB)', startMs: 12, durationMs: 30 },
+        { name: 'download', startMs: 42, durationMs: 3 },
+        { name: 'total', startMs: 0, durationMs: 45 },
+      ],
+      1000,
+    );
+    root.end();
+    const kids = tracer.finish().spans.filter((x) => x.parentSpanId === root.id);
+    expect(kids.map((k) => [k.name, k.startTime, k.endTime, k.status])).toEqual([
+      ['TCP connect', 1002, 1012, 'ok'],
+      ['waiting (TTFB)', 1012, 1042, 'ok'],
+      ['download', 1042, 1045, 'ok'],
+    ]);
   });
 });

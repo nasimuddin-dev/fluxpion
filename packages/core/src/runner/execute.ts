@@ -22,7 +22,7 @@ import type {
 } from '../model/types.js';
 import { ApsError, normalizeError } from '../errors.js';
 import type { VariableScope } from '../vars/variables.js';
-import type { Tracer, SpanHandle } from '../trace/tracer.js';
+import { timingSpans, type Tracer, type SpanHandle } from '../trace/tracer.js';
 import type { Redactor } from '../util/redact.js';
 import type { Logger } from '../log/logger.js';
 import { executeHttp, timingSummary } from '../protocols/http/client.js';
@@ -293,6 +293,7 @@ async function runHttp(test: HttpTest, scope: VariableScope, svc: ExecServices, 
     const { response, prepared } = await executeHttp(spec, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, openExternal: svc.openExternal, cookieJar: svc.cookieJar });
     svc.onHttpResponse?.({ testId: test.id ?? test.name, status: response.status, statusText: response.statusText ?? '', headers: response.headers, body: response.bodyPreview, durationMs: response.durationMs, url: prepared.url, timing: timingSummary(response) });
     if (response.connection?.certificate) svc.onCertificate?.(prepared.url, response.connection.certificate);
+    timingSpans(s, response.timeline);
     s.setAttributes({ url: prepared.url, status: response.status, size: response.size, durationMs: response.durationMs });
     s.span.input = { headers: prepared.headers, body: prepared.bodyPreview };
     s.end({ status: response.status >= 400 ? 'error' : 'ok', output: { status: response.status, headers: response.headers, body: summarize(response.bodyPreview, 16_000) } });

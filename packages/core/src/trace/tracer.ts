@@ -140,6 +140,25 @@ export class SpanHandle {
     const msg = (err as Error)?.message ?? String(err);
     this.end({ status: 'error', error: msg });
   }
+
+  /** A finished child span with known times (e.g. a phase measured elsewhere). */
+  childAt(name: string, kind: SpanKind, startTime: number, durationMs: number, attributes?: Record<string, unknown>): SpanHandle {
+    const c = this.tracer.start(name, kind, { parent: this, attributes });
+    c.span.startTime = Math.round(startTime);
+    c.span.status = 'ok';
+    c.span.endTime = Math.round(startTime + durationMs);
+    c.span.durationMs = Math.round(durationMs * 100) / 100;
+    this.tracer.emit(c.span, 'end');
+    return c;
+  }
+}
+
+/** The phases of an HTTP response's timeline (DNS, TCP, TLS, waiting, download) as child spans of its request span. */
+export function timingSpans(parent: SpanHandle, timeline: Array<{ name: string; startMs: number; durationMs: number }> | undefined, base = parent.span.startTime): void {
+  for (const p of timeline ?? []) {
+    if (p.name === 'total' || p.name === 'prepare') continue;
+    parent.childAt(p.name, 'http', base + p.startMs, p.durationMs, { phase: p.name });
+  }
 }
 
 /** Build a parent→children tree from a flat span list (for UI rendering). */
