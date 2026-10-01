@@ -667,6 +667,8 @@ export function CollectionTree({
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
                   {c.name}
                 </span>
+                {/* two collections with one name (an import done twice): their ids tell them apart */}
+                {collections.some((x) => x !== c && x.name === c.name) && <span className="text-[0.7rem] text-muted font-normal mono truncate shrink-0 max-w-[40%]" title="Another collection has this name; this is its id">{c.id}</span>}
               </button>
               {!c.problem && (
                 <NodeMenu

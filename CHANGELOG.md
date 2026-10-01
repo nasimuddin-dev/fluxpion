@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Collections with the same name are told apart**: the sidebar shows each one's id beside the name (e.g. a collection imported twice), so you can keep one and delete the other.
 - **Arrow keys in the sidebar**: ↑ ↓ move between rows, → expands and ← collapses a collection, category, folder or section, like a file tree (with Enter, F2 and Delete).
 - **The sidebar reveals what you open**: opening a request from a tab, search, history or a link expands its collection, category and folders (even ones folded by hand) and scrolls it into view, highlighted.
 
