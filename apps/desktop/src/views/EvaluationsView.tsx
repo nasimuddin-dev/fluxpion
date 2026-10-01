@@ -1,3 +1,4 @@
+import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { Bookmark, FlaskConical, History, KeyRound, Play, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSticky } from '../lib/sticky';
@@ -107,7 +108,7 @@ export function EvaluationsView() {
   const [d, setD] = useState<Draft>(drafts.load);
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [runId, setRunId] = useSticky<string | undefined>('eval:runId', undefined);
-  const [runs, setRuns] = useState<Array<{ id: string; name: string; startedAt: string; passed: number; total: number }>>([]);
+  const [runs, setRuns] = useState<RunRow[]>([]);
   const [sub, setSub] = useSticky<'prompt' | 'dataset' | 'evaluators'>('eval:sub', 'dataset');
   // dataset files of the workspace (datasets/), offered next to Load file
   const [datasets, setDatasets] = useState<Array<{ path: string; name: string }>>([]);
@@ -160,7 +161,7 @@ export function EvaluationsView() {
       // the engine builds the test template, exactly as `testpion eval run` and the run_evaluation MCP tool do
       const r = await call<{ runId: string }>('eval.runDraft', { draft: d, environment: env });
       setRunId(r.runId);
-      setRuns((rs) => [{ id: r.runId, name: d.name, startedAt: new Date().toISOString(), passed: 0, total: 0 }, ...rs]);
+      setRuns((rs) => [{ id: r.runId, name: d.name, startedAt: new Date().toISOString(), passed: 0, total: 0, failed: 0, errors: 0 }, ...rs]);
     } catch (e) {
       useApp.getState().toast(asError(e).message, 'error');
     }
@@ -221,8 +222,9 @@ export function EvaluationsView() {
                 {evalRuns.map((r) => (
                   <button key={r.id} className={cx('w-full text-left px-3 py-2 border-b border-line/60 text-sm', runId === r.id ? 'bg-accent/10' : 'hover:bg-hover')} onClick={() => setRunId(r.id)}>
                     <div className="truncate">{r.name}</div>
+                    <RunMiniBar r={r} />
                     <div className="text-xs text-muted flex gap-2">
-                      {r.total ? <span>{r.passed}/{r.total} passed</span> : null}
+                      {r.total ? <span className={r.failed + r.errors ? 'text-bad' : 'text-ok'}>{r.passed}/{r.total} passed</span> : null}
                       <span className="ml-auto">{timeAgo(r.startedAt)}</span>
                     </div>
                   </button>
@@ -414,9 +416,14 @@ export function EvaluationsView() {
           <RunPanel runId={runId} expectedTotal={d.limit ? Math.min(d.limit, count) : count} />
         ) : (
           <div className="h-full flex flex-col">
-            <Empty icon={<FlaskConical size={28} />} title="Run an evaluation">
-              Datasets are streamed record-by-record with bounded concurrency, retries and rate limiting. Results are written to disk and can be compared against a baseline.
-            </Empty>
+            {evalRuns.length ? (
+              // earlier runs of these evaluations: pass rate and duration, click one to open it
+              <RunsOverview runs={evalRuns} onSelect={setRunId} />
+            ) : (
+              <Empty icon={<FlaskConical size={28} />} title="Run an evaluation">
+                Datasets are streamed record-by-record with bounded concurrency, retries and rate limiting. Results are written to disk and can be compared against a baseline.
+              </Empty>
+            )}
           </div>
         )}
       </div>
