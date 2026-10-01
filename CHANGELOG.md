@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.36.0 — 2026-10-01
+
+Highlights: the new TestPion logo, one look for every sidebar and menu, a JWT inspector, and workspace Export in the switcher.
+
+- **New logo**: the TP test-tube mark is the app icon (installer, Start menu and desktop shortcuts, taskbar, every size), the window icon and sits beside the wordmark in the top bar; the website logo and favicons use it too.
+- **The top bar is the title bar** (Windows, Linux): the logo and wordmark sit where the grey system title was, the window buttons are drawn over the bar's right end in the theme's colours, and File / Edit / View / Window / Help are behind the **☰** button. The window fits the screen and opens maximised on smaller ones (a laptop at 125 %).
+- **One look everywhere**: every sidebar list (Collections, MCP servers, API definitions, Tests, Environments, Monitors, Load tests, saved prompts, evaluations, gRPC, WebSocket, MCP) has the same header (title, count, **+** and **⋯**), the same folder rows, the same row buttons and a right-click menu on every row. Detail pages (a monitor, a load test, a provider, an environment) have one header style: the main actions, the rest under **⋯**.
+- **Folders for MCP servers and API definitions** in the explorer: **⋯ ▸ New folder**, **Move to folder** on a server or definition, rename or delete a folder (its items stay).
+- **New HTTP request** is the name everywhere (menus, buttons, the empty collection); an empty collection offers it as a button, and every collection row has a **+** for it.
+- **Tests**: the file tree has a menu on every row (Open, Run, Rename, Duplicate, Delete; Run or delete a folder); **+** offers every kind of test (*New HTTP test* …).
+- **Environments**: Make active, Duplicate and Delete from a row's menu; AI Lab providers: Duplicate and Remove (saved at once) from the list.
+- **JWT**: a **JWT** tab on responses that hold a token (claims, issued, expires in …), a `jwt` check (expiry margin, claims), `testpion jwt <token>` and the `decode_jwt` MCP tool. The demo token endpoint returns an `id_token`.
+- **Workspace switcher**: **Export** next to **Import** (native save dialog; cancelling does nothing; the message says where it was saved), and **Import** uses the native file dialog. Importing a workspace export keeps exactly its environments and names a repeated import *… (imported) 2*.
+- Sidebar panes show their names when there is room; Monitors no longer says *paused* twice; the monitor page uses the full width.
+
 ## 0.35.0 — 2026-10-01
 
 Highlights: request health that follows your checks, certificate reminders, traces you can filter.
