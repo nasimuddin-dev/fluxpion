@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.25.0 — 2026-10-01
+
+Highlights: compare any two runs, response-time limits for monitors, workspace datasets everywhere.
+
+- **Compare runs**: the Baselines dialog of a finished run can compare it with an earlier run (not only a saved baseline): new failures, fixed tests, slower tests and the change of pass rate, latency, tokens and scores. AI agents use the new `compare_runs` MCP tool.
+- **Monitor response-time limit**: a monitor can fail a run whose p95 response time is over a limit, even when every check passes; it shows *Too slow* with the reason and alerts like any failure (`testpion monitor add … --max-p95 800`).
+- **Workspace datasets**: Evaluations load a file from the workspace's `datasets/` folder (next to *Load file…*); `testpion datasets` and the `list_datasets` MCP tool list them (SQLite databases with their tables). `testpion load` runs in a workspace join its load history.
+- **Charts**: keyboard access (Tab to a chart, arrows to move, Enter to open); the charts now share one set of components (lines, columns, bars, tiles).
+- **Tests**: filter the runs list by name or environment, or show only failed runs.
+- **Fixes**: CSV fields with line breaks are one record again (engine, preview and counts); evaluation runs no longer leave `inline-*` copies in `datasets/`; transport errors and non-OK gRPC codes show as red badges everywhere.
+
 ## 0.24.0 — 2026-10-01
 
 Highlights: Amazon Bedrock, a Table and Chart view for JSON responses, load test history and more charts.
