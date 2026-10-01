@@ -37,6 +37,8 @@ interface MonitorRow extends MonitorDraft {
   lastResult?: MonitorResult;
   /** Statuses of the latest runs, oldest first. */
   recent?: string[];
+  /** Share of the last 7 days' runs that passed. */
+  uptime7d?: number;
   nextRunAt?: string;
   due: boolean;
   running: boolean;
@@ -241,7 +243,7 @@ export function MonitorsView() {
                   folder: m.folder,
                   icon: <span className={cx('block w-2 h-2 rounded-full', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />,
                   badge: m.enabled ? <RecentRuns statuses={m.recent ?? []} /> : <Badge>paused</Badge>,
-                  subtitle: `${colName(m.collectionId)} · ${m.schedule}${m.lastResult ? ` · ${timeAgo(m.lastResult.startedAt)}` : ''}`,
+                  subtitle: `${colName(m.collectionId)} · ${m.schedule}${m.uptime7d !== undefined ? ` · ${m.uptime7d}% (7 days)` : ''}${m.lastResult ? ` · ${timeAgo(m.lastResult.startedAt)}` : ''}`,
                 }))}
                 itemMenu={(id) => {
                   const m = rows.find((x) => x.id === id)!;

@@ -33,7 +33,13 @@ export async function runMonitorNow(be: Backend, m: Monitor, trigger: MonitorRes
 
 export function monitorHandlers(be: Backend): Handlers {
   // `recent`: results of the latest runs, oldest first, for the small strips in lists
-  const status = (m: Monitor) => ({ ...monitorStatus(be.ws, m), running: be.runningMonitors.has(m.id), recent: monitorResults(be.ws, m.id, 20).map((r) => r.status).reverse() });
+  // `uptime7d`: share of the last 7 days' runs that passed (absent when nothing ran)
+  const status = (m: Monitor) => {
+    const days = monitorDaily(be.ws, m.id, 7);
+    const runs = days.reduce((n, d) => n + d.runs, 0);
+    const passed = days.reduce((n, d) => n + d.passed, 0);
+    return { ...monitorStatus(be.ws, m), running: be.runningMonitors.has(m.id), recent: monitorResults(be.ws, m.id, 20).map((r) => r.status).reverse(), ...(runs ? { uptime7d: Math.round((passed / runs) * 1000) / 10 } : {}) };
+  };
   return {
     'monitor.list': () => listMonitors(be.ws).map(status),
     'monitor.save': ({ monitor }: { monitor: Omit<Monitor, 'id'> & { id?: string } }) => status(saveMonitor(be.ws, { ...monitor, id: monitor.id || shortId('mon-') })),
