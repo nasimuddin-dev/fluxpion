@@ -5,6 +5,7 @@ import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
 import { useSingleEditorTab } from '../components/EditorTabs';
+import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useSticky } from '../lib/sticky';
@@ -262,6 +263,7 @@ export function WebSocketView() {
       ]}
     />
     <div className="h-full flex flex-col min-w-0">
+      <RequestBreadcrumb collectionId={current?.collectionId ?? collectionId} folder={current?.folder} name={title} onSave={() => void save()} />
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <Badge tone={status === 'open' ? 'ok' : status === 'connecting' ? 'warn' : 'default'}>{status}</Badge>
         <div className="flex rounded-md border border-line overflow-hidden text-xs shrink-0" role="group" aria-label="Protocol">

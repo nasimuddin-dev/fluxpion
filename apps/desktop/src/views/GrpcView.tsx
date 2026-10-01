@@ -5,6 +5,7 @@ import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
 import { SidebarShell } from '../components/SidebarShell';
 import { useSingleEditorTab } from '../components/EditorTabs';
+import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { useLibrary } from '../lib/library';
 import { useIntent, useSaveShortcut } from '../hooks';
@@ -275,6 +276,7 @@ export function GrpcView() {
       ]}
     />
     <div className="h-full flex flex-col min-w-0">
+      <RequestBreadcrumb collectionId={currentSaved?.collectionId ?? collectionId} folder={currentSaved?.folder} name={title} onSave={() => void saveRequest()} />
       <div className="flex items-center gap-2 p-2 border-b border-line">
         <VarInput
           ariaLabel="gRPC server"

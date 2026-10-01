@@ -17,6 +17,7 @@ import { useSticky } from '../lib/sticky';
 import { useDoc } from '../lib/docs';
 import { SidebarShell } from '../components/SidebarShell';
 import { useSingleEditorTab } from '../components/EditorTabs';
+import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { ScriptsPanel } from '../components/ScriptsPanel';
@@ -334,6 +335,7 @@ export function GraphQLView() {
   return (
     <div className="h-full flex flex-col">
       {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}
+      <RequestBreadcrumb collectionId={d.collectionId} requestId={d.requestId} name={d.name || 'GraphQL query'} onSave={() => void save()} />
       <div className="@container flex items-center gap-2 p-2 border-b border-line shrink-0">
         <Badge tone="accent">{isSubscription ? 'WS' : 'POST'}</Badge>
         <VarInput ariaLabel="GraphQL endpoint" className="flex-1 min-w-40 h-8" value={d.endpoint} onChange={(endpoint) => set({ endpoint })} placeholder="https://api.example.com/graphql" />

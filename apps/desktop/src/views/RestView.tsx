@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ChevronDown, ChevronRight, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
@@ -45,6 +45,7 @@ import { METHODS, RestTab, SendResult, blankRequest, drafts } from './rest/types
 import { RequestEditor } from './rest/RequestEditor';
 import { SaveModal, ImportModal } from './rest/dialogs';
 import { saveAsTestFile } from '../lib/save-test';
+import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
 
 
 /** Production environments where the user chose "don't ask again" (this session only). */
@@ -607,7 +608,7 @@ export function RestView() {
           </Empty>
         ) : (
         <>
-        <RequestBreadcrumb collections={collections} tab={tab} onSave={() => void quickSave()} />
+        <RequestBreadcrumb collectionId={tab.collectionId} requestId={tab.requestId} name={tab.name} dirty={tab.dirty} onSave={() => void quickSave()} />
         <div className="flex items-center gap-2 p-2 border-b border-line shrink-0">
           {/* the app's own menu instead of a native <select>: the desktop app's native popup didn't let people pick a method */}
           <Menu
@@ -713,45 +714,3 @@ export function RestView() {
   );
 }
 
-/** The folder names from a collection's top level down to a request (empty at the top level). */
-function folderPath(nodes: CollectionNode[], id: string): string[] | undefined {
-  for (const n of nodes) {
-    if (n.id === id) return [];
-    if (n.kind === 'folder') {
-      const inner = folderPath(n.items, id);
-      if (inner) return [n.name, ...inner];
-    }
-  }
-  return undefined;
-}
-
-/** Where the open request lives (Collection › Folder › Request), like Postman; or that it isn't saved yet. */
-function RequestBreadcrumb({ collections, tab, onSave }: { collections: Collection[]; tab: RestTab; onSave(): void }) {
-  const c = tab.collectionId ? collections.find((x) => x.id === tab.collectionId) : undefined;
-  const path = c && tab.requestId ? folderPath(c.items, tab.requestId) : undefined;
-  if (!c || !path)
-    return (
-      <div className="flex items-center gap-1.5 px-3 pt-1.5 text-xs text-muted min-w-0">
-        <span className="truncate">Not saved in a collection</span>
-        <button className="text-accent hover:underline shrink-0" onClick={onSave}>
-          Save (Ctrl+S)
-        </button>
-      </div>
-    );
-  return (
-    <nav aria-label="Where this request is saved" className="flex items-center gap-1 px-3 pt-1.5 text-xs text-muted min-w-0">
-      <button className="hover:text-fg hover:underline truncate shrink min-w-0" title="Collection settings, runner and docs" onClick={() => useApp.getState().openIntent('collections', { collectionId: c.id })}>
-        {c.name}
-      </button>
-      {path.map((f, i) => (
-        <span key={i} className="flex items-center gap-1 min-w-0 shrink">
-          <ChevronRight size={11} className="shrink-0" />
-          <span className="truncate">{f}</span>
-        </span>
-      ))}
-      <ChevronRight size={11} className="shrink-0" />
-      <span className="text-fg truncate">{tab.name}</span>
-      {tab.dirty && <span className="shrink-0">· unsaved changes</span>}
-    </nav>
-  );
-}
