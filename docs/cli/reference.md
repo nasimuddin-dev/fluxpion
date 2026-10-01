@@ -85,6 +85,16 @@ testpion send https://api.example.com/items -X POST -H "Content-Type: applicatio
 
 Check results go to stderr, so `testpion send … | jq` gets only the body.
 
+## `collections` and `requests`
+
+What a workspace holds, for scripts and AI agents (`--json`), the same as the `list_collections` and `list_requests` MCP tools:
+
+```bash
+testpion collections                     # each collection: requests, gRPC calls, connections
+testpion requests "Veterinary API"       # its requests, then its gRPC calls and WebSocket / MQTT connections
+testpion requests "Veterinary API" --json
+```
+
 ## `run-collection`
 
 Runs a collection one request at a time, in order, with its `pm.*` scripts, like Postman's Collection Runner or Newman. `<collection>` is a collection name or id in the workspace, a collection file (TestPion or Postman v2.1 JSON), or an http(s) link to one (e.g. a collection published in a repository). A collection file runs in a temporary workspace, so your own workspace isn't changed.

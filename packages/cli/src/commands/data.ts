@@ -217,6 +217,56 @@ export function registerDataCommands(program: Command): void {
       if (min !== undefined && report.summary.operationPct < min) process.exitCode = EXIT.TEST_FAILURE;
     });
   program
+    .command('collections')
+    .description('list the collections of a workspace: requests, gRPC calls and connections in each')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace?: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const rows = store
+          .listCollections()
+          .filter((c) => !c.problem)
+          .map((c) => {
+            const saved = collectionSavedItems(store, c.id);
+            return { id: c.id, name: c.name, requests: collectionRequests(c).length, grpcCalls: saved?.grpc?.length ?? 0, connections: saved?.websocket?.length ?? 0 };
+          });
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        if (!rows.length) return console.log(dim('No collections. Create one in the app, or import one: testpion import <file>'));
+        for (const r of rows) console.log(`${r.name}  ${dim(r.id)}  ${[`${r.requests} request${r.requests === 1 ? '' : 's'}`, r.grpcCalls ? `${r.grpcCalls} gRPC` : '', r.connections ? `${r.connections} connection${r.connections === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('requests')
+    .description("list what a collection holds: its HTTP and GraphQL requests, then its gRPC calls and WebSocket / Socket.IO / MQTT connections (run-collection runs them all)")
+    .argument('<collection>', 'collection name or id')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--json', 'print as JSON')
+    .action((ref: string, o: { workspace?: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const cols = store.listCollections().filter((c) => !c.problem);
+        const c = cols.find((x) => x.id === ref) ?? cols.find((x) => x.name.toLowerCase() === ref.toLowerCase());
+        if (!c) throw new CliError(`No collection "${ref}". Collections: ${cols.map((x) => x.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+        const redactor = new Redactor();
+        const saved = collectionSavedItems(store, c.id);
+        const rows = [
+          ...collectionRequests(c).map((r) => ({ id: r.id, kind: r.node.kind, name: r.name, folder: r.path.join(' / ') || undefined, method: r.node.kind === 'http' ? r.node.request.method : 'GQL', target: redactor.redactString(r.node.kind === 'http' ? r.node.request.url : r.node.request.endpoint) })),
+          ...(saved?.grpc ?? []).map((i) => ({ id: i.id, kind: 'grpc', name: i.name, folder: i.folder, method: 'gRPC', target: `${(i.data as { target?: string }).target ?? ''} ${(i.data as { method?: string }).method ?? ''}`.trim() })),
+          ...(saved?.websocket ?? []).map((i) => {
+            const d = i.data as { url?: string; mode?: string };
+            return { id: i.id, kind: 'websocket', name: i.name, folder: i.folder, method: d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'SIO' : 'WS', target: redactor.redactString(d.url ?? '') };
+          }),
+        ];
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        for (const r of rows) console.log(`${r.method.padEnd(6)} ${r.folder ? dim(`${r.folder} / `) : ''}${r.name}  ${dim(r.target)}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
     .command('export')
     .description('export a collection as a Postman v2.1 collection (default), TestPion JSON, an OpenAPI 3.1 document (--format openapi) or a Bruno collection folder (--format bruno --out <folder>)\n<collection> is a collection name or id in the workspace, or a collection file to convert')
     .argument('<collection>', 'collection name or id, a file, or an http(s) link')
