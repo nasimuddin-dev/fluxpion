@@ -19,6 +19,10 @@ describe('feedback reports', () => {
     expect(u.searchParams.get('title')).toBe(r.title);
     expect(u.searchParams.get('body')).toBe(r.body);
     expect(r.shortened).toBe(false);
+    // the email alternative: to the maintainer, with the same title and report
+    expect(r.mailto.startsWith('mailto:nasim.uddinbd02@gmail.com?subject=')).toBe(true);
+    expect(decodeURIComponent(r.mailto)).toContain('TestPion: [UI] Load view is cramped');
+    expect(r.mailShortened).toBe(false);
   });
 
   it('adds steps for problems only, and shortens a report too long for a link', () => {

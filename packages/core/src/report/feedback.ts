@@ -8,6 +8,8 @@ import { Redactor } from '../util/redact.js';
 export type FeedbackKind = 'bug' | 'idea' | 'ui' | 'question';
 
 export const FEEDBACK_REPO = 'nasimuddin-dev/testpion';
+/** Where emailed feedback goes (the maintainer). */
+export const FEEDBACK_EMAIL = 'nasim.uddinbd02@gmail.com';
 
 export const FEEDBACK_KINDS: Record<FeedbackKind, { label: string; prefix: string; labels: string[] }> = {
   bug: { label: 'Something is broken', prefix: 'Bug', labels: ['bug'] },
@@ -39,7 +41,13 @@ export interface FeedbackReport {
   url: string;
   /** The body in the link was shortened: paste the full report (copied) into the issue. */
   shortened: boolean;
+  /** An email to the maintainer with the report (mail apps take short links only: then the body is shortened too). */
+  mailto: string;
+  mailShortened: boolean;
 }
+
+/** Mail apps cut long mailto: links; keep the body under this. */
+const MAX_MAIL_BODY = 1800;
 
 /** Links longer than this are refused by some browsers and by GitHub. */
 const MAX_URL = 7500;
@@ -83,5 +91,9 @@ export function composeFeedback(i: FeedbackInput, opts: { repo?: string } = {}):
     while (b.length > 200 && link(b + note).length > MAX_URL) b = b.slice(0, Math.floor(b.length * 0.8));
     url = link(b + note);
   }
-  return { title, body, labels: kind.labels, url, shortened };
+  const mailBody = body.length > MAX_MAIL_BODY ? `${body.slice(0, MAX_MAIL_BODY)}
+
+(The report was longer: paste the full report from your clipboard here.)` : body;
+  const mailto = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(`TestPion: ${title}`)}&body=${encodeURIComponent(mailBody)}`;
+  return { title, body, labels: kind.labels, url, shortened, mailto, mailShortened: body.length > MAX_MAIL_BODY };
 }

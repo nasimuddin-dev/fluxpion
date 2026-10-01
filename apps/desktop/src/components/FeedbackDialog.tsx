@@ -1,4 +1,4 @@
-import { Bug, Copy, Download, ExternalLink, HelpCircle, Lightbulb, Paintbrush } from 'lucide-react';
+import { Bug, Copy, Download, ExternalLink, HelpCircle, Lightbulb, Mail, Paintbrush } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call } from '../api';
 import { finishSave, type SaveResult } from '../lib/files';
@@ -26,6 +26,8 @@ interface Report {
   body: string;
   url: string;
   shortened: boolean;
+  mailto: string;
+  mailShortened: boolean;
 }
 
 const KINDS: Array<{ id: FeedbackKind; label: string; hint: string; icon: ReactNode }> = [
@@ -100,6 +102,15 @@ export function FeedbackDialog({ request, onClose }: { request: FeedbackRequest;
     useApp.getState().toast(report.shortened ? 'GitHub opened with a shortened report: the full report is on your clipboard to paste' : 'GitHub opened: review the report and click Submit new issue', 'success');
     onClose();
   };
+  /** An email to the maintainer in the user's mail app (no GitHub account needed). */
+  const email = async () => {
+    if (!report) return;
+    if (report.mailShortened) await copy(true);
+    if (info?.nativeDialogs) await call('app.openExternal', { url: report.mailto });
+    else window.location.href = report.mailto;
+    useApp.getState().toast(report.mailShortened ? 'Your mail app opened with a shortened report: the full report is on your clipboard to paste' : 'Your mail app opened with the report: review it and send', 'success');
+    onClose();
+  };
   const save = async () => {
     if (!report) return;
     try {
@@ -116,12 +127,15 @@ export function FeedbackDialog({ request, onClose }: { request: FeedbackRequest;
       width={640}
       footer={
         <>
-          <span className="text-xs text-muted mr-auto">Nothing is sent until you submit it on GitHub, or copy or save it.</span>
+          <span className="text-xs text-muted mr-auto">Nothing is sent until you post it on GitHub or send the email yourself.</span>
           <Button icon={<Copy size={13} />} disabled={!ready} onClick={() => void copy()}>
             Copy
           </Button>
           <Button icon={<Download size={13} />} disabled={!ready} onClick={() => void save()}>
             Save as file
+          </Button>
+          <Button icon={<Mail size={13} />} disabled={!ready} onClick={() => void email()} title="Opens your mail app with the report addressed to the TestPion maintainer; no GitHub account needed">
+            Email
           </Button>
           <Button variant="primary" icon={<ExternalLink size={13} />} disabled={!ready} onClick={() => void openGitHub()} title="Opens a new GitHub issue with this report filled in; you review it and post it">
             Open on GitHub

@@ -9,6 +9,7 @@ import {
   describeCertificates,
   getTlsTrust,
   clearTokenCache,
+  FEEDBACK_EMAIL,
 } from '@testpion/core';
 import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -76,7 +77,8 @@ export function appHandlers(be: Backend): Handlers {
       be.consoleBuffer = [];
     },
     'app.openExternal': ({ url }: { url: string }) => {
-      if (!/^https?:\/\//.test(url)) throw new ApsError('ValidationError', 'Only http(s) URLs can be opened');
+      // web links, and the feedback email (mailto: to the maintainer only)
+      if (!/^https?:\/\//.test(url) && !url.startsWith(`mailto:${FEEDBACK_EMAIL}?`)) throw new ApsError('ValidationError', 'Only http(s) URLs can be opened');
       return be.host.openExternal?.(url);
     },
     /** Show a workspace folder in the file manager. Only folders of known workspaces: opening a path runs it if it's a program. */
