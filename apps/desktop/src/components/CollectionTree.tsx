@@ -64,6 +64,8 @@ export interface ExtraGroup {
   items: Array<{ id: string; name: string; folder?: string; badge?: string }>;
   onOpen(id: string): void;
   menu?(id: string): MenuItem[];
+  /** Show the item in another collection (dragged onto it). */
+  onMoveTo?(id: string, collectionId: string): void;
 }
 
 /** Tree of collections → folders → requests with inline actions. */
@@ -188,6 +190,30 @@ export function CollectionTree({
     },
     onDragEnd: () => (setDrag(undefined), setDropAt(undefined)),
   });
+  // a gRPC call or connection dragged onto another collection moves there
+  const [dragExtra, setDragExtra] = useState<{ g: ExtraGroup; id: string; from: string }>();
+  const collectionDropProps = (c: Collection) => {
+    const nodes = dropProps(c, c.id, 'into', {});
+    const extraHere = () => !!dragExtra?.g.onMoveTo && dragExtra.from !== c.id;
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        if (!extraHere()) return nodes.onDragOver(e);
+        e.preventDefault();
+        e.stopPropagation();
+        if (dropAt?.id !== c.id) setDropAt({ id: c.id, mode: 'into' });
+      },
+      onDragLeave: nodes.onDragLeave,
+      onDrop: (e: React.DragEvent) => {
+        if (!extraHere()) return nodes.onDrop(e);
+        e.preventDefault();
+        e.stopPropagation();
+        const d = dragExtra!;
+        setDragExtra(undefined);
+        setDropAt(undefined);
+        d.g.onMoveTo!(d.id, c.id);
+      },
+    };
+  };
   const dropProps = (c: Collection, id: string, mode: 'before' | 'into', place: { beforeId?: string; folderId?: string }) => ({
     onDragOver: (e: React.DragEvent) => {
       if (!canDrop(place)) return;
@@ -437,7 +463,7 @@ export function CollectionTree({
     </div>
     );
   };
-  const renderExtra = (g: ExtraGroup, depth: number) => {
+  const renderExtra = (g: ExtraGroup, depth: number, from?: string) => {
     const shown = g.items.filter((i) => !f || i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f));
     const folders = [...new Set(shown.map((i) => i.folder ?? ''))].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
     return folders.map((folder) => (
@@ -453,6 +479,14 @@ export function CollectionTree({
           .map((i) => (
             <div
               key={i.id}
+              draggable={!!g.onMoveTo}
+              onDragStart={(e) => {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', i.name);
+                setDragExtra({ g, id: i.id, from: from ?? '' });
+              }}
+              onDragEnd={() => (setDragExtra(undefined), setDropAt(undefined))}
               className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === i.id ? 'bg-accent-soft text-fg' : menuFor === i.id ? 'bg-hover' : 'hover:bg-hover')}
               style={{ paddingLeft: 8 + (depth + (folder ? 1 : 0)) * 12 }}
               onContextMenu={(e) => {
@@ -496,7 +530,7 @@ export function CollectionTree({
         <>
           {renderNodes(c, c.items, 1)}
           {extras.map((g) => (
-            <div key={g.cat}>{renderExtra(g, 1)}</div>
+            <div key={g.cat}>{renderExtra(g, 1, c.id)}</div>
           ))}
         </>
       );
@@ -518,7 +552,7 @@ export function CollectionTree({
           return (
             <div key={g.cat}>
               {categoryRow(c, g.cat, g.items.length, isOpen)}
-              {isOpen && renderExtra(g, 2)}
+              {isOpen && renderExtra(g, 2, c.id)}
             </div>
           );
         })}
@@ -546,7 +580,7 @@ export function CollectionTree({
           <div key={c.id}>
             <div
               className={cx('group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors', menuFor === c.id && 'bg-hover', dropClass(c.id))}
-              {...dropProps(c, c.id, 'into', {})}
+              {...collectionDropProps(c)}
               onContextMenu={(e) => {
                 if (c.problem) return;
                 e.preventDefault();

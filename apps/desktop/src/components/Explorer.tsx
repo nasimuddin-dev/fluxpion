@@ -433,8 +433,8 @@ export function Explorer() {
     }
   };
   const extraGroups = (c: Collection): ExtraGroup[] => [
-    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
-    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
+    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!), onMoveTo: (id, to) => void moveItem('grpc', id, to) },
+    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!), onMoveTo: (id, to) => void moveItem('websocket', id, to) },
   ];
   const newOfCategory = (c: Collection, cat: RequestCategory) => {
     if (cat === 'grpc' || cat === 'websocket') return intent(cat, { newDoc: true, collectionId: c.id });
