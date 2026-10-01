@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { formatMs, timeAgo } from '../lib/format';
 import { cx } from './ui';
+import { ChartCard as Card, ChartTip, niceMax as nice, Swatch, useWidth } from './charts';
 
 /** A monitor run, as the charts need it. */
 export interface RunPoint {
@@ -18,51 +19,10 @@ export interface RunPoint {
 const STATUS_LABEL = { passed: 'Passed', failed: 'Failed', error: 'Could not run' } as const;
 const statusColor = (s: RunPoint['status']) => (s === 'passed' ? 'var(--ok)' : 'var(--bad)');
 
-/** Width of an element, kept current (charts draw at their real size: round markers, crisp text). */
-function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
-  const ref = useRef<T>(null);
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
-    ro.observe(el);
-    setW(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, w];
-}
-
-function Card({ title, aside, legend, children }: { title: string; aside?: ReactNode; legend?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="rounded-xl border border-line bg-panel/40 p-3 min-w-0">
-      <div className="flex items-baseline gap-2 mb-2">
-        <h3 className="text-xs font-semibold text-muted uppercase tracking-wide">{title}</h3>
-        {aside && <div className="ml-auto text-xs text-muted">{aside}</div>}
-      </div>
-      {children}
-      {legend && <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-muted">{legend}</div>}
-    </section>
-  );
-}
-
-function Swatch({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
-      {label}
-    </span>
-  );
-}
-
 /** The hover card shared by the charts: what one run did. */
 function Tip({ r, x, width }: { r: RunPoint; x: number; width: number }) {
   return (
-    <div
-      role="tooltip"
-      className="pointer-events-none absolute top-0 z-10 rounded-lg border border-line bg-popover px-2.5 py-1.5 text-xs shadow-lg whitespace-nowrap"
-      style={{ left: Math.max(0, Math.min(x + 12, width - 190)) }}
-    >
+    <ChartTip x={x} width={width}>
       <div className="flex items-center gap-1.5 font-medium text-fg">
         <span className="w-2 h-2 rounded-full" style={{ background: statusColor(r.status) }} />
         {STATUS_LABEL[r.status]} · {timeAgo(r.startedAt)}
@@ -73,7 +33,7 @@ function Tip({ r, x, width }: { r: RunPoint; x: number; width: number }) {
         {r.p50Ms !== undefined ? ` · median response ${formatMs(r.p50Ms)}` : ''}
       </div>
       <div className="text-muted">{new Date(r.startedAt).toLocaleString()}</div>
-    </div>
+    </ChartTip>
   );
 }
 
@@ -131,13 +91,6 @@ export function AvailabilityStrip({ runs }: { runs: RunPoint[] }) {
     </Card>
   );
 }
-
-const nice = (v: number) => {
-  if (v <= 0) return 1;
-  const p = 10 ** Math.floor(Math.log10(v));
-  const f = v / p;
-  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
-};
 
 /** Run time over the last runs: one line (one axis), each point coloured by its result, the median dashed. */
 export function RunTimeChart({ runs }: { runs: RunPoint[] }) {

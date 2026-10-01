@@ -30,6 +30,101 @@ export interface RunMeta {
   dir: string;
 }
 
+/** One day of workspace activity (local calendar day of the caller). */
+export interface ActivityDay {
+  /** YYYY-MM-DD */
+  day: string;
+  requests: number;
+  /** Requests that failed: HTTP 4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors. */
+  failedRequests: number;
+  /** Median duration of that day's requests, when known. */
+  medianMs?: number;
+  runs: number;
+  /** Runs with at least one failed or errored test. */
+  failedRuns: number;
+  tests: number;
+  failedTests: number;
+}
+
+export interface Activity {
+  days: ActivityDay[];
+  /** Median duration of all the period's requests, when known. */
+  medianMs?: number;
+  /** Requests in the period per kind (http, graphql, grpc, mcp, llm, websocket). */
+  byKind: Record<string, number>;
+  /** Slowest requests of the period, by name. */
+  slowest: Array<{ name: string; kind: string; durationMs: number; count: number }>;
+}
+
+/** Whether a history status means the request worked. */
+export function historyOk(status: number | string | undefined): boolean {
+  if (status === undefined || status === null || status === '') return true;
+  const n = typeof status === 'number' ? status : Number(status);
+  if (!isNaN(n)) return n > 0 && n < 400;
+  return /^(ok|passed|success|connected|closed)$/i.test(String(status));
+}
+
+/**
+ * Per-day activity of the last `days` days, from history and runs.
+ * `tzOffsetMin` is the caller's offset (Date#getTimezoneOffset) so days follow the user's calendar.
+ */
+export function summarizeActivity(
+  history: Array<Pick<HistoryEntry, 'timestamp' | 'kind' | 'status' | 'durationMs' | 'name'>>,
+  runs: Array<Pick<RunMeta, 'startedAt' | 'total' | 'passed' | 'failed' | 'errors'>>,
+  opts: { days?: number; tzOffsetMin?: number; now?: number } = {},
+): Activity {
+  const n = Math.max(1, Math.min(opts.days ?? 14, 90));
+  const off = (opts.tzOffsetMin ?? 0) * 60_000;
+  const dayOf = (t: number) => new Date(t - off).toISOString().slice(0, 10);
+  const now = opts.now ?? Date.now();
+  const days: ActivityDay[] = [];
+  const index = new Map<string, ActivityDay>();
+  for (let i = n - 1; i >= 0; i--) {
+    const d: ActivityDay = { day: dayOf(now - i * 86_400_000), requests: 0, failedRequests: 0, runs: 0, failedRuns: 0, tests: 0, failedTests: 0 };
+    days.push(d);
+    index.set(d.day, d);
+  }
+  const durations = new Map<string, number[]>();
+  const all: number[] = [];
+  const byKind: Record<string, number> = {};
+  const slow = new Map<string, { name: string; kind: string; total: number; count: number }>();
+  for (const h of history) {
+    const d = index.get(dayOf(Date.parse(h.timestamp)));
+    if (!d) continue;
+    d.requests++;
+    if (!historyOk(h.status)) d.failedRequests++;
+    byKind[h.kind] = (byKind[h.kind] ?? 0) + 1;
+    if (typeof h.durationMs === 'number' && h.durationMs >= 0) {
+      (durations.get(d.day) ?? durations.set(d.day, []).get(d.day)!).push(h.durationMs);
+      all.push(h.durationMs);
+      const key = `${h.kind} ${h.name}`;
+      const s = slow.get(key) ?? { name: h.name, kind: h.kind, total: 0, count: 0 };
+      s.total += h.durationMs;
+      s.count++;
+      slow.set(key, s);
+    }
+  }
+  const median = (list: number[]) => {
+    list.sort((a, b) => a - b);
+    const m = list.length >> 1;
+    return Math.round(list.length % 2 ? list[m]! : (list[m - 1]! + list[m]!) / 2);
+  };
+  for (const [day, list] of durations) index.get(day)!.medianMs = median(list);
+  for (const r of runs) {
+    const d = index.get(dayOf(Date.parse(r.startedAt)));
+    if (!d) continue;
+    d.runs++;
+    d.tests += r.total;
+    d.failedTests += r.failed + r.errors;
+    if (r.failed + r.errors > 0) d.failedRuns++;
+  }
+  const slowest = [...slow.values()]
+    .map((s) => ({ name: s.name, kind: s.kind, durationMs: Math.round(s.total / s.count), count: s.count }))
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, 5);
+  return { days, medianMs: all.length ? median(all) : undefined, byKind, slowest };
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -61,8 +156,13 @@ export interface MetaStore {
   addTrace(t: TraceMeta): void;
   listTraces(q?: ListQuery): Page<TraceMeta>;
   getTrace(id: string): TraceMeta | undefined;
+  /** Workspace activity per day (requests, failures, runs) for charts. */
+  activity(opts?: { days?: number; tzOffsetMin?: number }): Activity;
   close(): void;
 }
+
+/** Start of the activity window (one extra day so any time zone's first day is complete). */
+const activitySince = (days = 14) => new Date(Date.now() - (Math.min(Math.max(days, 1), 90) + 1) * 86_400_000).toISOString();
 
 type SqliteDb = {
   exec(sql: string): void;
@@ -244,6 +344,25 @@ class SqliteMetaStore implements MetaStore {
     this.db.prepare('DELETE FROM runs WHERE id = ?').run(id);
   }
 
+  activity(opts: { days?: number; tzOffsetMin?: number } = {}): Activity {
+    const since = activitySince(opts.days);
+    const hist = (this.db.prepare('SELECT ts, kind, name, status, duration FROM history WHERE ts >= ?').all(since) as Array<Record<string, unknown>>).map((r) => ({
+      timestamp: r.ts as string,
+      kind: r.kind as HistoryEntry['kind'],
+      name: r.name as string,
+      status: r.status === null ? undefined : isNaN(Number(r.status)) ? (r.status as string) : Number(r.status),
+      durationMs: (r.duration as number) ?? undefined,
+    }));
+    const runs = (this.db.prepare('SELECT started, total, passed, failed, errors FROM runs WHERE started >= ?').all(since) as Array<Record<string, number | string>>).map((r) => ({
+      startedAt: r.started as string,
+      total: Number(r.total),
+      passed: Number(r.passed),
+      failed: Number(r.failed),
+      errors: Number(r.errors),
+    }));
+    return summarizeActivity(hist, runs, opts);
+  }
+
   addTrace(t: TraceMeta): void {
     this.stmt('INSERT OR REPLACE INTO traces (id, name, kind, status, start, duration, spans, run_id, path) VALUES (?,?,?,?,?,?,?,?,?)').run(t.id, t.name, t.kind, t.status, t.startTime, t.durationMs, t.spanCount, t.runId ?? null, t.path);
     if (this.inserts.traces++ % PRUNE_EVERY === 0) {
@@ -378,6 +497,14 @@ class JsonlMetaStore implements MetaStore {
   deleteRun(id: string) {
     this.data.runs = this.data.runs.filter((r) => r.id !== id);
     this.log('runs', id, 'del');
+  }
+  activity(opts: { days?: number; tzOffsetMin?: number } = {}) {
+    const since = activitySince(opts.days);
+    return summarizeActivity(
+      this.data.history.filter((h) => h.timestamp >= since),
+      this.data.runs.filter((r) => r.startedAt >= since),
+      opts,
+    );
   }
   addTrace(t: TraceMeta) {
     this.data.traces.push(t);

@@ -1,4 +1,4 @@
-import { AlarmClock, BookOpen, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
+import { Activity as ActivityIcon, AlarmClock, BookOpen, Bot, ShieldCheck, FolderPlus, FolderTree, GitBranch, History, KeyRound, Network, Play, Plug, Sparkles, Upload } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { call, modKey } from '../api';
 import { promptText, useApp } from '../store';
@@ -6,6 +6,7 @@ import { runMenuCommand } from '../menu-commands';
 import type { Collection, CollectionNode, HttpRequestSpec } from '../types';
 import { timeAgo, uid, plural } from '../lib/format';
 import { Badge, cx, Empty, Kbd, statusTone } from '../components/ui';
+import { ActivityCharts, type Activity } from '../components/ActivityCharts';
 
 interface HistoryItem {
   id: string;
@@ -87,6 +88,25 @@ export function HomeView() {
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [monitors, setMonitors] = useState<HomeMonitor[]>([]);
   const [runs, setRuns] = useState<HomeRun[]>([]);
+  const [activity, setActivity] = useState<Activity>();
+  // the dashboard's period, remembered
+  const [days, setDays] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('aps.homeDays')) || 14;
+    } catch {
+      return 14;
+    }
+  });
+  const loadActivity = (n = days) => void call<Activity>('stats.activity', { days: n, tzOffsetMin: new Date().getTimezoneOffset() }).then(setActivity, () => setActivity(undefined));
+  const pickDays = (n: number) => {
+    setDays(n);
+    loadActivity(n);
+    try {
+      localStorage.setItem('aps.homeDays', String(n));
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const open = useApp((s) => s.openIntent);
   const setView = useApp((s) => s.setView);
 
@@ -95,6 +115,7 @@ export function HomeView() {
     void call<{ items: HistoryItem[] }>('history.list', { limit: 8 }).then((r) => setRecent(r.items));
     void call<HomeMonitor[]>('monitor.list').then(setMonitors, () => setMonitors([]));
     void call<{ items: HomeRun[] }>('runs.list', { limit: 6 }).then((r) => setRuns(r.items), () => setRuns([]));
+    loadActivity();
   };
   useEffect(() => {
     load();
@@ -149,6 +170,25 @@ export function HomeView() {
           <Action icon={<Bot size={16} />} hue="indigo" title="Ask the assistant" text="Explain an error, draft tests or ask how to do something." onClick={() => useApp.getState().set({ assistant: { task: 'free', title: 'Ask the assistant', context: {} } })} />
           <Action icon={<BookOpen size={16} />} hue="slate" title="Read the docs" text="Guides for requests, scripts, the runner, mocks and the CLI." onClick={() => window.open(DOCS, '_blank', 'noopener')} />
         </div>
+
+        {activity && (
+          <section aria-label="Activity" className="rounded-2xl border border-line bg-bg shadow-sm p-4 flex flex-col gap-3">
+            <header className="flex items-center gap-2 text-sm font-semibold">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-panel2 text-muted">
+                <ActivityIcon size={15} />
+              </span>
+              Activity
+              <div role="radiogroup" aria-label="Period" className="ml-auto flex rounded-lg border border-line p-0.5 text-xs font-normal">
+                {[7, 14, 30].map((n) => (
+                  <button key={n} role="radio" aria-checked={days === n} className={cx('px-2.5 py-1 rounded-md', days === n ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-fg')} onClick={() => pickDays(n)}>
+                    {n} days
+                  </button>
+                ))}
+              </div>
+            </header>
+            <ActivityCharts activity={activity} />
+          </section>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-4">
           <Card title="Recent requests" icon={<History size={15} />} action={<button className="text-xs text-accent hover:underline" onClick={() => setView('history')}>All history</button>}>

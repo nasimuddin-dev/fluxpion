@@ -445,6 +445,13 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       },
     },
     {
+      name: 'workspace_activity',
+      description:
+        'Workspace activity per day (local days): requests sent from the app and how many failed (4xx/5xx, transport errors, non-OK gRPC codes, MCP tool errors), median response time, test runs and failed tests; plus requests per kind and the slowest requests on average. Use it to spot a day things started failing or slowing down.',
+      inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'How many days (default 14, max 90)' } } },
+      run: (a) => store.meta.activity({ days: Number(a.days) || 14, tzOffsetMin: new Date().getTimezoneOffset() }),
+    },
+    {
       name: 'compare_responses',
       description:
         'Compare two responses from the history (ids from request_history): status, timing, header changes (volatile ones like date are flagged) and a field-by-field JSON body diff ($.path added / removed / changed), or a line diff for text. Sensitive values are masked.',

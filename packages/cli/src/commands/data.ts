@@ -508,6 +508,29 @@ export function registerDataCommands(program: Command): void {
       }
     });
   histCmd
+    .command('activity')
+    .description('workspace activity per day: requests sent, failed requests, median response time, test runs and failed tests')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('-d, --days <n>', 'how many days, up to 90', '14')
+    .option('--json', 'print as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const a = store.meta.activity({ days: Number(o.days) || 14, tzOffsetMin: new Date().getTimezoneOffset() });
+        if (o.json) console.log(JSON.stringify(a, null, 2));
+        else {
+          for (const d of a.days)
+            console.log(
+              `${d.day}  ${String(d.requests).padStart(4)} requests${d.failedRequests ? red(` (${d.failedRequests} failed)`) : ''}${d.medianMs !== undefined ? dim(`  median ${formatDuration(d.medianMs)}`) : ''}  ${d.runs ? `${d.runs} runs, ${d.tests} tests${d.failedTests ? red(` (${d.failedTests} failed)`) : ''}` : ''}`,
+            );
+          const kinds = Object.entries(a.byKind).map(([k, n]) => `${k} ${n}`).join(', ');
+          if (kinds) console.log(dim(`By kind: ${kinds}`));
+        }
+      } finally {
+        store.close();
+      }
+    });
+  histCmd
     .command('diff')
     .description('compare two responses from the history (older first): status, timing, headers and a field-by-field body diff')
     .argument('<before>', 'history id of the older response')
