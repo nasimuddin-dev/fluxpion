@@ -27,6 +27,8 @@ import {
   type HttpResponseData,
   buildGraphQLOperation,
   schemaFromSdl,
+  workspaceStorage,
+  deleteRunsBefore,
 } from '@testpion/core';
 import type { Backend, Handlers, HttpSendParams, GqlSendParams } from '../backend.js';
 
@@ -88,6 +90,15 @@ export function requestsHandlers(be: Backend): Handlers {
     'history.get': ({ id }: { id: string }) => be.ws.meta.getHistory(id),
     'history.delete': ({ id }: { id: string }) => be.ws.meta.deleteHistory(id),
     'history.clear': () => be.ws.meta.clearHistory(),
+    /** What the workspace keeps on disk (runs, traces, response bodies, history) — Settings ▸ Storage. */
+    'storage.usage': () => workspaceStorage(be.ws),
+    'storage.deleteRunsBefore': ({ days }: { days: number }) => {
+      const n = Math.max(1, Math.floor(Number(days) || 0));
+      if (!n) throw new ApsError('ValidationError', 'Give a number of days');
+      const r = deleteRunsBefore(be.ws, new Date(Date.now() - n * 86_400_000).toISOString());
+      be.host.emit('data.changed', { kind: 'runs' });
+      return r;
+    },
     /** HTTP and GraphQL history (optionally filtered) as a HAR file, secrets redacted. */
     'history.exportHar': async ({ query, kind, limit }: { query?: string; kind?: string; limit?: number }) => {
       const items = be.ws.meta.listHistory({ query, kind: kind || undefined, limit: Math.min(limit ?? 500, 2000) }).items;

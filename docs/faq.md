@@ -43,7 +43,7 @@ Response bodies stream to disk, and the viewer only shows a preview (2 MB by def
 
 ## Where is my data stored?
 
-In `~/.testpion` (`%USERPROFILE%\.testpion` on Windows): settings, logs, encrypted secrets and workspaces. A workspace can also live in any folder you open, such as one in a git repository.
+In `~/.testpion` (`%USERPROFILE%\.testpion` on Windows): settings, logs, encrypted secrets and workspaces. A workspace can also live in any folder you open, such as one in a git repository. **Settings ▸ Storage** shows how much the open workspace keeps besides its definitions (runs, traces, response bodies, history) and deletes old runs; `testpion storage --delete-runs-older-than 30` does the same from a terminal.
 
 ## Why does Windows or macOS warn me when installing?
 

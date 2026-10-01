@@ -51,6 +51,8 @@ import {
   collectionVariableFlow,
   referencedVariableNames,
   loadHistory,
+  workspaceStorage,
+  deleteRunsBefore,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -259,6 +261,31 @@ export function registerDataCommands(program: Command): void {
         if (o.json) return console.log(JSON.stringify(rows, null, 2));
         if (!rows.length) return console.log(dim('No collections. Create one in the app, or import one: testpion import <file>'));
         for (const r of rows) console.log(`${r.name}  ${dim(r.id)}  ${[`${r.requests} request${r.requests === 1 ? '' : 's'}`, r.grpcCalls ? `${r.grpcCalls} gRPC` : '', r.connections ? `${r.connections} connection${r.connections === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('storage')
+    .description('what the workspace keeps on disk (runs, traces, response bodies, history) and, with --delete-runs-older-than, clean up old runs')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--delete-runs-older-than <days>', 'delete runs that started more than this many days ago (results and reports; baselines stay)')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace?: string; deleteRunsOlderThan?: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        let deleted: { deleted: number; bytes: number } | undefined;
+        if (o.deleteRunsOlderThan !== undefined) {
+          const days = Number(o.deleteRunsOlderThan);
+          if (!(days >= 1)) throw new CliError('--delete-runs-older-than needs a number of days (1 or more)', EXIT.CONFIG_ERROR);
+          deleted = deleteRunsBefore(store, new Date(Date.now() - days * 86_400_000).toISOString());
+        }
+        const u = workspaceStorage(store);
+        if (o.json) return console.log(JSON.stringify({ ...u, ...(deleted ? { deleted } : {}) }, null, 2));
+        if (deleted) console.log(green(`Deleted ${deleted.deleted} run${deleted.deleted === 1 ? '' : 's'} (${(deleted.bytes / 1048576).toFixed(1)} MB)`));
+        for (const p of u.parts) console.log(`${p.label.padEnd(28)} ${(p.bytes / 1048576).toFixed(1).padStart(8)} MB  ${dim(`${p.files} files`)}`);
+        console.log(`${'Total'.padEnd(28)} ${(u.totalBytes / 1048576).toFixed(1).padStart(8)} MB`);
+        console.log(dim(`${u.runs} runs, ${u.history} history entries, ${u.traces} traces`));
       } finally {
         store.close();
       }

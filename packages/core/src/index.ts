@@ -95,6 +95,7 @@ export * from './mcp-server/mcp-mock.js';
 export * from './storage/fsutil.js';
 export * from './storage/secrets.js';
 export * from './storage/metastore.js';
+export * from './storage/storage-usage.js';
 export * from './storage/workspace.js';
 export * from './storage/search.js';
 export * from './storage/current-values.js';

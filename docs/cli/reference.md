@@ -91,6 +91,7 @@ What a workspace holds, for scripts and AI agents (`--json`), the same as the `l
 
 ```bash
 testpion collections                     # each collection: requests, gRPC calls, connections
+testpion storage -w my-workspace --delete-runs-older-than 30   # disk use; clean up old runs
 testpion load-history -w my-workspace          # earlier load tests: req/s, p95, errors, pass rules
 testpion variable-flow "Veterinary API"  # who sets and uses each variable; exit 1 on used-before-set / never-set
 testpion workspace-report -o report.html # activity, collection health, monitors and runs as one HTML file to share
