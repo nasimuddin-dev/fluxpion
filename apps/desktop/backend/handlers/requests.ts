@@ -30,6 +30,8 @@ import {
   workspaceStorage,
   deleteRunsBefore,
   listCertificates,
+  checkCertificate,
+  recordCertificate,
   workspaceAttention,
   collectionTiming,
 } from '@testpion/core';
@@ -92,6 +94,12 @@ export function requestsHandlers(be: Backend): Handlers {
     'stats.requests': ({ collectionId }: { collectionId: string }) => be.ws.meta.requestStats(collectionId),
     /** TLS certificates of the HTTPS hosts called, soonest to expire first. */
     'certificates.list': () => listCertificates(be.ws),
+    /** Connect to a host now, read its certificate and record it (the list then shows the fresh one). */
+    'certificates.check': async ({ host }: { host: string }) => {
+      const c = await checkCertificate(host);
+      recordCertificate(be.ws, `https://${c.host}:${c.port}/`, c);
+      return c;
+    },
     /** What needs attention: failing monitors, expiring certificates, the latest failed run, failing requests, flaky tests. */
     'stats.attention': () => workspaceAttention(be.ws),
     /** Where the time of a collection's requests went (DNS, TCP, TLS, server, download), from responses sent in the app. */

@@ -311,6 +311,21 @@ export function HomeView() {
                 <span className="truncate mono text-xs flex-1">{c.host}</span>
                 <span className="text-xs text-muted truncate max-w-[40%] hidden sm:inline">{c.issuer}</span>
                 <Badge tone={c.daysLeft === undefined ? 'default' : c.daysLeft < 14 ? 'bad' : c.daysLeft < 30 ? 'warn' : 'ok'}>{c.daysLeft === undefined ? '?' : c.daysLeft < 0 ? 'expired' : `${c.daysLeft} days`}</Badge>
+                <button
+                  className="text-xs text-accent hover:underline shrink-0"
+                  title={`Connect to ${c.host} now and read its certificate (trust, days left)`}
+                  onClick={() =>
+                    void call<{ daysLeft?: number; trusted: boolean; trustError?: string }>('certificates.check', { host: c.host }).then(
+                      (r) => {
+                        useApp.getState().toast(`${c.host}: ${r.daysLeft ?? '?'} days left${r.trusted ? '' : `, not trusted (${r.trustError})`}`, r.trusted && (r.daysLeft ?? 0) >= 14 ? 'success' : 'error');
+                        void call<typeof certs>('certificates.list').then(setCerts, () => undefined);
+                      },
+                      (e) => useApp.getState().toast(`${c.host}: ${asError(e).message}`, 'error'),
+                    )
+                  }
+                >
+                  Check now
+                </button>
               </div>
             ))}
             {certs.length > 6 && <div className="px-2 pt-1 text-xs text-muted">and {certs.length - 6} more: testpion certificates</div>}
