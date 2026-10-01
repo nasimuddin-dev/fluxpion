@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Copy, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call, on } from '../api';
 import { useApp } from '../store';
@@ -56,6 +56,18 @@ export function AttentionCard() {
           onClick={() => useApp.getState().set({ assistant: { task: 'triage-attention', title: 'What to fix first', context: { items: items.map((i) => ({ severity: i.severity, kind: i.kind, message: i.message })) } } })}
         >
           <Sparkles size={12} /> What first?
+        </button>
+        <button
+          className="inline-flex items-center gap-1 text-xs font-normal text-accent hover:underline"
+          title="Copy the list as Markdown (to paste into a chat or an issue)"
+          onClick={() =>
+            void navigator.clipboard.writeText(['**Needs attention**', ...items.map((i) => `- ${i.severity === 'high' ? '🔴' : i.severity === 'medium' ? '🟠' : '⚪'} ${i.message}`)].join('\n')).then(
+              () => useApp.getState().toast('Copied', 'success'),
+              () => useApp.getState().toast('Could not copy to the clipboard', 'error'),
+            )
+          }
+        >
+          <Copy size={12} /> Copy
         </button>
         <span className="text-xs font-normal text-muted">
           {items.length} item{items.length === 1 ? '' : 's'}
