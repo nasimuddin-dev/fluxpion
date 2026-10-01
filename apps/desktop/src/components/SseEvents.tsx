@@ -1,3 +1,4 @@
+import { ArrivalSpark } from './charts';
 import { useMemo, useState } from 'react';
 import { Radio, Square } from 'lucide-react';
 import type { SseEvent } from '../types';
@@ -41,6 +42,7 @@ export function SseEvents({ events, live, onStop, stopped, dropped }: { events: 
           <span className="text-muted">Event stream</span>
         )}
         <Badge tone="accent">{plural(events.length, 'event')}</Badge>
+        <ArrivalSpark times={events.map((e) => e.atMs)} />
         {types > 1 && <span className="text-xs text-muted">{types} types</span>}
         {stopped && <Badge tone="warn" title="You stopped the stream; these are the events received until then.">stopped</Badge>}
         {!!dropped && <Badge tone="warn" title="Only the first 10,000 events are kept.">{dropped} not kept</Badge>}
