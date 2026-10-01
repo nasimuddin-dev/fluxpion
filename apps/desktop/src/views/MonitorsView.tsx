@@ -350,7 +350,7 @@ function MonitorDetail(p: {
   }, [results]);
   const next = m.enabled && m.nextRunAt ? Date.parse(m.nextRunAt) - Date.now() : undefined;
   return (
-    <div className="p-4 flex flex-col gap-4 max-w-4xl">
+    <div className="p-4 flex flex-col gap-4 max-w-6xl">
       <PageHeader
         icon={<AlarmClock size={18} />}
         title={m.name}
