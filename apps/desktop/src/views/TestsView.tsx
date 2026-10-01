@@ -9,7 +9,7 @@ import { CodeEditor } from '../components/CodeEditor';
 import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { RunPanel } from '../components/RunPanel';
 import { SidebarShell } from '../components/SidebarShell';
-import { RowMenu, TreeHeader } from '../components/TreeParts';
+import { RowMenu, TreeHeader, treeKeys } from '../components/TreeParts';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, IconButton, Input, rowActionClass, SectionTitle, Split, Tabs, type MenuItem } from '../components/ui';
@@ -322,7 +322,7 @@ export function TestsView() {
                     <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter test files" aria-label="Filter test files" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
                   </div>
                 )}
-                <div className="flex-1 overflow-auto">{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use + to create an HTTP, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
+                <div className="flex-1 overflow-auto" onKeyDown={treeKeys}>{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use + to create an HTTP, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
                 <div className="border-t border-line p-2 flex flex-col gap-2">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <label className="flex flex-col gap-0.5">

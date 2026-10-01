@@ -327,3 +327,28 @@ export function InlineRename({ value, onCommit, onCancel, validate, label = 'Nam
 
 /** Put the keyboard back on a row after an inline rename (rows carry data-rename-id). */
 export const focusRow = (id: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-rename-id="${CSS.escape(id)}"]`)?.focus());
+
+/**
+ * The keyboard in every tree and list (put it on the container's onKeyDown): ↑ ↓ move between rows, Home / End jump to
+ * the first and last, → opens a closed folder and ← closes an open one. Rows are the elements with data-tree-row.
+ */
+export function treeKeys(e: React.KeyboardEvent<HTMLElement>): void {
+  const row = (e.target as HTMLElement).closest<HTMLElement>('[data-tree-row]');
+  if (!row || (e.target as HTMLElement).tagName === 'INPUT') return;
+  const rows = () => [...e.currentTarget.querySelectorAll<HTMLElement>('[data-tree-row]')].filter((r) => r.offsetParent);
+  const go = (next?: HTMLElement) => {
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+    next.scrollIntoView({ block: 'nearest' });
+  };
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const all = rows();
+    go(all[all.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1)]);
+  } else if (e.key === 'Home') go(rows()[0]);
+  else if (e.key === 'End') go(rows().at(-1));
+  else if ((e.key === 'ArrowRight' && row.getAttribute('aria-expanded') === 'false') || (e.key === 'ArrowLeft' && row.getAttribute('aria-expanded') === 'true')) {
+    e.preventDefault();
+    row.click();
+  }
+}

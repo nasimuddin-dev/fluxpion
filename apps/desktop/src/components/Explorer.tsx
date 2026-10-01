@@ -12,7 +12,7 @@ import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, menuKeys, type MenuItem } from './ui';
-import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow } from './TreeParts';
+import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow, treeKeys } from './TreeParts';
 
 /**
  * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
@@ -372,22 +372,6 @@ export function Explorer() {
   // Import and Export open here, without leaving the request editors
   const [importing, setImporting] = useState(false);
   const [collapseAll, setCollapseAll] = useState(0);
-  const treeKeys = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-tree-row]');
-    if (!row) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      const rows = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-tree-row]')].filter((r) => r.offsetParent);
-      const next = rows[rows.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1)];
-      if (next) {
-        e.preventDefault();
-        next.focus();
-        next.scrollIntoView({ block: 'nearest' });
-      }
-    } else if ((e.key === 'ArrowRight' && row.getAttribute('aria-expanded') === 'false') || (e.key === 'ArrowLeft' && row.getAttribute('aria-expanded') === 'true')) {
-      e.preventDefault();
-      row.click();
-    }
-  };
   const revealKey = useApp((s) => s.intent?.nonce);
   const [exporting, setExporting] = useState(false);
   const importDefinition = () => setImporting(true);

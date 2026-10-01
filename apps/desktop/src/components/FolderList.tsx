@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { confirmAction } from '../store';
 import { Button, cx, Input, type MenuItem } from './ui';
 import { closeTabsFor } from './EditorTabs';
-import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow, TreeHeader } from './TreeParts';
+import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow, TreeHeader, treeKeys } from './TreeParts';
 
 export interface FolderListItem {
   id: string;
@@ -179,7 +179,7 @@ export function FolderList({
           <Input className="w-full h-7 min-h-7 text-sm" placeholder={`Filter ${itemNoun}s`} aria-label={`Filter ${itemNoun}s`} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       )}
-      <div className="flex-1 overflow-auto pb-2">
+      <div className="flex-1 overflow-auto pb-2" onKeyDown={treeKeys}>
         {allFolders.filter((f) => !ql || shown.some((i) => i.folder === f)).map((f) => {
           const inFolder = shown.filter((i) => i.folder === f);
           const open = !!ql || !collapsed[f];

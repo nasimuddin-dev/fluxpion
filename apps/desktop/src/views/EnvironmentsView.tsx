@@ -10,7 +10,7 @@ import { EnvCompare } from '../components/EnvCompare';
 import { EnvMatrix } from '../components/EnvMatrix';
 import { TrashDialog } from '../components/TrashDialog';
 import { Badge, Button, cx, Empty, Field, Input, Menu, MoreMenu, Split, Tabs, Toggle } from '../components/ui';
-import { CountPill, focusRow, InlineRename, RowMenu, TreeHeader } from '../components/TreeParts';
+import { CountPill, focusRow, InlineRename, RowMenu, TreeHeader, treeKeys } from '../components/TreeParts';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
@@ -163,7 +163,7 @@ export function EnvironmentsView() {
       <div className="flex-1 min-h-0">
         {scope === 'environment' && (
           <Split id="envs" sidebar initial={22}>
-            <div className="h-full flex flex-col bg-panel/50">
+            <div className="h-full flex flex-col bg-panel/50" onKeyDown={treeKeys}>
               <TreeHeader
                 title="Environments"
                 count={envs.length}
