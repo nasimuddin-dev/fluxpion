@@ -22,6 +22,9 @@ interface DataFile {
   count: number;
   columns: string[];
   preview: Array<Record<string, unknown>>;
+  /** A SQLite database: its tables and the query whose rows are the iterations. */
+  tables?: string[];
+  query?: string;
 }
 
 interface RunRow {
@@ -133,6 +136,7 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
         environment: environment || undefined,
         iterations: Number(iterations) || undefined,
         dataPath: data?.path,
+        dataQuery: data?.tables ? data.query : undefined,
         delayMs: Math.max(0, Number(delay) || 0),
         bail,
         keepVariableValues: keepValues,
@@ -143,6 +147,18 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
       useApp.getState().toast(asError(e).message, 'error');
     } finally {
       setStarting(false);
+    }
+  };
+
+  // the query of a SQLite data file, applied (re-previewed) on Enter or with the button
+  const [query, setQuery] = useState('');
+  useEffect(() => setQuery(data?.query ?? ''), [data?.path, data?.query]);
+  const applyQuery = async (q = query) => {
+    if (!data) return;
+    try {
+      setData(await call<DataFile>('col.previewDataFile', { path: data.path, query: q }));
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
     }
   };
 
@@ -198,7 +214,7 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
             </Field>
           </div>
 
-          <Field label="Data" hint="CSV or JSON. Each row becomes one iteration: use {{column}} in requests or pm.iterationData.get('column') in scripts.">
+          <Field label="Data" hint="CSV, JSON or a SQLite database (with a query). Each row becomes one iteration: use {{column}} in requests or pm.iterationData.get('column') in scripts.">
             {data ? (
               <div className="flex items-center gap-2 rounded-md border border-line px-2 py-1.5 text-sm">
                 <FileSpreadsheet size={14} className="text-muted shrink-0" />
@@ -214,6 +230,36 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
               <Button icon={<FileSpreadsheet size={13} />} onClick={pickData}>
                 Select file
               </Button>
+            )}
+            {data?.tables && (
+              <div className="mt-2 flex flex-col gap-1.5">
+                <textarea
+                  aria-label="SQL query for the data"
+                  className="w-full min-h-16 rounded-md border border-line bg-bg px-2 py-1.5 mono text-xs outline-none focus:border-accent"
+                  placeholder="SELECT * FROM users"
+                  value={query}
+                  spellCheck={false}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void applyQuery();
+                    }
+                  }}
+                />
+                <div className="flex items-center gap-1 flex-wrap text-xs">
+                  <Button size="sm" onClick={() => void applyQuery()} disabled={query.trim() === (data.query ?? '').trim()}>
+                    Apply query
+                  </Button>
+                  <span className="text-muted ml-1">Tables:</span>
+                  {data.tables.map((t) => (
+                    <button key={t} className="mono px-1.5 rounded bg-panel2 hover:text-accent" title={`SELECT * FROM ${t}`} onClick={() => void applyQuery(`SELECT * FROM "${t.replace(/"/g, '""')}"`)}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">Read-only: one SELECT (or WITH … SELECT). Ctrl+Enter applies it.</p>
+              </div>
             )}
           </Field>
 

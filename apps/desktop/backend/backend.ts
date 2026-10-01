@@ -1168,9 +1168,9 @@ export class Backend {
     return this.startRun(p.name ?? (p.paths.join(', ') || 'All tests'), tests, p);
   }
 
-  async readRunData(path: string): Promise<DatasetRecord[]> {
+  async readRunData(path: string, query?: string): Promise<DatasetRecord[]> {
     const rows: DatasetRecord[] = [];
-    for await (const r of readDataset({ path, limit: 100_000 })) rows.push(r);
+    for await (const r of readDataset({ path, query, limit: 100_000 })) rows.push(r);
     return rows;
   }
 
@@ -1188,7 +1188,7 @@ export class Backend {
         collection,
         selection: p.selection,
         iterations: p.iterations,
-        data: p.dataPath ? await this.readRunData(p.dataPath) : undefined,
+        data: p.dataPath ? await this.readRunData(p.dataPath, p.dataQuery) : undefined,
         delayMs: p.delayMs,
         realtime,
       }),
@@ -1287,6 +1287,8 @@ export interface CollectionRunParams {
   iterations?: number;
   /** CSV / JSON file with one row per iteration. */
   dataPath?: string;
+  /** SQL for a SQLite data file (read-only). */
+  dataQuery?: string;
   delayMs?: number;
   bail?: boolean;
   /** Save variables set by scripts as current values (Postman's "Keep variable values"). Default true. */

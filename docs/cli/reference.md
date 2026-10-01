@@ -111,7 +111,8 @@ testpion run-collection api.postman_collection.json -e staging.postman_environme
 | Option | Description |
 |---|---|
 | `-e, --environment` | Environment name, or a Postman environment file. |
-| `-d, --iteration-data` | CSV or JSON data file: one row per iteration (`pm.iterationData`, `{{column}}`). |
+| `-d, --iteration-data` | CSV, JSON or JSONL data file, or a SQLite database: one row per iteration (`pm.iterationData`, `{{column}}`). |
+| `--iteration-query` | With a SQLite database as `-d`: the read-only `SELECT` whose rows are the iterations. |
 | `-n, --iteration-count` | Number of iterations (default: the number of data rows, or 1). |
 | `--delay-request <ms>` | Pause between requests. |
 | `--watch` | Run again whenever the collection, an environment or the data file changes, until Ctrl+C. |

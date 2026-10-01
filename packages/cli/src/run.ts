@@ -258,6 +258,7 @@ export async function finishRun(a: {
 
 export interface CollectionCliOptions extends Pick<RunCliOptions, 'workspace' | 'environment' | 'bail' | 'timeout' | 'reporter' | 'out' | 'var' | 'baseline' | 'saveBaseline' | 'failOnRegression' | 'trace' | 'verbose' | 'quiet' | 'logLevel' | 'otlp' | 'otlpHeader' | 'rerunFailed'> {
   iterationData?: string;
+  iterationQuery?: string;
   iterationCount?: string;
   delayRequest?: string;
   folder?: string[];
@@ -348,7 +349,7 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
     const file = resolve(o.iterationData);
     if (!existsSync(file)) throw new CliError(`Data file ${file} does not exist`, EXIT.CONFIG_ERROR);
     data = [];
-    for await (const r of readDataset({ path: file, limit: 100_000 })) data.push(r);
+    for await (const r of readDataset({ path: file, query: o.iterationQuery, limit: 100_000 })) data.push(r);
   }
   const iterations = o.iterationCount ? Number(o.iterationCount) : undefined;
   if (iterations !== undefined && !(iterations >= 1)) throw new CliError('--iteration-count must be 1 or more', EXIT.CONFIG_ERROR);

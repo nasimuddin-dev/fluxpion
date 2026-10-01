@@ -17,7 +17,7 @@ Plans change with feedback. Vote or comment on [GitHub issues](https://github.co
 
 - Kafka as a protocol, next to HTTP, GraphQL, gRPC, WebSocket, Socket.IO, MQTT and MCP.
 - A native AWS Bedrock provider.
-- Database-query datasets.
+- Database-query datasets for PostgreSQL and MySQL (SQLite databases already work as datasets).
 
 ## Shipped
 

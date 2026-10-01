@@ -9,15 +9,19 @@ import { queryAll } from '../util/jsonpath.js';
 export type DatasetRecord = Record<string, unknown>;
 
 export interface DatasetSource {
-  /** Local file (.jsonl, .ndjson, .json, .csv, .md). */
+  /** Local file (.jsonl, .ndjson, .json, .csv, .md), or a SQLite database (.db, .sqlite, .sqlite3) with `query`. */
   path?: string;
+  /** SQL for a SQLite database: one record per row, columns as fields. Read-only (SELECT / WITH / VALUES). */
+  query?: string;
+  /** Values for `?` (array) or `:name` / `$name` / `@name` (object) placeholders in `query`. */
+  params?: unknown[] | Record<string, unknown>;
   /** Remote JSON / JSONL (API response dataset). */
   url?: string;
   /** JSONPath to the array of records inside a JSON document. */
   recordsPath?: string;
   /** Inline records. */
   records?: DatasetRecord[];
-  format?: 'jsonl' | 'json' | 'csv' | 'markdown';
+  format?: 'jsonl' | 'json' | 'csv' | 'markdown' | 'sqlite';
   limit?: number;
   offset?: number;
 }
@@ -41,10 +45,12 @@ export async function* readDataset(src: DatasetSource): AsyncGenerator<DatasetRe
 
 function formatOf(src: DatasetSource): NonNullable<DatasetSource['format']> {
   if (src.format) return src.format;
+  if (src.query) return 'sqlite';
   const ext = extname(src.path ?? new URL(src.url ?? 'http://x/a.json').pathname).toLowerCase();
   if (ext === '.jsonl' || ext === '.ndjson') return 'jsonl';
   if (ext === '.csv' || ext === '.tsv') return 'csv';
   if (ext === '.md' || ext === '.markdown') return 'markdown';
+  if (SQLITE_EXT.test(ext)) return 'sqlite';
   return 'json';
 }
 
@@ -63,6 +69,10 @@ async function* rawRecords(src: DatasetSource): AsyncGenerator<DatasetRecord> {
     return;
   }
   if (!src.path) throw new ApsError('ConfigurationError', 'Dataset needs `path`, `url` or `records`');
+  if (fmt === 'sqlite') {
+    yield* sqliteRecords(src.path, src.query, src.params);
+    return;
+  }
   if (fmt === 'jsonl') {
     const rl = createInterface({ input: createReadStream(src.path, 'utf8'), crlfDelay: Infinity });
     let line = 0;
@@ -102,6 +112,66 @@ async function* rawRecords(src: DatasetSource): AsyncGenerator<DatasetRecord> {
   }
   const text = await readFile(src.path, 'utf8');
   yield* parseText(text, fmt, src.recordsPath);
+}
+
+const SQLITE_EXT = /^\.(db|db3|sqlite|sqlite3)$/;
+
+/** Whether a data file is a SQLite database (it needs a query). */
+export const isSqliteDataset = (path: string) => SQLITE_EXT.test(extname(path).toLowerCase());
+
+type SqliteStatement = { all(...a: unknown[]): unknown[]; iterate?(...a: unknown[]): IterableIterator<unknown>; columns?(): Array<{ name: string }> };
+type SqliteModule = { DatabaseSync: new (path: string, opts?: { readOnly?: boolean; open?: boolean }) => { prepare(sql: string): SqliteStatement; close(): void } };
+
+function sqliteModule(): SqliteModule {
+  const gbm = (process as unknown as { getBuiltinModule?: (id: string) => unknown }).getBuiltinModule;
+  const emit = process.emitWarning;
+  process.emitWarning = (() => undefined) as typeof process.emitWarning;
+  try {
+    const m = gbm?.('node:sqlite') as SqliteModule | undefined;
+    if (m?.DatabaseSync) return m;
+  } catch {
+    /* fall through */
+  } finally {
+    process.emitWarning = emit;
+  }
+  throw new ApsError('ConfigurationError', 'SQLite datasets need Node.js 22.5 or newer (node:sqlite)', { suggestions: ['Update Node.js, or export the rows to CSV or JSON.'] });
+}
+
+/**
+ * Rows of a read-only query on a SQLite database. The database is opened read-only and only
+ * SELECT / WITH / VALUES statements are accepted, so a dataset can never change it.
+ */
+function* sqliteRecords(path: string, query: string | undefined, params?: DatasetSource['params']): Generator<DatasetRecord> {
+  const sql = query?.trim().replace(/;\s*$/, '');
+  const where = ['In a test file: dataset: { path: app.db, query: "SELECT …" }.', 'With run-collection: --iteration-query "SELECT …".', 'In the app: the query box under the data file in the Collection Runner.'];
+  if (!sql) throw new ApsError('ConfigurationError', `${path} is a SQLite database: add a query (for example SELECT * FROM users)`, { suggestions: where });
+  if (!/^(select|with|values)\b/i.test(sql) || sql.includes(';'))
+    throw new ApsError('ValidationError', 'A dataset query must be one SELECT, WITH or VALUES statement', { why: 'Datasets only read data; the database is opened read-only.', suggestions: ['Write a single SELECT (WITH … SELECT and VALUES work too), without a trailing second statement.'] });
+  const { DatabaseSync } = sqliteModule();
+  let db: InstanceType<SqliteModule['DatabaseSync']>;
+  try {
+    db = new DatabaseSync(path, { readOnly: true });
+  } catch (e) {
+    throw new ApsError('ConfigurationError', `Could not open the SQLite database ${path}: ${(e as Error).message}`);
+  }
+  try {
+    let stmt: SqliteStatement;
+    try {
+      stmt = db.prepare(sql);
+    } catch (e) {
+      throw new ApsError('ValidationError', `The dataset query failed: ${(e as Error).message}`, { suggestions: ["Check the table and column names; SELECT name FROM sqlite_master WHERE type = 'table' lists the tables."] });
+    }
+    const args = params === undefined ? [] : Array.isArray(params) ? params : [params];
+    const rows = stmt.iterate ? stmt.iterate(...args) : stmt.all(...args)[Symbol.iterator]();
+    for (const row of rows as Iterable<Record<string, unknown>>) {
+      // BLOBs become base64 text; numbers, strings and NULL stay as they are
+      const rec: DatasetRecord = {};
+      for (const [k, v] of Object.entries(row)) rec[k] = v instanceof Uint8Array ? Buffer.from(v).toString('base64') : typeof v === 'bigint' ? Number(v) : v;
+      yield rec;
+    }
+  } finally {
+    db.close();
+  }
 }
 
 function* parseText(text: string, fmt: string, recordsPath?: string): Generator<DatasetRecord> {
@@ -184,5 +254,16 @@ function* parseMarkdownTable(md: string): Generator<DatasetRecord> {
     const rec: DatasetRecord = {};
     header.forEach((h, i) => (rec[h] = coerce(c[i] ?? '')));
     yield rec;
+  }
+}
+
+/** Tables and views of a SQLite database (read-only), for suggesting a dataset query. */
+export function sqliteTables(path: string): string[] {
+  const { DatabaseSync } = sqliteModule();
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    return (db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY type, name").all() as Array<{ name: string }>).map((r) => r.name);
+  } finally {
+    db.close();
   }
 }

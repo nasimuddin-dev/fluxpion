@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, dirname, join } from 'node:path';
 import {
   ApsError,
+  isSqliteDataset,
+  readDataset,
+  sqliteTables,
   fetchImportText,
   bruFilesToBrunoExport,
   collectionToBru,
@@ -232,13 +235,31 @@ export function collectionsHandlers(be: Backend): Handlers {
     },
     /** Pick a CSV/JSON data file for a collection run; returns a preview of its rows. */
     'col.pickDataFile': async () => {
-      const f = await be.host.openDialog?.({ filters: [{ name: 'Data files', extensions: ['csv', 'json', 'jsonl'] }] });
+      const f = await be.host.openDialog?.({ filters: [{ name: 'Data files', extensions: ['csv', 'json', 'jsonl', 'db', 'sqlite', 'sqlite3'] }] });
       return f ? be.handlers['col.previewDataFile']!({ path: f }) : null;
     },
-    'col.previewDataFile': async ({ path }: { path: string }) => {
-      const rows = await be.readRunData(path);
+    'col.previewDataFile': async ({ path, query }: { path: string; query?: string }) => {
+      // a SQLite database needs a query: start with its first table
+      let tables: string[] | undefined;
+      if (isSqliteDataset(path)) {
+        tables = sqliteTables(path);
+        const select = (t: string) => `SELECT * FROM "${t.replace(/"/g, '""')}"`;
+        if (!query) {
+          // the first table that has rows (else the first table)
+          for (const t of tables) {
+            const it = readDataset({ path, query: select(t), limit: 1 })[Symbol.asyncIterator]();
+            if (!(await it.next()).done) {
+              query = select(t);
+              break;
+            }
+          }
+          query ??= tables[0] ? select(tables[0]) : undefined;
+        }
+        if (!query) return { path, name: basename(path), count: 0, columns: [], preview: [], tables, query: '' };
+      }
+      const rows = await be.readRunData(path, query);
       const columns = [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))];
-      return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20) };
+      return { path, name: basename(path), count: rows.length, columns, preview: rows.slice(0, 20), ...(tables ? { tables, query } : {}) };
     },
     /** Export a collection as TestPion JSON or a Postman v2.1 collection (`notes` lists what Postman can't hold). */
     'col.export': async ({ id, format = 'testpion' }: { id: string; format?: 'testpion' | 'postman' | 'openapi' | 'bruno' }) => {
