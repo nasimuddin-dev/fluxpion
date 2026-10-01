@@ -163,7 +163,7 @@ export function CollectionsView() {
               <Badge>v{draft.version}</Badge>
               <div className="ml-auto flex gap-2">
                 <Button size="sm" icon={<FilePlus2 size={12} />} onClick={() => useApp.getState().openIntent('rest', { newTab: true })}>
-                  New request
+                  New HTTP request
                 </Button>
                 <Button
                   size="sm"

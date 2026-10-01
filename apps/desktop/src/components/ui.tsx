@@ -81,6 +81,13 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
 );
 IconButton.displayName = 'IconButton';
 
+/** The small + / ⋯ buttons on explorer rows: one look everywhere. Header rows (sections, collections) keep them faintly visible; item rows show them on hover. */
+export const rowActionClass = (header = false) =>
+  cx(
+    'grid place-items-center h-6 w-6 shrink-0 rounded-md text-muted transition-opacity hover:text-fg hover:bg-panel2 focus:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-panel2 data-[state=open]:text-fg',
+    header ? 'opacity-60 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100',
+  );
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, ...p }, ref) => <input ref={ref} className={cx('field', className)} {...p} />);
 Input.displayName = 'Input';
 

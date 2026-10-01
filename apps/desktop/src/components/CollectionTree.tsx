@@ -1,8 +1,8 @@
-import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
+import { Plus, AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call, on } from '../api';
-import { cx, Menu, menuKeys, type MenuItem } from './ui';
+import { Button, cx, IconButton, Menu, menuKeys, rowActionClass, type MenuItem } from './ui';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
 import { closeTabsFor } from './EditorTabs';
@@ -76,6 +76,9 @@ export const CATEGORY_META: Record<RequestCategory, { label: string; badge: stri
   grpc: { label: 'gRPC', badge: 'gRPC', cls: 'text-[#2ea99e]' },
   websocket: { label: 'WebSocket & MQTT', badge: 'WS', cls: 'text-[#d97706]' },
 };
+
+/** The one name of "new request of this kind" in every menu and button: New HTTP request, New GraphQL request … */
+export const newRequestOf = (cat: RequestCategory) => (cat === 'rest' ? 'New HTTP request' : `New ${CATEGORY_META[cat].label} request`);
 
 /** Saved items of a collection that aren't collection requests (gRPC calls, WebSocket connections). */
 export interface ExtraGroup {
@@ -521,7 +524,7 @@ export function CollectionTree({
     const key = `${c.id}:cat:${cat}`;
     // the same menu as every other row (right-click or ⋯): create here, run the collection, fold
     const items: MenuItem[] = [
-      ...(onNewOfCategory ? [{ label: `New ${CATEGORY_META[cat].label} request`, icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }] : []),
+      ...(onNewOfCategory ? [{ label: newRequestOf(cat), icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }] : []),
       ...(onRun ? [{ label: 'Run collection', icon: <Play size={14} />, onSelect: () => onRun(c) }] : []),
       { label: isOpen ? 'Collapse' : 'Expand', icon: isOpen ? <ChevronRight size={14} /> : <ChevronDown size={14} />, separator: true, onSelect: () => toggle(key, isOpen) },
     ];
@@ -543,8 +546,8 @@ export function CollectionTree({
       </button>
       {onNewOfCategory && (
         <button
-          aria-label={`New ${CATEGORY_META[cat].label} request in ${c.name}`}
-          title={`New ${CATEGORY_META[cat].label} request`}
+          aria-label={`${newRequestOf(cat)} in ${c.name}`}
+          title={newRequestOf(cat)}
           className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100"
           onClick={() => onNewOfCategory(c, cat)}
         >
@@ -557,7 +560,7 @@ export function CollectionTree({
         onOpenChange={(o) => setMenuFor(o ? key : undefined)}
         items={items}
         trigger={
-          <button aria-label={`More actions for ${CATEGORY_META[cat].label}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
+          <button aria-label={`More actions for ${CATEGORY_META[cat].label}`} className={rowActionClass()}>
             <MoreHorizontal size={14} />
           </button>
         }
@@ -601,7 +604,7 @@ export function CollectionTree({
                   open={menuFor === i.id}
                   onOpenChange={(o) => setMenuFor(o ? i.id : undefined)}
                   trigger={
-                    <button aria-label={`More actions for ${i.name}`} className="grid place-items-center h-6 w-6 rounded-md text-muted hover:text-fg hover:bg-panel2 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
+                    <button aria-label={`More actions for ${i.name}`} className={rowActionClass()}>
                       <MoreHorizontal size={14} />
                     </button>
                   }
@@ -675,7 +678,7 @@ export function CollectionTree({
         return (
           <div key={c.id}>
             <div
-              className={cx('group flex items-center h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors', menuFor === c.id && 'bg-hover', dropClass(c.id))}
+              className={cx('group flex items-center gap-0.5 h-8 rounded-md mx-1 hover:bg-hover pr-1 pl-1.5 transition-colors', menuFor === c.id && 'bg-hover', dropClass(c.id))}
               {...collectionDropProps(c)}
               onContextMenu={(e) => {
                 if (c.problem) return;
@@ -697,7 +700,14 @@ export function CollectionTree({
                 {collections.some((x) => x !== c && x.name === c.name) && <span className="text-[0.7rem] text-muted font-normal mono truncate shrink-0 max-w-[40%]" title="Another collection has this name; this is its id">{c.id}</span>}
               </button>
               {!c.problem && (
+                <IconButton label={`${newRequestLabel ?? 'New HTTP request'} in ${c.name}`} className={rowActionClass(true)} onClick={() => onNewRequest(c)}>
+                  <Plus size={14} />
+                </IconButton>
+              )}
+              {!c.problem && (
                 <NodeMenu
+                  header
+                  label={c.name}
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
                   onRename={async () => {
@@ -708,7 +718,7 @@ export function CollectionTree({
                   onDelete={() => void deleteCollection(c)}
                   extraItems={[
                     ...(onNewOfCategory
-                      ? (['graphql', 'soap', 'grpc', 'websocket'] as const).map((cat) => ({ label: `New ${CATEGORY_META[cat].label} request`, icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }))
+                      ? (['graphql', 'soap', 'grpc', 'websocket'] as const).map((cat) => ({ label: newRequestOf(cat), icon: <FilePlus2 size={14} />, onSelect: () => onNewOfCategory(c, cat) }))
                       : []),
                     ...(onSettings ? [{ label: 'Settings, runner & docs', icon: <Settings2 size={14} />, onSelect: () => onSettings(c) }] : []),
                     { label: 'Run in CI…', icon: <Workflow size={14} />, onSelect: () => useApp.getState().set({ ci: { collection: c.id } }) },
@@ -728,11 +738,18 @@ export function CollectionTree({
               )}
             </div>
             {isOpen && renderContents(c)}
-            {isOpen && !c.items.length && !(extraGroups?.(c) ?? []).some((g) => g.items.length) && <div className="pl-8 py-1 text-xs text-muted">Empty collection</div>}
+            {isOpen && !f && !favoritesOnly && !c.problem && !c.items.length && !(extraGroups?.(c) ?? []).some((g) => g.items.length) && (
+              <div className="pl-7 pr-3 py-1.5 flex flex-col items-start gap-1.5">
+                <p className="text-xs text-muted leading-snug">No requests yet.</p>
+                <Button size="sm" icon={<Plus size={12} />} onClick={() => onNewRequest(c)}>
+                  {newRequestLabel ?? 'New HTTP request'}
+                </Button>
+              </div>
+            )}
           </div>
         );
       })}
-      {!collections.some((c) => c.items.some(matches) || (categorize && extraMatches(c))) && (
+      {(f || favoritesOnly) && !collections.some((c) => c.items.some(matches) || (categorize && extraMatches(c))) && (
         <p className="px-3 py-4 text-sm text-muted text-center">
           {favoritesOnly ? 'No favorite requests yet. Use a request’s menu to add one.' : f ? 'No requests match this filter.' : 'No requests in these collections yet.'}
         </p>
@@ -759,9 +776,15 @@ function NodeMenu({
   extraItems,
   open,
   onOpenChange,
-  newRequestLabel = 'New request',
+  newRequestLabel = 'New HTTP request',
+  header,
+  label,
 }: {
   newRequestLabel?: string;
+  /** On a header row (a collection): the button stays faintly visible, like the + beside it. */
+  header?: boolean;
+  /** What the menu is for (named on the button). */
+  label?: string;
   onEdit?(): void;
   onRename?(): void;
   onDelete?(): void;
@@ -808,8 +831,8 @@ function NodeMenu({
       open={open}
       onOpenChange={onOpenChange}
       trigger={
-        <button aria-label="More actions" className="p-1 rounded-md text-muted opacity-0 group-hover:opacity-100 hover:bg-panel2 hover:text-fg focus:opacity-100 data-[state=open]:opacity-100 data-[state=open]:bg-panel2 transition-opacity">
-          <MoreHorizontal size={15} />
+        <button aria-label={label ? `More actions for ${label}` : 'More actions'} className={rowActionClass(header)}>
+          <MoreHorizontal size={14} />
         </button>
       }
     />
