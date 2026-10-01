@@ -34,4 +34,6 @@ environment: Staging
 
 Every run writes `junit.xml`, `report.json`, `report.html` and `report.md`, containing totals, duration, errors, latency percentiles, AI metrics, tokens, cost estimates, and per-test AI details (prompt, model, input, output, evaluator, score, explanation). See [assertions](./assertions.md), [datasets](./datasets.md) and [CI/CD](./ci-cd.md).
 
+In the app, a finished run has a **Charts** tab next to its results: how many tests fell in each response-time range (passed and failed), results per test type, the five slowest tests (click one to find it in the results) and the checks that failed most.
+
 :::

@@ -18,13 +18,36 @@ export interface Activity {
   days: ActivityDay[];
   medianMs?: number;
   byKind: Record<string, number>;
-  slowest: Array<{ name: string; kind: string; durationMs: number; count: number }>;
+  slowest: Array<{
+    name: string;
+    kind: string;
+    durationMs: number;
+    count: number;
+  }>;
 }
 
-const KIND_LABEL: Record<string, string> = { http: 'REST', graphql: 'GraphQL', grpc: 'gRPC', mcp: 'MCP', llm: 'AI', websocket: 'WebSocket' };
+const KIND_LABEL: Record<string, string> = {
+  http: 'REST',
+  graphql: 'GraphQL',
+  grpc: 'gRPC',
+  mcp: 'MCP',
+  llm: 'AI',
+  websocket: 'WebSocket',
+};
 const dayDate = (day: string) => new Date(day + 'T12:00:00');
-const shortDay = (day: string, i: number, n: number) => (i === n - 1 ? 'Today' : dayDate(day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-const longDay = (day: string) => dayDate(day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const shortDay = (day: string, i: number, n: number) =>
+  i === n - 1
+    ? 'Today'
+    : dayDate(day).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      });
+const longDay = (day: string) =>
+  dayDate(day).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 
 const H = 140;
 const PAD = { l: 48, r: 6, t: 8, b: 20 };
@@ -60,7 +83,27 @@ function YGrid({ max, y, width, format = String, whole }: { max: number; y(v: nu
 }
 
 /** One stacked bar per day: the good part at the base, the failed part above it (2px gap). */
-function DailyStack({ title, aside, days, ok, bad, okLabel, badLabel, tip, empty }: { title: string; aside?: ReactNode; days: ActivityDay[]; ok(d: ActivityDay): number; bad(d: ActivityDay): number; okLabel: string; badLabel: string; tip(d: ActivityDay): ReactNode; empty: string }) {
+function DailyStack({
+  title,
+  aside,
+  days,
+  ok,
+  bad,
+  okLabel,
+  badLabel,
+  tip,
+  empty,
+}: {
+  title: string;
+  aside?: ReactNode;
+  days: ActivityDay[];
+  ok(d: ActivityDay): number;
+  bad(d: ActivityDay): number;
+  okLabel: string;
+  badLabel: string;
+  tip(d: ActivityDay): ReactNode;
+  empty: string;
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number>();
   // counts: whole numbers on the axis (at least 0, 1, 2)
@@ -140,7 +183,16 @@ function MedianLine({ days, overall }: { days: ActivityDay[]; overall?: number }
   };
   const any = days.some((d) => d.medianMs !== undefined);
   return (
-    <ChartCard title="Median response" aside={overall !== undefined ? <span>period <b className="text-fg">{formatMs(overall)}</b></span> : undefined}>
+    <ChartCard
+      title="Median response"
+      aside={
+        overall !== undefined ? (
+          <span>
+            period <b className="text-fg">{formatMs(overall)}</b>
+          </span>
+        ) : undefined
+      }
+    >
       <div ref={ref} className="relative" onMouseMove={onMove} onMouseLeave={() => setHover(undefined)}>
         <svg width={width} height={H} role="img" aria-label="Median response time per day">
           <YGrid max={max} y={y} width={width} format={formatMs} />
@@ -157,7 +209,9 @@ function MedianLine({ days, overall }: { days: ActivityDay[]; overall?: number }
         {hover !== undefined && days[hover] && (
           <ChartTip x={x(hover)} width={width}>
             <div className="font-medium text-fg">{longDay(days[hover]!.day)}</div>
-            <div className="text-muted mt-0.5">{days[hover]!.medianMs !== undefined ? `median ${formatMs(days[hover]!.medianMs!)} over ${plural(days[hover]!.requests, 'request')}` : 'no requests'}</div>
+            <div className="text-muted mt-0.5">
+              {days[hover]!.medianMs !== undefined ? `median ${formatMs(days[hover]!.medianMs!)} over ${plural(days[hover]!.requests, 'request')}` : 'no requests'}
+            </div>
           </ChartTip>
         )}
       </div>
@@ -240,12 +294,23 @@ export function ActivityCharts({ activity }: { activity: Activity }) {
         <Stat label="Requests sent" value={String(requests)} sub={failed ? `${failed} failed` : requests ? 'none failed' : 'nothing sent yet'} />
         <Stat label="Request success" value={pct(requests - failed, requests)} tone={!requests ? undefined : failed / requests > 0.05 ? 'bad' : 'ok'} sub="2xx/3xx, OK and tool results" />
         <Stat label="Median response" value={activity.medianMs !== undefined ? formatMs(activity.medianMs) : '—'} sub="all requests of the period" />
-        <Stat label="Tests passed" value={pct(tests - failedTests, tests)} tone={!tests ? undefined : failedTests ? 'bad' : 'ok'} sub={runs ? `${plural(tests, 'test')} in ${plural(runs, 'run')}` : 'no test runs yet'} />
+        <Stat
+          label="Tests passed"
+          value={pct(tests - failedTests, tests)}
+          tone={!tests ? undefined : failedTests ? 'bad' : 'ok'}
+          sub={runs ? `${plural(tests, 'test')} in ${plural(runs, 'run')}` : 'no test runs yet'}
+        />
       </div>
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
         <DailyStack
           title="Requests"
-          aside={requests ? <span>failed <b className="text-fg">{pct(failed, requests)}</b></span> : undefined}
+          aside={
+            requests ? (
+              <span>
+                failed <b className="text-fg">{pct(failed, requests)}</b>
+              </span>
+            ) : undefined
+          }
           days={days}
           ok={(d) => d.requests - d.failedRequests}
           bad={(d) => d.failedRequests}

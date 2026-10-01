@@ -41,7 +41,11 @@ export function Swatch({ color, label }: { color: string; label: string }) {
 /** A hover card positioned at x inside a chart of the given width. */
 export function ChartTip({ x, width, children, top = 0 }: { x: number; width: number; children: ReactNode; top?: number }) {
   return (
-    <div role="tooltip" className="pointer-events-none absolute z-10 rounded-lg border border-line bg-popover px-2.5 py-1.5 text-xs shadow-lg whitespace-nowrap" style={{ top, left: Math.max(0, Math.min(x + 12, width - 200)) }}>
+    <div
+      role="tooltip"
+      className="pointer-events-none absolute z-10 rounded-lg border border-line bg-popover px-2.5 py-1.5 text-xs shadow-lg whitespace-nowrap"
+      style={{ top, left: Math.max(0, Math.min(x + 12, width - 200)) }}
+    >
       {children}
     </div>
   );

@@ -27,6 +27,8 @@ import {
   WorkspaceSearch,
   WorkspaceStore,
   batcher,
+  runBreakdown,
+  type RunBreakdown,
   isEventStream,
   createEngineContext,
   estimateCost,
@@ -1075,6 +1077,24 @@ export class Backend {
       total++;
     }
     return { items, total };
+  }
+
+  /** Latency histogram, slowest results, results per type and most failed checks of a finished run (streamed from disk). */
+  async runBreakdown(runId: string): Promise<RunBreakdown> {
+    const file = join(this.ws.runDir(runId), 'results.jsonl');
+    const b = runBreakdown();
+    if (existsSync(file)) {
+      const rl = createInterface({ input: createReadStream(file, 'utf8'), crlfDelay: Infinity });
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        try {
+          b.add(JSON.parse(line));
+        } catch {
+          /* skip a torn line */
+        }
+      }
+    }
+    return b.result();
   }
 
   startRun(

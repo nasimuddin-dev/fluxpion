@@ -6,6 +6,7 @@ import type { RunSummary, TestResult, Trace } from '../types';
 import { formatCost, formatMs, plural } from '../lib/format';
 import { CheckList, ErrorPanel, StatusIcon } from './Results';
 import { TraceView } from './TraceView';
+import { RunCharts } from './RunCharts';
 import { finishSave, viewContent, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Modal, Select, Split, Tabs, VirtualList, Menu, MetricGrid } from './ui';
 
@@ -41,6 +42,22 @@ export function RunPanel({ runId, expectedTotal, onRerunFailed }: { runId: strin
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<TestResult>();
   const [baselineOpen, setBaselineOpen] = useState(false);
+  // results list or the run's charts (once it finished); remembered
+  const [pane, setPane] = useState<'results' | 'charts'>(() => {
+    try {
+      return localStorage.getItem('aps.runPane') === 'charts' ? 'charts' : 'results';
+    } catch {
+      return 'results';
+    }
+  });
+  const pickPane = (p: 'results' | 'charts') => {
+    setPane(p);
+    try {
+      localStorage.setItem('aps.runPane', p);
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const loadingPage = useRef(false);
 
   useEffect(() => {
@@ -159,41 +176,64 @@ export function RunPanel({ runId, expectedTotal, onRerunFailed }: { runId: strin
           ))}
         </MetricGrid>
       )}
-      <div className="flex-1 min-h-0">
-        <Split id="run-results" initial={48}>
-          <div className="h-full flex flex-col">
-            <div className="flex items-center gap-2 p-2 border-b border-line">
-              <Select className="h-7 min-h-7 py-0 text-sm" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status filter">
-                <option value="all">All</option>
-                <option value="failed">Failed & errors</option>
-                <option value="passed">Passed</option>
-                <option value="skipped">Skipped</option>
-              </Select>
-              <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter by name" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <span className="text-xs text-muted tabular-nums">{done ? `${rows.length}/${total}` : `${live.length} shown`}</span>
+      {done && (
+        <Tabs
+          className="min-h-9 [&>button]:h-9"
+          tabs={[
+            { id: 'results', label: 'Results', badge: total || undefined },
+            { id: 'charts', label: 'Charts' },
+          ]}
+          value={pane}
+          onChange={pickPane}
+        />
+      )}
+      {done && pane === 'charts' ? (
+        <div className="flex-1 min-h-0">
+          <RunCharts
+            runId={runId}
+            onPick={(name) => {
+              setQuery(name);
+              pickPane('results');
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0">
+          <Split id="run-results" initial={48}>
+            <div className="h-full flex flex-col">
+              <div className="flex items-center gap-2 p-2 border-b border-line">
+                <Select className="h-7 min-h-7 py-0 text-sm" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status filter">
+                  <option value="all">All</option>
+                  <option value="failed">Failed & errors</option>
+                  <option value="passed">Passed</option>
+                  <option value="skipped">Skipped</option>
+                </Select>
+                <Input className="flex-1 h-7 min-h-7 text-sm" placeholder="Filter by name" value={query} onChange={(e) => setQuery(e.target.value)} />
+                <span className="text-xs text-muted tabular-nums">{done ? `${rows.length}/${total}` : `${live.length} shown`}</span>
+              </div>
+              {list.length ? (
+                <VirtualList
+                  className="flex-1"
+                  items={list}
+                  rowHeight={30}
+                  onEndReached={done && rows.length < total ? () => void loadPage(false) : undefined}
+                  render={(r) => (
+                    <button title={r.name} onClick={() => setSel(r)} className={cx('w-full h-full flex items-center gap-2 px-3 border-b border-line/50 text-sm text-left hover:bg-hover', sel?.id === r.id && sel.attempts === r.attempts && 'bg-accent/10')}>
+                      <StatusIcon status={r.status} />
+                      <span className="truncate flex-1 min-w-0">{r.name}</span>
+                      <span className="text-[0.7rem] text-muted uppercase tracking-wide shrink-0">{r.type}</span>
+                      <span className="text-xs text-muted tabular-nums w-14 text-right shrink-0">{formatMs(r.latencyMs ?? r.durationMs)}</span>
+                    </button>
+                  )}
+                />
+              ) : (
+                <Empty title={done ? 'No results match' : 'Waiting for results…'} />
+              )}
             </div>
-            {list.length ? (
-              <VirtualList
-                className="flex-1"
-                items={list}
-                rowHeight={30}
-                onEndReached={done && rows.length < total ? () => void loadPage(false) : undefined}
-                render={(r) => (
-                  <button title={r.name} onClick={() => setSel(r)} className={cx('w-full h-full flex items-center gap-2 px-3 border-b border-line/50 text-sm text-left hover:bg-hover', sel?.id === r.id && sel.attempts === r.attempts && 'bg-accent/10')}>
-                    <StatusIcon status={r.status} />
-                    <span className="truncate flex-1 min-w-0">{r.name}</span>
-                    <span className="text-[0.7rem] text-muted uppercase tracking-wide shrink-0">{r.type}</span>
-                    <span className="text-xs text-muted tabular-nums w-14 text-right shrink-0">{formatMs(r.latencyMs ?? r.durationMs)}</span>
-                  </button>
-                )}
-              />
-            ) : (
-              <Empty title={done ? 'No results match' : 'Waiting for results…'} />
-            )}
-          </div>
-          <div className="h-full min-h-0">{sel ? <ResultDetail r={sel} /> : <Empty icon={<Target size={24} />} title="Select a result to inspect checks, output and trace" />}</div>
-        </Split>
-      </div>
+            <div className="h-full min-h-0">{sel ? <ResultDetail r={sel} /> : <Empty icon={<Target size={24} />} title="Select a result to inspect checks, output and trace" />}</div>
+          </Split>
+        </div>
+      )}
       {baselineOpen && <BaselineModal runId={runId} onClose={() => setBaselineOpen(false)} />}
     </div>
   );

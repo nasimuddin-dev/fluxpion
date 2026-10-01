@@ -66,6 +66,7 @@ export function testingHandlers(be: Backend): Handlers {
       be.startRun(draft.name || 'Evaluation', evaluationTests(draft), { environment, concurrency: draft.concurrency, retries: draft.retries, traceMode: 'all' }),
     'runs.cancel': ({ runId }: { runId: string }) => be.runs.get(runId)?.ctrl.abort(),
     'runs.list': (q: { query?: string; limit?: number; offset?: number }) => be.ws.meta.listRuns(q),
+    'runs.breakdown': ({ runId }: { runId: string }) => be.runBreakdown(runId),
     'runs.summary': ({ runId }: { runId: string }) => {
       const f = join(be.ws.runDir(runId), 'summary.json');
       return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null;
