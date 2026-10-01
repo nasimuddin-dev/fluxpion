@@ -15,6 +15,7 @@ interface RequestStat {
   lastAt: string;
   lastOk: boolean;
   medianMs?: number;
+  recent?: string[];
 }
 
 /** From `col.variableFlow` (collectionVariableFlow in core). */
@@ -191,6 +192,9 @@ export function CollectionOverview({ collection, onOpen }: { collection: Collect
                   {!hasChecks(r.node) && <span className="text-muted shrink-0" title="No assertions or tests">no checks</span>}
                   {r.stat ? (
                     <>
+                      <span className="w-12 shrink-0 hidden md:flex justify-end">
+                        <RecentRuns statuses={r.stat.recent ?? []} />
+                      </span>
                       <Badge tone={statusTone(r.stat.lastStatus)}>{String(r.stat.lastStatus ?? '—')}</Badge>
                       <span className="w-24 h-1.5 rounded-full bg-hover/60 overflow-hidden shrink-0 hidden sm:block" title={r.stat.medianMs !== undefined ? `median ${formatMs(r.stat.medianMs)}` : undefined}>
                         {r.stat.medianMs !== undefined && <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(4, (r.stat.medianMs / maxMs) * 100)}%` }} />}
@@ -202,7 +206,7 @@ export function CollectionOverview({ collection, onOpen }: { collection: Collect
                       <span className="w-16 text-right text-muted shrink-0">{timeAgo(r.stat.lastAt)}</span>
                     </>
                   ) : (
-                    <span className="text-muted shrink-0 w-[19rem] text-right">not sent yet</span>
+                    <span className="text-muted shrink-0 w-[19rem] md:w-[22.5rem] text-right">not sent yet</span>
                   )}
                 </button>
               ))}

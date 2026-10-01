@@ -52,8 +52,8 @@ describe('request stats', () => {
       { timestamp: '2026-10-01T00:00:00Z', status: 200 },
     ]);
     expect(out).toEqual([
-      { requestId: 'a', count: 2, failed: 1, lastStatus: 500, lastAt: '2026-10-01T03:00:00Z', lastOk: false, medianMs: 200 },
-      { requestId: 'b', count: 1, failed: 0, lastStatus: 200, lastAt: '2026-10-01T01:00:00Z', lastOk: true, medianMs: 50 },
+      { requestId: 'a', count: 2, failed: 1, lastStatus: 500, lastAt: '2026-10-01T03:00:00Z', lastOk: false, medianMs: 200, recent: ['passed', 'failed'] },
+      { requestId: 'b', count: 1, failed: 0, lastStatus: 200, lastAt: '2026-10-01T01:00:00Z', lastOk: true, medianMs: 50, recent: ['passed'] },
     ]);
   });
 });

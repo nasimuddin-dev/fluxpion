@@ -135,6 +135,8 @@ export interface RequestStat {
   lastAt: string;
   lastOk: boolean;
   medianMs?: number;
+  /** The latest results, oldest first (up to 10): passed or failed. */
+  recent?: string[];
 }
 
 /** Per saved request: responses, failures, the latest status and the median time of the latest 50. Rows newest first. */
@@ -144,12 +146,14 @@ export function summarizeRequestStats(rows: Array<{ requestId?: string; timestam
     if (!r.requestId) continue;
     let e = by.get(r.requestId);
     if (!e) {
-      e = { stat: { requestId: r.requestId, count: 0, failed: 0, lastStatus: r.status, lastAt: r.timestamp, lastOk: historyOk(r.status) }, times: [] };
+      e = { stat: { requestId: r.requestId, count: 0, failed: 0, lastStatus: r.status, lastAt: r.timestamp, lastOk: historyOk(r.status), recent: [] }, times: [] };
       by.set(r.requestId, e);
     }
     e.stat.count++;
     if (!historyOk(r.status)) e.stat.failed++;
     if (typeof r.durationMs === 'number' && e.times.length < 50) e.times.push(r.durationMs);
+    // rows come newest first: prepend so the strip reads oldest to newest
+    if (e.stat.recent!.length < 10) e.stat.recent!.unshift(historyOk(r.status) ? 'passed' : 'failed');
   }
   return [...by.values()].map(({ stat, times }) => {
     if (times.length) {
