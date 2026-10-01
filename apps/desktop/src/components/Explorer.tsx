@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, MoreHorizontal, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -359,8 +359,26 @@ export function Explorer() {
   };
   const moveItem = (kind: 'grpc' | 'websocket', id: string, collectionId: string | undefined) => editLibrary(kind, (items) => items.map((i) => (i.id === id ? { ...i, collectionId } : i)));
   /** The menu of a gRPC call or connection: the same actions as a request's (open, rename, duplicate, move, delete). */
+  /** Copy a saved gRPC call as a grpcurl command, or a connection's URL ({{variables}} resolved). */
+  const copySaved = async (kind: 'grpc' | 'websocket', id: string) => {
+    try {
+      const it = (await call<Library<Record<string, any>>>('lib.get', { kind })).items.find((i) => i.id === id);
+      if (!it) return;
+      const env = useApp.getState().environment;
+      const d = it.data;
+      const text =
+        kind === 'grpc'
+          ? await call<string>('grpc.grpcurl', { target: d.target, method: d.method, message: d.message, metadata: d.metadata, tls: d.tls, protoFiles: d.descriptorSet ? [] : (d.protoFiles ?? []).map((f: { name: string }) => f.name), timeoutMs: d.timeoutMs, environment: env })
+          : String(d.url ?? '');
+      await navigator.clipboard.writeText(text);
+      useApp.getState().toast(kind === 'grpc' ? 'Copied as grpcurl' : 'Copied the URL', 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
   const moveMenu = (kind: 'grpc' | 'websocket', item: SavedItem): MenuItem[] => [
     { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(kind, { savedId: item.id }) },
+    { label: kind === 'grpc' ? 'Copy as grpcurl' : 'Copy URL', icon: <Copy size={14} />, onSelect: () => void copySaved(kind, item.id) },
     {
       label: 'Rename',
       icon: <Pencil size={14} />,

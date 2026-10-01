@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Copy from the sidebar**: a gRPC call's menu has *Copy as grpcurl* and a connection's *Copy URL* (`{{variables}}` resolved), like *Copy as cURL* on requests.
 - **Monitors can watch gRPC calls and connections**: *What to run* lists the collection's gRPC calls and connections after its requests, so a monitor can check just those.
 - **One collection list for the whole app**: the sidebar, the REST editor and the breadcrumbs share one copy of the workspace's collections, fetched once after a burst of changes, instead of each fetching every collection after every save.
 - **Insomnia imports bring gRPC and WebSocket requests**: from an Insomnia 4 export, gRPC requests (with their `.proto` files, metadata and TLS) and WebSocket requests (headers, first message) become the imported collection's gRPC calls and connections, in their folders.
