@@ -90,6 +90,8 @@ export interface ExtraGroup {
   items: Array<{ id: string; name: string; folder?: string; badge?: string }>;
   onOpen(id: string): void;
   menu?(id: string): MenuItem[];
+  /** Rename an item in place (F2, or Rename in its menu). */
+  rename?(id: string): { editing: boolean; start(): void; done(name?: string): void };
 }
 
 /** Drag data of a saved gRPC call or connection (from the tree or "Not in a collection"): `{ kind, id, from? }`. */
@@ -608,10 +610,12 @@ export function CollectionTree({
           </div>
         )}
         {(isOpen || !folder) && inside
-          .map((i) => (
+          .map((i) => {
+            const rn = g.rename?.(i.id);
+            return (
             <div
               key={i.id}
-              {...(onDropSaved ? savedItemDragProps(g.cat, i.id, i.name, from) : {})}
+              {...(onDropSaved && !rn?.editing ? savedItemDragProps(g.cat, i.id, i.name, from) : {})}
               onDragEnd={() => setDropAt(undefined)}
               className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === i.id ? 'bg-accent-soft text-fg' : menuFor === i.id ? 'bg-hover' : 'hover:bg-hover')}
               style={{ paddingLeft: 8 + (depth + (folder ? 1 : 0)) * 12 }}
@@ -621,10 +625,30 @@ export function CollectionTree({
                 setMenuFor(i.id);
               }}
             >
-              <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => g.onOpen(i.id)} onKeyDown={g.menu ? menuKeys(g.menu(i.id)) : undefined} title={i.name} data-tree-row>
+              {rn?.editing ? (
+                <div className="flex items-center gap-2 flex-1 min-w-0 pl-4">
+                  <span className={cx('mono text-[0.64rem] font-bold w-10 shrink-0', CATEGORY_META[g.cat].cls)}>{i.badge ?? CATEGORY_META[g.cat].badge}</span>
+                  <InlineRename value={i.name} onCommit={(name) => rn.done(name)} onCancel={() => rn.done()} />
+                </div>
+              ) : (
+              <button
+                className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4"
+                onClick={() => g.onOpen(i.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'F2' && rn) {
+                    e.preventDefault();
+                    return rn.start();
+                  }
+                  if (g.menu) menuKeys(g.menu(i.id))?.(e);
+                }}
+                title={i.name}
+                data-tree-row
+                data-rename-id={i.id}
+              >
                 <span className={cx('mono text-[0.64rem] font-bold w-10 shrink-0', CATEGORY_META[g.cat].cls)}>{i.badge ?? CATEGORY_META[g.cat].badge}</span>
                 <span className="truncate">{i.name}</span>
               </button>
+              )}
               {g.menu && (
                 <Menu
                   width={230}
@@ -639,7 +663,8 @@ export function CollectionTree({
                 />
               )}
             </div>
-          ))}
+            );
+          })}
       </div>
       );
     });

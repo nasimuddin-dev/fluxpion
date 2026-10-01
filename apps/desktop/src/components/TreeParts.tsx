@@ -110,9 +110,14 @@ export function TreeFolderRow({
   menu,
   dropTarget,
   className,
+  onRename,
   ...rest
-}: { name: string; count: number; open: boolean; onToggle(): void; menu: MenuItem[]; dropTarget?: boolean } & Omit<HTMLAttributes<HTMLDivElement>, 'onToggle'>) {
+}: { name: string; count: number; open: boolean; onToggle(): void; menu: MenuItem[]; dropTarget?: boolean; onRename?(to: string): unknown } & Omit<HTMLAttributes<HTMLDivElement>, 'onToggle'>) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const key = `folder:${name}`;
+  // with onRename, "Rename folder" in the menu (and F2) renames in place instead of asking in a dialog
+  const items = onRename ? menu.map((m) => (m.label === 'Rename folder' ? { ...m, onSelect: () => setEditing(true) } : m)) : menu;
   return (
     <div
       {...rest}
@@ -127,13 +132,46 @@ export function TreeFolderRow({
         setMenuOpen(true);
       }}
     >
-      <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={onToggle} aria-expanded={open} data-tree-row>
-        {open ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
-        <Folder size={13} className="text-muted shrink-0" />
-        <span className="truncate flex-1">{name}</span>
-        <CountPill n={count} />
-      </button>
-      <RowMenu label={`folder ${name}`} items={menu} open={menuOpen} onOpenChange={setMenuOpen} />
+      {editing ? (
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          {open ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+          <Folder size={13} className="text-muted shrink-0" />
+          <InlineRename
+            value={name}
+            label="Folder name"
+            onCommit={(to) => {
+              setEditing(false);
+              void onRename?.(to);
+              focusRow(`folder:${to}`);
+            }}
+            onCancel={() => {
+              setEditing(false);
+              focusRow(key);
+            }}
+          />
+        </div>
+      ) : (
+        <button
+          className="flex items-center gap-1 flex-1 min-w-0 text-left"
+          onClick={onToggle}
+          onKeyDown={(e) => {
+            if (e.key === 'F2' && onRename) {
+              e.preventDefault();
+              setEditing(true);
+            }
+          }}
+          aria-expanded={open}
+          data-tree-row
+          data-rename-id={key}
+          title={onRename ? 'F2 renames' : undefined}
+        >
+          {open ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+          <Folder size={13} className="text-muted shrink-0" />
+          <span className="truncate flex-1">{name}</span>
+          <CountPill n={count} />
+        </button>
+      )}
+      <RowMenu label={`folder ${name}`} items={items} open={menuOpen} onOpenChange={setMenuOpen} />
     </div>
   );
 }

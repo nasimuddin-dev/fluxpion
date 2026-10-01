@@ -12,7 +12,7 @@ import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, menuKeys, type MenuItem } from './ui';
-import { askFolderName, folderMenuItems, moveToFolderItem, RowMenu, TreeFolderRow } from './TreeParts';
+import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow } from './TreeParts';
 
 /**
  * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
@@ -98,11 +98,19 @@ function Section({
   );
 }
 
-function Row({ icon, label, sub, onClick, title, active, menu, drag, indent }: { icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string; active?: boolean; menu?: MenuItem[]; drag?: ReturnType<typeof savedItemDragProps>; indent?: boolean }) {
+/** Renaming a row in place: whether it is being renamed, and how to start and finish. */
+interface RowRename {
+  editing: boolean;
+  start(): void;
+  done(name?: string): void;
+}
+
+function Row({ id, icon, label, sub, onClick, title, active, menu, drag, indent, rename }: { id?: string; icon?: ReactNode; label: string; sub?: ReactNode; onClick(): void; title?: string; active?: boolean; menu?: MenuItem[]; drag?: ReturnType<typeof savedItemDragProps>; indent?: boolean; rename?: RowRename }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
       {...drag}
+      draggable={rename?.editing ? false : drag?.draggable}
       className={cx('group mx-1 flex items-center rounded-md pr-1 transition-colors', active ? 'bg-accent-soft' : menuOpen ? 'bg-hover' : 'hover:bg-hover')}
       onContextMenu={(e) => {
         if (!menu) return;
@@ -110,11 +118,31 @@ function Row({ icon, label, sub, onClick, title, active, menu, drag, indent }: {
         setMenuOpen(true);
       }}
     >
-      <button title={title ?? label} onClick={onClick} onKeyDown={menuKeys(menu)} data-tree-row className={cx('flex-1 min-w-0 flex items-center gap-2 h-8 pr-1 text-sm text-left', indent ? 'pl-10' : 'pl-6')}>
-        {icon && <span className="text-muted shrink-0">{icon}</span>}
-        <span className="truncate flex-1">{label}</span>
-        {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}
-      </button>
+      {rename?.editing ? (
+        <div className={cx('flex-1 min-w-0 flex items-center gap-2 h-8 pr-1 text-sm', indent ? 'pl-10' : 'pl-6')}>
+          {icon && <span className="text-muted shrink-0">{icon}</span>}
+          <InlineRename value={label} onCommit={(name) => rename.done(name)} onCancel={() => rename.done()} />
+        </div>
+      ) : (
+        <button
+          title={title ?? label}
+          onClick={onClick}
+          onKeyDown={(e) => {
+            if (e.key === 'F2' && rename) {
+              e.preventDefault();
+              return rename.start();
+            }
+            menuKeys(menu)?.(e);
+          }}
+          data-tree-row
+          data-rename-id={id}
+          className={cx('flex-1 min-w-0 flex items-center gap-2 h-8 pr-1 text-sm text-left', indent ? 'pl-10' : 'pl-6')}
+        >
+          {icon && <span className="text-muted shrink-0">{icon}</span>}
+          <span className="truncate flex-1">{label}</span>
+          {sub && <span className="text-xs text-muted truncate max-w-[45%]">{sub}</span>}
+        </button>
+      )}
       {menu && <RowMenu label={label} items={menu} open={menuOpen} onOpenChange={setMenuOpen} />}
     </div>
   );
@@ -391,16 +419,33 @@ export function Explorer() {
       useApp.getState().toast(asError(e).message, 'error');
     }
   };
+  /** The server, saved gRPC call or connection being renamed in place. */
+  const [renaming, setRenaming] = useState<string>();
+  const renameSaved = (kind: 'grpc' | 'websocket', id: string): RowRename => ({
+    editing: renaming === id,
+    start: () => setRenaming(id),
+    done: (name) => {
+      setRenaming(undefined);
+      if (name) void editLibrary(kind, (items) => items.map((i) => (i.id === id ? { ...i, name } : i)));
+      focusRow(id);
+    },
+  });
+  const renameServer = (id: string): RowRename => ({
+    editing: renaming === id,
+    start: () => setRenaming(id),
+    done: (name) => {
+      setRenaming(undefined);
+      if (name) void editServers((list) => list.map((x) => (x.id === id ? { ...x, name } : x)));
+      focusRow(id);
+    },
+  });
   const moveMenu = (kind: 'grpc' | 'websocket', item: SavedItem): MenuItem[] => [
     { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(kind, { savedId: item.id }) },
     { label: kind === 'grpc' ? 'Copy as grpcurl' : 'Copy URL', icon: <Copy size={14} />, onSelect: () => void copySaved(kind, item.id) },
     {
       label: 'Rename',
       icon: <Pencil size={14} />,
-      onSelect: async () => {
-        const name = (await promptText(`Rename ${kind === 'grpc' ? 'gRPC call' : 'connection'}`, { value: item.name, okLabel: 'Rename' }))?.trim();
-        if (name) await editLibrary(kind, (items) => items.map((i) => (i.id === item.id ? { ...i, name } : i)));
-      },
+      onSelect: () => setRenaming(item.id),
     },
     {
       label: 'Duplicate',
@@ -446,10 +491,7 @@ export function Explorer() {
       label: 'Rename',
       icon: <Pencil size={14} />,
       separator: true,
-      onSelect: async () => {
-        const name = (await promptText('Rename MCP server', { value: s.name, okLabel: 'Rename' }))?.trim();
-        if (name) await editServers((list) => list.map((x) => (x.id === s.id ? { ...x, name } : x)));
-      },
+      onSelect: () => setRenaming(s.id),
     },
     { label: 'Duplicate', icon: <CopyPlus size={14} />, onSelect: () => void editServers((list) => list.flatMap((x) => (x.id === s.id ? [x, { ...x, id: uid('mcp-'), name: `${x.name} copy` }] : [x]))) },
     {
@@ -497,16 +539,17 @@ export function Explorer() {
     if (name) await ops.setFolders((fs) => [...fs, name]);
   };
   /** The ⋯ menu of a folder (the shared one): rename it, or delete it (its items move to the top level). */
+  const renameFolder = async (ops: FolderOps, name: string, next: string) => {
+    await ops.assign((_, folder) => (folder === name ? next : folder));
+    await ops.setFolders((fs) => fs.map((x) => (x === name ? next : x)));
+  };
   const folderMenu = (ops: FolderOps, name: string, itemNoun: string, addLabel: string, onAdd: () => void): MenuItem[] =>
     folderMenuItems({
       name,
       itemNoun,
       addLabel,
       onAdd,
-      rename: async (next) => {
-        await ops.assign((_, folder) => (folder === name ? next : folder));
-        await ops.setFolders((fs) => fs.map((x) => (x === name ? next : x)));
-      },
+      rename: (next) => renameFolder(ops, name, next),
       remove: async () => {
         await ops.assign((_, folder) => (folder === name ? undefined : folder));
         await ops.setFolders((fs) => fs.filter((x) => x !== name));
@@ -536,7 +579,7 @@ export function Explorer() {
           const isOpen = !!f || sections.isOpen(key, true);
           return (
             <div key={key}>
-              <TreeFolderRow className="pl-5" name={name} count={inside.length} open={isOpen} onToggle={() => sections.toggle(key, true)} menu={menuOf(name)} />
+              <TreeFolderRow className="pl-5" name={name} count={inside.length} open={isOpen} onToggle={() => sections.toggle(key, true)} menu={menuOf(name)} onRename={(to) => renameFolder(ops, name, to)} />
               {isOpen && (inside.length ? inside.map((i) => row(i, true)) : <p className="pl-10 py-1 text-xs text-muted">Empty folder</p>)}
             </div>
           );
@@ -574,8 +617,8 @@ export function Explorer() {
     }
   };
   const extraGroups = (c: Collection): ExtraGroup[] => [
-    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!) },
-    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!) },
+    { cat: 'grpc', items: grpcByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('grpc', { savedId: id }), menu: (id) => moveMenu('grpc', grpc.find((i) => i.id === id)!), rename: (id) => renameSaved('grpc', id) },
+    { cat: 'websocket', items: socketsByCollection.get(c.id) ?? NONE, onOpen: (id) => intent('websocket', { savedId: id }), menu: (id) => moveMenu('websocket', sockets.find((i) => i.id === id)!), rename: (id) => renameSaved('websocket', id) },
   ];
   const newOfCategory = (c: Collection, cat: RequestCategory) => {
     if (cat === 'grpc' || cat === 'websocket') return intent(cat, { newDoc: true, collectionId: c.id });
@@ -675,7 +718,7 @@ export function Explorer() {
                     <div key={`${kind}:${g.folder ?? ''}`}>
                       {g.folder && <FolderLabel name={g.folder} />}
                       {g.items.map((i) => (
-                        <Row key={i.id} icon={<span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', CATEGORY_META[kind].cls)}>{i.badge ?? CATEGORY_META[kind].badge}</span>} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} drag={savedItemDragProps(kind, i.id, i.name)} />
+                        <Row key={i.id} icon={<span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', CATEGORY_META[kind].cls)}>{i.badge ?? CATEGORY_META[kind].badge}</span>} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} drag={savedItemDragProps(kind, i.id, i.name)} id={i.id} rename={renameSaved(kind, i.id)} />
                       ))}
                     </div>
                   )),
@@ -698,6 +741,8 @@ export function Explorer() {
                 active={openRequestId === s.id}
                 onClick={() => intent('mcp', { serverId: s.id })}
                 menu={withMove(serverMenu(s), moveToFolder(mcpOps, servers, s.id, s.folder))}
+                id={s.id}
+                rename={renameServer(s.id)}
               />
             ))
           ) : (
