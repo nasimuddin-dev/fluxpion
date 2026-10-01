@@ -1,6 +1,7 @@
+import { CompareView, type Compared } from '../components/ResponseHistory';
 import { Download, History, RotateCcw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { call } from '../api';
+import { asError, call } from '../api';
 import { confirmAction, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { HttpRequestSpec } from '../types';
@@ -31,6 +32,21 @@ export function HistoryView() {
   const [kind, setKind] = useState('');
   const [failedOnly, setFailedOnly] = useState(false);
   const [sel, setSel] = useState<Entry>();
+  // Ctrl/⌘+click a second entry: compare the two responses (older first)
+  const [pair, setPair] = useState<{ before: Entry; after: Entry; result?: Compared; error?: string }>();
+  const pick = (e: Entry, ev: React.MouseEvent) => {
+    if ((ev.ctrlKey || ev.metaKey) && sel && sel.id !== e.id) {
+      const [before, after] = sel.timestamp <= e.timestamp ? [sel, e] : [e, sel];
+      setPair({ before, after });
+      void call<Compared>('history.compare', { before: before.id, after: after.id }).then(
+        (result) => setPair({ before, after, result }),
+        (err) => setPair({ before, after, error: asError(err).message }),
+      );
+      return;
+    }
+    setPair(undefined);
+    setSel(e);
+  };
   const load = useCallback(
     async (reset = true) => {
       const r = await call<{ items: Entry[]; total: number }>('history.list', { query: query || undefined, kind: kind || undefined, failed: failedOnly || undefined, limit: 200, offset: reset ? 0 : items.length });
@@ -95,7 +111,7 @@ export function HistoryView() {
             Clear
           </Button>
         </div>
-        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} {total === 1 ? 'entry' : 'entries'} · grouped by day · double-click to open</div>
+        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} {total === 1 ? 'entry' : 'entries'} · grouped by day · double-click to open · Ctrl+click another to compare</div>
         {items.length ? (
           <VirtualList
             className="flex-1"
@@ -111,7 +127,7 @@ export function HistoryView() {
                 );
               const e = row.item;
               return (
-              <button onDoubleClick={() => reopen(e)} onClick={() => setSel(e)} className={cx('w-full h-full text-left px-3 border-b border-line/60 flex flex-col justify-center', sel?.id === e.id ? 'bg-accent/10' : 'hover:bg-hover')}>
+              <button onDoubleClick={() => reopen(e)} onClick={(ev) => pick(e, ev)} className={cx('w-full h-full text-left px-3 border-b border-line/60 flex flex-col justify-center', sel?.id === e.id || pair?.before.id === e.id || pair?.after.id === e.id ? 'bg-accent/10' : 'hover:bg-hover')}>
                 <div className="flex items-center gap-2 text-sm">
                   {e.method && <span className={cx('mono method-badge text-[0.64rem] font-bold w-14 shrink-0', `method-${e.method}`)}>{e.method}</span>}
                   {!e.method && <Badge>{e.kind}</Badge>}
@@ -141,7 +157,22 @@ export function HistoryView() {
         )}
       </div>
       <div className="h-full flex flex-col">
-        {sel ? (
+        {pair ? (
+          <>
+            <div className="flex items-center gap-2 px-3 h-10 border-b border-line text-sm">
+              <span className="font-medium truncate">Comparing two responses</span>
+              <span className="text-xs text-muted truncate">
+                {new Date(pair.before.timestamp).toLocaleTimeString()} → {new Date(pair.after.timestamp).toLocaleTimeString()}
+              </span>
+              <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setPair(undefined)}>
+                Close
+              </Button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto">
+              {pair.error ? <p className="p-3 text-sm text-bad">{pair.error}</p> : pair.result ? <CompareView c={pair.result} labels={[`${pair.before.name} · ${new Date(pair.before.timestamp).toLocaleString()}`, `${pair.after.name} · ${new Date(pair.after.timestamp).toLocaleString()}`]} /> : <Empty title="Comparing…" />}
+            </div>
+          </>
+        ) : sel ? (
           <>
             <div className="flex items-center gap-2 px-3 h-10 border-b border-line">
               <span className="font-medium truncate">{sel.name}</span>
