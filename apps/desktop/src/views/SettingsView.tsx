@@ -209,6 +209,29 @@ export function SettingsView() {
               <div>Secret storage: {info?.secretBackend}</div>
               {!!ws?.migrations.length && <div>Migrations applied on open: {ws.migrations.join(', ')}</div>}
               <div className="text-muted">Available check types: {info?.checkTypes.join(', ')}</div>
+              <div>
+                <Button
+                  size="sm"
+                  title="Versions, platform and storage backends, for a bug report (your home folder is replaced with ~)"
+                  onClick={() => {
+                    const home = (ws?.path ?? '').match(/^([A-Za-z]:\\Users\\[^\\]+|\/(?:home|Users)\/[^/]+)/)?.[1];
+                    const text = [
+                      `TestPion ${info?.appVersion ?? '?'} (engine ${info?.version ?? '?'})`,
+                      `Electron ${info?.electron ?? '-'} · Node ${info?.node ?? '-'} · ${navigator.platform}`,
+                      `Metadata store: ${info?.metaBackend ?? '?'} · Secret storage: ${info?.secretBackend ?? '?'}`,
+                      `Workspace: ${home ? (ws?.path ?? '').replace(home, '~') : (ws?.path ?? '-')}`,
+                      `Theme: ${s.theme} · Proxy: ${s.proxy?.mode ?? 'env'}`,
+                    ].join('\n');
+                    void navigator.clipboard.writeText(text).then(
+                      () => useApp.getState().toast('Diagnostics copied', 'success'),
+                      () => useApp.getState().toast('Could not copy to the clipboard', 'error'),
+                    );
+                  }}
+                >
+                  Copy diagnostics
+                </Button>
+                <span className="text-xs text-muted ml-2">From a terminal: testpion doctor</span>
+              </div>
             </div>
           )}
         </div>
