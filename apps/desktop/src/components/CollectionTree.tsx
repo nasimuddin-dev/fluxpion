@@ -1,7 +1,7 @@
 import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
-import { asError, call } from '../api';
+import { asError, call, on } from '../api';
 import { cx, Menu, menuKeys, type MenuItem } from './ui';
 import { confirmAction, promptText, useApp } from '../store';
 import { MoveDialog, subtreeIds } from './MoveDialog';
@@ -100,6 +100,26 @@ export function savedItemDragProps(kind: 'grpc' | 'websocket', id: string, name:
 }
 
 /** Tree of collections → folders → requests with inline actions. */
+/** Per collection: sent requests and how many are failing now; refreshed after requests and runs (debounced). */
+function useCollectionsHealth(): Record<string, { sent: number; failing: number }> {
+  const [health, setHealth] = useState<Record<string, { sent: number; failing: number }>>({});
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () => void call<Record<string, { sent: number; failing: number }>>('stats.collectionsHealth').then(setHealth, () => undefined);
+    const soon = () => {
+      clearTimeout(timer);
+      timer = setTimeout(load, 1500);
+    };
+    load();
+    const offs = [on('console', soon), on('run.finished', soon)];
+    return () => {
+      clearTimeout(timer);
+      offs.forEach((off) => off());
+    };
+  }, []);
+  return health;
+}
+
 export function CollectionTree({
   collections,
   activeRequestId,
@@ -149,6 +169,7 @@ export function CollectionTree({
   revealKey?: number;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
+  const health = useCollectionsHealth();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
   /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
   /** A copy of the collection with everything it holds (its gRPC calls and connections too). */
@@ -667,6 +688,11 @@ export function CollectionTree({
                 <span className={cx('truncate', c.problem && 'text-bad')} title={c.problem}>
                   {c.name}
                 </span>
+                {health[c.id]?.failing ? (
+                  <span className="shrink-0 text-[0.65rem] font-semibold px-1 rounded bg-bad/15 text-bad" title={`${health[c.id]!.failing} of ${health[c.id]!.sent} sent requests: the latest response failed`}>
+                    {health[c.id]!.failing}
+                  </span>
+                ) : null}
                 {/* two collections with one name (an import done twice): their ids tell them apart */}
                 {collections.some((x) => x !== c && x.name === c.name) && <span className="text-[0.7rem] text-muted font-normal mono truncate shrink-0 max-w-[40%]" title="Another collection has this name; this is its id">{c.id}</span>}
               </button>

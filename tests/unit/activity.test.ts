@@ -58,6 +58,20 @@ describe('request stats', () => {
   });
 });
 
+describe('request health with checks', () => {
+  it("counts a response as fine when its own checks passed (an expected 404), and as failing when they did not", async () => {
+    const { summarizeRequestStats } = await import('@testpion/core');
+    const out = summarizeRequestStats([
+      { requestId: 'notfound', timestamp: '2026-10-01T02:00:00Z', status: 404, checksOk: true },
+      { requestId: 'wrong', timestamp: '2026-10-01T01:00:00Z', status: 200, checksOk: false },
+    ]);
+    expect(out.map((s) => [s.requestId, s.lastOk, s.failed, s.recent])).toEqual([
+      ['notfound', true, 0, ['passed']],
+      ['wrong', false, 1, ['failed']],
+    ]);
+  });
+});
+
 describe('history: failed only', () => {
   it('lists only the responses that failed (SQLite and JSONL stores agree)', async () => {
     const { openMetaStore } = await import('@testpion/core');

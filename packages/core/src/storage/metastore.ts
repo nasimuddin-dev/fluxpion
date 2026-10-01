@@ -140,20 +140,22 @@ export interface RequestStat {
 }
 
 /** Per saved request: responses, failures, the latest status and the median time of the latest 50. Rows newest first. */
-export function summarizeRequestStats(rows: Array<{ requestId?: string; timestamp: string; status?: number | string; durationMs?: number }>): RequestStat[] {
+export function summarizeRequestStats(rows: Array<{ requestId?: string; timestamp: string; status?: number | string; durationMs?: number; checksOk?: boolean }>): RequestStat[] {
+  // a response is fine when its own checks passed (an expected 404 is), else by its status
+  const ok = (r: { status?: number | string; checksOk?: boolean }) => (typeof r.checksOk === 'boolean' ? r.checksOk : historyOk(r.status));
   const by = new Map<string, { stat: RequestStat; times: number[] }>();
   for (const r of rows) {
     if (!r.requestId) continue;
     let e = by.get(r.requestId);
     if (!e) {
-      e = { stat: { requestId: r.requestId, count: 0, failed: 0, lastStatus: r.status, lastAt: r.timestamp, lastOk: historyOk(r.status), recent: [] }, times: [] };
+      e = { stat: { requestId: r.requestId, count: 0, failed: 0, lastStatus: r.status, lastAt: r.timestamp, lastOk: ok(r), recent: [] }, times: [] };
       by.set(r.requestId, e);
     }
     e.stat.count++;
-    if (!historyOk(r.status)) e.stat.failed++;
+    if (!ok(r)) e.stat.failed++;
     if (typeof r.durationMs === 'number' && e.times.length < 50) e.times.push(r.durationMs);
     // rows come newest first: prepend so the strip reads oldest to newest
-    if (e.stat.recent!.length < 10) e.stat.recent!.unshift(historyOk(r.status) ? 'passed' : 'failed');
+    if (e.stat.recent!.length < 10) e.stat.recent!.unshift(ok(r) ? 'passed' : 'failed');
   }
   return [...by.values()].map(({ stat, times }) => {
     if (times.length) {
@@ -415,7 +417,7 @@ class SqliteMetaStore implements MetaStore {
 
   requestStats(collectionId: string): RequestStat[] {
     const rows = this.db
-      .prepare("SELECT ts, status, duration, json_extract(doc, '$.requestId') AS rid FROM history WHERE json_extract(doc, '$.collectionId') = ? ORDER BY ts DESC LIMIT 5000")
+      .prepare("SELECT ts, status, duration, json_extract(doc, '$.requestId') AS rid, json_extract(doc, '$.responseMeta.checksOk') AS cok FROM history WHERE json_extract(doc, '$.collectionId') = ? ORDER BY ts DESC LIMIT 5000")
       .all(collectionId) as Array<Record<string, unknown>>;
     return summarizeRequestStats(
       rows.map((r) => ({
@@ -423,6 +425,7 @@ class SqliteMetaStore implements MetaStore {
         timestamp: r.ts as string,
         status: r.status === null ? undefined : isNaN(Number(r.status)) ? (r.status as string) : Number(r.status),
         durationMs: (r.duration as number) ?? undefined,
+        checksOk: r.cok === null || r.cok === undefined ? undefined : !!r.cok,
       })),
     );
   }
@@ -576,7 +579,8 @@ class JsonlMetaStore implements MetaStore {
       this.data.history
         .filter((h) => h.collectionId === collectionId)
         .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
-        .slice(0, 5000),
+        .slice(0, 5000)
+        .map((h) => ({ ...h, checksOk: (h.responseMeta as { checksOk?: boolean } | undefined)?.checksOk })),
     );
   }
   addTrace(t: TraceMeta) {
