@@ -1,4 +1,4 @@
-import { AlarmClock, Bot, Keyboard, Columns2, CopyX, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
+import { AlarmClock, Bot, Keyboard, Columns2, CopyX, Disc, GitCompare, ScanSearch, TerminalSquare, Variable, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
 import { createElement, lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
@@ -104,6 +104,10 @@ const PALETTE_ICONS: Record<string, LucideIcon> = {
   'm-new-env': KeyRound,
   'm-open-examples': Sparkles,
   'm-ci': Workflow,
+  'm-record': Disc,
+  'm-var-usages': Variable,
+  'm-openapi-diff': GitCompare,
+  'm-api-coverage': ScanSearch,
   'm-new-monitor': AlarmClock,
   'm-new-workspace': Layers,
   'm-open-ws': FolderOpen,
@@ -277,7 +281,8 @@ export default function App() {
       { id: 'm-exp-env', label: 'Export Current Environment', hint: 'File', run: () => void runMenuCommand('export-environment') },
       { id: 'm-exp-ws', label: 'Export Workspace', hint: 'File', run: () => void runMenuCommand('export-workspace') },
     ];
-    for (const c of cmds) c.icon = PALETTE_ICONS[c.id] ? createElement(PALETTE_ICONS[c.id]!, { size: 16 }) : undefined;
+    // every command has an icon: its own, or a generic one for a command added without
+    for (const c of cmds) c.icon = createElement(PALETTE_ICONS[c.id] ?? TerminalSquare, { size: 16 });
     // "Go to" commands use the navigation's own icons
     for (const n of NAV) cmds.push({ id: `go-${n.id}`, label: `Go to ${n.label}`, icon: n.icon, run: () => s.setView(n.id) });
     for (const e of workspace?.environments ?? [])

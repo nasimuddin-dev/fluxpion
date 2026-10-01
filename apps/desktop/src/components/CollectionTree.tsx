@@ -46,6 +46,9 @@ export function duplicateNode(nodes: CollectionNode[], id: string, copy: (n: Col
   return nodes.flatMap((n) => (n.id === id ? [n, copy(n)] : n.kind === 'folder' ? [{ ...n, items: duplicateNode(n.items, id, copy) }] : [n]));
 }
 
+/** Rows of one list (a collection's or folder's direct items) shown at first, and added by "Show more". */
+const LIST_PAGE = 300;
+
 /** How each category of request looks in the tree. */
 export const CATEGORY_META: Record<RequestCategory, { label: string; badge: string; cls: string }> = {
   rest: { label: 'REST', badge: 'HTTP', cls: 'text-ok' },
@@ -158,7 +161,7 @@ export function CollectionTree({
       drop(c, place);
     },
   });
-  const dropClass = (id: string) => (dropAt?.id !== id ? undefined : dropAt.mode === 'into' ? 'ring-1 ring-accent bg-accent/10' : 'shadow-[inset_0_2px_0_var(--accent)]');
+  const dropClass = (id: string) => (dropAt?.id !== id ? undefined : dropAt.mode === 'into' ? 'ring-1 ring-inset ring-accent bg-accent/10' : 'shadow-[inset_0_2px_0_var(--accent)]');
   const move = (from: Collection, n: CollectionNode, to: Collection, folderId: string | undefined) => {
     const without = { ...from, items: mapNodes(from.items, (x) => (x.id === n.id ? null : x)) };
     if (to.id === from.id) onChange({ ...without, items: addToFolder(without.items, folderId, n) });
@@ -233,8 +236,19 @@ export function CollectionTree({
   // in a category, a folder shows when it holds requests of that category (empty folders: the first category)
   const inScope = (n: CollectionNode, scope?: { cat: RequestCategory; first: boolean }) =>
     !scope || (n.kind === 'folder' ? hasCategory(n.items, scope.cat) || (scope.first && isEmptyFolder(n)) : requestCategory(n) === scope.cat);
-  const renderNodes = (c: Collection, nodes: CollectionNode[], depth: number, scope?: { cat: RequestCategory; first: boolean }): React.ReactNode =>
-    nodes.filter((n) => matches(n) && inScope(n, scope)).map((n) => {
+  // a very long list (thousands of requests in one folder) is shown a page at a time, so the sidebar stays fast
+  const [limits, setLimits] = useState<Record<string, number>>({});
+  const renderNodes = (c: Collection, nodes: CollectionNode[], depth: number, scope?: { cat: RequestCategory; first: boolean }, listId: string = c.id): React.ReactNode => {
+    const list = nodes.filter((n) => matches(n) && inScope(n, scope));
+    const listKey = `${listId}:${scope?.cat ?? ''}`;
+    let limit = limits[listKey] ?? LIST_PAGE;
+    if (list.length > limit && activeRequestId) {
+      // the open request is always in view
+      const at = list.findIndex((n) => n.id === activeRequestId);
+      if (at >= limit) limit = at + 20;
+    }
+    const shown = list.length > limit ? list.slice(0, limit) : list;
+    const rows = shown.map((n) => {
       const pad = { paddingLeft: 8 + depth * 12 };
       if (n.kind === 'folder') {
         const isOpen = open[n.id] ?? !!f;
@@ -266,7 +280,7 @@ export function CollectionTree({
                 }}
               />
             </div>
-            {isOpen && renderNodes(c, n.items, depth + 1, scope)}
+            {isOpen && renderNodes(c, n.items, depth + 1, scope, n.id)}
           </div>
         );
       }
@@ -277,7 +291,7 @@ export function CollectionTree({
       return (
         <div key={n.id}>
         <div
-          className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuFor === n.id && 'bg-hover', dropClass(n.id))}
+          className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_2rem]', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuFor === n.id && 'bg-hover', dropClass(n.id))}
           style={pad}
           {...dragProps(c, n)}
           {...dropProps(c, n.id, 'before', { beforeId: n.id })}
@@ -327,6 +341,18 @@ export function CollectionTree({
         </div>
       );
     });
+    const hidden = list.length - shown.length;
+    return (
+      <>
+        {rows}
+        {hidden > 0 && (
+          <button className="mx-1 h-7 w-[calc(100%-0.5rem)] rounded-md text-xs text-accent text-left hover:bg-hover" style={{ paddingLeft: 8 + depth * 12 + 16 }} onClick={() => setLimits((l) => ({ ...l, [listKey]: limit + LIST_PAGE }))}>
+            Show {Math.min(hidden, LIST_PAGE)} more ({hidden} not shown; the filter searches all of them)
+          </button>
+        )}
+      </>
+    );
+  };
 
   const categoryRow = (c: Collection, cat: RequestCategory, count: number, isOpen: boolean) => (
     <div className="group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors" style={{ paddingLeft: 20 }} {...(cat === 'rest' || cat === 'soap' || cat === 'graphql' ? dropProps(c, `${c.id}:${cat}`, 'into', {}) : {})}>
