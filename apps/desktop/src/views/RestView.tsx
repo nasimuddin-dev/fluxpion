@@ -594,7 +594,7 @@ export function RestView() {
       />
       <div className="h-full flex flex-col min-w-0">
         {noTabs ? (
-          <NoOpenTabs view="rest" onDescribe={() => void describeRequest()} />
+          <NoOpenTabs onDescribe={() => void describeRequest()} />
         ) : (
         <>
         <RequestBreadcrumb collectionId={tab.collectionId} requestId={tab.requestId} name={tab.name} dirty={tab.dirty} onSave={() => void quickSave()} />

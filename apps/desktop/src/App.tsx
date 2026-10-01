@@ -337,7 +337,7 @@ export default function App() {
             {/* a multi-document view with every tab closed: the same "No open requests" as the HTTP view */}
             {isDocView(view) && !(docs[view] ?? []).length && (
               <div className="absolute inset-0 flex flex-col">
-                <NoOpenTabs view={view} />
+                <NoOpenTabs />
               </div>
             )}
             {mounted.flatMap((id) => {

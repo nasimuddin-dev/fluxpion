@@ -1,5 +1,5 @@
 import { ArrowRightToLine, ChevronDown, Copy, FileCheck2, ListX, Pencil, Pin, PinOff, Plug, Plus, Radio, Send, Sparkles, SquareX, Waypoints, X } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { useApp, type ViewId } from '../store';
 import { docKey, isDocView, useDoc, useDocs } from '../lib/docs';
@@ -228,21 +228,11 @@ export function closeTabsFor(itemIds: string[]) {
   }
 }
 
-/** What a request view's main button creates when no tab is open (the rest are in "New request ▾"). */
-const PRIMARY_NEW: Partial<Record<ViewId, { label: string; icon: ReactNode; intent: Record<string, unknown> }>> = {
-  graphql: { label: 'New GraphQL request', icon: <Plus size={13} />, intent: { newDoc: true, reset: true } },
-  grpc: { label: 'New gRPC request', icon: <Waypoints size={13} />, intent: { newDoc: true } },
-  websocket: { label: 'New connection', icon: <Radio size={13} />, intent: { newDoc: true } },
-  mcp: { label: 'Add MCP server', icon: <Plug size={13} />, intent: { addServer: true } },
-  apidef: { label: 'Import OpenAPI', icon: <FileCheck2 size={13} />, intent: { newDoc: true } },
-};
-
 /**
- * The editor area when no tab is open, the same in every request view (HTTP, GraphQL, gRPC, WebSocket, MCP, API
- * definitions): the view's own "new" first, every kind of request under "New request", and "Describe with AI".
+ * The editor area when no tab is open: exactly the same in every request view (HTTP, GraphQL, gRPC, WebSocket, MCP,
+ * API definitions): every kind of request under "New request", and "Describe with AI".
  */
-export function NoOpenTabs({ view, onDescribe }: { view: ViewId; onDescribe?(): void }) {
-  const primary = PRIMARY_NEW[view];
+export function NoOpenTabs({ onDescribe }: { onDescribe?(): void }) {
   const describe = onDescribe ?? (() => useApp.getState().openIntent('rest', { describe: true }));
   return (
     <Empty
@@ -250,17 +240,12 @@ export function NoOpenTabs({ view, onDescribe }: { view: ViewId; onDescribe?(): 
       title="No open requests"
       action={
         <div className="flex flex-wrap justify-center gap-2">
-          {primary && (
-            <Button variant="primary" icon={primary.icon} onClick={() => useApp.getState().openIntent(view, primary.intent)}>
-              {primary.label}
-            </Button>
-          )}
           <Menu
             width={240}
             align="center"
             items={newRequestItems()}
             trigger={
-              <Button variant={primary ? 'default' : 'primary'} icon={<Plus size={13} />}>
+              <Button variant="primary" icon={<Plus size={13} />}>
                 New request
                 <ChevronDown size={13} />
               </Button>
