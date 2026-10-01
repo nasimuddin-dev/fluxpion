@@ -83,6 +83,11 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
     setInfo(await call<MockInfo>('mock.status', { collectionId }));
   };
   const routes = info.routes;
+  // hits per route (by method and example served), and how requests were answered
+  const hitsOf = (r: (typeof routes)[number]) => hits.filter((h) => h.method === r.method && h.example === r.example).length;
+  const served = hits.filter((h) => h.example).length;
+  const forwarded = hits.filter((h) => !h.example && h.forwarded).length;
+  const unmatched = hits.length - served - forwarded;
 
   return (
     <div className="p-4 flex flex-col gap-4 max-w-4xl">
@@ -147,6 +152,7 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
                   <td className="text-muted truncate">
                     {r.example} <span className="text-xs">· {r.request}</span>
                   </td>
+                  {info.running && <td className="w-16 pr-3 text-right text-xs tabular-nums" title="Requests answered with this example">{hitsOf(r) ? `${hitsOf(r)} hit${hitsOf(r) === 1 ? '' : 's'}` : <span className="text-muted">—</span>}</td>}
                 </tr>
               ))}
             </tbody>
@@ -159,6 +165,30 @@ export function MockPanel({ collectionId, onOpenRequest }: { collectionId: strin
       {info.running && (
         <section>
           <h3 className="text-xs font-medium text-muted mb-1.5">Requests</h3>
+          {hits.length > 0 && (
+            <div className="mb-2">
+              <div className="flex h-2 gap-0.5 rounded-full overflow-hidden" role="img" aria-label={`${served} served from examples, ${forwarded} forwarded, ${unmatched} without a matching example`}>
+                {served > 0 && <span className="bg-ok" style={{ flex: served }} />}
+                {forwarded > 0 && <span className="bg-accent" style={{ flex: forwarded }} />}
+                {unmatched > 0 && <span className="bg-warn" style={{ flex: unmatched }} />}
+              </div>
+              <div className="flex flex-wrap gap-x-4 mt-1 text-xs text-muted">
+                <span>
+                  <span className="text-ok">●</span> {served} from examples
+                </span>
+                {forwarded > 0 && (
+                  <span>
+                    <span className="text-accent">●</span> {forwarded} forwarded
+                  </span>
+                )}
+                {unmatched > 0 && (
+                  <span>
+                    <span className="text-warn">●</span> {unmatched} without a matching example
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           {hits.length ? (
             <div className="border border-line rounded-md max-h-64 overflow-auto text-sm">
               {hits.map((h, i) => (
