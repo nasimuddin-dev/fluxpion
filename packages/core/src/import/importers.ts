@@ -415,7 +415,7 @@ export function importHar(text: string): { collection: Collection } {
 }
 
 /** Import any supported document into a collection (and optionally an environment). */
-export function importAny(text: string, opts: { name?: string } = {}): { format: string; collection?: Collection; environment?: Environment; environments?: Environment[]; secretValues?: Record<string, Record<string, string>> } {
+export function importAny(text: string, opts: { name?: string } = {}): { format: string; collection?: Collection; environment?: Environment; environments?: Environment[]; secretValues?: Record<string, Record<string, string>>; savedItems?: unknown } {
   const format = detectFormat(text);
   switch (format) {
     case 'openapi':
@@ -430,7 +430,7 @@ export function importAny(text: string, opts: { name?: string } = {}): { format:
     case 'insomnia':
     case 'bruno': {
       const r = format === 'insomnia' ? importInsomnia(text) : importBruno(text);
-      return { format, collection: r.collection, environment: r.environments[0], environments: r.environments };
+      return { format, collection: r.collection, environment: r.environments[0], environments: r.environments, savedItems: 'savedItems' in r ? r.savedItems : undefined };
     }
     case 'hoppscotch':
       return { format, ...importHoppscotch(text) };

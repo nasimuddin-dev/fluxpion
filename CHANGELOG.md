@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Insomnia imports bring gRPC and WebSocket requests**: from an Insomnia 4 export, gRPC requests (with their `.proto` files, metadata and TLS) and WebSocket requests (headers, first message) become the imported collection's gRPC calls and connections, in their folders.
 - **MCP `get_request` shows gRPC calls and connections too** (target, method, message and metadata; URL, mode and message), masked like requests.
 - **Collections with the same name are told apart**: the sidebar shows each one's id beside the name (e.g. a collection imported twice), so you can keep one and delete the other.
 - **Arrow keys in the sidebar**: ↑ ↓ move between rows, → expands and ← collapses a collection, category, folder or section, like a file tree (with Enter, F2 and Delete).

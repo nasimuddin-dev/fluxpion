@@ -37,7 +37,7 @@ Copied commands include the request's real header and token values, so they run 
 
 - OpenAPI 3 / Swagger 2 (JSON or YAML). Tags become folders, parameters and example bodies are generated, security schemes map to auth, and each documented response becomes a saved [example](#examples) (so the collection can be [mocked](/api-testing/mock-servers) right away). The document is kept in the workspace's `specs/` folder and every request gets a [**Matches OpenAPI contract**](../test-runner/assertions.md#openapi-contract-testing) check, so running the collection tests the API against its own contract (`testpion import --no-contract-checks` leaves the checks out).
 - Postman v2.1 collections (including scripts, request descriptions and saved responses, which become [examples](#examples)) and environments.
-- Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment.
+- Insomnia exports (the v4 JSON export and v5 YAML files). Environments come over too: the base environment is merged into each sub-environment. From a v4 export, gRPC requests (with their `.proto` files) and WebSocket requests come over as the collection's gRPC calls and connections.
 - Bruno collections: the collection folder itself (**Bruno folder…**, the folder with `bruno.json` and the `.bru` files you keep in git), a single `.bru` request file, or a JSON export (*Export collection*). See [Bruno](#bruno) below.
 - Hoppscotch collections (JSON).
 - WSDL 1.1 documents of SOAP services (a file, or a `?wsdl` link). See [SOAP](#soap-wsdl) below.

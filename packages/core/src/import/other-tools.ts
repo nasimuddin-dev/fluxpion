@@ -1,5 +1,5 @@
 import { parse as parseYaml } from 'yaml';
-import type { AuthConfig, BodyConfig, CheckConfig, Collection, CollectionFolder, CollectionNode, Environment, KeyValue, SavedGraphQLRequest, SavedHttpRequest } from '../model/types.js';
+import type { AuthConfig, BodyConfig, CheckConfig, Collection, CollectionFolder, CollectionNode, Environment, KeyValue, LibraryItem, SavedGraphQLRequest, SavedHttpRequest } from '../model/types.js';
 import { SCHEMA_VERSION } from '../model/types.js';
 import { shortId, slugify } from '../util/ids.js';
 import { bruFilesToBrunoExport, looksLikeBru } from './bru.js';
@@ -146,7 +146,41 @@ function insomniaEnvironments(name: string, base: Any | undefined, subs: Any[]):
   return subs.map((s) => ({ id: slugify(s.name ?? 'env') || 'env', name: s.name ?? 'Environment', variables: merge(flattenVars(s.data ?? {})), ...(s.color ? { color: s.color } : {}) }));
 }
 
-export function importInsomnia(text: string): { collection: Collection; environments: Environment[] } {
+/**
+ * Insomnia 4 exports also hold gRPC requests (with their .proto files) and WebSocket requests: they become
+ * the imported collection's gRPC calls and connections (library items, see `savedItems` in workspace-import).
+ */
+function insomniaSavedItems(res: Any[]): { grpc?: LibraryItem[]; websocket?: LibraryItem[] } | undefined {
+  const byId = new Map(res.map((r) => [r._id, r]));
+  const folderOf = (parentId: string): string | undefined => {
+    const names: string[] = [];
+    for (let p = byId.get(parentId); p && p._type === 'request_group'; p = byId.get(p.parentId)) names.unshift(String(p.name ?? 'Folder'));
+    return names.join(' / ') || undefined;
+  };
+  const kv = (list: Any[] | undefined) => (list ?? []).filter((x: Any) => x?.name).map((x: Any) => ({ key: String(x.name), value: normalizeTemplate(String(x.value ?? '')), enabled: !x.disabled }));
+  const protos = new Map(res.filter((r) => r._type === 'proto_file' && typeof r.protoText === 'string').map((r) => [r._id, { name: /\.proto$/.test(String(r.name ?? '')) ? String(r.name) : `${r.name || 'service'}.proto`, text: String(r.protoText) }]));
+  const grpc: LibraryItem[] = res
+    .filter((r) => r._type === 'grpc_request')
+    .map((r) => {
+      const url = normalizeTemplate(String(r.url ?? ''));
+      const proto = protos.get(r.protoFileId);
+      return {
+        id: shortId('lib-'),
+        name: String(r.name || 'gRPC call'),
+        folder: folderOf(r.parentId),
+        data: { target: url.replace(/^grpcs?:\/\//, ''), method: String(r.protoMethodName ?? '').replace(/^\//, ''), message: String(r.body?.text ?? '{}'), metadata: kv(r.metadata), tls: /^grpcs:/i.test(url), protoFiles: proto ? [proto] : [] },
+      };
+    });
+  const websocket: LibraryItem[] = res
+    .filter((r) => r._type === 'websocket_request')
+    .map((r) => {
+      const payload = res.find((p) => p._type === 'websocket_payload' && p.parentId === r._id);
+      return { id: shortId('lib-'), name: String(r.name || 'WebSocket'), folder: folderOf(r.parentId), data: { url: normalizeTemplate(String(r.url ?? '')), mode: 'websocket', message: String(payload?.value ?? ''), headers: kv(r.headers), protocols: '' } };
+    });
+  return grpc.length || websocket.length ? { ...(grpc.length ? { grpc } : {}), ...(websocket.length ? { websocket } : {}) } : undefined;
+}
+
+export function importInsomnia(text: string): { collection: Collection; environments: Environment[]; savedItems?: { grpc?: LibraryItem[]; websocket?: LibraryItem[] } } {
   const t = text.trim();
   const d: Any = t.startsWith('{') ? JSON.parse(t) : parseYaml(t);
   if (String(d.type ?? '').startsWith('collection.insomnia.rest/5')) {
@@ -180,7 +214,7 @@ export function importInsomnia(text: string): { collection: Collection; environm
   const items = workspaces.length === 1 ? build(workspaces[0]._id) : workspaces.length ? workspaces.map((w) => ({ kind: 'folder', id: shortId('fld-'), name: w.name, items: build(w._id) }) as CollectionFolder) : build(res.find((r) => r._type === 'request' || r._type === 'request_group')?.parentId);
   const base = res.find((r) => r._type === 'environment' && workspaces.some((w) => w._id === r.parentId)) ?? res.find((r) => r._type === 'environment' && !res.some((p) => p._id === r.parentId && p._type === 'environment'));
   const subs = base ? res.filter((r) => r._type === 'environment' && r.parentId === base._id) : [];
-  return { collection: collectionOf(name, items, { description: workspaces[0]?.description || undefined }), environments: insomniaEnvironments(name, base, subs) };
+  return { collection: collectionOf(name, items, { description: workspaces[0]?.description || undefined }), environments: insomniaEnvironments(name, base, subs), savedItems: insomniaSavedItems(res) };
 }
 
 /* ------------------------------------------------------------------ Bruno */

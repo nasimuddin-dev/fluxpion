@@ -30,13 +30,15 @@ export interface WorkspaceImportResult {
  * Put a collection file's `savedItems` (gRPC calls, connections) into the workspace library, shown in the
  * imported collection. An item whose id the workspace already uses gets a new one, so nothing is replaced.
  */
-function restoreSavedItems(store: WorkspaceStore, text: string, collectionId: string): Record<string, number> | undefined {
-  let saved: unknown;
+function savedItemsOf(text: string): unknown {
   try {
-    saved = (JSON.parse(text) as { savedItems?: unknown }).savedItems;
+    return (JSON.parse(text) as { savedItems?: unknown }).savedItems;
   } catch {
     return undefined;
   }
+}
+
+function restoreSavedItems(store: WorkspaceStore, saved: unknown, collectionId: string): Record<string, number> | undefined {
   if (!saved || typeof saved !== 'object') return undefined;
   const counts: Record<string, number> = {};
   for (const kind of COLLECTION_ITEM_KINDS) {
@@ -93,8 +95,9 @@ export function importIntoWorkspace(store: WorkspaceStore, text: string, opts: {
     const ids = new Set(store.listCollections().map((c) => c.id));
     if (ids.has(collection.id) || ids.has(slugify(collection.id))) collection = { ...collection, id: `${slugify(collection.name) || 'collection'}-${shortId().slice(-4)}` };
     out.collection = store.saveCollection(collection);
-    // a TestPion collection file can carry the collection's gRPC calls and connections
-    if (r.format === 'aps-collection') out.savedItems = restoreSavedItems(store, text, out.collection.id);
+    // a TestPion collection file (or an Insomnia export) can carry the collection's gRPC calls and connections
+    const saved = r.format === 'aps-collection' ? savedItemsOf(text) : r.savedItems;
+    if (saved) out.savedItems = restoreSavedItems(store, saved, out.collection.id);
     const warnings = scriptCompatibility(collection, (name) => store.readScriptPackage(name) !== undefined);
     if (warnings.length) out.scriptWarnings = warnings;
   }
