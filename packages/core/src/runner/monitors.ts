@@ -7,6 +7,7 @@ import { shortId } from '../util/ids.js';
 import { writeReports } from '../report/reports.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { collectionRequests, runCollection } from './collection-run.js';
+import { collectionRealtimeTests } from './collection-realtime.js';
 import { readResultsFile, type RunEvent } from './runner.js';
 
 /**
@@ -131,7 +132,7 @@ export function validateMonitor(store: WorkspaceStore, m: Pick<Monitor, 'name'> 
   if (!m.name?.trim()) throw invalid('A monitor needs a name');
   if (!(m.everyMinutes >= MIN_EVERY_MINUTES && m.everyMinutes <= MAX_EVERY_MINUTES)) throw invalid('A monitor runs every 1 minute to 7 days');
   const collection = store.getCollection(m.collectionId);
-  if (!collectionRequests(collection, m.selection).length) throw invalid(`Nothing to run: the selection has no requests in "${collection.name}"`);
+  if (!collectionRequests(collection, m.selection).length && !collectionRealtimeTests(store, collection, m.selection).length) throw invalid(`Nothing to run: the selection has no requests in "${collection.name}"`);
   if (m.environment && !store.getEnvironment(m.environment)) throw invalid(`No environment "${m.environment}"`);
   if (m.webhook && !/^https?:\/\//i.test(m.webhook.trim()) && !/^\{\{[^}]+\}\}/.test(m.webhook.trim())) throw invalid('The alert webhook must be an http(s) URL or a {{variable}}');
 }
@@ -238,6 +239,7 @@ export async function executeMonitor(o: ExecuteMonitorOptions): Promise<MonitorR
         runId,
         collection,
         selection: monitor.selection,
+        realtime: collectionRealtimeTests(store, collection, monitor.selection),
         iterations: monitor.iterations,
         bail: monitor.bail,
         services: ctx.services,

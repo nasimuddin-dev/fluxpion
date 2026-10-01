@@ -2,7 +2,7 @@ import { FileSpreadsheet, History, ListChecks, Play, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { asError, call } from '../api';
 import { useApp } from '../store';
-import type { Collection, CollectionNode } from '../types';
+import type { Collection, CollectionNode, Library } from '../types';
 import { timeAgo, plural } from '../lib/format';
 import { RunPanel } from './RunPanel';
 import { hasNativeDialogs, pickTextFile } from '../lib/files';
@@ -13,7 +13,7 @@ interface RunnableRequest {
   name: string;
   method: string;
   path: string[];
-  kind: 'http' | 'graphql';
+  kind: 'http' | 'graphql' | 'grpc' | 'websocket';
 }
 
 interface DataFile {
@@ -63,7 +63,30 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
   const envs = useApp((s) => s.workspace?.environments ?? []);
   const activeEnv = useApp((s) => s.environment);
   const [environment, setEnvironment] = useState(activeEnv ?? '');
-  const requests = useMemo(() => flatten(collection.items, [], folderId), [collection.items, folderId]);
+  // the collection's gRPC calls and connections run after its requests (not in a folder run)
+  const [realtime, setRealtime] = useState<RunnableRequest[]>([]);
+  useEffect(() => {
+    let live = true;
+    const kinds = [
+      ['grpc', 'gRPC'],
+      ['websocket', 'WS'],
+    ] as const;
+    void Promise.all(kinds.map(([kind]) => call<Library<{ mode?: string }>>('lib.get', { kind }).catch(() => ({ folders: [], items: [] }) as Library<{ mode?: string }>))).then((libs) => {
+      if (!live) return;
+      setRealtime(
+        libs.flatMap((lib, i) =>
+          lib.items
+            .filter((it) => it.collectionId === collection.id)
+            .sort((a, b) => (a.folder ?? '').localeCompare(b.folder ?? '') || a.name.localeCompare(b.name))
+            .map((it) => ({ id: it.id, name: it.name, path: it.folder ? [it.folder] : [], kind: kinds[i]![0], method: kinds[i]![0] === 'websocket' && it.data?.mode === 'mqtt' ? 'MQTT' : kinds[i]![0] === 'websocket' && it.data?.mode === 'socketio' ? 'SIO' : kinds[i]![1] })),
+        ),
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [collection.id]);
+  const requests = useMemo(() => [...flatten(collection.items, [], folderId), ...(folderId ? [] : realtime)], [collection.items, folderId, realtime]);
   const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
   const [iterations, setIterations] = useState('');
   const [delay, setDelay] = useState('0');
@@ -227,7 +250,7 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
                       setUnchecked(next);
                     }}
                   />
-                  <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', r.kind === 'http' ? `method-${r.method}` : 'text-[#e535ab]')}>{r.method.slice(0, 5)}</span>
+                  <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', r.kind === 'http' ? `method-${r.method}` : r.kind === 'grpc' ? 'text-[#2ea99e]' : r.kind === 'websocket' ? 'text-[#d97706]' : 'text-[#e535ab]')}>{r.method.slice(0, 5)}</span>
                   <span className="truncate">{r.name}</span>
                   {r.path.length > 0 && <span className="ml-auto text-xs text-muted truncate max-w-[45%]">{r.path.join(' / ')}</span>}
                 </label>

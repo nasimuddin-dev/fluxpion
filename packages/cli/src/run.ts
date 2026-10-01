@@ -44,6 +44,7 @@ import {
   type Redactor,
   exportOtlp,
   otlpTargetFromEnv,
+  collectionRealtimeTests,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, cyan, CliError, collectVar, openWorkspace, readImport, loadCollectionRef, cleanupFailedRun, readResults } from './shared.js';
 
@@ -397,6 +398,8 @@ export async function executeCollectionRun(ref: string, o: CollectionCliOptions)
       runId,
       collection,
       selection,
+      // the collection's gRPC calls and connections (a workspace collection; a collection file has none)
+      realtime: fromFile ? undefined : collectionRealtimeTests(store, collection, selection),
       data,
       iterations,
       delayMs: o.delayRequest ? Number(o.delayRequest) : undefined,

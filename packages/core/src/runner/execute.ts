@@ -345,7 +345,9 @@ async function runGrpc(test: GrpcTest, scope: VariableScope, svc: ExecServices, 
   // without proto files, the server describes itself (server reflection)
   let protoFiles: Array<{ name: string; text: string }> | undefined;
   let descriptorSet: string | undefined;
-  if (test.protos.length) {
+  if (test.protoFiles?.length) protoFiles = test.protoFiles;
+  else if (test.descriptorSet) descriptorSet = test.descriptorSet;
+  else if (test.protos?.length) {
     if (!svc.readFile) throw new ApsError('ConfigurationError', 'gRPC tests need a workspace to read their .proto files from');
     protoFiles = test.protos.map((name) => ({ name, text: svc.readFile!(name) }));
   } else descriptorSet = (await reflectServer(parseGrpcTarget(r.target, test.tls), { metadata: r.metadata })).descriptorSet;

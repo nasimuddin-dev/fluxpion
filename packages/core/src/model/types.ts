@@ -315,6 +315,10 @@ export interface GrpcTest extends TestBase {
    * `protos/vet/v1/common.proto`. Empty: the server is asked through gRPC server reflection.
    */
   protos: string[];
+  /** .proto files given inline (a gRPC call saved in the app keeps its files); used instead of `protos`. */
+  protoFiles?: Array<{ name: string; text: string }>;
+  /** A FileDescriptorSet (base64) from an earlier server reflection; used when there are no .proto files. */
+  descriptorSet?: string;
   tls?: boolean;
 }
 

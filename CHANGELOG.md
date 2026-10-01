@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Running a collection runs everything it holds**: its gRPC calls and WebSocket / Socket.IO / MQTT connections now run after its requests, in the Collection Runner (listed with the requests, each can be unticked), `testpion run-collection`, monitors and the `run_collection` MCP tool. A gRPC call passes when the server answers OK, using the call's saved `.proto` files or its server-reflection descriptor; a connection passes when the server accepts it, and its saved message, Socket.IO event or MQTT publish is sent. gRPC tests in test files can also carry `.proto` files inline (`protoFiles`) or a `descriptorSet`.
+
 ## 0.16.2 — 2026-09-30
 
 The follow-up to the 0.16.1 review: the items that were left open and could be fixed.

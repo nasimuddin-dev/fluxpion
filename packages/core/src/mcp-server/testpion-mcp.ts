@@ -21,6 +21,7 @@ import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
+import { collectionRealtimeTests } from '../runner/collection-realtime.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
@@ -781,7 +782,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const ctx = createEngineContext({ store, secrets, settings, environment, collectionId: c.id });
         const results: TestResult[] = [];
         try {
-          const summary = await runCollection({ name: c.name, runId: shortId('mcp-'), collection: c, selection, services: ctx.services, traceMode: 'none', environment, onEvent: (e: RunEvent) => e.type === 'test-end' && results.push(e.result) });
+          const summary = await runCollection({ name: c.name, runId: shortId('mcp-'), collection: c, selection, realtime: collectionRealtimeTests(store, c, selection), services: ctx.services, traceMode: 'none', environment, onEvent: (e: RunEvent) => e.type === 'test-end' && results.push(e.result) });
           return { total: summary.total, passed: summary.passed, failed: summary.failed, errors: summary.errors, skipped: summary.skipped, durationMs: summary.durationMs, results: results.slice(0, 200).map(summarizeResult) };
         } finally {
           await ctx.dispose();

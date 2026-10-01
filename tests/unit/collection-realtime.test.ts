@@ -1,0 +1,74 @@
+import { describe, it, expect, afterAll } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import { WebSocketServer } from 'ws';
+import { Backend } from '../../apps/desktop/backend/backend.js';
+import { collectionRealtimeTests, parseProtos, savedConnectionToTest, savedGrpcCallToTest } from '../../packages/core/src/index.js';
+
+// A collection shows the gRPC calls and connections saved into it (collectionId); a collection run runs them
+// too, after its requests, so "Run collection" covers everything the collection holds.
+const PROTO = `syntax = "proto3";\npackage demo;\nmessage Hi { string name = 1; }\nmessage Reply { string text = 1; }\nservice Greeter { rpc Say(Hi) returns (Reply); }\n`;
+const home = mkdtempSync(join(tmpdir(), 'tp-col-rt-'));
+const be = new Backend({ appDir: home, emit: () => undefined });
+const closers: Array<() => unknown> = [];
+afterAll(async () => {
+  for (const c of closers) await c();
+  await be.dispose();
+  rmSync(home, { recursive: true, force: true, maxRetries: 3 });
+});
+
+describe('collection runs include gRPC calls and connections', () => {
+  it('converts saved items into tests', () => {
+    const g = savedGrpcCallToTest({ id: 'g1', name: 'Say hi', folder: 'greeter', data: { target: 'localhost:1', method: 'demo.Greeter/Say', message: '{"name":"a"}', protoFiles: [{ name: 'demo.proto', text: PROTO }], descriptorSet: 'ignored' } }, 'Shop');
+    expect(g).toMatchObject({ type: 'grpc', name: 'greeter / Say hi', location: ['Shop', 'greeter', 'Say hi'], message: { name: 'a' }, protos: [], descriptorSet: undefined, assertions: [{ type: 'status', expected: 0 }] });
+    const sio = savedConnectionToTest({ id: 's', name: 'Chat', data: { url: 'http://x', mode: 'socketio', event: 'msg', message: '{"t":1}', ack: true } }, 'Shop');
+    expect(sio.send).toEqual([{ event: 'msg', args: [{ t: 1 }], ack: true }]);
+    const mqtt = savedConnectionToTest({ id: 'm', name: 'Broker', data: { url: 'mqtt://x', mode: 'mqtt', topic: 'a/b', message: 'hi', subscriptions: [{ topic: 'a/#' }], username: 'u' } }, 'Shop');
+    expect(mqtt).toMatchObject({ send: [{ topic: 'a/b', payload: 'hi', qos: 0 }], subscribe: [{ topic: 'a/#' }], username: 'u', headers: undefined });
+    const ws = savedConnectionToTest({ id: 'w', name: 'Echo', data: { url: 'ws://x', message: '  ', protocols: 'a, b' } }, 'Shop');
+    expect(ws).toMatchObject({ mode: 'websocket', send: [], protocols: ['a', 'b'] });
+  });
+
+  it('runs a collection: its request, then its gRPC call and its connection', async () => {
+    // HTTP, gRPC and WebSocket servers
+    const http = createServer((_req, res) => res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}'));
+    await new Promise<void>((r) => http.listen(0, '127.0.0.1', r));
+    closers.push(() => new Promise((r) => http.close(r)));
+    const pkg = grpc.loadPackageDefinition(protoLoader.fromJSON(parseProtos([{ name: 'demo.proto', text: PROTO }]).toJSON(), { keepCase: true })) as any;
+    const server = new grpc.Server();
+    server.addService(pkg.demo.Greeter.service, { Say: (call: any, cb: any) => cb(null, { text: `hi ${call.request.name}` }) });
+    const grpcPort = await new Promise<number>((ok, fail) => server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (e, p) => (e ? fail(e) : ok(p))));
+    closers.push(() => server.forceShutdown());
+    const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await new Promise((r) => wss.once('listening', r));
+    wss.on('connection', (s) => s.on('message', (d) => s.send(`echo:${d}`)));
+    closers.push(() => wss.close());
+
+    const col = { schemaVersion: '1.0', id: 'shop', name: 'Shop', version: 0, variables: [], updatedAt: '', items: [{ kind: 'http', id: 'r1', name: 'Health', request: { method: 'GET', url: `http://127.0.0.1:${(http.address() as AddressInfo).port}/health` }, assertions: [{ type: 'status', expected: 200 }] }] };
+    await be.invoke('col.save', col);
+    await be.invoke('lib.save', { kind: 'grpc', library: { folders: [], items: [{ id: 'g1', name: 'Say hi', collectionId: 'shop', data: { target: `127.0.0.1:${grpcPort}`, method: 'demo.Greeter/Say', message: '{"name":"ada"}', metadata: [], protoFiles: [{ name: 'demo.proto', text: PROTO }] } }, { id: 'g2', name: 'Elsewhere', collectionId: 'other', data: { target: 'x:1', method: 'a.B/C' } }] } });
+    await be.invoke('lib.save', { kind: 'websocket', library: { folders: [], items: [{ id: 'w1', name: 'Echo', collectionId: 'shop', data: { url: `ws://127.0.0.1:${(wss.address() as AddressInfo).port}`, message: 'ping', headers: [] } }] } });
+
+    expect(collectionRealtimeTests(be.ws, col).map((t) => t.id)).toEqual(['g1', 'w1']);
+    expect(collectionRealtimeTests(be.ws, col, ['w1']).map((t) => t.id)).toEqual(['w1']);
+
+    const { runId } = (await be.invoke('col.run', { collectionId: 'shop' })) as { runId: string };
+    let summary: { total: number; passed: number } | null = null;
+    for (let i = 0; i < 100 && !summary; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      summary = (await be.invoke('runs.summary', { runId })) as typeof summary;
+    }
+    expect(summary).toMatchObject({ total: 3, passed: 3 });
+    const results = (await be.invoke('runs.results', { runId })) as { items: Array<{ name: string; status: string; output?: unknown }> };
+    expect(results.items.map((r) => [r.name, r.status])).toEqual([
+      ['Health', 'passed'],
+      ['Say hi', 'passed'],
+      ['Echo', 'passed'],
+    ]);
+  }, 30_000);
+});

@@ -58,6 +58,7 @@ import {
   scriptRequestSender,
   runTests,
   runCollection,
+  collectionRealtimeTests,
   collectionRequests,
   readDataset,
   shortId,
@@ -1153,7 +1154,9 @@ export class Backend {
 
   startCollectionRun(p: CollectionRunParams) {
     const collection = this.ws.getCollection(p.collectionId);
-    const count = collectionRequests(collection, p.selection).length;
+    // its gRPC calls and connections run too (after its requests)
+    const realtime = collectionRealtimeTests(this.ws, collection, p.selection);
+    const count = collectionRequests(collection, p.selection).length + realtime.length;
     if (!count) throw new ApsError('ValidationError', 'Nothing to run: the selection has no requests');
     const folder = p.selection?.length === 1 ? findNodeName(collection.items, p.selection[0]!) : undefined;
     const name = p.name ?? (folder ? `${collection.name} / ${folder}` : collection.name);
@@ -1165,6 +1168,7 @@ export class Backend {
         iterations: p.iterations,
         data: p.dataPath ? await this.readRunData(p.dataPath) : undefined,
         delayMs: p.delayMs,
+        realtime,
       }),
     );
   }

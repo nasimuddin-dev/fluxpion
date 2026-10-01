@@ -167,6 +167,8 @@ The Collection Runner works like Postman's. It runs a whole collection or one fo
 | Keep variable values | Values set with `pm.environment.set()` and similar are saved as [current values](./rest.md#scripts) after the run. Turn this off to throw them away |
 | Stop on first failure | End the run when a request fails or errors |
 
+**gRPC calls and WebSocket / Socket.IO / MQTT connections** saved in the collection run too, after its requests in every iteration, and they're listed (and can be unticked) with the requests. A gRPC call passes when the server answers OK (code 0), with the call's saved `.proto` files or its server-reflection descriptor; a connection passes when the server accepts it, and its saved message (event, or publish) is sent. A folder run includes only the folder's requests. The same applies to `testpion run-collection`, monitors and the `run_collection` MCP tool.
+
 Variables set by a script carry over to the requests that follow. A token saved by **Get access token** is used by later requests that inherit bearer auth `{{accessToken}}`. Collection-level and [folder-level](#folders) scripts run before each request's own scripts.
 
 To control the order from scripts:

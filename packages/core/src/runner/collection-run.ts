@@ -99,6 +99,11 @@ export interface CollectionRunOptions extends Omit<RunOptions, 'tests' | 'concur
   delayMs?: number;
   /** Safety limit on requests per iteration, so a `setNextRequest` loop can't run forever. Default 1000. */
   maxRequestsPerIteration?: number;
+  /**
+   * The collection's gRPC calls and WebSocket / MQTT connections (see `collectionRealtimeTests`): they run
+   * after its requests in every iteration, with the iteration's data row as variables.
+   */
+  realtime?: TestCase[];
 }
 
 /**
@@ -109,7 +114,8 @@ export interface CollectionRunOptions extends Omit<RunOptions, 'tests' | 'concur
 export async function runCollection(opts: CollectionRunOptions): Promise<RunSummary> {
   const { collection, selection, data, delayMs = 0 } = opts;
   const refs = collectionRequests(collection, selection);
-  if (!refs.length) throw new ApsError('ValidationError', 'Nothing to run: the selection has no requests');
+  const realtime = opts.realtime ?? [];
+  if (!refs.length && !realtime.length) throw new ApsError('ValidationError', 'Nothing to run: the selection has no requests');
   const iterations = Math.max(1, opts.iterations ?? (data?.length || 1));
   const maxSteps = opts.maxRequestsPerIteration ?? 1000;
 
@@ -160,6 +166,16 @@ export async function runCollection(opts: CollectionRunOptions): Promise<RunSumm
           const j = find(next);
           i = j >= 0 ? j : refs.length; // unknown name ends the iteration, like Postman
         } else i++;
+      }
+      // then the collection's gRPC calls and connections, in order
+      for (const t of realtime) {
+        if (opts.signal?.aborted) return;
+        if (!first && delayMs > 0) await sleep(delayMs, opts.signal).catch(() => undefined);
+        first = false;
+        const id = `${t.id}@${it + 1}`;
+        const done = waitFor(id);
+        yield { ...t, id, name: iterations > 1 ? `#${it + 1} ${t.name}` : t.name, variables: row ? { ...(t.variables ?? {}), ...row } : t.variables };
+        if (!(await done)) return;
       }
     }
   };
