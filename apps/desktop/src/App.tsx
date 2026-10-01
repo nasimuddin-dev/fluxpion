@@ -7,7 +7,7 @@ import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { ViewBoundary } from './components/ViewBoundary';
 import { isRequestView } from './store';
 import { Explorer } from './components/Explorer';
-import { EditorTabStrip, useEditorTabsStore } from './components/EditorTabs';
+import { EditorTabStrip, NoOpenTabs, useEditorTabsStore } from './components/EditorTabs';
 import { DOC_VIEWS, DocContext, isDocView, useDocs } from './lib/docs';
 import { watchRunNotifications } from './lib/run-notifications';
 import { remindExpiringCertificates, watchMonitorAlerts } from './lib/monitor-alerts';
@@ -320,6 +320,12 @@ export default function App() {
         <main className="flex-1 min-w-0 flex flex-col">
           {isRequestView(view) && view !== 'collections' && <EditorTabStrip />}
           <div className="flex-1 min-h-0 relative">
+            {/* a multi-document view with every tab closed: the same "No open requests" as the HTTP view */}
+            {isDocView(view) && !(docs[view] ?? []).length && (
+              <div className="absolute inset-0 flex flex-col">
+                <NoOpenTabs view={view} />
+              </div>
+            )}
             {mounted.flatMap((id) => {
               const V = VIEWS[id];
               // multi-document editors: one instance per open document (tab), each with its own draft and connection

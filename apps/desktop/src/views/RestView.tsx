@@ -1,5 +1,5 @@
 import { JSONPath } from 'jsonpath-plus';
-import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Save, Send, Square, Star, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
@@ -10,7 +10,7 @@ import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { SidebarShell } from '../components/SidebarShell';
-import { newRequestItems, useEditorTabs } from '../components/EditorTabs';
+import { NoOpenTabs, useEditorTabs } from '../components/EditorTabs';
 import { uid } from '../lib/format';
 
 /** Browser devtools "Copy as cURL (bash/cmd) / fetch / fetch (Node.js) / PowerShell" output. */
@@ -201,6 +201,8 @@ export function RestView() {
 
   useIntent('rest', async (p) => {
     if (p?.tabCommand) return runTabCommand(p.tabCommand);
+    // "Describe with AI" from an empty GraphQL, gRPC, WebSocket or MCP view
+    if (p?.describe) return void describeRequest();
     if (p?.newTab) {
       const t = blankRequest();
       setTabs((ts) => [...ts, t]);
@@ -592,30 +594,7 @@ export function RestView() {
       />
       <div className="h-full flex flex-col min-w-0">
         {noTabs ? (
-          <Empty
-            icon={<Send size={28} />}
-            title="No open requests"
-            action={
-              <div className="flex gap-2">
-                <Menu
-                  width={240}
-                  align="center"
-                  items={newRequestItems()}
-                  trigger={
-                    <Button variant="primary" icon={<Plus size={13} />}>
-                      New request
-                      <ChevronDown size={13} />
-                    </Button>
-                  }
-                />
-                <Button icon={<Sparkles size={13} />} onClick={() => void describeRequest()}>
-                  Describe with AI
-                </Button>
-              </div>
-            }
-          >
-            Open a request from the sidebar, or start a new one.
-          </Empty>
+          <NoOpenTabs view="rest" onDescribe={() => void describeRequest()} />
         ) : (
         <>
         <RequestBreadcrumb collectionId={tab.collectionId} requestId={tab.requestId} name={tab.name} dirty={tab.dirty} onSave={() => void quickSave()} />
