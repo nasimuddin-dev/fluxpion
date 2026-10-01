@@ -49,6 +49,7 @@ import {
   listWorkspaceDatasets,
   workspaceReportHtml,
   collectionVariableFlow,
+  referencedVariableNames,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -99,6 +100,26 @@ export function registerDataCommands(program: Command): void {
         if (o.json) console.log(JSON.stringify(uses, null, 2));
         else if (!uses.length) console.log(yellow(`{{${name}}} isn't used or defined in this workspace.`));
         else for (const u of uses) console.log(`${u.where}  ${dim(u.field)}`);
+      } finally {
+        store.close();
+      }
+    });
+  varsCmd
+    .command('unused')
+    .description('variables of the environments and the workspace that nothing reads ({{name}} anywhere, script gets, test files)')
+    .requiredOption('-w, --workspace <nameOrPath>')
+    .option('--json', 'print as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const used = referencedVariableNames(store);
+        const rows = [
+          ...store.listEnvironments().map((e) => ({ scope: `environment ${e.name}`, unused: e.variables.map((v) => v.key).filter((k) => k && !used.has(k)) })),
+          { scope: 'workspace', unused: (store.workspace.variables ?? []).map((v) => v.key).filter((k) => k && !used.has(k)) },
+        ].filter((x) => x.unused.length);
+        if (o.json) console.log(JSON.stringify(rows, null, 2));
+        else if (!rows.length) console.log(green('Every variable is used.'));
+        else for (const r of rows) console.log(`${r.scope}: ${r.unused.join(', ')}`);
       } finally {
         store.close();
       }

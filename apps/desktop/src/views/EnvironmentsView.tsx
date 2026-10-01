@@ -30,6 +30,9 @@ export function EnvironmentsView() {
   };
   const [sel, setSel] = useState<string>();
   const [draft, setDraft] = useState<Environment>();
+  // variables of the open environment that nothing reads (refreshed when it is opened or saved)
+  const [unused, setUnused] = useState<string[]>([]);
+  const refreshUnused = (env?: string) => void (env ? call<string[]>('vars.unused', { environment: env }).then(setUnused, () => setUnused([])) : setUnused([]));
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({});
   const [scope, setScope] = useState<'environment' | 'workspace' | 'global'>('environment');
@@ -77,6 +80,7 @@ export function EnvironmentsView() {
       return;
     }
     setDraft(e);
+    refreshUnused(e?.name);
     setSecretValues({});
     if (e) void call('env.secretStatus', { envId: e.id, keys: e.variables.filter((v) => v.secret).map((v) => v.key) }).then(setSecretStatus);
   }, [sel, envs]);
@@ -264,6 +268,11 @@ export function EnvironmentsView() {
                     setDraft({ ...draft, variables: next.map((r) => ({ key: r.key, value: r.secret ? '' : r.value, secret: r.secret, enabled: r.enabled })) });
                   }}
                 />
+                {unused.length > 0 && (
+                  <p className="text-xs text-muted px-1" title="No request, script, saved item, test file or other variable reads these. Find usages to double-check before deleting.">
+                    Not used anywhere in the workspace: <span className="mono text-fg">{unused.join(', ')}</span>
+                  </p>
+                )}
                 <CurrentValues envName={draft.name} />
                 <div className="text-xs text-muted flex items-start gap-2 bg-panel rounded-md p-2">
                   <KeyRound size={13} className="mt-0.5 shrink-0" />

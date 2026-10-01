@@ -1,5 +1,6 @@
 import type { Collection } from '../model/types.js';
 import { collectionRequests } from './collection-run.js';
+import type { WorkspaceStore } from '../storage/workspace.js';
 
 /** Where a variable is set or used: a request (in run order) or the collection / a folder (runs around every request inside). */
 export interface FlowPlace {
@@ -90,4 +91,36 @@ export function collectionVariableFlow(collection: Collection, definedElsewhere:
   }
   // scripted variables first (the chain), then the rest by name
   return [...flows.values()].sort((a, b) => Number(!a.setBy.length) - Number(!b.setBy.length) || a.name.localeCompare(b.name));
+}
+
+/**
+ * Every variable name the workspace reads: `{{name}}` anywhere in collections, saved gRPC calls, connections,
+ * prompts, monitors and other library items, MCP server settings, test files and variable values, plus
+ * script reads (`pm.environment.get('name')` …). What is not in it is defined but never used.
+ */
+export function referencedVariableNames(store: Pick<WorkspaceStore, 'listCollections' | 'libraryKinds' | 'getLibrary' | 'getMcpServers' | 'testTree' | 'readTestFile' | 'listEnvironments' | 'workspace'>): Set<string> {
+  const found = new Set<string>();
+  const scan = (text: string) => {
+    for (const n of names(TOKEN_RE, text, 1)) found.add(n);
+    for (const n of names(GET_RE, text, 2)) found.add(n);
+  };
+  const scanValue = (v: unknown) => strings(v).forEach(scan);
+  for (const c of store.listCollections()) if (!(c as { problem?: string }).problem) scanValue(c);
+  for (const kind of store.libraryKinds()) scanValue(store.getLibrary(kind).items);
+  scanValue(store.getMcpServers());
+  for (const e of store.listEnvironments()) scanValue(e.variables.map((v) => v.value));
+  scanValue((store.workspace.variables ?? []).map((v) => v.value));
+  const walk = (nodes: ReturnType<WorkspaceStore['testTree']>) => {
+    for (const n of nodes) {
+      if (n.kind === 'dir') walk(n.children ?? []);
+      else if (/\.(ya?ml|json)$/i.test(n.name))
+        try {
+          scan(store.readTestFile(n.path));
+        } catch {
+          /* unreadable file */
+        }
+    }
+  };
+  walk(store.testTree());
+  return found;
 }

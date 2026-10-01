@@ -36,9 +36,10 @@ Dynamic values (`{{$uuid}}`, `{{$timestamp}}` …) and `{{$env.NAME}}` count as 
 ```bash
 testpion vars usages accessToken -w my-workspace
 testpion vars rename token accessToken -w my-workspace
+testpion vars unused -w my-workspace          # variables nothing reads
 ```
 
-AI agents use the MCP tools `variable_usages` and `rename_variable`.
+Under an environment's variables, *Not used anywhere in the workspace* lists the ones nothing reads (no `{{name}}` in requests, saved items, MCP servers, test files or other variables, and no script `get`); check one with **Usages** before deleting it. AI agents use the MCP tools `variable_usages`, `rename_variable` and `unused_variables`.
 
 ## Built-in variables
 

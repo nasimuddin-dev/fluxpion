@@ -24,7 +24,7 @@ import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtim
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
 import { listWorkspaceDatasets, readDataset, type DatasetRecord } from '../runner/datasets.js';
-import { collectionVariableFlow } from '../runner/variable-flow.js';
+import { collectionVariableFlow, referencedVariableNames } from '../runner/variable-flow.js';
 import { collectionRealtimeTests, collectionSavedItems } from '../runner/collection-realtime.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -1013,6 +1013,19 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const after = summaryOf(String(a.after));
         const baseline = await createBaseline(`run ${before.runId}`, before, await readResultsFile(join(store.runDir(before.runId), 'results.jsonl')));
         return compareToBaseline(baseline, after, await readResultsFile(join(store.runDir(after.runId), 'results.jsonl')), { latencyPct: Number(a.latencyPct) || 25, tokensPct: 20, scoreDrop: 0.05 });
+      },
+    },
+    {
+      name: 'unused_variables',
+      description:
+        'Variables defined in environments and the workspace that nothing in the workspace reads ({{name}} in requests, saved items, MCP servers, test files or other variables, or a script get). Use it to clean up; variable_usages double-checks one name before deleting it.',
+      inputSchema: { type: 'object', properties: {} },
+      run: () => {
+        const used = referencedVariableNames(store);
+        return [
+          ...store.listEnvironments().map((e) => ({ scope: `environment ${e.name}`, unused: e.variables.map((v) => v.key).filter((k) => k && !used.has(k)) })),
+          { scope: 'workspace', unused: (store.workspace.variables ?? []).map((v) => v.key).filter((k) => k && !used.has(k)) },
+        ].filter((x) => x.unused.length);
       },
     },
     {

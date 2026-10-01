@@ -21,6 +21,7 @@ import {
   type Environment,
   type WorkspaceBundle,
   findLiteralSecrets,
+  referencedVariableNames,
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
@@ -179,6 +180,12 @@ export function workspaceHandlers(be: Backend): Handlers {
       return be.ws.saveEnvironment(env);
     },
     /** Set one variable in an environment (from the {{variable}} popover): updates it, or adds it; secret ones stay in the secret store. */
+    /** Variables defined in this environment (or, without one, in the workspace) that nothing in the workspace reads. */
+    'vars.unused': ({ environment }: { environment?: string } = {}) => {
+      const used = referencedVariableNames(be.ws);
+      const keys = environment ? (be.ws.getEnvironment(environment)?.variables ?? []).map((v) => v.key) : (be.ws.workspace.variables ?? []).map((v) => v.key);
+      return [...new Set(keys.filter((k) => k && !used.has(k)))];
+    },
     'vars.setInEnvironment': async ({ environment, name, value }: { environment: string; name: string; value: string }) => {
       const env = be.ws.getEnvironment(environment) ?? be.ws.listEnvironments().find((e) => e.name === environment);
       if (!env) throw new ApsError('ConfigurationError', 'Choose an environment first (top bar), then add the variable to it');
