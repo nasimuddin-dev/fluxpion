@@ -51,7 +51,7 @@ features:
     link: /features
     linkText: All features
   - title: Built for AI agents
-    details: testpion mcp-server gives agents 58 tools, from sending requests and running tests to what needs attention, with secrets redacted. Every CLI command has --json and the docs publish llms.txt.
+    details: testpion mcp-server gives agents 59 tools, from sending requests and running tests to what needs attention, with secrets redacted. Every CLI command has --json and the docs publish llms.txt.
     link: /ai-testing/mcp-server
     linkText: MCP server
   - title: Local-first and private

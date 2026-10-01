@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.33.0 — 2026-10-01
+
+Highlights: what needs attention, timing everywhere, AI help for monitors.
+
+- **Needs attention** on Home: failing monitors, certificates that expire within 30 days, the latest failed run, saved requests whose latest response failed and flaky tests, most severe first (click one to open it). Also first in the workspace report, `testpion attention` (exit 1 on a high-severity item) and the `what_needs_attention` MCP tool, which the MCP server now suggests as a first call.
+- **Timing**: History shows where an entry's time went (DNS, TCP, TLS, server, download); the collection Overview adds it up for the collection (also the `collection_timing` MCP tool); load history keeps the server p95 and the share of new connections per run.
+- **Collection Overview**: each request's latest results as a strip in Request health.
+- **Monitors**: **Explain with AI** when a monitor is failing, from its results, reasons and per-request numbers.
+- **Docs**: the home page has monitors and certificates, charts and AI agents.
+- **Performance**: the flaky-test scan is reused until a new run is added.
+
 ## 0.32.0 — 2026-10-01
 
 Highlights: flaky tests across the workspace, scores by run, a variables matrix, per-request monitor numbers.
