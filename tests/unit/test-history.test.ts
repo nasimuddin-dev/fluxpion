@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorkspaceStore, flakyTests, summarizeTestHistory, testHistory, type RunSummary, type TestResult } from '../../packages/core/src/index.js';
+import { WorkspaceStore, flakyTests, latestResults, summarizeTestHistory, testHistory, type RunSummary, type TestResult } from '../../packages/core/src/index.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'tp-testhist-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -41,6 +41,9 @@ describe('test history across runs', () => {
     // across the workspace: login flipped twice (passed, failed, passed) and passed once after a retry; other ran once
     const flaky = await flakyTests(store);
     expect(flaky.map((f) => [f.id, f.runs, f.passed, f.flips, f.retried, f.lastStatus, f.recent.join(',')])).toEqual([['login', 3, 2, 2, 1, 'passed', 'passed,failed,passed']]);
+    // the latest result per name, newest run first
+    const latest = await latestResults(store, ['Login', 'Other', 'Missing']);
+    expect(Object.fromEntries(Object.entries(latest).map(([k, v]) => [k, [v.runId, v.status]]))).toEqual({ Login: ['run-4', 'passed'], Other: ['run-3', 'passed'] });
     store.close();
   });
 });

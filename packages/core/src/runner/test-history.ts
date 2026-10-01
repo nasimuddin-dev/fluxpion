@@ -125,3 +125,18 @@ async function scanFlaky(store: WorkspaceStore, runs: Array<{ id: string; starte
   }
   return out.sort((a, b) => b.flips - a.flips || b.retried - a.retried || a.name.localeCompare(b.name));
 }
+
+/** The latest result of each named test over the latest `runs` runs (newest first): one pass, stops once all are found. */
+export async function latestResults(store: WorkspaceStore, names: string[], opts: { runs?: number } = {}): Promise<Record<string, { status: string; runId: string; startedAt: string; latencyMs?: number }>> {
+  const wanted = new Set(names);
+  const out: Record<string, { status: string; runId: string; startedAt: string; latencyMs?: number }> = {};
+  if (!wanted.size) return out;
+  for (const run of store.meta.listRuns({ limit: Math.min(Math.max(opts.runs ?? 30, 1), 300) }).items) {
+    for await (const r of await readResultsFile(join(store.runDir(run.id), 'results.jsonl'))) {
+      if (!wanted.has(r.name) || out[r.name]) continue;
+      out[r.name] = { status: r.status, runId: run.id, startedAt: run.startedAt, latencyMs: r.latencyMs ?? r.durationMs };
+    }
+    if (Object.keys(out).length === wanted.size) break;
+  }
+  return out;
+}

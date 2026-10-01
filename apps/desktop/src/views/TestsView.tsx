@@ -4,6 +4,7 @@ import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSaveShortcut } from '../hooks';
 import { timeAgo } from '../lib/format';
+import { StatusIcon } from '../components/Results';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { RunPanel } from '../components/RunPanel';
@@ -135,6 +136,13 @@ export function TestsView() {
   const [runId, setRunId] = useState<string>();
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [tab, setTab] = useState<'editor' | 'run'>('editor');
+  // the latest result of each test in the previewed file
+  const [latest, setLatest] = useState<Record<string, { status: string; runId: string; startedAt: string }>>({});
+  useEffect(() => {
+    const names = preview && !('error' in preview) && !preview.suite ? preview.tests.map((t) => t.name) : [];
+    if (!names.length) return setLatest({});
+    void call<typeof latest>('runs.latestResults', { names }).then(setLatest, () => setLatest({}));
+  }, [preview]);
   const [opts, setOpts] = useState({ concurrency: 4, retries: 0, grep: '', tags: '' });
   const env = useApp((s) => s.environment);
 
@@ -387,6 +395,19 @@ export function TestsView() {
                             {g}
                           </Badge>
                         ))}
+                        {latest[t.name] && (
+                          <button
+                            className="ml-auto flex items-center gap-1.5 text-xs text-muted hover:text-fg shrink-0"
+                            title={`Latest result: ${latest[t.name]!.status} · ${new Date(latest[t.name]!.startedAt).toLocaleString()} (open the run)`}
+                            onClick={() => {
+                              setRunId(latest[t.name]!.runId);
+                              setTab('run');
+                            }}
+                          >
+                            <StatusIcon status={latest[t.name]!.status} />
+                            {timeAgo(latest[t.name]!.startedAt)}
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
