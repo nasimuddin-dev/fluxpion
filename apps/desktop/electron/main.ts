@@ -34,12 +34,21 @@ if (!capture && !existsSync(join(app.getPath('appData'), 'TestPion'))) {
 
 // Single instance — a second launch focuses the existing window.
 if (!capture && !app.requestSingleInstanceLock()) app.quit();
+// the installer's app id: the taskbar groups TestPion's windows under its own icon (not Electron's, when run from source)
+if (process.platform === 'win32') app.setAppUserModelId('dev.nasimuddin.protolens');
 
 function osBackendName(): string {
   if (process.platform === 'win32') return 'Windows DPAPI';
   if (process.platform === 'darwin') return 'macOS Keychain';
   const b = (safeStorage as unknown as { getSelectedStorageBackend?: () => string }).getSelectedStorageBackend?.();
   return b ? `Linux ${b}` : 'Linux Secret Service';
+}
+
+/** The window and taskbar icon: the .ico on Windows (every size), the PNG elsewhere. The packaged Windows app takes it from its .exe. */
+function windowIcon(): string | undefined {
+  const win32 = process.platform === 'win32';
+  if (app.isPackaged) return win32 ? undefined : join(process.resourcesPath, 'icon.png');
+  return join(__dirname, '..', 'build', win32 ? 'icon.ico' : join('icons', '256x256.png'));
 }
 
 function createWindow(): void {
@@ -53,7 +62,7 @@ function createWindow(): void {
     minHeight: 600,
     title: 'TestPion',
     // the window and taskbar icon (the packaged Windows app also has it in its .exe)
-    icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(__dirname, '..', 'build', 'icons', '256x256.png'),
+    icon: windowIcon(),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1117' : '#ffffff',
     show: false,
     webPreferences: {
