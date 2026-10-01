@@ -1,4 +1,4 @@
-import { BookmarkPlus, Download, ExternalLink, Sparkles } from 'lucide-react';
+import { BookmarkPlus, Camera, Download, ExternalLink, Sparkles } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useState } from 'react';
 import { call, visualizationUrl } from '../api';
@@ -109,6 +109,11 @@ export function ResponseViewer({
           {onGenerateTests && (
             <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onGenerateTests} title="Write pm tests for this response with the AI assistant (added to the Post-response script)">
               Generate tests
+            </Button>
+          )}
+          {onAddAssertion && isJson && (
+            <Button size="sm" variant="ghost" icon={<Camera size={12} />} title="Add a check that later responses keep this response's shape (fields and types); in the Tests tab it can compare values too and ignore fields" onClick={() => onAddAssertion({ type: 'snapshot', path: '$', expected: response.json, mode: 'shape' })}>
+              Snapshot
             </Button>
           )}
           {onSuggestAssertions && (

@@ -1,3 +1,4 @@
+import { compareSnapshot, describeDifference } from './snapshot.js';
 import { createHash } from 'node:crypto';
 import AjvModule, { type ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
@@ -250,6 +251,21 @@ registerCheck('json-schema', (cfg, ctx) => {
   } catch (e) {
     return res(cfg, false, `invalid schema: ${(e as Error).message}`);
   }
+});
+
+// the response (or `path` in it) against a stored JSON snapshot: by shape (fields and types) or by values
+registerCheck('snapshot', (cfg, ctx) => {
+  if (cfg.expected === undefined) return res(cfg, false, 'no snapshot stored: add one from a response (Add snapshot check)');
+  let actual = cfg.path ? target(cfg, ctx).value : ctx.body;
+  if (typeof actual === 'string') {
+    const p = tryParseJson(actual);
+    if (p.ok) actual = p.value;
+  }
+  const mode = cfg.mode === 'values' ? 'values' : 'shape';
+  const diffs = compareSnapshot(cfg.expected, actual, { mode, ignore: Array.isArray(cfg.ignore) ? (cfg.ignore as unknown[]).map(String) : undefined, strict: cfg.strict === true });
+  return res(cfg, !diffs.length, diffs.length ? `${diffs.length === 50 ? '50+' : diffs.length} difference${diffs.length === 1 ? '' : 's'} from the snapshot: ${diffs.slice(0, 5).map(describeDifference).join('; ')}` : `matches the snapshot (${mode})`, {
+    metadata: { differences: diffs.slice(0, 50) },
+  });
 });
 
 registerCheck('type', (cfg, ctx) => {

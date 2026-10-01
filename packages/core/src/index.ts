@@ -45,6 +45,7 @@ export * from './ai/agent.js';
 export * from './ai/assist.js';
 
 export * from './eval/checks.js';
+export * from './eval/snapshot.js';
 export * from './eval/security.js';
 export * from './eval/text.js';
 export * from './scripts/sandbox.js';

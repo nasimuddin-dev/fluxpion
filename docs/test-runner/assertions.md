@@ -17,6 +17,7 @@ All checks share `type`, an optional `name`, and usually `path` (JSONPath such a
 | `contains`, `not-contains` | `path`, `expected` (a string or a list; `any: true`) |
 | `regex`, `not-regex` | `path`, `expected` / `pattern`, `flags` |
 | `json-schema` | `path`, `schema` (inferred from `expected` if omitted) |
+| `snapshot` | `expected` (the stored JSON), `path` (optional), `mode`: `shape` (default: the same fields and types, values may change) or `values`, `ignore` (paths such as `$.id`, `$..updatedAt`, `$.items[*].price`), `strict` (also fail on new fields) |
 | `openapi` | `spec` (an OpenAPI 3 / Swagger 2 file in the workspace, or the document inline), `operationId` (optional). See [contract testing](#openapi-contract-testing). |
 | `type`, `length`, `threshold`, `greater-than`, `less-than` | `path`, `expected` / `min` / `max` |
 | `latency`, `tokens`, `cost` | `max` (`tokens` also takes `field: input\|output\|total`) |
@@ -26,6 +27,20 @@ All checks share `type`, an optional `name`, and usually `path` (JSONPath such a
 | AI, RAG, agent and safety checks | see [evaluations](../ai-testing/evaluations.md) |
 
 Check options can use variables, e.g. `expected: "{{expected}}"`. Script tests (`pm.test`) also appear as checks.
+
+## Snapshots
+
+A **snapshot** check keeps a copy of a response and compares later responses with it. By default it compares the *shape*: every field of the snapshot must still be there with the same type, while values may change, so it suits live data. `mode: values` compares the values too (array lengths included); `ignore` skips volatile fields.
+
+```yaml
+assertions:
+  - type: snapshot
+    mode: values
+    ignore: ["$.id", "$..updatedAt"]
+    expected: { "id": 1, "name": "Rex", "tags": ["dog"], "updatedAt": "2026-10-01" }
+```
+
+In the app, **Snapshot** above a JSON response adds one for the whole body, and the menu of an object or array in the response tree adds one for that part (*Keeps this shape*). A failure lists the differences, for example `$.price is string, was number` or `$.owner.email is missing`.
 
 ## OpenAPI contract testing
 

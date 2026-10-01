@@ -6,7 +6,7 @@ interface CheckDef {
   type: string;
   label: string;
   group: string;
-  fields: Array<'path' | 'expected' | 'max' | 'min' | 'threshold' | 'header' | 'tool' | 'schema' | 'criteria' | 'judge' | 'method' | 'values' | 'spec' | 'operationId'>;
+  fields: Array<'path' | 'expected' | 'max' | 'min' | 'threshold' | 'header' | 'tool' | 'schema' | 'criteria' | 'judge' | 'method' | 'values' | 'spec' | 'operationId' | 'snapshot'>;
   hint?: string;
 }
 
@@ -27,6 +27,7 @@ export const CHECK_DEFS: CheckDef[] = [
   { type: 'threshold', label: 'Number within', group: 'Body', fields: ['path', 'min', 'max'] },
   { type: 'json-schema', label: 'JSON Schema', group: 'Body', fields: ['path', 'schema'] },
   { type: 'is-json', label: 'Is valid JSON', group: 'Body', fields: [] },
+  { type: 'snapshot', label: 'Matches snapshot', group: 'Body', fields: ['path', 'snapshot'], hint: 'shape: the same fields and types, values may change; values: the same values too' },
   { type: 'openapi', label: 'Matches OpenAPI contract', group: 'Response', fields: ['spec', 'operationId'], hint: 'status, content type and body checked against the operation in the OpenAPI document' },
   { type: 'graphql-no-errors', label: 'No GraphQL errors', group: 'GraphQL', fields: [] },
   { type: 'graphql-errors', label: 'GraphQL error contains', group: 'GraphQL', fields: ['expected'] },
@@ -142,6 +143,24 @@ export function AssertionEditor({ checks, onChange, groups }: { checks: CheckCon
                 value={String(c.operationId ?? '')}
                 onChange={(e) => set(i, { operationId: e.target.value || undefined })}
               />
+            )}
+            {def.fields.includes('snapshot') && (
+              <>
+                <select className="field h-7 min-h-7 py-0" value={c.mode === 'values' ? 'values' : 'shape'} onChange={(e) => set(i, { mode: e.target.value })} title={def.hint} aria-label="Snapshot comparison">
+                  <option value="shape">same shape</option>
+                  <option value="values">same values</option>
+                </select>
+                <input
+                  className="field h-7 min-h-7 mono flex-1 min-w-40"
+                  placeholder="ignore, e.g. $.id, $..updatedAt, $.items[*].price"
+                  title="Paths not compared: [*] any index, * any key, $.. any depth"
+                  value={((c.ignore as string[]) ?? []).join(', ')}
+                  onChange={(e) => set(i, { ignore: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                />
+                <span className="text-xs text-muted" title={c.expected === undefined ? '' : JSON.stringify(c.expected, null, 2).slice(0, 2000)}>
+                  {c.expected === undefined ? 'no snapshot yet' : `snapshot ${(JSON.stringify(c.expected).length / 1024).toFixed(1)} KB`}
+                </span>
+              </>
             )}
             {def.fields.includes('schema') && (
               <input

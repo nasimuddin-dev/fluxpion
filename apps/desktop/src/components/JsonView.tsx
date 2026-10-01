@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Copy, Equal, ListChecks, ListOrdered, Search, Shapes, Variable, WrapText } from 'lucide-react';
+import { Camera, ChevronDown, ChevronRight, ChevronUp, CircleCheck, Copy, Equal, ListChecks, ListOrdered, Search, Shapes, Variable, WrapText } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { JSONPath } from 'jsonpath-plus';
 import { cx, IconButton, Input, Menu, VirtualList, type MenuItem } from './ui';
@@ -40,6 +40,8 @@ export interface TreeAssertion {
   path: string;
   expected?: unknown;
   min?: number;
+  /** Snapshot checks: compare the shape or the values. */
+  mode?: 'shape' | 'values';
 }
 
 /** A variable name for a key: `access_token` stays, `user-id` → `userId`, an index → `item0`. */
@@ -61,6 +63,7 @@ function assertionItems(r: { path: string; value: unknown; expandable: boolean }
     items.push({ label: `Has ${r.value.length} item${r.value.length === 1 ? '' : 's'}`, icon: <ListOrdered size={14} />, onSelect: () => onAssert({ type: 'length', path: r.path, expected: (r.value as unknown[]).length }) });
     items.push({ label: 'Is not empty', icon: <ListChecks size={14} />, onSelect: () => onAssert({ type: 'length', path: r.path, min: 1 }) });
   }
+  if (r.expandable) items.push({ label: 'Keeps this shape (snapshot)', icon: <Camera size={14} />, onSelect: () => onAssert({ type: 'snapshot', path: r.path, expected: r.value, mode: 'shape' }) });
   return items;
 }
 
