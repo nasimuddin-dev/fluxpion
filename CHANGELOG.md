@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.0 — 2026-10-01
+
+Highlights: compare two history entries, response p95 for monitors, `testpion doctor`.
+
+- **History**: Ctrl/Cmd+click a second entry to compare the two responses side by side.
+- **Monitors**: a *Response p95* chart with the limit drawn on it, and the editor shows the p95 of recent runs next to the response time limit.
+- **Evaluations**: an overview of earlier runs (pass rate and duration, click one to open it) and pass / fail bars in the runs list.
+- **Search**: monitors, saved load tests and saved evaluations, opened in their views.
+- **Diagnostics**: `testpion doctor` checks Node.js, SQLite, the app folder, secrets, proxy and certificates and the workspace files (`--json`, exit 1 on an error); **Settings ▸ About ▸ Copy diagnostics** copies versions and storage backends for a bug report with your home folder masked.
+- **Docs**: screenshots of the Home activity dashboard and a run's Charts tab.
+
 ## 0.27.0 — 2026-10-01
 
 Highlights: storage clean-up, flaky tests, unused variables.
