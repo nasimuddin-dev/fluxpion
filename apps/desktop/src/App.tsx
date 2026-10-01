@@ -1,5 +1,5 @@
 import { AlarmClock, BarChart3, Bot, Keyboard, Columns2, CopyX, Disc, GitCompare, ScanSearch, TerminalSquare, Variable, Download, FileDown, FlaskConical, FolderOpen, FolderPlus, FolderTree, Gauge, GitBranch, History, KeyRound, Layers, ListChecks, ListX, Network, Play, Plug, Radio, RefreshCw, ScrollText, Search, Settings, Sparkles, SquareTerminal, Upload, Waypoints, Workflow, X, type LucideIcon } from 'lucide-react';
-import { createElement, lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent } from 'react';
+import { createElement, lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentType, type LazyExoticComponent } from 'react';
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel, CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
@@ -185,11 +185,16 @@ export default function App() {
   useEffect(() => {
     if (isDocView(view)) useDocs.getState().ensure(view);
   }, [view]);
-  // the last tab of a GraphQL / gRPC / WebSocket / MCP editor closed while other tabs are open: show the nearest
-  // one (like closing a tab anywhere else); "No open requests" is only for when nothing is open
-  const viewDocs = (docs[view] ?? []).length;
+  // the last tab of an editor (HTTP, GraphQL, gRPC, WebSocket, MCP) closed while other tabs are open: show the nearest
+  // one, like closing a tab anywhere else; "No open requests" is only for when nothing is open. Only right after a
+  // close (the count went from some to none in the same view): opening a tab passes through "none" for a moment too.
+  const restTabs = useEditorTabsStore((s) => (s.byView.rest ?? []).length);
+  const ownTabs = isDocView(view) ? (docs[view] ?? []).length : view === 'rest' ? restTabs : -1;
+  const lastCount = useRef<{ view: ViewId; count: number }>(undefined);
   useEffect(() => {
-    if (!isDocView(view) || viewDocs) return;
+    const before = lastCount.current;
+    lastCount.current = { view, count: ownTabs };
+    if (!before || before.view !== view || before.count <= 0 || ownTabs !== 0) return;
     const open = Object.entries(useEditorTabsStore.getState().byView)
       .filter(([group]) => group !== view && !group.startsWith(`${view}:`))
       .flatMap(([, tabs]) => tabs);
@@ -197,7 +202,12 @@ export default function App() {
     if (!next) return;
     useApp.getState().setView(next.view);
     next.onSelect?.();
-  }, [view, viewDocs]);
+  }, [view, ownTabs]);
+  // a document view whose selected tab is gone (closed elsewhere, a stale session): select its first tab instead of showing nothing
+  useEffect(() => {
+    const list = docs[view] ?? [];
+    if (isDocView(view) && list.length && !list.includes(activeDocs[view] ?? '')) useDocs.getState().select(view, list[0]!);
+  }, [view, docs, activeDocs]);
   useEffect(() => {
     setVisited((cached) => {
       const next = [...cached.filter((id) => id !== view), view];
