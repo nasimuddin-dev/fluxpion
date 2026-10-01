@@ -326,6 +326,7 @@ export function Explorer() {
   // Import and Export open here, without leaving the request editors
   const [importing, setImporting] = useState(false);
   const [collapseAll, setCollapseAll] = useState(0);
+  const revealKey = useApp((s) => s.intent?.nonce);
   const [exporting, setExporting] = useState(false);
   const importDefinition = () => setImporting(true);
   /** Show a saved gRPC call / connection in another collection (or in none). */
@@ -497,6 +498,7 @@ export function Explorer() {
               onNewOfCategory={newOfCategory}
               onDropSaved={(kind, id, to) => void moveItem(kind, id, to)}
               collapseAll={collapseAll}
+              revealKey={revealKey}
               activeRequestId={openRequestId}
               onOpen={(c, n) => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
               onChange={(c) => void saveCollection(c)}

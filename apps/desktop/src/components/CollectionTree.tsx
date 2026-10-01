@@ -1,5 +1,5 @@
 import { AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call } from '../api';
 import { cx, Menu, type MenuItem } from './ui';
@@ -39,6 +39,18 @@ export function addToFolder(nodes: CollectionNode[], folderId: string | undefine
 /** Insert a node right before the node with this id, wherever it is in the tree. */
 export function insertBefore(nodes: CollectionNode[], beforeId: string, node: CollectionNode): CollectionNode[] {
   return nodes.flatMap((n) => (n.id === beforeId ? [node, n] : n.kind === 'folder' ? [{ ...n, items: insertBefore(n.items, beforeId, node) }] : [n]));
+}
+
+/** Ids of the folders from the top down to a node (empty at the top level; undefined when it isn't there). */
+export function folderIdsTo(nodes: CollectionNode[], id: string): string[] | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return [];
+    if (n.kind === 'folder') {
+      const inner = folderIdsTo(n.items, id);
+      if (inner) return [n.id, ...inner];
+    }
+  }
+  return undefined;
 }
 
 /** A deep copy of a request or folder with new ids throughout (a copied folder's requests are new requests). */
@@ -105,6 +117,7 @@ export function CollectionTree({
   onNewOfCategory,
   onDropSaved,
   collapseAll,
+  revealKey,
 }: {
   collections: Collection[];
   activeRequestId?: string;
@@ -132,6 +145,8 @@ export function CollectionTree({
   onDropSaved?(kind: 'grpc' | 'websocket', id: string, collectionId: string): void;
   /** Changes (1, 2 …) fold every collection and folder. */
   collapseAll?: number;
+  /** Changes whenever something is opened: the open request is revealed again (even if it was already open). */
+  revealKey?: number;
 }) {
   const [menuFor, setMenuFor] = useState<string>();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
@@ -339,6 +354,24 @@ export function CollectionTree({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapseAll]);
+  // reveal the open request: scroll its row into view when it changes (a tab, search or history opened it)
+  const treeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!activeRequestId) return;
+    // open its collection, category and folders (even ones folded by hand), then scroll to it
+    for (const c of collections) {
+      const folders = folderIdsTo(c.items, activeRequestId);
+      if (!folders) continue;
+      const node = findNode(c.items, activeRequestId);
+      const cat = node ? requestCategory(node) : undefined;
+      const keys = [c.id, ...(cat && categorize ? [`${c.id}:cat:${cat}`] : []), ...folders];
+      setOpen((o) => (keys.every((k) => o[k] !== false) ? o : { ...o, ...Object.fromEntries(keys.map((k) => [k, true])) }));
+      break;
+    }
+    const t = setTimeout(() => treeRef.current?.querySelector(`[data-node-id="${CSS.escape(activeRequestId)}"]`)?.scrollIntoView({ block: 'nearest' }), 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRequestId, revealKey]);
   const [editing, setEditing] = useState<{ c: Collection; folder: CollectionFolder }>();
   const f = filter?.toLowerCase();
   const matches = (n: CollectionNode) => matchesCollectionNode(n, filter, favoritesOnly);
@@ -361,7 +394,8 @@ export function CollectionTree({
     const rows = shown.map((n) => {
       const pad = { paddingLeft: 8 + depth * 12 };
       if (n.kind === 'folder') {
-        const isOpen = open[n.id] ?? !!f;
+        // the folders on the way to the open request start open, so it's always in sight
+        const isOpen = open[n.id] ?? (!!f || (!!activeRequestId && !!findNode(n.items, activeRequestId)));
         return (
           <div key={n.id}>
             <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', menuFor === n.id && 'bg-hover', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })} onContextMenu={(e) => (e.preventDefault(), setMenuFor(n.id))}>
@@ -401,6 +435,7 @@ export function CollectionTree({
       return (
         <div key={n.id}>
         <div
+          data-node-id={n.id}
           className={cx('group flex items-center h-8 text-sm pr-1 rounded-md mx-1 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_2rem]', activeRequestId === n.id ? 'bg-accent-soft text-fg' : 'hover:bg-hover', menuFor === n.id && 'bg-hover', dropClass(n.id))}
           style={pad}
           {...dragProps(c, n)}
@@ -602,7 +637,7 @@ export function CollectionTree({
   const extraMatches = (c: Collection) => (extraGroups?.(c) ?? []).some((g) => g.items.some((i) => !f || i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f)));
 
   return (
-    <div className="text-sm">
+    <div className="text-sm" ref={treeRef}>
       {editing && (
         <FolderEditor
           folder={editing.folder}
