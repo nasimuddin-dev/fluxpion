@@ -92,6 +92,7 @@ export function HomeView() {
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [monitors, setMonitors] = useState<HomeMonitor[]>([]);
   const [runs, setRuns] = useState<HomeRun[]>([]);
+  const [health, setHealth] = useState<Record<string, { sent: number; failing: number }>>({});
   const [certs, setCerts] = useState<Array<{ host: string; issuer?: string; validTo?: string; daysLeft?: number; lastSeen: string }>>([]);
   const [activity, setActivity] = useState<Activity>();
   // the dashboard's period, remembered
@@ -124,6 +125,7 @@ export function HomeView() {
     void call<HomeMonitor[]>('monitor.list').then(setMonitors, () => setMonitors([]));
     void call<{ items: HomeRun[] }>('runs.list', { limit: 6 }).then((r) => setRuns(r.items), () => setRuns([]));
     void call<typeof certs>('certificates.list').then(setCerts, () => setCerts([]));
+    void call<typeof health>('stats.collectionsHealth').then(setHealth, () => setHealth({}));
     loadActivity();
   };
   useEffect(() => {
@@ -241,6 +243,13 @@ export function HomeView() {
                     {c.name}
                     <span className="text-xs text-muted ml-2">{plural(count(c.items), 'request')}</span>
                   </button>
+                  {health[c.id]?.failing ? (
+                    <Badge tone="bad" title={`${health[c.id]!.failing} of ${health[c.id]!.sent} sent requests: the latest response failed`}>
+                      {health[c.id]!.failing} failing
+                    </Badge>
+                  ) : health[c.id]?.sent ? (
+                    <span className="w-2 h-2 rounded-full bg-ok shrink-0" title={`${health[c.id]!.sent} sent requests, all passing`} aria-label="all sent requests passing" />
+                  ) : null}
                   <button className="opacity-0 group-hover:opacity-100 text-muted hover:text-accent" title="Run collection" aria-label={`Run ${c.name}`} onClick={() => open('collections', { collectionId: c.id, run: true })}>
                     <Play size={13} />
                   </button>
