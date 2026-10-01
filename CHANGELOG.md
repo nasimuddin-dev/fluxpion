@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.39.1 — 2026-10-01
+
+- **Rename in place**: after Rename in a menu, the name field keeps the keyboard (a menu closing late could take the focus, so typing went elsewhere).
+
 ## 0.39.0 — 2026-10-01
 
 Highlights: rename in place everywhere, a response layout for every editor, a much faster filter on big workspaces, and keyboard navigation in every list.
