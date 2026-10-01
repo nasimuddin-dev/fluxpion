@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowUp, Copy, DatabaseZap } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, Copy, DatabaseZap, Table2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { plural } from '../lib/format';
-import { Button, cx, Input } from './ui';
+import { Button, cx, Input, Select } from './ui';
+import { ChartCard } from './charts';
 import { promptText, useApp } from '../store';
 import { asError, call } from '../api';
 
@@ -62,6 +63,16 @@ export function JsonTable({ rows, path }: { rows: Row[]; path: string }) {
     }
     return out;
   }, [rows, columns, filter, sort]);
+  // chart: a label column and a numeric column (the first of each kind by default)
+  const [view, setView] = useState<'table' | 'chart'>('table');
+  const numeric = useMemo(() => columns.filter((c) => rows.slice(0, 50).some((r) => typeof r[c] === 'number') && rows.slice(0, 50).every((r) => r[c] === undefined || r[c] === null || typeof r[c] === 'number')), [columns, rows]);
+  const labels = useMemo(() => columns.filter((c) => !numeric.includes(c) && rows.slice(0, 50).every((r) => r[c] === undefined || r[c] === null || typeof r[c] !== 'object')), [columns, numeric, rows]);
+  const [labelCol, setLabelCol] = useState<string>();
+  const [valueCol, setValueCol] = useState<string>();
+  const label = labelCol && columns.includes(labelCol) ? labelCol : (labels[0] ?? numeric[0]);
+  // by default the numeric column that varies most (a constant column makes a flat chart)
+  const varied = useMemo(() => [...numeric].sort((a, b) => new Set(rows.slice(0, 100).map((r) => r[b])).size - new Set(rows.slice(0, 100).map((r) => r[a])).size), [numeric, rows]);
+  const value = valueCol && numeric.includes(valueCol) ? valueCol : varied.find((c) => c !== label) ?? varied[0];
   const toggle = (key: string) => setSort((s) => (s?.key !== key ? { key, dir: 1 } : s.dir === 1 ? { key, dir: -1 } : undefined));
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -71,6 +82,16 @@ export function JsonTable({ rows, path }: { rows: Row[]; path: string }) {
           {plural(shown.length, 'row')}
           {shown.length !== rows.length ? ` of ${rows.length}` : ''} · {plural(columns.length, 'column')} · <span className="mono">{path}</span>
         </span>
+        {numeric.length > 0 && (
+          <div className="flex rounded-md border border-line overflow-hidden text-xs ml-2" role="radiogroup" aria-label="Show as">
+            {(['table', 'chart'] as const).map((v) => (
+              <button key={v} role="radio" aria-checked={view === v} className={cx('px-2 h-6 inline-flex items-center gap-1 capitalize', view === v ? 'bg-accent text-white' : 'hover:bg-hover')} onClick={() => setView(v)}>
+                {v === 'table' ? <Table2 size={12} /> : <BarChart3 size={12} />}
+                {v}
+              </button>
+            ))}
+          </div>
+        )}
         <Button
           size="sm"
           className="ml-auto"
@@ -103,6 +124,26 @@ export function JsonTable({ rows, path }: { rows: Row[]; path: string }) {
           Save as dataset
         </Button>
       </div>
+      {view === 'chart' && value ? (
+        <div className="flex-1 min-h-0 overflow-auto p-3">
+          <div className="flex items-center gap-2 mb-3 text-xs">
+            <span className="text-muted">Bars of</span>
+            <Select className="h-7 min-h-7 py-0 text-xs" aria-label="Value column" value={value} onChange={(e) => setValueCol(e.target.value)}>
+              {numeric.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+            <span className="text-muted">labelled by</span>
+            <Select className="h-7 min-h-7 py-0 text-xs" aria-label="Label column" value={label} onChange={(e) => setLabelCol(e.target.value)}>
+              {[...labels, ...numeric].map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+            <span className="text-muted">· sort and filter apply · first 100 rows</span>
+          </div>
+          <RowBars rows={shown.slice(0, 100)} label={label!} value={value} />
+        </div>
+      ) : (
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="text-xs border-collapse min-w-full">
           <thead className="sticky top-0 bg-panel z-10">
@@ -134,6 +175,36 @@ export function JsonTable({ rows, path }: { rows: Row[]; path: string }) {
         </table>
         {shown.length > LIMIT && <p className="text-xs text-muted p-2">Showing the first {LIMIT} rows; filter to narrow them down.</p>}
       </div>
+      )}
     </div>
+  );
+}
+
+/** One horizontal bar per row (one hue: it is magnitude), the label left, the value right; negative values run left of the axis. */
+function RowBars({ rows, label, value }: { rows: Row[]; label: string; value: string }) {
+  const nums = rows.map((r) => (typeof r[value] === 'number' ? (r[value] as number) : 0));
+  const max = Math.max(0, ...nums);
+  const min = Math.min(0, ...nums);
+  const span = max - min || 1;
+  const zero = (-min / span) * 100;
+  return (
+    <ChartCard title={`${value} by ${label}`}>
+      <div className="flex flex-col gap-1">
+        {rows.map((r, i) => {
+          const v = nums[i]!;
+          const w = (Math.abs(v) / span) * 100;
+          return (
+            <div key={i} className="flex items-center gap-2 text-xs" title={`${cell(r[label])}: ${cell(r[value])}`}>
+              <span className="w-40 shrink-0 truncate text-muted">{cell(r[label])}</span>
+              <span className="relative flex-1 h-3.5">
+                <span className="absolute inset-y-0 rounded-sm bg-accent" style={{ left: `${v < 0 ? zero - w : zero}%`, width: `${Math.max(w, v ? 0.5 : 0)}%` }} />
+                {min < 0 && <span className="absolute inset-y-[-2px] w-px bg-line" style={{ left: `${zero}%` }} />}
+              </span>
+              <span className="w-20 shrink-0 text-right tabular-nums text-fg">{r[value] === null || r[value] === undefined ? '—' : cell(r[value])}</span>
+            </div>
+          );
+        })}
+      </div>
+    </ChartCard>
   );
 }
