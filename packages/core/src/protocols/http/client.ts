@@ -1,4 +1,5 @@
 import { assertUrlAllowed, getNetworkPolicy } from '../../net/policy.js';
+import { ENGINE_VERSION } from '../../version.js';
 import { baseDispatcher, makeDispatcher, proxyGeneration } from '../../net/proxy.js';
 import { createWriteStream, openAsBlob, readFileSync, mkdirSync, type WriteStream } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -196,7 +197,7 @@ export async function prepareHttpRequest(spec: HttpRequestSpec, opts: HttpExecOp
   // the request's own cookies win over jar cookies with the same name
   const explicitCookie = headers.get('cookie') ?? undefined;
   if (opts.cookieJar) setJarCookies(headers, opts.cookieJar, url, explicitCookie);
-  if (!headers.has('user-agent')) headers.set('user-agent', 'TestPion/0.5');
+  if (!headers.has('user-agent')) headers.set('user-agent', `TestPion/${ENGINE_VERSION}`);
   if (!headers.has('accept')) headers.set('accept', '*/*');
   await applyAuth(spec.auth, headers, url, opts);
   const { body, preview } = await buildBody(spec.body, headers);
