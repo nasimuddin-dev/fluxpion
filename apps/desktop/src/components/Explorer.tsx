@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
@@ -283,6 +283,8 @@ export function Explorer() {
   const { width, handle } = useExplorerWidth();
   const sections = useOpenSections();
   const [filter, setFilter] = useState('');
+  // the box shows each keystroke at once; the lists follow as a lower-priority render (big workspaces stay smooth)
+  const shownFilter = useDeferredValue(filter);
   const allCollections = useCollections();
   const collections = useMemo(() => allCollections.filter((x) => !x.problem), [allCollections]);
   const [grpc, setGrpc] = useState<SavedItem[]>([]);
@@ -344,7 +346,7 @@ export function Explorer() {
 
   const grpcByCollection = useMemo(() => groupByCollection(grpc), [grpc]);
   const socketsByCollection = useMemo(() => groupByCollection(sockets), [sockets]);
-  const f = filter.trim().toLowerCase();
+  const f = shownFilter.trim().toLowerCase();
   const match = (...t: Array<string | undefined>) => !f || t.some((x) => x?.toLowerCase().includes(f));
   // gRPC calls and connections not (or no longer) in a collection
   const colIds = new Set(collections.map((c) => c.id));
@@ -669,7 +671,7 @@ export function Explorer() {
           <div className="pb-2 border-b border-line/60">
             <CollectionTree
               collections={collections}
-              filter={filter}
+              filter={shownFilter}
               categorize
               extraGroups={extraGroups}
               onNewOfCategory={newOfCategory}

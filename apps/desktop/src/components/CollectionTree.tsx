@@ -68,6 +68,8 @@ export function duplicateNode(nodes: CollectionNode[], id: string, copy: (n: Col
 
 /** Rows of one list (a collection's or folder's direct items) shown at first, and added by "Show more". */
 const LIST_PAGE = 300;
+/** While filtering every folder opens: draw at most this many rows in all (more on request), so each keystroke stays quick. */
+const FILTER_BUDGET = 300;
 
 /** How each category of request looks in the tree. */
 export const CATEGORY_META: Record<RequestCategory, { label: string; badge: string; cls: string }> = {
@@ -415,6 +417,10 @@ export function CollectionTree({
     !scope || (n.kind === 'folder' ? hasCategory(n.items, scope.cat) || (scope.first && isEmptyFolder(n)) : requestCategory(n) === scope.cat);
   // a very long list (thousands of requests in one folder) is shown a page at a time, so the sidebar stays fast
   const [limits, setLimits] = useState<Record<string, number>>({});
+  const [filterBudget, setFilterBudget] = useState(FILTER_BUDGET);
+  useEffect(() => setFilterBudget(FILTER_BUDGET), [f]);
+  // counted down as rows are drawn in this render; what doesn't fit is offered as "Show more"
+  const budget = { left: f ? filterBudget : Infinity, hidden: 0 };
   const renderNodes = (c: Collection, nodes: CollectionNode[], depth: number, scope?: { cat: RequestCategory; first: boolean }, listId: string = c.id): React.ReactNode => {
     const list = nodes.filter((n) => matches(n) && inScope(n, scope));
     const listKey = `${listId}:${scope?.cat ?? ''}`;
@@ -424,7 +430,13 @@ export function CollectionTree({
       const at = list.findIndex((n) => n.id === activeRequestId);
       if (at >= limit) limit = at + 20;
     }
-    const shown = list.length > limit ? list.slice(0, limit) : list;
+    let shown = list.length > limit ? list.slice(0, limit) : list;
+    if (budget.left !== Infinity) {
+      const fits = Math.max(0, budget.left);
+      budget.hidden += Math.max(0, shown.length - fits);
+      shown = shown.slice(0, fits);
+      budget.left -= shown.length;
+    }
     const rows = shown.map((n) => {
       const pad = { paddingLeft: 8 + depth * 12 };
       if (n.kind === 'folder') {
@@ -536,7 +548,7 @@ export function CollectionTree({
         </div>
       );
     });
-    const hidden = list.length - shown.length;
+    const hidden = Math.max(0, Math.min(list.length, limit) - shown.length) ? 0 : list.length - shown.length;
     return (
       <>
         {rows}
@@ -813,6 +825,15 @@ export function CollectionTree({
           </div>
         );
       })}
+      {budget.hidden > 0 && (
+        <button
+          className="mx-1 my-1 h-8 w-[calc(100%-0.5rem)] rounded-md text-xs text-accent text-left px-3 hover:bg-hover"
+          onClick={() => setFilterBudget((b) => b + FILTER_BUDGET)}
+          title="Showing the first matches; keep typing to narrow them down"
+        >
+          Show more matches ({budget.hidden}+ not shown; keep typing to narrow them down)
+        </button>
+      )}
       {(f || favoritesOnly) && !collections.some((c) => c.items.some(matches) || (categorize && extraMatches(c))) && (
         <p className="px-3 py-4 text-sm text-muted text-center">
           {favoritesOnly ? 'No favorite requests yet. Use a request’s menu to add one.' : f ? 'No requests match this filter.' : 'No requests in these collections yet.'}
