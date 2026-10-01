@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.39.0 — 2026-10-01
+
+Highlights: rename in place everywhere, a response layout for every editor, a much faster filter on big workspaces, and keyboard navigation in every list.
+
+- **Rename in place**: F2 (or Rename in a menu, or a double-click on a tab) turns a name into a text field; Enter or clicking away saves, Esc cancels, a blank name is refused. Collections, folders, requests, gRPC calls, connections, MCP servers, environments (the active one stays active), tabs (a saved item is renamed where it is saved), monitors, load tests, saved prompts, evaluations and saved examples. Test files keep their path dialog, which F2 now opens.
+- **Response layout**: Auto puts the response beside the request when there is room, the same in the HTTP, GraphQL, gRPC and MCP editors (they used to differ); or choose Side by side / Response below with the button at the right of the tabs, in Settings ▸ Appearance or the command palette. Each layout keeps its own size, and switching keeps what you typed.
+- **Faster filter**: on a 5,000-request workspace each keystroke in the explorer's filter went from up to a second of frozen window to 30–50 ms; at most 300 matching rows are drawn, with Show more matches for the rest.
+- **Tabs that don't fit** stay reachable: » lists them with how many are hidden, and the chosen one scrolls into view.
+- **Keyboard**: ↑ ↓, Home / End, → and ← work in every tree and list (Monitors, Load, AI Lab, Evaluations, Tests, Environments, the explorer).
+- **One button per row**: the + is merged into ⋯, whose menu starts with what + did; collection rows show it on hover, focus or right-click like every other row.
+- **Tab names**: new tabs are New HTTP / GraphQL / gRPC / WebSocket / Socket.IO / MQTT request or New MCP server (a WebSocket tab showed its URL); gRPC and WebSocket tabs remember their saved item across restarts.
+- **Feedback by email**: Send feedback has an Email button (to the maintainer) besides GitHub, Copy and Save.
+
 ## 0.38.0 — 2026-10-01
 
 Highlights: send feedback and report problems from the app, and steadier tabs.
