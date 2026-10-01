@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.18.0 — 2026-09-30
+
+Highlights: fixes for duplicated collections, expanding in the sidebar and Import from menus; Import and Export buttons in the sidebar; duplicate, rename and delete collections from their menu; drag gRPC calls and connections between collections; `testpion collections` / `requests`; notifications when runs finish.
 
 - **Fixed: a collection could appear twice, and expanding one expanded the other.** Saving a collection whose file name differs from its id (two of the examples' collections) wrote a second file with the same id instead of updating the first. Collections are now found and saved in their own file; two files that already share an id are listed, opened and saved separately; and importing a collection the workspace already has adds a copy instead of replacing it.
 - **Fixed: some sidebar items didn't collapse on the first click** (a category, or the collection holding the open request, which start expanded).
