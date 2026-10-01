@@ -1,8 +1,9 @@
-import { ArrowDown, ArrowUp, Copy } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, DatabaseZap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { plural } from '../lib/format';
 import { Button, cx, Input } from './ui';
-import { useApp } from '../store';
+import { promptText, useApp } from '../store';
+import { asError, call } from '../api';
 
 type Row = Record<string, unknown>;
 const isRow = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -83,6 +84,23 @@ export function JsonTable({ rows, path }: { rows: Row[]; path: string }) {
           }
         >
           Copy CSV
+        </Button>
+        <Button
+          size="sm"
+          icon={<DatabaseZap size={12} />}
+          title="Save the rows shown as a CSV in the workspace's datasets folder, to drive collection runs and tests"
+          onClick={async () => {
+            const name = await promptText('Save as dataset', { message: 'File name in the datasets folder', value: path === '$' ? 'response' : path.split('.').pop()!, okLabel: 'Save' });
+            if (!name) return;
+            try {
+              const r = await call<{ name: string }>('datasets.saveCsv', { name, text: rowsToCsv(shown, columns) });
+              useApp.getState().toast(`Saved ${plural(shown.length, 'row')} to datasets/${r.name}. Pick it in the Collection Runner.`, 'success');
+            } catch (e) {
+              useApp.getState().toast(asError(e).message, 'error');
+            }
+          }}
+        >
+          Save as dataset
         </Button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">

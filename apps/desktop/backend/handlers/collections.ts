@@ -1,6 +1,6 @@
 /** RPC handlers: Collections (requests, folders, examples, import/export) and their mock servers. */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import {
   ApsError,
   isSqliteDataset,
@@ -218,6 +218,36 @@ export function collectionsHandlers(be: Backend): Handlers {
       if (!r.ids.length) throw new ApsError('ValidationError', 'Nothing failed in that run');
       const c = be.ws.getCollection(collectionId);
       return be.startCollectionRun({ collectionId, selection: r.ids, environment, name: `Failed requests of ${c.name}` });
+    },
+    /** Data files in the workspace's datasets/ folder (for the Collection Runner and tests), newest first. */
+    'datasets.list': () => {
+      const root = be.ws.path('datasets');
+      const out: Array<{ path: string; name: string; size: number; modified: string }> = [];
+      const walk = (dir: string, depth: number) => {
+        if (!existsSync(dir) || depth > 3) return;
+        for (const e of readdirSync(dir, { withFileTypes: true })) {
+          const p = join(dir, e.name);
+          if (e.isDirectory()) walk(p, depth + 1);
+          else if (/\.(csv|tsv|json|jsonl|ndjson|db|sqlite|sqlite3)$/i.test(e.name)) {
+            const st = statSync(p);
+            out.push({ path: p, name: relative(root, p).split(sep).join('/'), size: st.size, modified: st.mtime.toISOString() });
+          }
+        }
+      };
+      walk(root, 0);
+      return out.sort((a, b) => (a.modified < b.modified ? 1 : -1)).slice(0, 500);
+    },
+    /** Save rows (CSV text, e.g. a response's table) as datasets/<name>.csv; never overwrites: name-2.csv etc. */
+    'datasets.saveCsv': ({ name, text }: { name: string; text: string }) => {
+      if (text.length > 50 * 1024 * 1024) throw new ApsError('ValidationError', 'The data is larger than 50 MB');
+      const base = basename(name).replace(/\.csv$/i, '').replace(/[^\w.-]+/g, '_').slice(0, 100) || 'data';
+      const dir = be.ws.path('datasets');
+      mkdirSync(dir, { recursive: true });
+      let dest = join(dir, `${base}.csv`);
+      for (let i = 2; existsSync(dest); i++) dest = join(dir, `${base}-${i}.csv`);
+      writeFileSync(dest, text);
+      be.host.emit('data.changed', { kind: 'datasets' });
+      return { path: dest, name: relative(dir, dest).split(sep).join('/') };
     },
     /**
      * A data file uploaded from the browser (no native file picker): it is stored in the workspace's

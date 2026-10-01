@@ -1,6 +1,6 @@
 import { FileSpreadsheet, History, ListChecks, Play, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { asError, call } from '../api';
+import { asError, call, on } from '../api';
 import { useApp } from '../store';
 import type { Collection, CollectionNode, Library } from '../types';
 import { timeAgo, plural } from '../lib/format';
@@ -162,6 +162,14 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
     }
   };
 
+  // data files already in the workspace (datasets/), offered next to the file picker
+  const [datasets, setDatasets] = useState<Array<{ path: string; name: string }>>([]);
+  useEffect(() => {
+    const load = () => void call<Array<{ path: string; name: string }>>('datasets.list').then(setDatasets, () => setDatasets([]));
+    load();
+    return on<{ kind?: string; method?: string }>('data.changed', (p) => (p?.kind === 'datasets' || p?.method === 'ws.open') && load());
+  }, []);
+
   const pickData = async () => {
     try {
       let d: DataFile | null;
@@ -227,9 +235,35 @@ export function CollectionRunner({ collection, folderId, onFolderChange }: { col
                 </button>
               </div>
             ) : (
-              <Button icon={<FileSpreadsheet size={13} />} onClick={pickData}>
-                Select file
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button icon={<FileSpreadsheet size={13} />} onClick={pickData}>
+                  Select file
+                </Button>
+                {datasets.length > 0 && (
+                  <Select
+                    className="h-8 min-h-8 py-0 text-sm max-w-56"
+                    aria-label="Use a workspace dataset"
+                    value=""
+                    onChange={async (e) => {
+                      const ds = datasets.find((d) => d.path === e.target.value);
+                      if (!ds) return;
+                      try {
+                        setData(await call<DataFile>('col.previewDataFile', { path: ds.path }));
+                        setIterations('');
+                      } catch (err) {
+                        useApp.getState().toast(`Could not read the data file: ${asError(err).message}`, 'error');
+                      }
+                    }}
+                  >
+                    <option value="">or a workspace dataset…</option>
+                    {datasets.map((d) => (
+                      <option key={d.path} value={d.path}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </div>
             )}
             {data?.tables && (
               <div className="mt-2 flex flex-col gap-1.5">
