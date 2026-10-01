@@ -73,6 +73,13 @@ export function SettingsView() {
                   <option value="dark">Dark</option>
                 </Select>
               </Field>
+              <Field label="Response layout" hint="Where the response goes in the HTTP, GraphQL, gRPC and MCP editors. Auto puts it beside the request when there is room. Also: the layout button at the right of the tabs.">
+                <Select value={s.responseLayout ?? 'auto'} onChange={(e) => set({ responseLayout: e.target.value as AppSettings['responseLayout'] })}>
+                  <option value="auto">Auto (side by side when there is room)</option>
+                  <option value="side">Side by side</option>
+                  <option value="below">Response below</option>
+                </Select>
+              </Field>
               <Field label={`Font size (${s.fontSize}px)`}>
                 <input type="range" min={11} max={20} value={s.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
               </Field>

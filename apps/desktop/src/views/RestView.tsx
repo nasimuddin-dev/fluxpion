@@ -42,6 +42,7 @@ import { SseEvents } from '../components/SseEvents';
 import { ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
 import { Button, cx, Empty, IconButton, Input, Menu, Split } from '../components/ui';
+import { ResponseSplit } from '../components/ResponseSplit';
 import { METHODS, RestTab, SendResult, blankRequest, drafts } from './rest/types';
 import { RequestEditor } from './rest/RequestEditor';
 import { SaveModal, ImportModal } from './rest/dialogs';
@@ -664,7 +665,7 @@ export function RestView() {
             Save
           </Button>
         </div>
-        <Split id="rest-req-res" direction="vertical" initial={45}>
+        <ResponseSplit id="rest-req-res" initialBelow={45}>
           <RequestEditor tab={tab} update={update} setReq={setReq} setParams={setParams} setExamples={setExamples} />
           <div className="h-full min-h-0 flex flex-col">
             {sending[tab.id] && liveEvents[sending[tab.id]!] ? (
@@ -688,7 +689,7 @@ export function RestView() {
               </Empty>
             )}
           </div>
-        </Split>
+        </ResponseSplit>
         </>
         )}
       </div>

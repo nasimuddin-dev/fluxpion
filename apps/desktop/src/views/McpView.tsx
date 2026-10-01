@@ -21,6 +21,7 @@ import { closeTabsFor, NEW_TAB_TITLE, useSingleEditorTab } from '../components/E
 import { EnvironmentsPane, HistoryPane } from '../components/SidebarPanes';
 import { McpUsage } from '../components/McpUsage';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Select, Split, Tabs, VirtualList } from '../components/ui';
+import { ResponseSplit } from '../components/ResponseSplit';
 
 interface Tool {
   name: string;
@@ -641,7 +642,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
         </div>
       </div>
       {tool ? (
-        <Split id="mcp-tool-run" direction="vertical" initial={55}>
+        <ResponseSplit id="mcp-tool-run" initialBelow={55}>
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 px-3 h-10 border-b border-line">
               <span className="font-semibold mono">{tool.name}</span>
@@ -683,7 +684,7 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
             </div>
           </div>
           <div className="h-full min-h-0">{result ? 'error' in result ? <ErrorPanel error={result.error} context={{ tool: tool.name }} /> : <ToolResult r={result} name={tool.name} /> : <Empty title="Execute the tool to see its result" />}</div>
-        </Split>
+        </ResponseSplit>
       ) : (
         <Empty title="This server exposes no tools" />
       )}

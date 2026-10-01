@@ -16,6 +16,7 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { JsonTree } from '../components/JsonView';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, Field, IconButton, Input, Split, Tabs, VirtualList } from '../components/ui';
+import { ResponseSplit } from '../components/ResponseSplit';
 import { pickTextFile } from '../lib/files';
 import { useSticky } from '../lib/sticky';
 import { useDoc } from '../lib/docs';
@@ -336,7 +337,7 @@ export function GrpcView() {
         </Button>
       </div>
       <div className="flex-1 min-h-0">
-        <Split id="grpc-main" initial={45}>
+        <ResponseSplit id="grpc-main" initialSide={45}>
           <div className="h-full flex flex-col min-h-0">
             <Tabs
               value={tab}
@@ -571,7 +572,7 @@ export function GrpcView() {
               </>
             )}
           </div>
-        </Split>
+        </ResponseSplit>
       </div>
     </div>
     </Split>

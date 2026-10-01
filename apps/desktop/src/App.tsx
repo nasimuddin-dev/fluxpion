@@ -12,6 +12,7 @@ import { DOC_VIEWS, DocContext, isDocView, useDocs } from './lib/docs';
 import { watchRunNotifications } from './lib/run-notifications';
 import { remindExpiringCertificates, watchMonitorAlerts } from './lib/monitor-alerts';
 import { runMenuCommand, type MenuCommand } from './menu-commands';
+import { setResponseLayout } from './components/ResponseSplit';
 import { loadMonaco } from './components/CodeEditor';
 import { Spinner, TooltipProvider } from './components/ui';
 import { McpClientRequests } from './components/McpClientRequests';
@@ -296,6 +297,9 @@ export default function App() {
       { id: 'mcp-usage', label: 'MCP Tool Usage: calls, failures and time per tool', hint: 'MCP', run: () => s.openIntent('mcp', { tab: 'usage' }) },
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
       { id: 'shortcuts', label: 'Keyboard Shortcuts', hint: '?', run: () => s.set({ shortcutsOpen: true }) },
+      { id: 'layout-side', label: 'Response Layout: Side by Side', hint: 'View', run: () => setResponseLayout('side') },
+      { id: 'layout-below', label: 'Response Layout: Response Below', hint: 'View', run: () => setResponseLayout('below') },
+      { id: 'layout-auto', label: 'Response Layout: Auto', hint: 'View', run: () => setResponseLayout('auto') },
       { id: 'update', label: 'Check for Updates', hint: 'Help', run: () => void checkForUpdates({ manual: true }) },
       { id: 'm-new-http', label: 'New HTTP Request', hint: 'File', run: () => void runMenuCommand('new-http') },
       { id: 'm-new-grpc', label: 'New gRPC Request', hint: 'File', run: () => void runMenuCommand('new-grpc') },

@@ -6,6 +6,7 @@ import { docKey, isDocView, useDoc, useDocs } from '../lib/docs';
 import { loadDraft, saveDraft } from '../lib/draft-store';
 import { Button, cx, Empty, Menu, type MenuItem } from './ui';
 import { InlineRename } from './TreeParts';
+import { ResponseLayoutButton } from './ResponseSplit';
 
 /**
  * One tab strip for every request editor (Postman-style): REST's tabs and a tab for each other editor that
@@ -425,13 +426,15 @@ export function EditorTabStrip() {
         }
         items={newRequestItems()}
       />
+      <span className="ml-auto" />
+      <ResponseLayoutButton />
       {tabs.length > 1 && (
         <Menu
           align="end"
           width={300}
           items={tabs.map((t) => ({ label: `${t.title}${t.dirty ? ' •' : ''}`, icon: <span className={cx('mono method-badge text-[0.6rem] font-bold w-11', t.badgeClass)}>{t.badge}</span>, onSelect: () => select(t) }))}
           trigger={
-            <button aria-label="All open tabs" title="All open tabs" className="ml-auto mr-1.5 mb-1 shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted border border-line bg-bg hover:text-fg hover:bg-hover data-[state=open]:text-fg data-[state=open]:bg-hover">
+            <button aria-label="All open tabs" title="All open tabs" className="mr-1.5 mb-1 shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted border border-line bg-bg hover:text-fg hover:bg-hover data-[state=open]:text-fg data-[state=open]:bg-hover">
               {tabs.length}
               <ChevronDown size={13} />
             </button>

@@ -27,6 +27,7 @@ import { JsonTable, tableRowsOf } from '../components/JsonTable';
 import { CheckList, ErrorPanel } from '../components/Results';
 import { VarInput } from '../components/VarInput';
 import { Badge, Button, cx, Empty, IconButton, Input, Select, Split, statusTone, Tabs, Tooltip } from '../components/ui';
+import { ResponseSplit } from '../components/ResponseSplit';
 import { saveAsTestFile } from '../lib/save-test';
 
 interface SchemaType {
@@ -478,7 +479,7 @@ export function GraphQLView() {
             ]}
           />
           <Split id="gql-schema" initial={74} min={40} collapsedSecond={!schemaOpen}>
-            <Split id="gql-main" initial={50}>
+            <ResponseSplit id="gql-main" initialSide={50}>
               <div className="h-full flex flex-col">
                 <div className="flex items-center h-8 px-2 border-b border-line gap-1 text-xs text-muted shrink-0">
                   <span className="font-medium text-fg">{d.name}</span>
@@ -600,7 +601,7 @@ export function GraphQLView() {
                   </Empty>
                 )}
               </div>
-            </Split>
+            </ResponseSplit>
             <div className="h-full flex flex-col min-h-0 bg-panel/50">
               <div className="flex items-center gap-2 px-3 h-8 border-b border-line text-xs font-semibold uppercase tracking-wider text-muted shrink-0">
                 <Network size={13} /> Schema

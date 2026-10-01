@@ -324,6 +324,8 @@ export interface AppSettings {
   schemaVersion: string;
   theme: 'system' | 'light' | 'dark';
   fontSize: number;
+  /** Where responses go in the request editors: side by side, below, or auto (side by side when there is room). */
+  responseLayout?: 'auto' | 'below' | 'side';
   reducedMotion: boolean;
   logLevel: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
   redactFields: string[];
