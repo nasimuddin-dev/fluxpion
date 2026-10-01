@@ -578,16 +578,26 @@ export function CollectionTree({
   const renderExtra = (g: ExtraGroup, depth: number, from?: string) => {
     const shown = g.items.filter((i) => !f || i.name.toLowerCase().includes(f) || i.folder?.toLowerCase().includes(f));
     const folders = [...new Set(shown.map((i) => i.folder ?? ''))].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
-    return folders.map((folder) => (
+    return folders.map((folder) => {
+      // a folder of saved gRPC calls / connections: the same row as a collection's folders
+      const key = `${from ?? ''}:${g.cat}:folder:${folder}`;
+      const isOpen = !!f || (open[key] ?? true);
+      const inside = shown.filter((i) => (i.folder ?? '') === folder);
+      return (
       <div key={folder}>
         {folder && (
-          <div className="flex items-center gap-1 h-7 text-xs text-muted truncate mx-1" style={{ paddingLeft: 8 + depth * 12 + 13 }}>
-            <Folder size={12} className="shrink-0" />
-            <span className="truncate">{folder}</span>
+          <div className="group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors" style={{ paddingLeft: 8 + depth * 12 }}>
+            <button className="flex items-center gap-1 flex-1 min-w-0 text-left" onClick={() => toggle(key, isOpen)} aria-expanded={isOpen} data-tree-row>
+              {isOpen ? <ChevronDown size={13} className="text-muted shrink-0" /> : <ChevronRight size={13} className="text-muted shrink-0" />}
+              <Folder size={13} className="text-muted shrink-0" />
+              <span className="truncate">{folder}</span>
+              <span className="ml-auto pl-1">
+                <CountPill n={inside.length} />
+              </span>
+            </button>
           </div>
         )}
-        {shown
-          .filter((i) => (i.folder ?? '') === folder)
+        {(isOpen || !folder) && inside
           .map((i) => (
             <div
               key={i.id}
@@ -621,7 +631,8 @@ export function CollectionTree({
             </div>
           ))}
       </div>
-    ));
+      );
+    });
   };
   /** A collection's contents: grouped by category when it holds more than one kind of request. */
   const renderContents = (c: Collection) => {
