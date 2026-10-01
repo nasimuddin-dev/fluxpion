@@ -37,8 +37,8 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 
 | Tool | What it does |
 |---|---|
-| `list_collections` | Collections with their request and example counts. |
-| `list_requests` | The requests of a collection: id, name, method, URL (with `{{variables}}`), folder. |
+| `list_collections` | Collections with their request, gRPC call, connection and example counts. |
+| `list_requests` | What a collection holds: its requests (id, name, method, URL with `{{variables}}`, folder), then its gRPC calls (target, method) and WebSocket / Socket.IO / MQTT connections (url, mode). `run_collection` runs them all. |
 | `get_request` | One saved request: headers, body, auth type, scripts, assertions, documentation, example names. |
 | `list_environments` | Environments and their variable **names** (values are not returned). |
 | `collection_docs` | The collection's [Markdown documentation](/api-testing/collections#documentation). |

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **AI agents see the whole collection**: the MCP tools `list_collections` (counts of gRPC calls and connections) and `list_requests` (each gRPC call's target and method, each connection's URL and mode) include a collection's gRPC calls and connections, which `run_collection` runs.
 - **Drag gRPC calls and connections onto a collection**: from another collection or from *Not in a collection*, drop one on a collection in the sidebar to move it there, like requests.
 - **Rename, Duplicate and Delete on a collection's menu** (right-click or **⋯** in the sidebar). Duplicate copies everything the collection holds, its gRPC calls and connections included, with new ids throughout and a free name (*copy*, *copy 2* …); Delete moves it to Recently deleted and closes its tabs. Also as the `col.duplicate` RPC method.
 

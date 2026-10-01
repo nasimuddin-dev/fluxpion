@@ -21,7 +21,7 @@ import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
-import { collectionRealtimeTests } from '../runner/collection-realtime.js';
+import { collectionRealtimeTests, collectionSavedItems } from '../runner/collection-realtime.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
 import { addRequestToCollection, externalizeSecrets } from '../import/save-request.js';
@@ -143,24 +143,48 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
   const all: Tool[] = [
     {
       name: 'list_collections',
-      description: 'List the collections of the TestPion workspace with their request counts.',
+      description: 'List the collections of the TestPion workspace with their request counts (HTTP/GraphQL requests, gRPC calls, WebSocket/MQTT connections).',
       inputSchema: { type: 'object', properties: {} },
       run: () =>
-        collections().map((c) => ({ id: c.id, name: c.name, description: c.description?.slice(0, 300), requests: flatten(c.items).length, examples: flatten(c.items).reduce((a, f) => a + (f.node.kind === 'http' ? f.node.examples?.length ?? 0 : 0), 0) })),
+        collections().map((c) => {
+          const saved = collectionSavedItems(store, c.id);
+          return {
+            id: c.id,
+            name: c.name,
+            description: c.description?.slice(0, 300),
+            requests: flatten(c.items).length,
+            grpcCalls: saved?.grpc?.length ?? 0,
+            connections: saved?.websocket?.length ?? 0,
+            examples: flatten(c.items).reduce((a, f) => a + (f.node.kind === 'http' ? f.node.examples?.length ?? 0 : 0), 0),
+          };
+        }),
     },
     {
       name: 'list_requests',
-      description: 'List the requests of a collection: id, name, method, URL (with {{variables}}) and folder.',
+      description: 'List what a collection holds: its HTTP and GraphQL requests (id, name, method, URL with {{variables}}, folder), then its gRPC calls (kind grpc: target, method) and WebSocket / Socket.IO / MQTT connections (kind websocket: url, mode). run_collection runs all of them.',
       inputSchema: { type: 'object', properties: { collection: str('Collection name or id') }, required: ['collection'] },
-      run: (a) =>
-        flatten(findCollection(a.collection).items).map(({ node, folder }) => ({
-          id: node.id,
-          name: node.name,
-          kind: node.kind,
-          method: node.kind === 'http' ? node.request.method : 'POST',
-          url: node.kind === 'http' ? redactor.redactString(node.request.url) : node.request.endpoint,
-          folder: folder || undefined,
-        })),
+      run: (a) => {
+        const c = findCollection(a.collection);
+        const saved = collectionSavedItems(store, c.id);
+        return [
+          ...flatten(c.items).map(({ node, folder }) => ({
+            id: node.id,
+            name: node.name,
+            kind: node.kind,
+            method: node.kind === 'http' ? node.request.method : 'POST',
+            url: node.kind === 'http' ? redactor.redactString(node.request.url) : node.request.endpoint,
+            folder: folder || undefined,
+          })),
+          ...(saved?.grpc ?? []).map((i) => {
+            const d = i.data as { target?: string; method?: string };
+            return { id: i.id, name: i.name, kind: 'grpc', target: d.target, method: d.method, folder: i.folder };
+          }),
+          ...(saved?.websocket ?? []).map((i) => {
+            const d = i.data as { url?: string; mode?: string };
+            return { id: i.id, name: i.name, kind: 'websocket', mode: d.mode ?? 'websocket', url: d.url ? redactor.redactString(d.url) : undefined, folder: i.folder };
+          }),
+        ];
+      },
     },
     {
       name: 'get_request',
