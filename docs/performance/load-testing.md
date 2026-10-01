@@ -7,7 +7,7 @@ description: "Load test HTTP endpoints, whole collections and LLM providers with
 
 # Load testing
 
-Configure virtual users, duration, ramp-up and ramp-down, a global requests-per-second cap, and think time. The results include throughput, p50/p90/p95/p99 latency, error rate, status code distribution and connection failures, with live charts.
+Configure virtual users, duration, ramp-up and ramp-down, a global requests-per-second cap, and think time. The results include throughput, p50/p90/p95/p99 latency, error rate, status code distribution and connection failures, with live charts: requests per second, p95 latency, errors per second and virtual users over time (one crosshair across all four; hover for the values at that second) and a status-code bar with counts and shares.
 
 LLM targets also report tokens per second, input and output tokens, estimated cost, time to first token, time between tokens and total generation time.
 

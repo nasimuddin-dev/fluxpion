@@ -105,6 +105,13 @@ export function checkLoadSafeguards(cfg: LoadTestConfig, resolvedUrl?: string): 
       why: 'Load tests can degrade or take down live systems.',
       suggestions: ['Run against a staging environment.', 'If you are authorised to load-test production, enable "Allow production" explicitly for this run.'],
     });
+  // an unset variable would otherwise surface as a strange "remote host {{baseurl}}" error
+  const unresolved = resolvedUrl?.match(/\{\{\s*([^}]+?)\s*\}\}/);
+  if (unresolved)
+    throw new ApsError('ConfigurationError', `The URL uses {{${unresolved[1]}}}, which is not set`, {
+      why: 'Variables in the target URL are resolved from the active environment, the collection and globals before the load test starts.',
+      suggestions: [`Choose an environment that defines ${unresolved[1]}, or set it in the active one.`, 'Or type the full URL.'],
+    });
   if (resolvedUrl && !cfg.allowRemoteHosts) {
     const host = new URL(resolvedUrl).hostname;
     if (!isLocalHost(host))

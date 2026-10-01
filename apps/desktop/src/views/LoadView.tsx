@@ -14,6 +14,7 @@ import { useSticky } from '../lib/sticky';
 import { useIntent } from '../hooks';
 import { Badge, Button, cx, Empty, Field, Input, Metric, Select, Split, Tabs, Toggle, MetricGrid } from '../components/ui';
 import { ErrorPanel } from '../components/Results';
+import { LoadTimeline, StatusCodes } from '../components/LoadCharts';
 import type { NormalizedError } from '../api';
 
 interface Snapshot {
@@ -70,28 +71,6 @@ const drafts = persisted('load', {
   allowRemote: false,
   allowProduction: false,
 });
-
-function Chart({ series, field, color, label, format }: { series: Snapshot['series']; field: 'rps' | 'p95' | 'errors' | 'vus'; color: string; label: string; format?(v: number): string }) {
-  const w = 480;
-  const h = 110;
-  const vals = series.map((s) => s[field]);
-  const max = Math.max(1, ...vals);
-  const pts = series.map((s, i) => `${(i / Math.max(1, series.length - 1)) * w},${h - (s[field] / max) * (h - 12) - 4}`).join(' ');
-  const last = vals[vals.length - 1] ?? 0;
-  return (
-    <div className="rounded-md border border-line bg-panel p-2">
-      <div className="flex justify-between text-xs text-muted">
-        <span>{label}</span>
-        <span className="text-fg tabular-nums">{format ? format(last) : last}</span>
-      </div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28" preserveAspectRatio="none" role="img" aria-label={`${label} chart`}>
-        <line x1="0" x2={w} y1={h - 4} y2={h - 4} stroke="var(--line)" />
-        {series.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />}
-      </svg>
-      <div className="text-[0.7rem] text-muted">max {format ? format(max) : max}</div>
-    </div>
-  );
-}
 
 export function LoadView() {
   const [d, setD] = useState(drafts.load);
@@ -464,12 +443,8 @@ export function LoadView() {
                 <Metric label="Est. cost" value={formatCost(s.ai.costUsd)} />
               </MetricGrid>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <Chart series={s.series} field="rps" color="var(--accent)" label="Requests / second" />
-              <Chart series={s.series} field="p95" color="var(--judge)" label="p95 latency (per second)" format={(v) => formatMs(v)} />
-              <Chart series={s.series} field="errors" color="var(--bad)" label="Errors / second" />
-              <Chart series={s.series} field="vus" color="var(--ok)" label="Virtual users" />
-            </div>
+            <LoadTimeline series={s.series} />
+            <StatusCodes codes={s.statusCodes} />
             {prep && (prep.unresolved.length > 0 || prep.warmUp) && (
               <div className="text-xs text-muted">
                 {prep.warmUp && `Warm-up: ${prep.warmUp.passed} passed${prep.warmUp.failed ? `, ${prep.warmUp.failed} failed` : ''}. `}
@@ -505,16 +480,6 @@ export function LoadView() {
                 </table>
               </div>
             )}
-            <div>
-              <div className="text-xs text-muted font-semibold mb-1">Status code distribution</div>
-              <div className="flex gap-2 flex-wrap">
-                {Object.entries(s.statusCodes).map(([k, v]) => (
-                  <Badge key={k} tone={/^2/.test(k) || k === 'OK' ? 'ok' : /^[45]/.test(k) || isNaN(Number(k)) ? 'bad' : 'warn'}>
-                    {k}: {v}
-                  </Badge>
-                ))}
-              </div>
-            </div>
           </div>
         ) : (
           !error && (
