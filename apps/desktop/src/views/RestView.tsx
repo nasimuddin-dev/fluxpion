@@ -1,5 +1,5 @@
 import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Plus, Save, Send, Square, Star, Upload } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
@@ -46,6 +46,7 @@ import { RequestEditor } from './rest/RequestEditor';
 import { SaveModal, ImportModal } from './rest/dialogs';
 import { saveAsTestFile } from '../lib/save-test';
 import { RequestBreadcrumb } from '../components/RequestBreadcrumb';
+import { refreshCollections, useCollections } from '../lib/collections-store';
 
 
 /** Production environments where the user chose "don't ask again" (this session only). */
@@ -85,7 +86,7 @@ export function RestView() {
   const [active, setActive] = useState<string>(() => drafts.load().active ?? tabs[0]?.id ?? '');
   const [results, setResults] = useState<Record<string, SendResult>>({});
   const [sending, setSending] = useState<Record<string, string>>({});
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const collections = useCollections();
   const [filter, setFilter] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(() => localStorage.getItem('aps.rest.favoritesOnly') === 'true');
   const [saving, setSaving] = useState(false);
@@ -118,9 +119,8 @@ export function RestView() {
   const [liveEvents, setLiveEvents] = useState<Record<string, SseEvent[]>>({});
 
   useEffect(() => drafts.save({ tabs, active }), [tabs, active]);
-  const loadCollections = useCallback(() => call<Collection[]>('col.list').then(setCollections), []);
-  // renamed or moved in the sidebar: the breadcrumb and Save dialog follow
-  useEffect(() => on('data.changed', () => void loadCollections()), [loadCollections]);
+  // the shared list (lib/collections-store): fetched once for the sidebar, this view and the breadcrumbs
+  const loadCollections = refreshCollections;
   useEffect(() => {
     void loadCollections();
   }, [loadCollections]);
@@ -205,8 +205,7 @@ export function RestView() {
       setTabs((ts) => [...ts, t]);
       setActive(t.id);
     } else if (p?.collectionId) {
-      const cols = await call<Collection[]>('col.list');
-      setCollections(cols);
+      const cols = await refreshCollections();
       const c = cols.find((x) => x.id === p.collectionId);
       const n = c && findNode(c.items, p.requestId);
       if (c && n) openRequest(c, n);

@@ -8,6 +8,7 @@ import { addToFolder, CATEGORY_META, CollectionTree, savedItemDragProps, type Ex
 import type { RequestCategory } from '../lib/collection-filter';
 import { closeTabsFor, newRequestItems, useEditorTabsStore } from './EditorTabs';
 import { ExportDialog } from './ExportDialog';
+import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, type MenuItem } from './ui';
@@ -246,7 +247,8 @@ export function Explorer() {
   const { width, handle } = useExplorerWidth();
   const sections = useOpenSections();
   const [filter, setFilter] = useState('');
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const allCollections = useCollections();
+  const collections = useMemo(() => allCollections.filter((x) => !x.problem), [allCollections]);
   const [grpc, setGrpc] = useState<SavedItem[]>([]);
   const [looseOpen, setLooseOpen] = useState(true);
   const [sockets, setSockets] = useState<SavedItem[]>([]);
@@ -267,14 +269,13 @@ export function Explorer() {
   const load = useCallback(async () => {
     const quiet = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
     const empty: Library<unknown> = { folders: [], items: [] };
-    const [c, g, w, s, sp] = await Promise.all([
-      quiet(call<Collection[]>('col.list'), []),
+    const [, g, w, s, sp] = await Promise.all([
+      refreshCollections(),
       quiet(call<Library<unknown>>('lib.get', { kind: 'grpc' }), empty),
       quiet(call<Library<unknown>>('lib.get', { kind: 'websocket' }), empty),
       quiet(call<Array<McpServerConfig & { connected?: boolean }>>('mcp.servers'), []),
       quiet(call<string[]>('openapi.specs'), []),
     ]);
-    setCollections(c.filter((x) => !x.problem));
     setGrpc(g.items.map(({ data: _, ...i }) => i));
     const wsBadge = (d: unknown) => ((d as { mode?: string })?.mode === 'mqtt' ? 'MQTT' : (d as { mode?: string })?.mode === 'socketio' ? 'SIO' : 'WS');
     setSockets(w.items.map(({ data, ...i }) => ({ ...i, badge: wsBadge(data) })));

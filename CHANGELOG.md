@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **One collection list for the whole app**: the sidebar, the REST editor and the breadcrumbs share one copy of the workspace's collections, fetched once after a burst of changes, instead of each fetching every collection after every save.
 - **Insomnia imports bring gRPC and WebSocket requests**: from an Insomnia 4 export, gRPC requests (with their `.proto` files, metadata and TLS) and WebSocket requests (headers, first message) become the imported collection's gRPC calls and connections, in their folders.
 - **MCP `get_request` shows gRPC calls and connections too** (target, method, message and metadata; URL, mode and message), masked like requests.
 - **Collections with the same name are told apart**: the sidebar shows each one's id beside the name (e.g. a collection imported twice), so you can keep one and delete the other.

@@ -1,38 +1,7 @@
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { call, on } from '../api';
+import { useCollections } from '../lib/collections-store';
 import { useApp } from '../store';
-import type { Collection, CollectionNode } from '../types';
-
-/** The collections' names and trees, shared by every breadcrumb and kept fresh when anything is saved. */
-let cache: Collection[] | undefined;
-let pending: Promise<Collection[]> | undefined;
-const listeners = new Set<(c: Collection[]) => void>();
-function reload() {
-  pending ??= call<Collection[]>('col.list')
-    .then((c) => {
-      cache = c;
-      listeners.forEach((l) => l(c));
-      return c;
-    })
-    .catch(() => cache ?? [])
-    .finally(() => (pending = undefined));
-  return pending;
-}
-let wired = false;
-function useCollections(): Collection[] {
-  const [cols, setCols] = useState<Collection[]>(cache ?? []);
-  useEffect(() => {
-    if (!wired) {
-      wired = true;
-      on('data.changed', () => void reload());
-    }
-    listeners.add(setCols);
-    if (!cache) void reload();
-    return () => void listeners.delete(setCols);
-  }, []);
-  return cols;
-}
+import type { CollectionNode } from '../types';
 
 /** The folder names from a collection's top level down to a request (empty at the top level). */
 function folderPath(nodes: CollectionNode[], id: string): string[] | undefined {
