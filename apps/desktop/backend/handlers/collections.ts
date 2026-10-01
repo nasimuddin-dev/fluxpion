@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 import {
   ApsError,
   isSqliteDataset,
+  listWorkspaceDatasets,
   readDataset,
   sqliteTables,
   fetchImportText,
@@ -220,24 +221,8 @@ export function collectionsHandlers(be: Backend): Handlers {
       return be.startCollectionRun({ collectionId, selection: r.ids, environment, name: `Failed requests of ${c.name}` });
     },
     /** Data files in the workspace's datasets/ folder (for the Collection Runner and tests), newest first. */
-    'datasets.list': () => {
-      const root = be.ws.path('datasets');
-      const out: Array<{ path: string; name: string; size: number; modified: string }> = [];
-      const walk = (dir: string, depth: number) => {
-        if (!existsSync(dir) || depth > 3) return;
-        for (const e of readdirSync(dir, { withFileTypes: true })) {
-          const p = join(dir, e.name);
-          if (e.isDirectory()) walk(p, depth + 1);
-          // inline-*: copies older versions made for evaluation runs, not datasets of yours
-          else if (/\.(csv|tsv|json|jsonl|ndjson|db|sqlite|sqlite3)$/i.test(e.name) && !e.name.startsWith('inline-')) {
-            const st = statSync(p);
-            out.push({ path: p, name: relative(root, p).split(sep).join('/'), size: st.size, modified: st.mtime.toISOString() });
-          }
-        }
-      };
-      walk(root, 0);
-      return out.sort((a, b) => (a.modified < b.modified ? 1 : -1)).slice(0, 500);
-    },
+    'datasets.list': () =>
+      listWorkspaceDatasets(be.ws).map((d) => ({ path: join(be.ws.root, d.path), name: d.path.replace(/^datasets\//, ''), size: d.size, modified: d.modified, format: d.format, tables: d.tables })),
     /** The text of a dataset file in the workspace's datasets/ folder (CSV, JSON, JSONL, Markdown; up to 20 MB). */
     'datasets.read': ({ path }: { path: string }) => {
       const root = be.ws.path('datasets');

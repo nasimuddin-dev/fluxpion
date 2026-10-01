@@ -91,6 +91,7 @@ What a workspace holds, for scripts and AI agents (`--json`), the same as the `l
 
 ```bash
 testpion collections                     # each collection: requests, gRPC calls, connections
+testpion datasets                        # data files in datasets/ (for run-collection -d); SQLite tables too
 testpion requests "Veterinary API"       # its requests, then its gRPC calls and WebSocket / MQTT connections
 testpion requests "Veterinary API" --json
 testpion requests "Veterinary API" --health   # plus latest status, median time and failures from the app, and which have no checks

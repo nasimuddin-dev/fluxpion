@@ -1,8 +1,8 @@
 import { assertUrlAllowed } from '../net/policy.js';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
-import { extname } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
 import { ApsError } from '../errors.js';
 import { queryAll } from '../util/jsonpath.js';
 
@@ -279,4 +279,42 @@ export function sqliteTables(path: string): string[] {
   } finally {
     db.close();
   }
+}
+
+export interface WorkspaceDataset {
+  /** Path inside the workspace, e.g. datasets/users.csv (what run_collection's `data` and `-d` take). */
+  path: string;
+  size: number;
+  modified: string;
+  format: 'csv' | 'json' | 'jsonl' | 'markdown' | 'sqlite';
+  /** SQLite: its tables (a dataset needs a query). */
+  tables?: string[];
+}
+
+/** Data files in the workspace's datasets/ folder (up to three levels deep), newest first. */
+export function listWorkspaceDatasets(store: { root: string; path(...p: string[]): string }): WorkspaceDataset[] {
+  const root = store.path('datasets');
+  const out: WorkspaceDataset[] = [];
+  const walk = (dir: string, depth: number) => {
+    if (!existsSync(dir) || depth > 3) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p, depth + 1);
+      // inline-*: copies older versions made for evaluation runs
+      else if (/\.(csv|tsv|json|jsonl|ndjson|md|db|db3|sqlite|sqlite3)$/i.test(e.name) && !e.name.startsWith('inline-')) {
+        const st = statSync(p);
+        const format = formatOf({ path: p });
+        let tables: string[] | undefined;
+        if (format === 'sqlite')
+          try {
+            tables = sqliteTables(p);
+          } catch {
+            tables = [];
+          }
+        out.push({ path: relative(store.root, p).split(sep).join('/'), size: st.size, modified: st.mtime.toISOString(), format: format === 'markdown' ? 'markdown' : format, ...(tables ? { tables } : {}) });
+      }
+    }
+  };
+  walk(root, 0);
+  return out.sort((a, b) => (a.modified < b.modified ? 1 : -1)).slice(0, 500);
 }

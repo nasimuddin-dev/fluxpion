@@ -22,7 +22,7 @@ import { reflectServer } from '../protocols/grpc/reflection.js';
 import { runRealtimeExchange, type RealtimeExchange } from '../protocols/realtime.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { runCollection } from '../runner/collection-run.js';
-import { readDataset, type DatasetRecord } from '../runner/datasets.js';
+import { listWorkspaceDatasets, readDataset, type DatasetRecord } from '../runner/datasets.js';
 import { collectionRealtimeTests, collectionSavedItems } from '../runner/collection-realtime.js';
 import { collectionMarkdown } from '../report/collection-docs.js';
 import { detectRequestSnippet, parseRequestSnippet } from '../import/snippet.js';
@@ -977,6 +977,13 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           await ctx.dispose();
         }
       },
+    },
+    {
+      name: 'list_datasets',
+      description:
+        'Data files in the workspace datasets/ folder, newest first: path (give it to run_collection as `data`), size, format (csv, json, jsonl, markdown, sqlite) and, for SQLite databases, their tables (run_collection then needs a `query`). A response saved with the app\'s Table ▸ Save as dataset lands here too.',
+      inputSchema: { type: 'object', properties: {} },
+      run: () => listWorkspaceDatasets(store),
     },
     {
       name: 'load_history',

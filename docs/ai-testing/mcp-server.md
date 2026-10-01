@@ -51,6 +51,7 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `request_history` | Earlier responses of a saved request (sent in the app), newest first: id, time, status, duration, size. |
 | `response_time_stats` | Response-time summary of a saved request's recent responses: count, failed, fastest, mean, median (p50), p95 and slowest (ms). |
 | `collection_health` | How the requests of a collection are doing: per request its folder, method, whether it has checks, responses, failures, latest status and median time (failing first, then slowest). |
+| `list_datasets` | Data files in the workspace's `datasets/` folder (path, format, size; tables of SQLite databases), to pass to `run_collection` as `data`. |
 | `load_history` | Earlier load tests (from the app and `load_test`), newest first: target, virtual users, throughput, error rate, p50 / p95 / p99 and pass rules. |
 | `workspace_activity` | Per-day activity of the workspace (`days`, default 14): requests and failed requests, median response time, test runs and failed tests, requests per type and the slowest requests. |
 | `compare_environments` | Differences between two environments: missing keys, different values, disabled variables, secrets set on one side only. Statuses only, never values. |

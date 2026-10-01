@@ -46,6 +46,7 @@ import {
   renameVariable,
   historyToHar,
   collectionSavedItems,
+  listWorkspaceDatasets,
 } from '@testpion/core';
 import { EXIT, green, red, yellow, dim, bold, CliError, openWorkspace, loadCollectionRef, findWorkspaceUp } from '../shared.js';
 
@@ -234,6 +235,22 @@ export function registerDataCommands(program: Command): void {
         if (o.json) return console.log(JSON.stringify(rows, null, 2));
         if (!rows.length) return console.log(dim('No collections. Create one in the app, or import one: testpion import <file>'));
         for (const r of rows) console.log(`${r.name}  ${dim(r.id)}  ${[`${r.requests} request${r.requests === 1 ? '' : 's'}`, r.grpcCalls ? `${r.grpcCalls} gRPC` : '', r.connections ? `${r.connections} connection${r.connections === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}`);
+      } finally {
+        store.close();
+      }
+    });
+  program
+    .command('datasets')
+    .description('data files in the workspace datasets/ folder (for run-collection -d and test datasets), newest first; SQLite databases with their tables')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest workspace.json)')
+    .option('--json', 'print as JSON')
+    .action((o: { workspace?: string; json?: boolean }) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const rows = listWorkspaceDatasets(store);
+        if (o.json) return console.log(JSON.stringify(rows, null, 2));
+        if (!rows.length) return console.log(dim('No datasets. Put CSV, JSON, JSONL or SQLite files in the workspace datasets/ folder.'));
+        for (const r of rows) console.log(`${r.path}  ${dim(`${r.format}, ${(r.size / 1024).toFixed(1)} KB${r.tables ? `, tables: ${r.tables.join(', ') || 'none'}` : ''}`)}`);
       } finally {
         store.close();
       }
