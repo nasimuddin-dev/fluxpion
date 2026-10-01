@@ -9,9 +9,10 @@ import { CodeEditor } from '../components/CodeEditor';
 import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { RunPanel } from '../components/RunPanel';
 import { SidebarShell } from '../components/SidebarShell';
+import { TreeHeader } from '../components/TreeParts';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { finishSave, type SaveResult } from '../lib/files';
-import { Badge, Button, cx, Empty, IconButton, Input, Menu, SectionTitle, Split, Tabs } from '../components/ui';
+import { Badge, Button, cx, Empty, IconButton, Input, SectionTitle, Split, Tabs } from '../components/ui';
 
 interface Node {
   name: string;
@@ -255,45 +256,29 @@ export function TestsView() {
             icon: <ShieldCheck size={13} />,
             render: () => (
               <>
-                <SectionTitle
-                  right={
-                    <div className="flex items-center">
-                      <Menu
-                        width={220}
-                        items={(
-                          [
-                            ['http', 'New REST test'],
-                            ['graphql', 'New GraphQL test'],
-                            ['grpc', 'New gRPC test'],
-                            ['websocket', 'New WebSocket test'],
-                            ['mqtt', 'New MQTT test'],
-                            ['mcp', 'New MCP test'],
-                            ['llm', 'New AI test'],
-                            ['suite', 'New suite'],
-                          ] as const
-                        ).map(([kind, label], i) => ({ label, icon: kind === 'suite' ? <Layers size={13} /> : <FilePlus2 size={13} />, separator: i === 7, onSelect: () => void newFile(kind) }))}
-                        trigger={
-                          <button aria-label="New test file" title="New test file (REST, GraphQL, gRPC, WebSocket, MQTT, MCP, AI or a suite)" className="flex items-center gap-1 h-6 px-1.5 rounded-md text-xs text-muted hover:text-fg hover:bg-hover data-[state=open]:bg-hover">
-                            <FilePlus2 size={13} />
-                            New
-                            <ChevronDown size={11} />
-                          </button>
-                        }
-                      />
-                      <IconButton label="Run in CI (GitHub Actions, GitLab, Azure, Jenkins)" className="ml-1" onClick={() => useApp.getState().set({ ci: {} })}>
-                        <Workflow size={13} />
-                      </IconButton>
-                    </div>
-                  }
-                >
-                  Tests
-                </SectionTitle>
+                <TreeHeader
+                  title="Tests"
+                  addLabel="New test file"
+                  addItems={(
+                    [
+                      ['http', 'New HTTP test'],
+                      ['graphql', 'New GraphQL test'],
+                      ['grpc', 'New gRPC test'],
+                      ['websocket', 'New WebSocket test'],
+                      ['mqtt', 'New MQTT test'],
+                      ['mcp', 'New MCP test'],
+                      ['llm', 'New AI test'],
+                      ['suite', 'New suite'],
+                    ] as const
+                  ).map(([kind, label], i) => ({ label, icon: kind === 'suite' ? <Layers size={14} /> : <FilePlus2 size={14} />, separator: i === 7, onSelect: () => void newFile(kind) }))}
+                  menu={[{ label: 'Run in CI…', icon: <Workflow size={14} />, onSelect: () => useApp.getState().set({ ci: {} }) }]}
+                />
                 {tree.length > 0 && (
                   <div className="px-2 pb-2">
                     <Input className="w-full h-7 min-h-7 text-sm" placeholder="Filter test files" aria-label="Filter test files" value={treeFilter} onChange={(e) => setTreeFilter(e.target.value)} />
                   </div>
                 )}
-                <div className="flex-1 overflow-auto">{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use New to create a REST, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
+                <div className="flex-1 overflow-auto">{tree.length ? (tf && !filterTree(tree).length ? <p className="px-3 py-4 text-sm text-muted text-center">No test files match this filter.</p> : renderTree(filterTree(tree))) : <Empty title="No test files">Use + to create an HTTP, GraphQL, gRPC, WebSocket, MCP or AI test, or save one from the MCP view / AI Lab.</Empty>}</div>
                 <div className="border-t border-line p-2 flex flex-col gap-2">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <label className="flex flex-col gap-0.5">

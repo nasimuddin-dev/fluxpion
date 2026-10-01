@@ -1,4 +1,4 @@
-import { ArchiveRestore, ArrowLeftRight, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Plus, Save, ScanSearch, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Save, ScanSearch, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -9,7 +9,8 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import { EnvCompare } from '../components/EnvCompare';
 import { EnvMatrix } from '../components/EnvMatrix';
 import { TrashDialog } from '../components/TrashDialog';
-import { Badge, Button, cx, Empty, Field, IconButton, Input, Menu, SectionTitle, Split, Tabs, Toggle } from '../components/ui';
+import { Badge, Button, cx, Empty, Field, Input, Menu, Split, Tabs, Toggle } from '../components/ui';
+import { TreeHeader } from '../components/TreeParts';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
@@ -127,33 +128,21 @@ export function EnvironmentsView() {
         {scope === 'environment' && (
           <Split id="envs" sidebar initial={22}>
             <div className="h-full flex flex-col bg-panel/50">
-              <SectionTitle
-                right={
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<Plus size={12} />}
-                    onClick={async () => {
-                      const name = await promptText('New environment', { message: 'Environment name', value: 'Staging', okLabel: 'Create' });
-                      if (!name) return;
-                      const env: Environment = { id: uid('env-'), name, variables: [{ key: 'baseUrl', value: '', enabled: true }] };
-                      await call('env.save', { env });
-                      await load();
-                      setSel(env.id);
-                      await useApp.getState().refreshWorkspace();
-                    }}
-                  >
-                    New
-                  </Button>
-                }
-              >
-                <span className="flex items-center gap-1">
-                  Environments
-                  <IconButton label="Recently deleted" className="h-6 w-6" onClick={() => setTrashOpen(true)}>
-                    <ArchiveRestore size={12} />
-                  </IconButton>
-                </span>
-              </SectionTitle>
+              <TreeHeader
+                title="Environments"
+                count={envs.length}
+                addLabel="New environment"
+                onAdd={async () => {
+                  const name = await promptText('New environment', { message: 'Environment name', value: 'Staging', okLabel: 'Create' });
+                  if (!name) return;
+                  const env: Environment = { id: uid('env-'), name, variables: [{ key: 'baseUrl', value: '', enabled: true }] };
+                  await call('env.save', { env });
+                  await load();
+                  setSel(env.id);
+                  await useApp.getState().refreshWorkspace();
+                }}
+                menu={[{ label: 'Recently deleted…', icon: <ArchiveRestore size={14} />, onSelect: () => setTrashOpen(true) }]}
+              />
               {envs.map((e, i) => (
                 <button
                   key={e.id}

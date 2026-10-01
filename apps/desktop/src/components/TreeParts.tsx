@@ -25,15 +25,27 @@ export function RowMenu({ label, items, open, onOpenChange, header }: { label: s
   );
 }
 
-/** The + button of a row (new item in it). */
-export function RowAdd({ label, onClick, header }: { label: string; onClick(): void; header?: boolean }) {
+/** The + button of a row (new item in it); with `items` it opens a menu of what to create. */
+export function RowAdd({ label, onClick, header, items }: { label: string; onClick?(): void; header?: boolean; items?: MenuItem[] }) {
+  if (items)
+    return (
+      <Menu
+        width={230}
+        items={items}
+        trigger={
+          <button aria-label={label} title={label} className={rowActionClass(header)} onClick={(e) => e.stopPropagation()}>
+            <Plus size={14} />
+          </button>
+        }
+      />
+    );
   return (
     <IconButton
       label={label}
       className={rowActionClass(header)}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onClick?.();
       }}
     >
       <Plus size={14} />
@@ -47,9 +59,27 @@ export function CountPill({ n }: { n: number }) {
 }
 
 /** The header of a sidebar list: title, count, + (new) and ⋯ (also on right-click). */
-export function TreeHeader({ title, icon, count, addLabel, onAdd, menu = [] }: { title: string; icon?: ReactNode; count?: number; addLabel?: string; onAdd?(): void; menu?: MenuItem[] }) {
+export function TreeHeader({
+  title,
+  icon,
+  count,
+  addLabel,
+  onAdd,
+  addItems,
+  menu = [],
+}: {
+  title: string;
+  icon?: ReactNode;
+  count?: number;
+  addLabel?: string;
+  onAdd?(): void;
+  /** The + opens these (kinds of new item) instead of calling onAdd; the ⋯ menu lists them too. */
+  addItems?: MenuItem[];
+  menu?: MenuItem[];
+}) {
   const [open, setOpen] = useState(false);
-  const items: MenuItem[] = [...(onAdd ? [{ label: addLabel ?? 'New', icon: <Plus size={14} />, onSelect: onAdd }] : []), ...menu];
+  const adds: MenuItem[] = addItems ?? (onAdd ? [{ label: addLabel ?? 'New', icon: <Plus size={14} />, onSelect: onAdd }] : []);
+  const items: MenuItem[] = [...adds, ...menu.map((m, i) => (i === 0 && adds.length > 1 ? { ...m, separator: true } : m))];
   return (
     <div
       className={cx('group flex items-center gap-0.5 h-9 pl-3 pr-1 shrink-0', open && 'bg-hover')}
@@ -66,7 +96,7 @@ export function TreeHeader({ title, icon, count, addLabel, onAdd, menu = [] }: {
         </span>
       )}
       <span className="flex-1" />
-      {onAdd && <RowAdd label={addLabel ?? 'New'} onClick={onAdd} header />}
+      {(onAdd || addItems) && <RowAdd label={addLabel ?? 'New'} onClick={onAdd} items={addItems} header />}
       {items.length > 0 && <RowMenu label={title} items={items} open={open} onOpenChange={setOpen} header />}
     </div>
   );
