@@ -52,3 +52,14 @@ describe.skipIf(!sqlite)('SQLite datasets', () => {
     await expect(all({ path: db, query: 'SELECT nope FROM users' })).rejects.toThrow(/query failed/);
   });
 });
+
+describe('CSV records', () => {
+  it('keeps quoted line breaks, commas and quotes inside one record', async () => {
+    const { csvRecords } = await import('@testpion/core');
+    expect(csvRecords('id,body\r\n1,"line one\nline two, with ""quotes"""\r\n\r\n2,plain\n')).toEqual([
+      ['id', 'body'],
+      ['1', 'line one\nline two, with "quotes"'],
+      ['2', 'plain'],
+    ]);
+  });
+});

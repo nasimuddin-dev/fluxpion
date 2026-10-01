@@ -184,12 +184,11 @@ function* parseText(text: string, fmt: string, recordsPath?: string): Generator<
     return;
   }
   if (fmt === 'csv') {
-    const lines = text.split(/\r?\n/).filter((l) => l.trim());
-    const header = parseCsvLine(lines[0] ?? '', ',');
-    for (const l of lines.slice(1)) {
-      const cells = parseCsvLine(l, ',');
+    // quoted fields may span lines: a record ends where the quotes balance
+    const [header, ...rows] = csvRecords(text, ',');
+    for (const cells of rows) {
       const rec: DatasetRecord = {};
-      header.forEach((h, i) => (rec[h.trim()] = coerce(cells[i] ?? '')));
+      header!.forEach((h, i) => (rec[h.trim()] = coerce(cells[i] ?? '')));
       yield rec;
     }
     return;
@@ -201,6 +200,20 @@ function* parseText(text: string, fmt: string, recordsPath?: string): Generator<
 
 function toRecord(v: unknown): DatasetRecord {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as DatasetRecord) : { input: v };
+}
+
+/** CSV text as records of cells (RFC 4180: quoted fields may contain the delimiter, quotes and line breaks); blank lines are skipped. */
+export function csvRecords(text: string, delim = ','): string[][] {
+  const out: string[][] = [];
+  let pending = '';
+  for (const l of text.split(/\r?\n/)) {
+    pending = pending ? `${pending}\n${l}` : l;
+    if ((pending.match(/"/g)?.length ?? 0) % 2 === 1) continue;
+    if (pending.trim()) out.push(parseCsvLine(pending, delim));
+    pending = '';
+  }
+  if (pending.trim()) out.push(parseCsvLine(pending, delim));
+  return out;
 }
 
 export function parseCsvLine(line: string, delim = ','): string[] {

@@ -5,7 +5,7 @@
  * engine the CLI uses — so the UI thread never performs network or test execution.
  */
 import { randomBytes } from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { join, dirname } from 'node:path';
 import {
@@ -1202,15 +1202,27 @@ export class Backend {
 
   startEvalRun(p: EvalRunParams) {
     const base = this.ws.path('datasets');
-    mkdirSync(base, { recursive: true });
     let dataset: Record<string, unknown>;
+    let inline: string | undefined;
     if (p.datasetText !== undefined) {
-      const f = join(base, `inline-${shortId()}.${p.datasetFormat ?? 'jsonl'}`);
-      writeFileSync(f, p.datasetText);
-      dataset = { path: f, format: p.datasetFormat === 'md' ? 'markdown' : p.datasetFormat, limit: p.limit };
+      // the editor's text is streamed from a temporary file (not in datasets/), removed once the run has read it
+      const tmp = this.ws.path('runs', '.inline');
+      mkdirSync(tmp, { recursive: true });
+      inline = join(tmp, `${shortId('ds-')}.${p.datasetFormat ?? 'jsonl'}`);
+      writeFileSync(inline, p.datasetText);
+      dataset = { path: inline, format: p.datasetFormat === 'md' ? 'markdown' : p.datasetFormat, limit: p.limit };
     } else dataset = { path: p.datasetPath, limit: p.limit };
     const template = { ...p.template, dataset: { ...dataset, expectedField: p.expectedField ?? 'expected' } };
-    const tests = expandDataset(template, join(base, 'x'));
+    const expanded = expandDataset(template, join(base, 'x'));
+    const tests = inline
+      ? (async function* () {
+          try {
+            yield* expanded;
+          } finally {
+            rmSync(inline!, { force: true });
+          }
+        })()
+      : expanded;
     return this.startRun(p.name ?? String(p.template.name ?? 'Evaluation'), tests, { environment: p.environment, concurrency: p.concurrency, retries: p.retries, traceMode: 'all' });
   }
 

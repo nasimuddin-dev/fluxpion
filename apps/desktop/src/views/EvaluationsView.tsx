@@ -6,6 +6,7 @@ import { asError, call } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import type { CheckConfig, ProviderConfig } from '../types';
 import { templateVars, timeAgo } from '../lib/format';
+import { csvRecords } from '../lib/csv';
 import { AssertionEditor } from '../components/AssertionEditor';
 import { CodeEditor } from '../components/CodeEditor';
 import { RunPanel } from '../components/RunPanel';
@@ -72,7 +73,7 @@ function formatOf(text: string, fmt: Draft['datasetFormat']): Draft['datasetForm
 function countRecords(text: string, format: Draft['datasetFormat']): number {
   const fmt = formatOf(text, format);
   if (fmt === 'jsonl') return text.split('\n').filter((l) => l.trim()).length;
-  if (fmt === 'csv') return Math.max(0, text.split('\n').filter((l) => l.trim()).length - 1);
+  if (fmt === 'csv') return Math.max(0, csvRecords(text).length - 1);
   if (fmt === 'md') return Math.max(0, text.split('\n').filter((l) => l.trim().startsWith('|')).length - 2);
   try {
     const d = JSON.parse(text);
@@ -91,9 +92,9 @@ function previewRecords(text: string, format: Draft['datasetFormat']): Array<Rec
       return (Array.isArray(d) ? d : [d]).slice(0, 5);
     }
     if (fmt === 'csv') {
-      const [h, ...rows] = text.split('\n').filter((l) => l.trim());
-      const keys = h!.split(',').map((s) => s.trim());
-      return rows.slice(0, 5).map((r) => Object.fromEntries(r.split(',').map((v, i) => [keys[i], v])));
+      const [h, ...rows] = csvRecords(text);
+      const keys = (h ?? []).map((s) => s.trim());
+      return rows.slice(0, 5).map((r) => Object.fromEntries(r.map((v, i) => [keys[i], v])));
     }
   } catch {
     return [];
@@ -108,6 +109,11 @@ export function EvaluationsView() {
   const [runId, setRunId] = useSticky<string | undefined>('eval:runId', undefined);
   const [runs, setRuns] = useState<Array<{ id: string; name: string; startedAt: string; passed: number; total: number }>>([]);
   const [sub, setSub] = useSticky<'prompt' | 'dataset' | 'evaluators'>('eval:sub', 'dataset');
+  // dataset files of the workspace (datasets/), offered next to Load file
+  const [datasets, setDatasets] = useState<Array<{ path: string; name: string }>>([]);
+  useEffect(() => {
+    void call<Array<{ path: string; name: string }>>('datasets.list').then((l) => setDatasets(l.filter((x) => /\.(csv|tsv|json|jsonl|ndjson|md)$/i.test(x.name))), () => setDatasets([]));
+  }, []);
   const env = useApp((s) => s.environment);
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
   useEffect(() => drafts.save(d), [d]);
@@ -312,6 +318,30 @@ export function EvaluationsView() {
                 >
                   Load file…
                 </Button>
+                {datasets.length > 0 && (
+                  <Select
+                    className="h-7 min-h-7 py-0 text-xs max-w-48"
+                    aria-label="Load a workspace dataset"
+                    value=""
+                    onChange={async (e) => {
+                      if (!e.target.value) return;
+                      try {
+                        const r = await call<{ name: string; text: string }>('datasets.read', { path: e.target.value });
+                        const ext = r.name.split('.').pop()!.toLowerCase();
+                        set({ dataset: r.text, datasetFormat: ext === 'ndjson' ? 'jsonl' : ext === 'tsv' ? 'csv' : (ext as Draft['datasetFormat']) });
+                      } catch (err) {
+                        useApp.getState().toast(asError(err).message, 'error');
+                      }
+                    }}
+                  >
+                    <option value="">or a workspace dataset…</option>
+                    {datasets.map((x) => (
+                      <option key={x.path} value={x.path}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </div>
               <div className="flex-1 min-h-0">
                 <Split id="eval-dataset" direction="vertical" initial={65}>

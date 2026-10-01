@@ -228,7 +228,8 @@ export function collectionsHandlers(be: Backend): Handlers {
         for (const e of readdirSync(dir, { withFileTypes: true })) {
           const p = join(dir, e.name);
           if (e.isDirectory()) walk(p, depth + 1);
-          else if (/\.(csv|tsv|json|jsonl|ndjson|db|sqlite|sqlite3)$/i.test(e.name)) {
+          // inline-*: copies older versions made for evaluation runs, not datasets of yours
+          else if (/\.(csv|tsv|json|jsonl|ndjson|db|sqlite|sqlite3)$/i.test(e.name) && !e.name.startsWith('inline-')) {
             const st = statSync(p);
             out.push({ path: p, name: relative(root, p).split(sep).join('/'), size: st.size, modified: st.mtime.toISOString() });
           }
@@ -236,6 +237,14 @@ export function collectionsHandlers(be: Backend): Handlers {
       };
       walk(root, 0);
       return out.sort((a, b) => (a.modified < b.modified ? 1 : -1)).slice(0, 500);
+    },
+    /** The text of a dataset file in the workspace's datasets/ folder (CSV, JSON, JSONL, Markdown; up to 20 MB). */
+    'datasets.read': ({ path }: { path: string }) => {
+      const root = be.ws.path('datasets');
+      const file = be.ws.safePath(relative(root, path), root);
+      if (!/\.(csv|tsv|json|jsonl|ndjson|md)$/i.test(file)) throw new ApsError('ValidationError', 'Only CSV, JSON, JSONL and Markdown datasets can be opened as text');
+      if (statSync(file).size > 20 * 1024 * 1024) throw new ApsError('ValidationError', 'The dataset is larger than 20 MB');
+      return { name: relative(root, file).split(sep).join('/'), text: readFileSync(file, 'utf8') };
     },
     /** Save rows (CSV text, e.g. a response's table) as datasets/<name>.csv; never overwrites: name-2.csv etc. */
     'datasets.saveCsv': ({ name, text }: { name: string; text: string }) => {

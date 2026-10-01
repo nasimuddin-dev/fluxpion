@@ -5,6 +5,7 @@ import type { CheckConfig, TestCase } from '../model/types.js';
 import { ApsError } from '../errors.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { expandDataset } from './loader.js';
+import { csvRecords } from './datasets.js';
 
 /**
  * Saved evaluations (the app's Evaluations view, `library/evaluations.json`): a dataset × prompt × model ×
@@ -69,7 +70,7 @@ export function countDatasetRecords(text: string, format: SavedEvaluation['datas
   const fmt = datasetFormatOf(text, format);
   const lines = text.split('\n').filter((l) => l.trim());
   if (fmt === 'jsonl') return lines.length;
-  if (fmt === 'csv') return Math.max(0, lines.length - 1);
+  if (fmt === 'csv') return Math.max(0, csvRecords(text).length - 1);
   if (fmt === 'md') return Math.max(0, lines.filter((l) => l.trim().startsWith('|')).length - 2);
   try {
     const d = JSON.parse(text);
