@@ -262,13 +262,16 @@ export function InlineRename({ value, onCommit, onCancel, validate, label = 'Nam
   useEffect(() => {
     // after a menu closes (Rename in a ⋯ menu) its focus handling may run late and take the focus: take it back
     const grab = () => {
-      if (ref.current && document.activeElement !== ref.current) {
+      const a = document.activeElement as HTMLElement | null;
+      // never from another field the user went to: only from nothing, or a button / menu that just closed
+      const typing = a && a !== ref.current && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable);
+      if (ref.current && a !== ref.current && !typing) {
         ref.current.focus();
         ref.current.select();
       }
     };
     const id = requestAnimationFrame(grab);
-    const timers = [setTimeout(grab, 60), setTimeout(grab, 200)];
+    const timers = [60, 200, 450, 900].map((ms) => setTimeout(grab, ms));
     return () => (cancelAnimationFrame(id), timers.forEach(clearTimeout));
   }, []);
   // a click anywhere else ends the rename, even if the field lost the focus to something else
