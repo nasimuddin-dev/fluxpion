@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { plural } from '../lib/format';
-import { cx, Input } from './ui';
+import { Button, cx, Input } from './ui';
+import { useApp } from '../store';
 
 type Row = Record<string, unknown>;
 const isRow = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -32,6 +33,12 @@ export function tableRowsOf(json: unknown): { rows: Row[]; path: string } | unde
 }
 
 const LIMIT = 500;
+/** Rows as CSV (RFC 4180 quoting), every row that matches the filter, in the shown order. */
+export function rowsToCsv(rows: Row[], columns: string[]): string {
+  const q = (s: string) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  return [columns.map(q).join(','), ...rows.map((r) => columns.map((c) => q(cell(r[c]))).join(','))].join('\r\n') + '\r\n';
+}
+
 const cell = (v: unknown) => (v === null ? 'null' : v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 /** A JSON array of objects as a table: a column per key, click a header to sort, filter any cell. */
@@ -63,6 +70,20 @@ export function JsonTable({ rows, path }: { rows: Row[]; path: string }) {
           {plural(shown.length, 'row')}
           {shown.length !== rows.length ? ` of ${rows.length}` : ''} · {plural(columns.length, 'column')} · <span className="mono">{path}</span>
         </span>
+        <Button
+          size="sm"
+          className="ml-auto"
+          icon={<Copy size={12} />}
+          title="Copy the rows shown (all of them, not only the first 500) as CSV"
+          onClick={() =>
+            void navigator.clipboard.writeText(rowsToCsv(shown, columns)).then(
+              () => useApp.getState().toast(`Copied ${plural(shown.length, 'row')} as CSV`, 'success'),
+              () => useApp.getState().toast('Could not copy to the clipboard', 'error'),
+            )
+          }
+        >
+          Copy CSV
+        </Button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="text-xs border-collapse min-w-full">

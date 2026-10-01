@@ -108,7 +108,7 @@ Open tabs, including pins, are restored when the app starts. You can close every
 The status, duration, size, headers, cookies and a timeline (prepare → TTFB → download) are always shown. **Save as example** keeps the response with the request (see [Examples](/api-testing/collections#examples)). For the body:
 
 - **Pretty** is a virtualised JSON tree. Click a key to copy its JSONPath.
-- **Table** appears when the JSON is an array of objects, or holds one up to three levels deep (such as `items`, `data.users`; the largest is used; GraphQL responses have it too): a column per key, click a header to sort (again to reverse), and filter rows by any cell. The first 500 rows are shown.
+- **Table** appears when the JSON is an array of objects, or holds one up to three levels deep (such as `items`, `data.users`; the largest is used; GraphQL responses have it too): a column per key, click a header to sort (again to reverse), and filter rows by any cell. The first 500 rows are shown; **Copy CSV** copies every matching row.
 - **Raw** is a virtualised text view with search.
 - **Preview** renders HTML in a sandboxed frame.
 
