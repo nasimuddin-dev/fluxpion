@@ -6,8 +6,9 @@ import { KeyValueEditor } from '../components/KeyValueEditor';
 import type { KeyValue } from '../types';
 import { useIntent } from '../hooks';
 import type { Trace } from '../types';
-import { formatMs, timeAgo } from '../lib/format';
+import { formatMs, plural, timeAgo } from '../lib/format';
 import { TraceView } from '../components/TraceView';
+import { DurationBar } from '../components/charts';
 import { Badge, Button, cx, Empty, IconButton, Input, Modal, Select, Split, VirtualList } from '../components/ui';
 
 interface TraceMeta {
@@ -71,6 +72,7 @@ function OtlpDialog({ ids, selected, onClose }: { ids: string[]; selected?: stri
 export function TracesView() {
   const [otlpOpen, setOtlpOpen] = useState(false);
   const [items, setItems] = useState<TraceMeta[]>([]);
+  const maxMs = Math.max(1, ...items.map((t) => t.durationMs));
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('');
@@ -114,7 +116,7 @@ export function TracesView() {
           </IconButton>
         </div>
         {otlpOpen && <OtlpDialog ids={items.map((t) => t.id)} selected={sel} onClose={() => setOtlpOpen(false)} />}
-        <div className="text-xs text-muted px-3 py-1">{total.toLocaleString()} traces</div>
+        <div className="text-xs text-muted px-3 py-1">{plural(total, 'trace')}</div>
         {items.length ? (
           <VirtualList
             className="flex-1"
@@ -126,11 +128,14 @@ export function TracesView() {
                 <div className="flex items-center gap-2 text-sm">
                   <span className={cx('w-1.5 h-1.5 rounded-full', t.status === 'ok' ? 'bg-ok' : 'bg-bad')} />
                   <span className="truncate min-w-0" title={t.name}>{t.name}</span>
-                  <span className="ml-auto text-xs text-muted tabular-nums whitespace-nowrap shrink-0 pl-2">{formatMs(t.durationMs)}</span>
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted tabular-nums whitespace-nowrap shrink-0 pl-2">
+                    <DurationBar ms={t.durationMs} max={maxMs} bad={t.status !== 'ok'} />
+                    {formatMs(t.durationMs)}
+                  </span>
                 </div>
                 <div className="text-xs text-muted flex gap-2 pl-3.5">
                   <Badge>{t.kind}</Badge>
-                  {t.spanCount} spans · {timeAgo(t.startTime)}
+                  {plural(t.spanCount, 'span')} · {timeAgo(t.startTime)}
                 </div>
               </button>
             )}

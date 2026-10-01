@@ -61,3 +61,16 @@ export const niceMax = (v: number) => {
 
 /** A duration for an axis tick: 250 ms, 1 s, 2.5 s (no trailing zeros). */
 export const axisMs = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${Number((ms / 1000).toFixed(2))} s`);
+
+/**
+ * How long something took next to the others in a list, as a thin bar (log scale, so a few slow
+ * items don't flatten the rest). Decorative: the number is always shown beside it.
+ */
+export function DurationBar({ ms, max, bad, className }: { ms: number; max: number; bad?: boolean; className?: string }) {
+  const w = max > 0 ? Math.max(0.04, Math.log1p(Math.max(0, ms)) / Math.log1p(max)) : 0;
+  return (
+    <span aria-hidden className={'inline-block h-1 w-16 rounded-full bg-hover/70 overflow-hidden align-middle ' + (className ?? '')}>
+      <span className="block h-full rounded-full" style={{ width: `${Math.min(1, w) * 100}%`, background: bad ? 'var(--bad)' : 'var(--accent)' }} />
+    </span>
+  );
+}

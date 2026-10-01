@@ -5,6 +5,7 @@ import { confirmAction, useApp } from '../store';
 import { useIntent } from '../hooks';
 import type { HttpRequestSpec } from '../types';
 import { formatBytes, formatMs, groupByDay } from '../lib/format';
+import { DurationBar } from '../components/charts';
 import { finishSave, type SaveResult } from '../lib/files';
 import { JsonTree } from '../components/JsonView';
 import { Badge, Button, cx, Empty, Input, Select, Split, statusTone, VirtualList } from '../components/ui';
@@ -50,6 +51,8 @@ export function HistoryView() {
     if (p?.historyId) setSel(await call('history.get', { id: p.historyId }));
   });
   const rows = useMemo(() => groupByDay(items, (e) => e.timestamp), [items]);
+  // the slowest loaded entry sets the scale of the duration bars
+  const maxMs = useMemo(() => Math.max(1, ...items.map((e) => e.durationMs ?? 0)), [items]);
   const reopen = (e: Entry) => {
     if (e.kind === 'http') useApp.getState().openIntent('rest', { request: e.request as HttpRequestSpec, name: e.name });
     else if (e.kind === 'llm') useApp.getState().openIntent('ai', {});
@@ -117,7 +120,12 @@ export function HistoryView() {
                 </div>
                 <div className="text-xs text-muted flex gap-2">
                   <span>{new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  {e.durationMs !== undefined && <span>{formatMs(e.durationMs)}</span>}
+                  {e.durationMs !== undefined && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <DurationBar ms={e.durationMs} max={maxMs} bad={statusTone(e.status) === 'bad'} />
+                      {formatMs(e.durationMs)}
+                    </span>
+                  )}
                   {e.size !== undefined && <span>{formatBytes(e.size)}</span>}
                 </div>
               </button>
