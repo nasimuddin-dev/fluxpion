@@ -105,6 +105,8 @@ Open tabs, including pins, are restored when the app starts. You can close every
 
 ## Responses
 
+**Response layout.** The response goes beside the request when there is room, or below it on a narrower window (*Auto*). The layout button at the right of the tabs (also Settings ▸ Appearance and the command palette) sets *Side by side* or *Response below* for every editor: HTTP, GraphQL, gRPC and MCP tools. Each layout remembers its own size. When the request's tabs (Params, Headers, Body …) don't fit, **»** lists them all.
+
 The status, duration, size, headers, cookies and a timeline are always shown. The timeline is a waterfall of prepare, DNS lookup, TCP connect and TLS handshake (on a new connection), waiting for the first byte (TTFB) and download, with the server's address, the TLS version and cipher, the certificate (subject, issuer, valid until, days left), or *Reused connection* when the request went over an open one. The Trace tab (and OpenTelemetry export) shows the phases as spans of the request. `testpion send <url> -i` prints the same phases, `--json` and the `send_request` MCP tool return them as `timing` (`dnsMs`, `tcpMs`, `tlsMs`, `ttfbMs`, `downloadMs`, `reusedConnection`). **Save as example** keeps the response with the request (see [Examples](/api-testing/collections#examples)). For the body:
 
 <figure class="aps-screenshot">
