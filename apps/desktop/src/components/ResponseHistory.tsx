@@ -115,7 +115,7 @@ export function ResponseHistory({ requestId, latestId }: { requestId: string; la
               <input type="checkbox" aria-label={`Select the response from ${timeAgo(e.timestamp)}`} checked={picked.includes(e.id)} onChange={() => toggle(e.id)} />
               <button className="flex-1 min-w-0 text-left" onClick={() => void view(e.id)} title="View this response">
                 <div className="flex items-center gap-1.5">
-                  <Badge tone={typeof e.status === 'number' ? statusTone(e.status) : 'bad'}>{e.status ?? '—'}</Badge>
+                  <Badge tone={e.status === undefined ? 'bad' : statusTone(e.status)}>{e.status ?? '—'}</Badge>
                   <span className="text-xs text-muted tabular-nums">{formatMs(e.durationMs)} · {formatBytes(e.size)}</span>
                 </div>
                 <div className="text-xs text-muted mt-0.5">
@@ -147,7 +147,7 @@ export function ResponseHistory({ requestId, latestId }: { requestId: string; la
           <div className="h-full flex flex-col min-h-0">
             <div className="flex items-center gap-2 px-3 h-9 border-b border-line text-sm shrink-0">
               <Eye size={14} className="text-muted" />
-              <Badge tone={typeof viewing.entry.status === 'number' ? statusTone(viewing.entry.status) : 'bad'}>{viewing.entry.status}</Badge>
+              <Badge tone={viewing.entry.status === undefined ? 'bad' : statusTone(viewing.entry.status)}>{viewing.entry.status}</Badge>
               <span className="text-muted">{new Date(viewing.entry.timestamp).toLocaleString()}</span>
             </div>
             <div className="flex-1 min-h-0">{viewing.bodyMissing ? <Empty title="The body of this response is no longer on disk" /> : <BodyView text={viewing.body ?? ''} />}</div>
@@ -190,9 +190,9 @@ export function CompareView({ c, labels }: { c: Compared; labels?: [string, stri
           <div>
             <div className="text-xs text-muted mb-1">Status</div>
             <span className="inline-flex items-center gap-1.5">
-              <Badge tone={typeof d.status.before === 'number' ? statusTone(d.status.before) : 'bad'}>{d.status.before}</Badge>
+              <Badge tone={statusTone(d.status.before)}>{d.status.before}</Badge>
               <ArrowRight size={12} className="text-muted" />
-              <Badge tone={typeof d.status.after === 'number' ? statusTone(d.status.after) : 'bad'}>{d.status.after}</Badge>
+              <Badge tone={statusTone(d.status.after)}>{d.status.after}</Badge>
             </span>
           </div>
           <div>

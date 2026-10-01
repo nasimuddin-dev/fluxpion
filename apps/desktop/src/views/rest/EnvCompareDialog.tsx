@@ -60,7 +60,7 @@ export function EnvCompareDialog({ tab, onClose }: { tab: RestTab; onClose(): vo
   const side = (s: Side) => (
     <span className="inline-flex items-center gap-2 text-sm">
       <span className="font-medium">{s.environment}</span>
-      {s.error ? <Badge tone="bad">error</Badge> : <Badge tone={typeof s.status === 'number' ? statusTone(s.status) : 'bad'}>{s.status}</Badge>}
+      {s.error ? <Badge tone="bad">error</Badge> : <Badge tone={statusTone(s.status)}>{s.status}</Badge>}
       {s.durationMs !== undefined && <span className="text-muted tabular-nums">{formatMs(s.durationMs)}</span>}
     </span>
   );

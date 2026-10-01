@@ -118,7 +118,7 @@ export function ConsolePanel() {
                 </span>
                 {e.kind && <Badge tone={e.kind === 'graphql' ? 'accent' : 'judge'}>{KIND_LABEL[e.kind]}</Badge>}
                 {e.source === 'run' && <Badge title={e.run}>run</Badge>}
-                {e.status !== undefined && <Badge tone={typeof e.status === 'number' ? statusTone(e.status) : OK_STATUS.has(e.status) ? 'ok' : 'bad'}>{e.status}</Badge>}
+                {e.status !== undefined && <Badge tone={statusTone(e.status)}>{e.status}</Badge>}
                 {!!e.failedChecks && <Badge tone="bad">{e.failedChecks} failed</Badge>}
                 {e.durationMs !== undefined && <span className="text-muted tabular-nums w-16 text-right shrink-0">{formatMs(e.durationMs)}</span>}
                 {e.size !== undefined && <span className="text-muted tabular-nums w-16 text-right shrink-0">{formatBytes(e.size)}</span>}

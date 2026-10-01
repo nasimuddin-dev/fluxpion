@@ -161,11 +161,13 @@ export function Badge({ children, tone = 'default', title }: { children: ReactNo
 }
 
 export function statusTone(status?: number | string): 'ok' | 'bad' | 'warn' | 'default' {
+  if (typeof status === 'string' && /^\d{3}$/.test(status)) status = Number(status);
   if (typeof status === 'number') return status < 300 ? 'ok' : status < 400 ? 'warn' : 'bad';
-  if (status === 'passed' || status === 'ok' || status === 'success') return 'ok';
-  if (status === 'failed' || status === 'error') return 'bad';
-  if (status === 'skipped') return 'warn';
-  return 'default';
+  if (status === undefined || status === '') return 'default';
+  if (/^(passed|ok|success|connected|closed|open|sent)$/i.test(status)) return 'ok';
+  if (status === 'skipped' || status === 'running' || status === 'pending') return 'warn';
+  // failed, error, NetworkError, TimeoutError, gRPC codes other than OK (UNAVAILABLE, NOT_FOUND …)
+  return 'bad';
 }
 
 export function Empty({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
