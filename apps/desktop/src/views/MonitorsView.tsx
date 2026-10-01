@@ -1,3 +1,4 @@
+import { RecentRuns } from '../components/charts';
 import { AlarmClock, ExternalLink, Folder, KeyRound, ListX, Pause, Pencil, Play, Plus, SquareX, Trash2, X } from 'lucide-react';
 import { SidebarShell } from '../components/SidebarShell';
 import { MonitorCharts } from '../components/MonitorCharts';
@@ -30,6 +31,8 @@ interface MonitorRow extends MonitorDraft {
   id: string;
   schedule: string;
   lastResult?: MonitorResult;
+  /** Statuses of the latest runs, oldest first. */
+  recent?: string[];
   nextRunAt?: string;
   due: boolean;
   running: boolean;
@@ -233,7 +236,7 @@ export function MonitorsView() {
                   name: m.name,
                   folder: m.folder,
                   icon: <span className={cx('block w-2 h-2 rounded-full', m.running ? 'bg-accent animate-pulse' : !m.lastResult ? 'bg-muted/50' : m.lastResult.status === 'passed' ? 'bg-ok' : 'bg-bad')} />,
-                  badge: m.enabled ? undefined : <Badge>paused</Badge>,
+                  badge: m.enabled ? <RecentRuns statuses={m.recent ?? []} /> : <Badge>paused</Badge>,
                   subtitle: `${colName(m.collectionId)} · ${m.schedule}${m.lastResult ? ` · ${timeAgo(m.lastResult.startedAt)}` : ''}`,
                 }))}
                 itemMenu={(id) => {

@@ -7,6 +7,7 @@ import type { Collection, CollectionNode, HttpRequestSpec } from '../types';
 import { timeAgo, uid, plural } from '../lib/format';
 import { Badge, cx, Empty, Kbd, statusTone } from '../components/ui';
 import { ActivityCharts, type Activity } from '../components/ActivityCharts';
+import { RecentRuns } from '../components/charts';
 
 interface HistoryItem {
   id: string;
@@ -69,6 +70,7 @@ interface HomeMonitor {
   id: string;
   name: string;
   enabled: boolean;
+  recent?: string[];
   lastResult?: { status: 'passed' | 'failed' | 'error'; passed: number; failed: number; errors: number; total: number; startedAt: string };
 }
 interface HomeRun {
@@ -252,6 +254,7 @@ export function HomeView() {
                     <button key={m.id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left hover:bg-hover" onClick={() => setView('monitors')}>
                       <span className={cx('w-2 h-2 rounded-full shrink-0', !r ? 'bg-muted/50' : r.status === 'passed' ? 'bg-ok' : 'bg-bad')} />
                       <span className="truncate flex-1">{m.name}</span>
+                      {m.enabled && <RecentRuns statuses={m.recent ?? []} className="hidden sm:inline-flex" />}
                       {!m.enabled ? <Badge>paused</Badge> : r ? <Badge tone={r.status === 'passed' ? 'ok' : 'bad'}>{r.status === 'passed' ? `${r.passed}/${r.total}` : r.status === 'failed' ? `${r.failed + r.errors} failed` : 'error'}</Badge> : <span className="text-xs text-muted">not run yet</span>}
                       <span className="text-xs text-muted shrink-0 w-16 text-right">{r ? timeAgo(r.startedAt) : ''}</span>
                     </button>

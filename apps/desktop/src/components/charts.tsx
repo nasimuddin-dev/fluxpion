@@ -74,3 +74,17 @@ export function DurationBar({ ms, max, bad, className }: { ms: number; max: numb
     </span>
   );
 }
+
+/** Results of the latest runs as tiny blocks, oldest left (green passed, red failed or could not run). */
+export function RecentRuns({ statuses, className }: { statuses: string[]; className?: string }) {
+  if (!statuses.length) return null;
+  const passed = statuses.filter((s) => s === 'passed').length;
+  const label = statuses.length === 1 ? `The last run ${passed ? 'passed' : 'failed'}` : `${passed} of the last ${statuses.length} runs passed (oldest left)`;
+  return (
+    <span className={'inline-flex items-end gap-px h-3 shrink-0 ' + (className ?? '')} role="img" aria-label={label} title={label}>
+      {statuses.map((s, i) => (
+        <span key={i} className="w-[3px] h-full rounded-[1px]" style={{ background: s === 'passed' ? 'var(--ok)' : 'var(--bad)', opacity: 0.85 }} />
+      ))}
+    </span>
+  );
+}
