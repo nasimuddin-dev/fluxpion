@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.0 — 2026-10-01
+
+Highlights: snapshot checks, variable flow, a shareable workspace report.
+
+- **Snapshot checks**: keep a copy of a response and check later responses against it: by *shape* (the same fields and types, values may change) or by *values*, ignoring paths such as `$.id` or `$..updatedAt`. **Snapshot** above a JSON response adds one, the response tree's menu adds one for any object or array, and **Update snapshot** next to a failed check takes the new response when the API changed on purpose. In test files: `type: snapshot`.
+- **Variable flow** (collection Overview): which request or script sets each variable and which requests use it, in run order, flagging *used before it is set*, *never set* and *set, never used*. Also `testpion variable-flow` (exits 1 on problems) and the `variable_flow` MCP tool.
+- **Workspace report**: **Share report** on Home (or `testpion workspace-report`) saves one HTML file with requests and tests per day, each collection's health, the monitors and the latest runs; names, counts and timings only.
+- **History**: a *Failed* filter (also `testpion history list --failed`), and the `recent_failures` MCP tool for agents. GraphQL requests now count in collection health.
+- **Streams**: WebSocket, Socket.IO and MQTT logs show messages and bytes in each direction with a messages-per-second sparkline and a direction filter; gRPC streams and Server-Sent Events show when their messages arrived.
+- **Fixes**: the status bar says "MCP connected" (it counts MCP servers).
+
 ## 0.25.0 — 2026-10-01
 
 Highlights: compare any two runs, response-time limits for monitors, workspace datasets everywhere.

@@ -1,6 +1,6 @@
 {
   "name": "@testpion/cli",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "description": "TestPion command-line runner for local and CI/CD test execution.",
   "license": "MIT",
   "type": "module",
@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@testpion/core": "0.25.0",
+    "@testpion/core": "0.26.0",
     "commander": "^15.0.0"
   }
 }
