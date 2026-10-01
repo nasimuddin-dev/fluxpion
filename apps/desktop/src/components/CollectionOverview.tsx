@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { call } from '../api';
 import type { Collection, CollectionNode } from '../types';
 import { formatMs, plural, timeAgo } from '../lib/format';
-import { BarRow, ChartCard, StatTile } from './charts';
+import { BarRow, ChartCard, RecentRuns, StatTile } from './charts';
+import { useApp } from '../store';
 import { Badge, cx, statusTone } from './ui';
 
 /** From `stats.requests` (summarizeRequestStats in core). */
@@ -76,6 +77,34 @@ function VariableFlowCard({ collectionId, onOpen }: { collectionId: string; onOp
   );
 }
 
+/** The collection's latest runs (Collection Runner and CLI runs are named after it): a pass / fail strip and the last result. */
+function RecentCollectionRuns({ name }: { name: string }) {
+  const [runs, setRuns] = useState<Array<{ id: string; name: string; startedAt: string; total: number; passed: number; failed: number; errors: number }>>([]);
+  useEffect(() => {
+    void call<{ items: typeof runs }>('runs.list', { query: name, limit: 50 }).then(
+      (r) => setRuns(r.items.filter((x) => x.name === name || x.name.startsWith(`${name} / `) || x.name === `Failed requests of ${name}`).slice(0, 20)),
+      () => setRuns([]),
+    );
+  }, [name]);
+  if (!runs.length) return null;
+  const last = runs[0]!;
+  const bad = last.failed + last.errors;
+  return (
+    <ChartCard title="Recent runs" aside={<RecentRuns statuses={[...runs].reverse().map((r) => (r.failed + r.errors ? 'failed' : 'passed'))} />}>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-muted">Last run</span>
+        <span className={bad ? 'text-bad' : 'text-ok'}>
+          {last.passed}/{last.total} passed
+        </span>
+        <span className="text-muted">· {timeAgo(last.startedAt)}{last.name !== name ? ` · ${last.name.slice(name.length + 3) || last.name}` : ''}</span>
+        <button className="ml-auto text-accent hover:underline" onClick={() => useApp.getState().openIntent('tests', { runId: last.id })}>
+          Open run
+        </button>
+      </div>
+    </ChartCard>
+  );
+}
+
 type Saved = Exclude<CollectionNode, { kind: 'folder' }>;
 interface Row {
   node: Saved;
@@ -139,6 +168,7 @@ export function CollectionOverview({ collection, onOpen }: { collection: Collect
         <StatTile label="Documented" value={pct(documented, kinds.http ?? 0)} sub={`${documented} of ${kinds.http ?? 0} REST requests`} />
         <StatTile label="Failing now" value={sent.length ? String(failing.length) : '—'} sub={sent.length ? `latest response of ${plural(sent.length, 'sent request')}` : 'nothing sent from the app yet'} tone={!sent.length ? undefined : failing.length ? 'bad' : 'ok'} />
       </div>
+      <RecentCollectionRuns name={collection.name} />
       <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_3fr]">
         <ChartCard title="By method">
           <div className="flex flex-col gap-1.5">
