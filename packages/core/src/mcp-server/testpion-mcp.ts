@@ -12,8 +12,21 @@ import { loadHistory, loadRunRecord, recordLoadRun } from '../load/history.js';
 import { ENGINE_VERSION } from '../version.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { AppSettings, Collection, CollectionNode, HttpRequestSpec, RunSummary, TestResult } from '../model/types.js';
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import type { AppSettings, CheckConfig, Collection, CollectionNode, HttpRequestSpec, RunSummary, TestResult } from '../model/types.js';
+import { AGENT_PROMPTS, agentGuide, toolAnnotations } from './agent-kit.js';
+import { checkTypes } from '../eval/checks.js';
+import { isSuiteFile, loadSuite, loadTestsFromFile } from '../runner/loader.js';
+import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import type { RunEvent } from '../runner/runner.js';
 import { ApsError, normalizeError } from '../errors.js';
 import { Redactor } from '../util/redact.js';
@@ -84,7 +97,7 @@ const BODY_CHARS = 20_000;
 interface Tool {
   name: string;
   description: string;
-  inputSchema: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
+  inputSchema: { type: 'object'; properties: Record<string, unknown>; required?: string[]; additionalProperties?: boolean };
   write?: boolean;
   run(args: Record<string, unknown>): Promise<unknown> | unknown;
 }
@@ -1176,6 +1189,88 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
       run: () => listWorkspaceDatasets(store),
     },
     {
+      name: 'testpion_guide',
+      description:
+        'How to use this TestPion workspace: which tool to use for what, how variables resolve, every check type this engine knows (with examples) and the YAML test file format. Read it before writing checks or test files.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      run: () => agentGuide({ workspace: store.workspace.name, checkTypes: checkTypes(), readOnly: opts.readOnly }),
+    },
+    {
+      name: 'set_request_checks',
+      write: true,
+      description:
+        'Set the checks (assertions) of a saved REST or GraphQL request: they run whenever it is sent, in the app, in run_collection and in CI. `mode: "append"` (default) adds them, `"replace"` replaces the existing ones. Each check is { type, name?, path?, expected?, … } (see testpion_guide for the types); unknown types are refused. Returns the request\'s checks.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          collection: str('Collection name or id'),
+          request: str('Request name or id'),
+          checks: { type: 'array', items: { type: 'object', properties: { type: { type: 'string' } }, required: ['type'] }, description: 'Checks, e.g. [{ "type": "status", "expected": 200 }, { "type": "exists", "path": "$.id" }]' },
+          mode: { type: 'string', enum: ['append', 'replace'], description: 'append (default) or replace' },
+        },
+        required: ['collection', 'request', 'checks'],
+      },
+      run: (a) => {
+        const c = findCollection(a.collection);
+        const { node } = findRequest(c, a.request);
+        if ((node as { kind: string }).kind !== 'http' && (node as { kind: string }).kind !== 'graphql') throw new ApsError('ValidationError', `"${node.name}" is not a REST or GraphQL request`);
+        const checks = Array.isArray(a.checks) ? (a.checks as CheckConfig[]) : [];
+        const known = new Set(checkTypes());
+        const unknown = checks.filter((k) => !k || typeof k.type !== 'string' || !known.has(k.type)).map((k) => String(k?.type));
+        if (unknown.length) throw new ApsError('ValidationError', `Unknown check type: ${unknown.join(', ')}. Known: ${[...known].join(', ')}`);
+        const next = a.mode === 'replace' ? checks : [...(node.assertions ?? []), ...checks];
+        const map = (nodes: CollectionNode[]): CollectionNode[] => nodes.map((n) => (n.kind === 'folder' ? { ...n, items: map(n.items) } : n.id === node.id ? ({ ...n, assertions: next } as CollectionNode) : n));
+        store.saveCollection({ ...c, items: map(c.items) });
+        return { collection: c.name, request: node.name, checks: next };
+      },
+    },
+    {
+      name: 'write_test_file',
+      write: true,
+      description:
+        'Write a YAML (or JSON) test file under tests/ for `testpion test`, run_tests and CI. The content is checked first: it must parse as TestPion tests or a suite (*.suite.yaml) and use known check types, otherwise nothing is written and the error says why. An existing file is only replaced with `overwrite: true`. See testpion_guide for the format. Returns the path and the tests it holds.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: str('Path inside tests/, e.g. "rest/pets.yaml" or "smoke.suite.yaml"'),
+          content: str('The file content (YAML or JSON)'),
+          overwrite: { type: 'boolean', description: 'Replace the file when it exists (default false)' },
+        },
+        required: ['path', 'content'],
+      },
+      run: async (a) => {
+        const rel = String(a.path ?? '').replace(/\\/g, '/').replace(/^tests\//, '');
+        if (!/\.(ya?ml|json)$/i.test(rel)) throw new ApsError('ValidationError', 'The path must end with .yaml, .yml or .json');
+        const dest = store.safePath(rel, store.path('tests'));
+        if (existsSync(dest) && a.overwrite !== true) throw new ApsError('ConfigurationError', `tests/${rel} exists; pass overwrite: true to replace it`);
+        // parse a copy first, so a broken file never lands in the workspace
+        const tmp = join(tmpdir(), `testpion-check-${shortId('t-')}-${rel.split('/').pop()}`);
+        writeFileSync(tmp, String(a.content ?? ''));
+        try {
+          if (isSuiteFile(tmp)) {
+            const suite = await loadSuite(tmp);
+            store.writeTestFile(rel, String(a.content));
+            return { path: `tests/${rel}`, suite };
+          }
+          const known = new Set(checkTypes());
+          const tests: Array<{ id?: string; name: string; type: string; checks: number }> = [];
+          const unknown = new Set<string>();
+          for await (const t of loadTestsFromFile(tmp)) {
+            const checks = ((t as { assertions?: CheckConfig[] }).assertions ?? []) as CheckConfig[];
+            checks.forEach((k) => !known.has(k.type) && unknown.add(String(k.type)));
+            tests.push({ id: t.id, name: t.name, type: t.type, checks: checks.length });
+            if (tests.length >= 1000) break;
+          }
+          if (!tests.length) throw new ApsError('ValidationError', 'No tests in the content: give one test (type, url …) or a tests: list (see testpion_guide)');
+          if (unknown.size) throw new ApsError('ValidationError', `Unknown check type: ${[...unknown].join(', ')}. Known: ${[...known].join(', ')}`);
+          store.writeTestFile(rel, String(a.content));
+          return { path: `tests/${rel}`, tests };
+        } finally {
+          rmSync(tmp, { force: true });
+        }
+      },
+    },
+    {
       name: 'load_history',
       description:
         'Earlier load tests of this workspace, newest first (from the app and from load_test): when, what was tested, virtual users, duration, requests, throughput (req/s), error rate, p50 / p95 / p99 in ms, status codes and pass/fail rules. Use it to see whether an API got slower or less reliable between runs.',
@@ -1260,17 +1355,67 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
   const server = new Server(
     { name: 'testpion', version: opts.version ?? ENGINE_VERSION },
     {
-      capabilities: { tools: {} },
-      instructions: `TestPion workspace "${store.workspace.name}". what_needs_attention lists what is failing or about to (monitors, certificates, runs, requests, flaky tests). Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. list_monitors and monitor_results show scheduled checks${opts.readOnly ? '' : ' (run_monitor runs one now)'}. parse_request_snippet reads a cURL / fetch / PowerShell command${opts.readOnly ? '' : ' and save_request stores it in a collection (secrets become {{variables}})'}. Values of secrets are never returned.`,
+      capabilities: { tools: {}, resources: {}, prompts: {} },
+      instructions: `TestPion workspace "${store.workspace.name}". what_needs_attention lists what is failing or about to (monitors, certificates, runs, requests, flaky tests). Use list_collections and list_requests to find requests, get_request or collection_docs to understand them${opts.readOnly ? '' : ', send_request to call one and run_collection to run tests'}. list_monitors and monitor_results show scheduled checks${opts.readOnly ? '' : ' (run_monitor runs one now)'}. parse_request_snippet reads a cURL / fetch / PowerShell command${opts.readOnly ? '' : ' and save_request stores it in a collection (secrets become {{variables}})'}. Values of secrets are never returned. Read testpion_guide (or the testpion://guide resource) for the check types and the test file format before writing tests${opts.readOnly ? '' : ' (set_request_checks, write_test_file)'}; the prompts investigate_failures, write_tests, debug_request, api_health_report and import_and_test walk through the common jobs.`,
     },
   );
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: tools.map(({ name, description, inputSchema, write }) => {
+      const annotations = toolAnnotations(name, !!write);
+      return { name, title: annotations.title, description, inputSchema, annotations };
+    }),
+  }));
+  // resources: what an agent (or its user, e.g. with @ in Claude Code) can read as context without calling tools
+  const json = (uri: string, data: unknown) => ({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(data, null, 2) }] });
+  const runTool = (name: string, args: Record<string, unknown> = {}) => all.find((t) => t.name === name)!.run(args);
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: [
+      { uri: 'testpion://guide', name: 'guide', title: 'TestPion guide for agents', description: 'Which tool to use for what, variables, check types and the test file format', mimeType: 'text/markdown' },
+      { uri: 'testpion://workspace', name: 'workspace', title: `Workspace "${store.workspace.name}"`, description: 'Collections (with request counts), environments (variable names) and monitors', mimeType: 'application/json' },
+      { uri: 'testpion://attention', name: 'attention', title: 'What needs attention', description: 'Failing monitors, expiring certificates, failed runs and requests, flaky tests', mimeType: 'application/json' },
+      ...collections().map((c) => ({ uri: `testpion://collections/${encodeURIComponent(c.id)}`, name: c.name, title: `Collection "${c.name}"`, description: 'Its documentation: every request with parameters, headers, body and examples', mimeType: 'text/markdown' })),
+    ],
+  }));
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+    resourceTemplates: [
+      { uriTemplate: 'testpion://collections/{collection}', name: 'collection', title: 'A collection\'s documentation', description: 'Collection name or id', mimeType: 'text/markdown' },
+      { uriTemplate: 'testpion://collections/{collection}/requests/{request}', name: 'request', title: 'A saved request', description: 'Its method, URL, headers, body, auth type, scripts and checks (secrets masked)', mimeType: 'application/json' },
+    ],
+  }));
+  server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+    const uri = req.params.uri;
+    if (uri === 'testpion://guide') return { contents: [{ uri, mimeType: 'text/markdown', text: agentGuide({ workspace: store.workspace.name, checkTypes: checkTypes(), readOnly: opts.readOnly }) }] };
+    if (uri === 'testpion://workspace')
+      return json(uri, { workspace: store.workspace.name, collections: await runTool('list_collections'), environments: await runTool('list_environments'), monitors: await runTool('list_monitors') });
+    if (uri === 'testpion://attention') return json(uri, await runTool('what_needs_attention'));
+    const m = /^testpion:\/\/collections\/([^/]+)(?:\/requests\/([^/]+))?$/.exec(uri);
+    if (m) {
+      const collection = decodeURIComponent(m[1]!);
+      if (m[2]) return json(uri, await runTool('get_request', { collection, request: decodeURIComponent(m[2]) }));
+      return { contents: [{ uri, mimeType: 'text/markdown', text: String(await runTool('collection_docs', { collection })) }] };
+    }
+    throw new ApsError('ConfigurationError', `Unknown resource ${uri}`);
+  });
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: AGENT_PROMPTS.filter((p) => !opts.readOnly || p.name === 'investigate_failures' || p.name === 'api_health_report').map(({ name, title, description, arguments: args }) => ({ name, title, description, arguments: args })),
+  }));
+  server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+    const p = AGENT_PROMPTS.find((x) => x.name === req.params.name);
+    if (!p) throw new ApsError('ConfigurationError', `Unknown prompt ${req.params.name}. Available: ${AGENT_PROMPTS.map((x) => x.name).join(', ')}`);
+    const args = (req.params.arguments ?? {}) as Record<string, string | undefined>;
+    const missing = p.arguments.filter((x) => x.required && !args[x.name]).map((x) => x.name);
+    if (missing.length) throw new ApsError('ValidationError', `Missing: ${missing.join(', ')}`);
+    return { description: p.description, messages: [{ role: 'user', content: { type: 'text', text: p.text(args) } }] };
+  });
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const tool = tools.find((t) => t.name === req.params.name);
     if (!tool) return { isError: true, content: [{ type: 'text', text: `Unknown tool ${req.params.name}` }] };
     try {
       const out = await tool.run((req.params.arguments ?? {}) as Record<string, unknown>);
-      return { content: [{ type: 'text', text: typeof out === 'string' ? out : JSON.stringify(out, null, 2) }] };
+      if (typeof out === 'string') return { content: [{ type: 'text', text: out }] };
+      // the JSON as text for every client, and as structured content for clients that read it (a list is wrapped: structured content is an object)
+      const structured = Array.isArray(out) ? { items: out } : out && typeof out === 'object' ? (out as Record<string, unknown>) : { value: out };
+      return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], structuredContent: structured };
     } catch (e) {
       const err = normalizeError(e);
       return { isError: true, content: [{ type: 'text', text: `${err.kind}: ${err.message}${err.suggestions.length ? `\n${err.suggestions.join('\n')}` : ''}` }] };
