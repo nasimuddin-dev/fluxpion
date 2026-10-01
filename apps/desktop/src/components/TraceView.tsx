@@ -17,6 +17,14 @@ const KIND_COLORS: Record<string, string> = {
   internal: '#8c959f',
 };
 
+/** A span's colour: by kind; the phases of an HTTP request (DNS, TCP, TLS, waiting, download) get their own shades. */
+function spanColor(s: Span): string {
+  const phase = (s.attributes as { phase?: string } | undefined)?.phase;
+  if (phase === 'DNS lookup' || phase === 'TCP connect' || phase === 'TLS handshake') return 'color-mix(in oklab, #0969da 45%, transparent)';
+  if (phase === 'download') return '#2da44e';
+  return KIND_COLORS[s.kind] ?? '#888';
+}
+
 export function spanRows(trace: Trace): Array<{ span: Span; depth: number }> {
   const ids = new Set(trace.spans.map((s) => s.spanId));
   const children = new Map<string | undefined, Span[]>();
@@ -69,11 +77,11 @@ export function TraceView({ trace }: { trace: Trace }) {
                 className={cx('w-full flex items-center h-7 text-sm border-b border-line/60 text-left hover:bg-hover', sel === s.spanId && 'bg-accent/10')}
               >
                 <div className="w-[38%] shrink-0 truncate flex items-center gap-1.5" style={{ paddingLeft: 8 + depth * 14 }}>
-                  <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: KIND_COLORS[s.kind] ?? '#888' }} />
+                  <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: spanColor(s) }} />
                   <span className={cx('truncate', s.status === 'error' && 'text-bad')}>{s.name}</span>
                 </div>
                 <div className="flex-1 relative h-full mr-3">
-                  <div className="absolute top-1.5 h-4 rounded-sm opacity-80" style={{ left: `${left}%`, width: `${width}%`, background: s.status === 'error' ? 'var(--bad)' : KIND_COLORS[s.kind] ?? '#888' }} />
+                  <div className="absolute top-1.5 h-4 rounded-sm opacity-80" style={{ left: `${left}%`, width: `${width}%`, background: s.status === 'error' ? 'var(--bad)' : spanColor(s) }} />
                   <span className="absolute top-1 text-[0.72rem] text-muted tabular-nums" style={{ left: `min(${left + width}% + 4px, calc(100% - 60px))` }}>
                     {formatMs(s.durationMs)}
                   </span>
