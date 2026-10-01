@@ -1,4 +1,4 @@
-import { ArchiveRestore, ArrowLeftRight, Check, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Save, ScanSearch, Trash2 } from 'lucide-react';
+import { ArchiveRestore, ArrowLeftRight, Check, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Pencil, Save, ScanSearch, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
@@ -10,7 +10,7 @@ import { EnvCompare } from '../components/EnvCompare';
 import { EnvMatrix } from '../components/EnvMatrix';
 import { TrashDialog } from '../components/TrashDialog';
 import { Badge, Button, cx, Empty, Field, Input, Menu, MoreMenu, Split, Tabs, Toggle } from '../components/ui';
-import { CountPill, RowMenu, TreeHeader } from '../components/TreeParts';
+import { CountPill, focusRow, InlineRename, RowMenu, TreeHeader } from '../components/TreeParts';
 
 export function EnvironmentsView() {
   const ws = useApp((s) => s.workspace);
@@ -50,6 +50,24 @@ export function EnvironmentsView() {
     await useApp.getState().refreshWorkspace();
   };
   const [menuFor, setMenuFor] = useState<string>();
+  /** The environment being renamed in place (F2, or Rename in its menu). */
+  const [renamingEnv, setRenamingEnv] = useState<string>();
+  /** Rename from the list: the active environment (chosen by name) stays active, and the open one keeps its unsaved edits. */
+  const renameEnv = async (env: Environment, name?: string) => {
+    setRenamingEnv(undefined);
+    focusRow(env.id);
+    if (!name) return;
+    try {
+      reordering.current = true;
+      await call('env.save', { env: { ...env, name } });
+      await load();
+      if (activeEnv === env.name) useApp.getState().setEnvironment(name);
+      await useApp.getState().refreshWorkspace();
+    } catch (e) {
+      reordering.current = false;
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
   // variables of the open environment that nothing reads (refreshed when it is opened or saved)
   const [unused, setUnused] = useState<string[]>([]);
   const refreshUnused = (env?: string) => void (env ? call<string[]>('vars.unused', { environment: env }).then(setUnused, () => setUnused([])) : setUnused([]));
@@ -96,7 +114,8 @@ export function EnvironmentsView() {
     const e = envs.find((x) => x.id === sel);
     if (reordering.current) {
       reordering.current = false;
-      if (e) setDraft((d) => (d?.id === e.id ? { ...d, order: e.order } : e));
+      // a reorder or a rename from the list: keep the open environment's unsaved edits
+      if (e) setDraft((d) => (d?.id === e.id ? { ...d, order: e.order, name: e.name } : e));
       return;
     }
     setDraft(e);
@@ -163,7 +182,7 @@ export function EnvironmentsView() {
               {envs.map((e, i) => (
                 <div
                   key={e.id}
-                  draggable
+                  draggable={renamingEnv !== e.id}
                   onContextMenu={(ev) => {
                     ev.preventDefault();
                     setMenuFor(e.id);
@@ -191,15 +210,32 @@ export function EnvironmentsView() {
                     dropAt === i && 'shadow-[inset_0_2px_0_var(--accent)]',
                   )}
                 >
+                  {renamingEnv === e.id ? (
+                    <div className="flex-1 min-w-0 flex items-center gap-2 text-sm">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: e.color ?? (e.isProduction ? 'var(--bad)' : 'var(--ok)') }} />
+                      <InlineRename
+                        value={e.name}
+                        label="Environment name"
+                        validate={(name) => (envs.some((x) => x.id !== e.id && x.name.toLowerCase() === name.toLowerCase()) ? 'Another environment has this name' : undefined)}
+                        onCommit={(name) => void renameEnv(e, name)}
+                        onCancel={() => void renameEnv(e)}
+                      />
+                    </div>
+                  ) : (
                   <button
                     className="flex-1 min-w-0 flex items-center gap-2 text-left text-sm"
-                    title="Drag (or Alt+↑/↓) to reorder"
+                    title="Drag (or Alt+↑/↓) to reorder · F2 renames"
                     data-tree-row
+                    data-rename-id={e.id}
                     onClick={() => {
                       setSel(e.id);
                       useApp.getState().markPlace('environments', { environmentId: e.id });
                     }}
                     onKeyDown={(ev) => {
+                      if (ev.key === 'F2') {
+                        ev.preventDefault();
+                        return setRenamingEnv(e.id);
+                      }
                       if (!ev.altKey || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
                       ev.preventDefault();
                       void move(e.id, ev.key === 'ArrowUp' ? i - 1 : i + 1);
@@ -210,13 +246,15 @@ export function EnvironmentsView() {
                     {e.isProduction && <Badge tone="bad">prod</Badge>}
                     <span className="ml-auto"><CountPill n={e.variables.length} /></span>
                   </button>
+                  )}
                   <RowMenu
                     label={e.name}
                     open={menuFor === e.id}
                     onOpenChange={(o) => setMenuFor(o ? e.id : undefined)}
                     items={[
                       { label: 'Make active', icon: <Check size={14} />, disabled: activeEnv === e.name, onSelect: () => void useApp.getState().setEnvironment(e.name) },
-                      { label: 'Duplicate', icon: <Copy size={14} />, separator: true, onSelect: () => void duplicateEnv(e) },
+                      { label: 'Rename', icon: <Pencil size={14} />, separator: true, onSelect: () => setRenamingEnv(e.id) },
+                      { label: 'Duplicate', icon: <Copy size={14} />, onSelect: () => void duplicateEnv(e) },
                       { label: 'Delete', icon: <Trash2 size={14} />, danger: true, separator: true, onSelect: () => void deleteEnv(e) },
                     ]}
                   />
