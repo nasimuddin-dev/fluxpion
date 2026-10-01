@@ -327,6 +327,7 @@ async function runGraphQL(test: GraphQLTest, scope: VariableScope, svc: ExecServ
     const out = await executeGraphQL({ ...r, auth }, { signal, redactor: svc.redactor, maxPreviewBytes: svc.maxPreviewBytes ?? 1024 * 1024, cookieJar: svc.cookieJar });
     svc.onHttpResponse?.({ testId: test.id ?? test.name, status: out.response.status, statusText: out.response.statusText ?? '', headers: out.response.headers, body: out.response.bodyPreview, durationMs: out.response.durationMs, url: out.prepared.url, timing: timingSummary(out.response) });
     if (out.response.connection?.certificate) svc.onCertificate?.(out.prepared.url, out.response.connection.certificate);
+    timingSpans(s, out.response.timeline);
     s.setAttributes({ endpoint: svc.redactor.redactUrl(r.endpoint), status: out.response.status, operationType: out.operationType, errors: out.errors?.length ?? 0 });
     s.end({ status: out.errors?.length || out.response.status >= 400 ? 'error' : 'ok', output: summarize(out.response.json ?? out.response.bodyPreview, 16_000) });
     return {

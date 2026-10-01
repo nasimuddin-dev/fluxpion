@@ -856,7 +856,9 @@ export class Backend {
         if (out.request) request = { ...request, endpoint: out.request.url, headers: out.request.headers };
       }
       const spec = ctx.vars.resolveDeep(request);
+      const sentAt = Date.now();
       const r = await executeGraphQL(spec, { signal: ctrl.signal, redactor: ctx.redactor, maxPreviewBytes: this.settings.maxPreviewBytes, payloadDir: this.ws.path('payloads'), cookieJar: ctx.services.cookieJar });
+      timingSpans(span, r.response.timeline, sentAt);
       span.end({ status: r.errors?.length ? 'error' : 'ok', output: r.response.json });
       const checks = await runChecks(ctx.vars.resolveDeep(p.assertions ?? []), {
         testType: 'graphql',
