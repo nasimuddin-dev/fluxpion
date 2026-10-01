@@ -29,7 +29,7 @@ testpion lint "My API" -w . --fail-on high     # exit 1 when there is a high fin
 testpion lint api.postman_collection.json --json
 ```
 
-AI agents use the MCP tool `security_review`. Values are never printed or returned.
+It also flags HTTPS hosts of the collection whose TLS certificate (as recorded when their responses came back) expires within 30 days, or has expired. AI agents use the MCP tool `security_review`. Values are never printed or returned.
 
 ## Security headers of a response
 

@@ -37,7 +37,7 @@ import { fetchImportText } from '../import/fetch-url.js';
 import { diffOpenApi } from '../openapi/diff.js';
 import { workspaceApiCoverage } from '../openapi/coverage.js';
 import { evaluationTests, findSavedEvaluation, listSavedEvaluations } from '../runner/saved-evaluations.js';
-import { securityLint, variableFlow } from '../eval/security.js';
+import { certificateLint, securityLint, variableFlow } from '../eval/security.js';
 import { collectSubscriptionEvents } from '../protocols/graphql/subscription.js';
 import { introspect } from '../protocols/graphql/graphql.js';
 import { buildGraphQLOperation } from '../protocols/graphql/operation-builder.js';
@@ -658,7 +658,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         const c = findCollection(a.collection);
         const ctx = createEngineContext({ store, secrets, settings, environment: checkEnvironment(a.environment), collectionId: c.id });
         try {
-          return [...securityLint(c, settings.redactFields), ...variableFlow(c, Object.keys(ctx.vars.toObject()))];
+          return [...securityLint(c, settings.redactFields), ...certificateLint(c, (u) => ctx.vars.resolve(u), listCertificates(store)), ...variableFlow(c, Object.keys(ctx.vars.toObject()))];
         } finally {
           await ctx.dispose();
         }

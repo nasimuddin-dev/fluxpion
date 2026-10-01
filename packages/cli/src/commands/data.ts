@@ -54,6 +54,7 @@ import {
   workspaceStorage,
   deleteRunsBefore,
   listCertificates,
+  certificateLint,
   testHistory,
   summarizeTestHistory,
 } from '@testpion/core';
@@ -73,16 +74,18 @@ export function registerDataCommands(program: Command): void {
       const settings = new WorkspaceManager().loadSettings();
       // variables: those of the environment, collection, workspace and globals count as defined
       let known: string[] = [];
+      let certs: ReturnType<typeof certificateLint> = [];
       try {
         const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
         const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings, environment: o.environment });
         known = Object.keys(ctx.vars.toObject());
+        certs = certificateLint(c, (u) => ctx.vars.resolve(u), listCertificates(store));
         await ctx.dispose();
         store.close();
       } catch {
         /* a collection file outside a workspace: only its own variables */
       }
-      const findings = [...securityLint(c, settings.redactFields), ...variableFlow(c, known)];
+      const findings = [...securityLint(c, settings.redactFields), ...certs, ...variableFlow(c, known)];
       if (o.json) console.log(JSON.stringify(findings, null, 2));
       else if (!findings.length) console.log(green(`No findings in "${c.name}".`));
       else {

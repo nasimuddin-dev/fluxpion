@@ -124,6 +124,40 @@ function literalSecrets(auth: AuthConfig | undefined): string[] {
   return out;
 }
 
+/**
+ * Certificates of the collection's HTTPS hosts (as recorded when responses came back) that expire within 30 days:
+ * one finding per host, high under 7 days. `resolve` turns a request URL with {{variables}} into a real one.
+ */
+export function certificateLint(collection: Collection, resolve: (url: string) => string, certs: Array<{ host: string; daysLeft?: number; validTo?: string; issuer?: string }>): SecurityFinding[] {
+  const byHost = new Map(certs.map((c) => [c.host, c]));
+  const seen = new Set<string>();
+  const out: SecurityFinding[] = [];
+  for (const ref of collectionRequests(collection)) {
+    if (ref.node.kind !== 'http') continue;
+    let host: string;
+    try {
+      const u = new URL(resolve(ref.node.request.url));
+      if (u.protocol !== 'https:') continue;
+      host = u.host;
+    } catch {
+      continue;
+    }
+    if (seen.has(host)) continue;
+    seen.add(host);
+    const c = byHost.get(host);
+    if (!c || c.daysLeft === undefined || c.daysLeft >= 30) continue;
+    const when = c.validTo ? ` (${c.validTo.slice(0, 10)})` : '';
+    out.push({
+      category: 'security',
+      severity: c.daysLeft < 7 ? 'high' : 'medium',
+      where: [collection.name, ...ref.path, ref.name].join(' › '),
+      message: c.daysLeft < 0 ? `The TLS certificate of ${host} has expired${when}` : `The TLS certificate of ${host} expires in ${c.daysLeft} day${c.daysLeft === 1 ? '' : 's'}${when}: renew it before clients start failing`,
+      requestId: ref.id,
+    });
+  }
+  return out;
+}
+
 /** Security findings in a collection's request definitions, most severe first. */
 export function securityLint(collection: Collection, redactFields?: string[]): SecurityFinding[] {
   const red = new Redactor(redactFields);

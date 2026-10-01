@@ -16,6 +16,8 @@ import {
   workspaceApiCoverage,
   apiCoverageMarkdown,
   securityLint,
+  certificateLint,
+  listCertificates,
   variableFlow,
   startRecorder,
   recordingToCollection,
@@ -157,7 +159,7 @@ export function collectionsHandlers(be: Backend): Handlers {
       // variables the requests use that the environment, collection, workspace and globals don't define
       const ctx = be.context({ environment, collectionId: id });
       try {
-        return [...securityLint(c, be.settings.redactFields), ...variableFlow(c, Object.keys(ctx.vars.toObject()))];
+        return [...securityLint(c, be.settings.redactFields), ...certificateLint(c, (u) => ctx.vars.resolve(u), listCertificates(be.ws)), ...variableFlow(c, Object.keys(ctx.vars.toObject()))];
       } finally {
         void ctx.dispose();
       }
