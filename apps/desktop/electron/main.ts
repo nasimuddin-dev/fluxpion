@@ -174,6 +174,8 @@ function start(): void {
     examplesDir: app.isPackaged ? join(process.resourcesPath, 'examples', 'public-workspace') : join(__dirname, '..', '..', '..', 'examples', 'public-workspace'),
     openExternal: (url) => shell.openExternal(url),
     openPath: (p) => shell.openPath(p),
+    // agents start this app with --mcp-server (from source: electron plus the app folder)
+    mcpCommand: app.isPackaged ? { command: process.execPath, args: [] } : { command: process.execPath, args: [app.getAppPath()] },
     saveDialog: async (opts) => (win ? (await dialog.showSaveDialog(win, opts)).filePath || undefined : undefined),
     openDialog: async (opts) => {
       if (!win) return undefined;

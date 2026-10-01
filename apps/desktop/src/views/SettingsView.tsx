@@ -1,4 +1,5 @@
 import { StoragePanel } from '../components/StoragePanel';
+import { AgentsPanel } from '../components/AgentsPanel';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call } from '../api';
@@ -9,7 +10,7 @@ import type { AppSettings, PriceEntry, ProviderConfig } from '../types';
 import { checkForUpdates } from '../updates';
 import { Badge, Button, Field, IconButton, Input, Select, Tabs, Toggle } from '../components/ui';
 
-type Tab = 'appearance' | 'requests' | 'proxy' | 'certificates' | 'privacy' | 'pricing' | 'load' | 'storage' | 'assistant' | 'about';
+type Tab = 'appearance' | 'requests' | 'proxy' | 'certificates' | 'privacy' | 'pricing' | 'load' | 'storage' | 'assistant' | 'about' | 'agents';
 
 export function SettingsView() {
   const settings = useApp((s) => s.settings);
@@ -50,10 +51,11 @@ export function SettingsView() {
           { id: 'load', label: 'Load testing' },
           { id: 'storage', label: 'Storage' },
           { id: 'assistant', label: 'AI assistant' },
+          { id: 'agents', label: 'AI agents (MCP)' },
           { id: 'about', label: 'About' },
         ]}
         right={
-          tab !== 'storage' && (
+          tab !== 'storage' && tab !== 'agents' && (
             <Button size="sm" variant="primary" icon={<Save size={12} />} onClick={save}>
               Save settings
             </Button>
@@ -176,6 +178,7 @@ export function SettingsView() {
             </>
           )}
           {tab === 'storage' && <StoragePanel />}
+          {tab === 'agents' && <AgentsPanel />}
           {tab === 'load' && (
             <>
               <Toggle checked={s.loadTesting.allowRemoteHosts} onChange={(allowRemoteHosts) => set({ loadTesting: { ...s.loadTesting, allowRemoteHosts } })} label="Allow load tests against remote (non-local) hosts by default" />

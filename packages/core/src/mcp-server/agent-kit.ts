@@ -234,3 +234,35 @@ ${a.source}
 If it is an OpenAPI link or document, use import_definition and then api_coverage. If it is a command, use parse_request_snippet, then save_request into "${a.collection || 'Imported'}" (create it if needed; secrets become {{variables}}: tell the user which ones to set). Send it with send_request, then add checks with set_request_checks and confirm they pass.`,
   },
 ];
+
+const AGENTS_START = '<!-- testpion:start (written by TestPion; edit outside these markers) -->';
+const AGENTS_END = '<!-- testpion:end -->';
+
+/**
+ * The TestPion part of a workspace's AGENTS.md (the file coding agents such as Claude Code, Codex, Cursor and
+ * Copilot read first in a folder): how to reach the workspace (MCP, CLI) and the guide. `connect` is the command
+ * that serves the workspace over MCP, as the app shows it.
+ */
+export function agentsMarkdown(o: { workspace: string; checkTypes: string[]; connect?: string }): string {
+  const guide = agentGuide({ workspace: o.workspace, checkTypes: o.checkTypes }).replace(/^# TestPion for AI agents\n/, '');
+  return `${AGENTS_START}
+# TestPion workspace
+
+This folder is a TestPion workspace: collections/ (saved requests), environments/ (variables; secret values are not in these files), tests/ (YAML test files), specs/ (OpenAPI), mocks/, datasets/. Prefer the TestPion tools to editing these JSON files by hand: they keep ids, secrets and references right.
+
+## Use it
+
+- **MCP** (best for agents): ${o.connect ? `\`${o.connect}\`` : '`testpion mcp-server -w .`'} serves this workspace as MCP tools, resources and prompts. Start with \`what_needs_attention\` or the \`testpion_guide\` tool.
+- **CLI**: \`testpion test tests/\` runs the test files and \`testpion run-collection "<name>"\` a collection (\`-r json\` writes report.json); \`testpion send <url> --json\` sends one request; listing commands (\`collections\`, \`requests\`, \`history\` …) take \`--json\`.
+${guide}${AGENTS_END}
+`;
+}
+
+/** AGENTS.md with the TestPion part added or replaced; what the user wrote around it stays as it is. */
+export function upsertAgentsMarkdown(existing: string | undefined, block: string): string {
+  if (!existing?.trim()) return block;
+  const a = existing.indexOf(AGENTS_START);
+  const b = existing.indexOf(AGENTS_END);
+  if (a >= 0 && b > a) return existing.slice(0, a) + block.trimEnd() + existing.slice(b + AGENTS_END.length);
+  return `${existing.trimEnd()}\n\n${block}`;
+}

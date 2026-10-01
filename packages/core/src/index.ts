@@ -94,6 +94,7 @@ export * from './runner/test-from.js';
 export * from './mock/mock-server.js';
 export * from './mock/graphql-mock.js';
 export * from './mcp-server/testpion-mcp.js';
+export { agentGuide, agentsMarkdown, upsertAgentsMarkdown, AGENT_PROMPTS } from './mcp-server/agent-kit.js';
 export * from './mcp-server/mcp-mock.js';
 
 export * from './storage/fsutil.js';
