@@ -355,3 +355,8 @@ export function treeKeys(e: React.KeyboardEvent<HTMLElement>): void {
     row.click();
   }
 }
+
+/** The kind of a row (gRPC, WS, MQTT, MCP, API …), in the same small badge as a request's method; colours match the editor tabs. */
+export function KindBadge({ text, cls }: { text: string; cls: string }) {
+  return <span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', cls)}>{text}</span>;
+}

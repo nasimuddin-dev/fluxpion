@@ -125,7 +125,8 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange, className, right }: { tabs: Array<{ id: NoInfer<T>; label: ReactNode; badge?: ReactNode }>; value: T; onChange(v: NoInfer<T>): void; className?: string; right?: ReactNode }) {
+/** A tab strip. A tab with `onClose` has a × (and middle-click closes it), like the request tabs; `title` names it in full. */
+export function Tabs<T extends string>({ tabs, value, onChange, className, right }: { tabs: Array<{ id: NoInfer<T>; label: ReactNode; badge?: ReactNode; title?: string; onClose?(): void }>; value: T; onChange(v: NoInfer<T>): void; className?: string; right?: ReactNode }) {
   // tabs that don't fit (a narrow pane, side by side) stay reachable: » lists them, the wheel scrolls, the chosen one is in view
   const listRef = useRef<HTMLDivElement>(null);
   const [hiddenTabs, setHiddenTabs] = useState<string[]>([]);
@@ -161,9 +162,13 @@ export function Tabs<T extends string>({ tabs, value, onChange, className, right
           role="tab"
           data-tab-id={t.id}
           aria-selected={value === t.id}
+          title={t.title}
           onClick={() => onChange(t.id)}
+          onAuxClick={(e) => {
+            if (e.button === 1 && t.onClose) (e.preventDefault(), t.onClose());
+          }}
           className={cx(
-            'relative px-2.5 h-10 text-sm whitespace-nowrap flex items-center gap-1.5 transition-colors duration-150',
+            'group relative px-2.5 h-10 text-sm whitespace-nowrap flex items-center gap-1.5 transition-colors duration-150',
             'after:absolute after:left-2 after:right-2 after:bottom-0 after:h-0.5 after:rounded-full after:transition-colors after:duration-200',
             value === t.id ? 'text-fg font-medium after:bg-[image:var(--brand-gradient)]' : 'text-muted hover:text-fg after:bg-transparent hover:after:bg-line-strong',
           )}
@@ -171,6 +176,16 @@ export function Tabs<T extends string>({ tabs, value, onChange, className, right
           {t.label}
           {t.badge !== undefined && t.badge !== null && t.badge !== 0 && (
             <span className={cx('text-[0.7rem] leading-4 px-1.5 rounded-full tabular-nums', value === t.id ? 'bg-accent-soft text-accent' : 'bg-panel2 text-muted')}>{t.badge}</span>
+          )}
+          {t.onClose && (
+            <span
+              role="button"
+              aria-label={`Close ${t.title ?? (typeof t.label === 'string' ? t.label : t.id)}`}
+              className={cx('shrink-0 rounded p-0.5 -mr-1 hover:text-fg hover:bg-hover', value === t.id ? 'opacity-60' : 'opacity-0 group-hover:opacity-100')}
+              onClick={(e) => (e.stopPropagation(), t.onClose!())}
+            >
+              <X size={12} />
+            </span>
           )}
         </button>
       ))}

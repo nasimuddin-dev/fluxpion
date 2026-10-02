@@ -12,7 +12,7 @@ import { refreshCollections, useCollections } from '../lib/collections-store';
 import { ImportModal } from '../views/rest/dialogs';
 import { isDocView, useDocs } from '../lib/docs';
 import { Button, cx, IconButton, Input, Menu, menuKeys, type MenuItem } from './ui';
-import { askFolderName, focusRow, folderMenuItems, InlineRename, moveToFolderItem, RowMenu, TreeFolderRow, treeKeys } from './TreeParts';
+import { askFolderName, focusRow, folderMenuItems, InlineRename, KindBadge, moveToFolderItem, RowMenu, TreeFolderRow, treeKeys } from './TreeParts';
 
 /**
  * The Collections explorer: the one sidebar of the request editors. The workspace lists its collections;
@@ -276,11 +276,6 @@ function useExplorerWidth() {
     </div>
   );
   return { width, handle };
-}
-
-/** The kind of a row (gRPC, WS, MQTT, MCP, API …), in the same small badge as a request's method; colours match the editor tabs. */
-function KindBadge({ text, cls }: { text: string; cls: string }) {
-  return <span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', cls)}>{text}</span>;
 }
 
 export function Explorer() {

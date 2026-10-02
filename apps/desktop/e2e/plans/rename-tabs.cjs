@@ -31,6 +31,6 @@ module.exports = withExpect(steps, {
   'menu-back': /tree: GETGET with query parameters/,
   esc: (r) => (!/NOPE/.test(r) && /GETMy HTTP/.test(r)) || 'Esc should keep the name',
   'ws-saved': /WSEcho X -> WSPostman echo/,
-  'mcp-saved': /Weather Xmock -> Weather \(offline mock\)/,
+  'mcp-saved': /Weather Xmock -> MCPWeather \(offline mock\)/,
   'graphql-new': /GQLMy GQL/,
 });

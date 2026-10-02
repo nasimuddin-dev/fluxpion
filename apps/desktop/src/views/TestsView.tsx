@@ -1,5 +1,5 @@
 import { BarChart3, ChevronDown, ChevronRight, CopyPlus, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Pencil, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSaveShortcut } from '../hooks';
@@ -9,7 +9,7 @@ import { CodeEditor } from '../components/CodeEditor';
 import { RunMiniBar, RunsOverview, type RunRow } from '../components/RunsOverview';
 import { RunPanel } from '../components/RunPanel';
 import { SidebarShell } from '../components/SidebarShell';
-import { RowMenu, TreeHeader, treeKeys } from '../components/TreeParts';
+import { KindBadge, RowMenu, TreeHeader, treeKeys } from '../components/TreeParts';
 import { EnvironmentsPane } from '../components/SidebarPanes';
 import { finishSave, type SaveResult } from '../lib/files';
 import { Badge, Button, cx, Empty, IconButton, Input, rowActionClass, SectionTitle, Split, Tabs, type MenuItem } from '../components/ui';
@@ -130,9 +130,12 @@ export function TestsView() {
   const filterTree = (nodes: Node[]): Node[] =>
     !tf ? nodes : nodes.flatMap((n) => (n.kind === 'dir' ? ((c) => (c.length ? [{ ...n, children: c }] : []))(filterTree(n.children ?? [])) : n.path.toLowerCase().includes(tf) ? [n] : []));
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // every file opens in its own tab (like requests): `file` is the one on screen, the others keep their edits here
   const [file, setFile] = useState<string>();
   const [content, setContent] = useState('');
   const [saved, setSaved] = useState('');
+  const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const buffers = useRef<Record<string, { content: string; saved: string }>>({});
   const [preview, setPreview] = useState<{ tests: Array<{ id?: string; name: string; type: string; tags?: string[] }>; suite?: { name: string; tests: string[] } } | { error: string }>();
   const [runId, setRunId] = useState<string>();
   const [runs, setRuns] = useState<RunRow[]>([]);
@@ -154,14 +157,57 @@ export function TestsView() {
     void loadRuns();
   }, [loadTree, loadRuns]);
 
-  const openFile = async (path: string) => {
-    if (content !== saved && file && !(await confirmAction({ title: 'Unsaved changes', message: `tests/${file} has unsaved changes.`, detail: 'Open the other file and discard them? Save with Ctrl+S to keep them.', confirmLabel: 'Discard changes', danger: true }))) return;
-    const text = await call<string>('tests.read', { path });
+  /** Show an open file's tab (the one on screen keeps its edits for when it comes back). */
+  const show = (path: string | undefined) => {
+    if (file && file !== path && openFilesRef.current.includes(file)) buffers.current[file] = { content, saved };
+    const b = path ? buffers.current[path] : undefined;
     setFile(path);
-    setContent(text);
-    setSaved(text);
+    setContent(b?.content ?? '');
+    setSaved(b?.saved ?? '');
     setTab('editor');
-    call('tests.preview', { path }).then(setPreview, (e) => setPreview({ error: asError(e).message }));
+    if (path) call('tests.preview', { path }).then(setPreview, (e) => setPreview({ error: asError(e).message }));
+    else setPreview(undefined);
+  };
+  const openFilesRef = useRef(openFiles);
+  openFilesRef.current = openFiles;
+  const openFile = async (path: string) => {
+    if (openFilesRef.current.includes(path)) return path === file ? setTab('editor') : show(path);
+    const text = await call<string>('tests.read', { path });
+    if (file) buffers.current[file] = { content, saved };
+    buffers.current[path] = { content: text, saved: text };
+    setOpenFiles((o) => (o.includes(path) ? o : [...o, path]));
+    openFilesRef.current = [...openFilesRef.current, path];
+    show(path);
+  };
+  /** Close a file's tab (asks first when it has unsaved changes); the next tab comes on screen. */
+  const closeFile = async (path: string, ask = true) => {
+    const b = path === file ? { content, saved } : buffers.current[path];
+    if (ask && b && b.content !== b.saved && !(await confirmAction({ title: 'Unsaved changes', message: `tests/${path} has unsaved changes.`, detail: 'Close it and discard them? Save with Ctrl+S to keep them.', confirmLabel: 'Discard changes', danger: true }))) return;
+    const i = openFilesRef.current.indexOf(path);
+    const rest = openFilesRef.current.filter((p) => p !== path);
+    delete buffers.current[path];
+    setOpenFiles(rest);
+    openFilesRef.current = rest;
+    if (path === file) {
+      setFile(undefined);
+      const next = rest[Math.min(i, rest.length - 1)];
+      const nb = next ? buffers.current[next] : undefined;
+      setFile(next);
+      setContent(nb?.content ?? '');
+      setSaved(nb?.saved ?? '');
+      if (next) call('tests.preview', { path: next }).then(setPreview, (e) => setPreview({ error: asError(e).message }));
+      else setPreview(undefined);
+    }
+  };
+  /** A file was renamed or moved: its tab follows. */
+  const renameOpen = (from: string, to: string) => {
+    if (!openFilesRef.current.includes(from)) return;
+    if (buffers.current[from]) buffers.current[to] = buffers.current[from]!;
+    delete buffers.current[from];
+    const next = openFilesRef.current.map((p) => (p === from ? to : p));
+    setOpenFiles(next);
+    openFilesRef.current = next;
+    if (file === from) setFile(to);
   };
   const save = async () => {
     if (!file) return;
@@ -221,9 +267,7 @@ export function TestsView() {
     try {
       await call('tests.write', { path: to, content: await call<string>('tests.read', { path }) });
       await call('tests.delete', { path });
-      if (file === path) {
-        setFile(to);
-      }
+      renameOpen(path, to);
       await loadTree();
     } catch (e) {
       useApp.getState().toast(asError(e).message, 'error');
@@ -238,11 +282,7 @@ export function TestsView() {
     const dir = n.kind === 'dir';
     if (!(await confirmAction({ title: dir ? 'Delete folder' : 'Delete test file', message: `Delete tests/${n.path}${dir ? ' and every file in it' : ''}?`, confirmLabel: 'Delete', danger: true }))) return;
     await call('tests.delete', { path: n.path });
-    if (file && (file === n.path || file.startsWith(`${n.path}/`))) {
-      setFile(undefined);
-      setContent('');
-      setSaved('');
-    }
+    for (const p of openFilesRef.current.filter((p) => p === n.path || p.startsWith(`${n.path}/`))) await closeFile(p, false);
     await loadTree();
   };
   const nodeMenu = (n: Node): MenuItem[] =>
@@ -280,7 +320,7 @@ export function TestsView() {
           depth={depth}
           label={n.name}
           active={file === n.path}
-          icon={n.name.includes('.suite.') ? <Layers size={13} className="text-judge shrink-0" /> : <FileCode2 size={13} className="text-muted shrink-0" />}
+          icon={<TestFileBadge path={n.path} />}
           onClick={() => void openFile(n.path)}
           onRun={/\.(ya?ml|json)$/.test(n.name) ? () => void run([n.path], n.path) : undefined}
           menu={nodeMenu(n)}
@@ -364,11 +404,27 @@ export function TestsView() {
         ]}
       />
       <div className="h-full flex flex-col min-w-0">
-        <Tabs
-          value={tab}
-          onChange={setTab}
+        <Tabs<string>
+          value={tab === 'run' ? 'run' : file ? `file:${file}` : 'editor'}
+          onChange={(id) => (id === 'run' ? setTab('run') : id === 'editor' ? setTab('editor') : show(id.slice(5)))}
           tabs={[
-            { id: 'editor', label: file ?? 'Editor' },
+            ...(openFiles.length
+              ? openFiles.map((p) => {
+                  const dirty = p === file ? content !== saved : buffers.current[p] ? buffers.current[p]!.content !== buffers.current[p]!.saved : false;
+                  return {
+                    id: `file:${p}`,
+                    title: `tests/${p}`,
+                    label: (
+                      <span className="flex items-center gap-1.5">
+                        <TestFileBadge path={p} />
+                        {p.split('/').pop()}
+                        {dirty && <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-label="unsaved changes" />}
+                      </span>
+                    ),
+                    onClose: () => void closeFile(p),
+                  };
+                })
+              : [{ id: 'editor', label: 'Editor' }]),
             { id: 'run', label: 'Runs', badge: runs.length },
           ]}
           right={
@@ -386,7 +442,7 @@ export function TestsView() {
                   onClick={async () => {
                     if (!(await confirmAction({ title: 'Delete test file', message: `Delete tests/${file}?`, detail: 'This cannot be undone (unless the workspace is in git).', confirmLabel: 'Delete file', danger: true }))) return;
                     await call('tests.delete', { path: file });
-                    setFile(undefined);
+                    await closeFile(file, false);
                     void loadTree();
                   }}
                 >
@@ -519,6 +575,27 @@ function RunList({ runs, active, onSelect, onOverview }: { runs: RunRow[]; activ
       </div>
     </div>
   );
+}
+
+/** What a test file holds, in the same badge as the explorer's rows: from its folder (rest/ → HTTP …), else its format. */
+const TEST_KINDS: Record<string, [string, string]> = {
+  rest: ['HTTP', 'text-ok'],
+  http: ['HTTP', 'text-ok'],
+  soap: ['SOAP', 'text-[#0ea5e9]'],
+  graphql: ['GQL', 'text-[#e535ab]'],
+  grpc: ['gRPC', 'text-[#2ea99e]'],
+  websocket: ['WS', 'text-[#d97706]'],
+  mqtt: ['MQTT', 'text-[#d97706]'],
+  mcp: ['MCP', 'text-accent'],
+  ai: ['AI', 'text-judge'],
+  llm: ['AI', 'text-judge'],
+  agent: ['AGT', 'text-judge'],
+};
+function TestFileBadge({ path }: { path: string }) {
+  if (/\.suite\.ya?ml$/i.test(path)) return <KindBadge text="SUITE" cls="text-judge" />;
+  const kind = TEST_KINDS[path.split('/')[0]!.toLowerCase()];
+  if (kind && path.includes('/')) return <KindBadge text={kind[0]} cls={kind[1]} />;
+  return <KindBadge text={/\.json$/i.test(path) ? 'JSON' : /\.csv$/i.test(path) ? 'CSV' : 'YAML'} cls="text-muted" />;
 }
 
 /** A row of the test file tree, like the collection tree's: folder (chevron) or file, ▶ run and ⋯ (also on right-click). */

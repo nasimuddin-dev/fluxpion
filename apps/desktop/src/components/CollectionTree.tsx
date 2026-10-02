@@ -392,9 +392,14 @@ export function CollectionTree({
   }, [collapseAll]);
   // reveal the open request: scroll its row into view when it changes (a tab, search or history opened it)
   const treeRef = useRef<HTMLDivElement>(null);
+  const lastReveal = useRef(revealKey);
   useEffect(() => {
     if (!activeRequestId) return;
-    // open its collection, category and folders (even ones folded by hand), then scroll to it
+    // something was opened (search, history, a link): open its collection, category and folders, even ones folded
+    // by hand. Switching or closing tabs only scrolls to the row when it shows: what the user folded stays folded.
+    const opened = revealKey !== lastReveal.current;
+    lastReveal.current = revealKey;
+    if (opened)
     for (const c of collections) {
       const folders = folderIdsTo(c.items, activeRequestId);
       if (!folders) continue;
