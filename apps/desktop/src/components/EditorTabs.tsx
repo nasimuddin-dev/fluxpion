@@ -366,12 +366,23 @@ export function EditorTabStrip() {
   const stripRef = useRef<HTMLDivElement>(null);
   // keep the active tab in view (scrolling only the strip: scrollIntoView could shift the whole window)
   useEffect(() => {
-    const strip = stripRef.current;
-    const el = strip?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (!strip || !el) return;
-    if (el.offsetLeft < strip.scrollLeft) strip.scrollLeft = el.offsetLeft;
-    else if (el.offsetLeft + el.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = el.offsetLeft + el.offsetWidth - strip.clientWidth;
-  }, [activeKey, view]);
+    const reveal = () => {
+      const strip = stripRef.current;
+      const el = strip?.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (!strip || !el) return;
+      // measured on screen: offsetLeft counts from the nearest positioned ancestor, not the strip, so it overshot and
+      // left the active tab half hidden at the left edge
+      const s = strip.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      if (r.left < s.left) strip.scrollLeft -= s.left - r.left;
+      else if (r.right > s.right) strip.scrollLeft += Math.min(r.right - s.right, r.left - s.left);
+    };
+    reveal();
+    // a tab just opened is drawn a moment later (its editor publishes it): look again then
+    const id = requestAnimationFrame(reveal);
+    const t = setTimeout(reveal, 150);
+    return () => (cancelAnimationFrame(id), clearTimeout(t));
+  }, [activeKey, view, tabs.length]);
   const select = (t: EditorTab) => {
     if (useApp.getState().view !== t.view) useApp.getState().setView(t.view);
     t.onSelect?.();
