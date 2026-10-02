@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.40.0 — 2026-10-01
+
+### AI assistant
+- **A conversation.** Follow-up questions remember what was asked and answered; **New conversation** starts over.
+- **It knows what you're looking at.** A question asked with a request open (HTTP, GraphQL, gRPC, WebSocket/MQTT or an MCP server) carries it and its latest result, shown above the field and removable. Secrets are hidden before anything is sent.
+- **Ctrl/⌘+J** opens it (press again, or Esc, to close). Before you type, it suggests questions that fit the screen, such as *Why did this request fail?*
+- **Answers stream in**, **Stop** ends one early, and they're formatted with a **Copy** button on each code block.
+- **Apply an answer where you asked for it:** Add to the checks (suggested assertions), Use this query (GraphQL), Use these arguments (MCP), Save as a test file (coverage gaps).
+
+### Examples for every protocol
+- New **Public REST APIs (playground)** collection: logins that return tokens, whole create-read-update-delete flows, API keys, status codes, slow responses, images and open data (DummyJSON, Restful-Booker, Postman Echo, ReqRes, Fake Store, Open-Meteo, PokéAPI, …).
+- More GraphQL (Star Wars, GraphQLZero with mutations, AniList, Pokémon), SOAP (calculator, country info), gRPC over TLS (every field type, metadata, errors, streaming), MQTT brokers (HiveMQ, EMQX), SSE streams, and MCP servers (Microsoft Learn, Context7, Cloudflare and Astro docs, GitMCP, Hugging Face, the Everything reference server).
+- **Your Examples workspace gets them too:** at start the app adds what's new and tells you once. It never changes, overwrites or brings back anything in your copy.
+
+### Uniform menus
+- Collection, folder and request menus share one grouping: create · run · configure · copy · organize · delete.
+- MCP servers and API definitions have a kind badge in the explorer (MCP, green when connected; API), like every request.
+- **Test files open in their own tabs**, like requests (each keeps its own edits).
+- Test files show what they test in the same badge (HTTP, GQL, gRPC, WS, MCP, AI, SUITE …).
+- Collections you folded stay folded: closing or switching tabs no longer expands them again (opening something from search or history still shows where it is).
+- Home counts a collection's saved gRPC calls and connections.
+
+### Quality
+- An end-to-end UI regression suite (19 plans in the real app) runs before every release and against the installed app after it.
+
 ## 0.39.2 — 2026-10-01
 
 - **Windows taskbar**: the installed app shows the TestPion icon again (it could show Electron's after TestPion had been run from source on the same computer).
