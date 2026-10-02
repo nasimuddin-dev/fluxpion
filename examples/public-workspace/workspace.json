@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "id": "ws-testpion-examples",
   "name": "TestPion Examples",
-  "description": "Ready-to-run examples of every kind of test against free public APIs: REST (httpbin, JSONPlaceholder, Swagger Petstore), GraphQL (Countries, Rick and Morty), gRPC (grpcb.in), WebSocket (echo servers), Server-Sent Events (Wikimedia), MCP (Petstore MCP, DeepWiki, an offline mock), AI prompts, evaluations, safety, RAG and an agent (offline demo model). Open a request and press Send, or run a collection or test suite.",
+  "description": "Ready-to-run examples of every kind of test against free public APIs, no account needed: REST (httpbin, JSONPlaceholder, Swagger Petstore, and a playground with logins, tokens, full create-read-update-delete flows and API keys: DummyJSON, Restful-Booker, Postman Echo, ReqRes, Fake Store, open data), GraphQL (Countries, Rick and Morty, Star Wars, GraphQLZero with mutations, AniList, Pokémon), SOAP, gRPC (grpcb.in, plain text and TLS), WebSocket and MQTT, Server-Sent Events, MCP (Petstore MCP, DeepWiki, Microsoft Learn, Context7, Cloudflare and Astro docs, GitMCP, Hugging Face, the Everything reference server, an offline mock), AI prompts, evaluations, safety, RAG and an agent (offline demo model). Open a request and press Send, or run a collection or test suite.",
   "variables": [
     { "key": "appName", "value": "TestPion", "enabled": true }
   ],

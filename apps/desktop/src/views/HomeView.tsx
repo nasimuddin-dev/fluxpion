@@ -164,7 +164,7 @@ export function HomeView() {
               <button className="text-accent hover:underline" onClick={() => setView('tests')}>
                 Tests
               </button>
-              . MCP has public servers, WebSocket and gRPC have saved connections, and AI Lab has prompts that run on an offline demo model.
+              . New to API testing? Start with <b>Public REST APIs (playground)</b>: logins, tokens and whole create, read, update and delete flows. GraphQL, SOAP, gRPC, WebSocket, MQTT, SSE and MCP servers each have public services to try, and AI Lab has prompts that run on an offline demo model.
             </p>
           ) : (
             <button className="relative block mt-3 text-sm text-accent hover:underline" onClick={() => void runMenuCommand('open-examples')}>
