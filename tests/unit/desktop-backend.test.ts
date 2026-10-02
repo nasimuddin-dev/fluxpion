@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Backend } from '../../apps/desktop/backend/backend.js';
+import { MockProvider } from '../../packages/core/src/ai/providers/mock.js';
 
 // The desktop backend is the app's whole RPC surface (and a future server's); its handlers live in one
 // module per domain (apps/desktop/backend/handlers). This checks they compose and work end to end.
@@ -106,5 +107,39 @@ describe('desktop backend', () => {
     expect(inspect[0]).toMatchObject({ name: 'token', scope: 'environment', value: 't1' });
     await expect(Promise.resolve().then(() => call('vars.setInEnvironment', { environment: 'nope', name: 'x', value: '1' }))).rejects.toThrow(/environment/);
     await expect(Promise.resolve().then(() => call('vars.setInEnvironment', { environment: 'pop-env', name: 'bad name', value: '1' }))).rejects.toThrow(/valid variable name/);
+  });
+
+  it('assistant: follow-ups carry the conversation, answers stream, secrets stay hidden', async () => {
+    await call('ai.saveProviders', { providers: [{ id: 'mock-as', name: 'Mock', kind: 'mock', baseUrl: 'mock://local', defaultModel: 'demo' }] });
+    const current = (await call('settings.get')) as object;
+    await call('settings.save', { ...current, assistantProvider: 'mock-as', assistantModel: 'demo' });
+    const seen: Array<Array<{ role: string; content: string }>> = [];
+    const chat = MockProvider.prototype.chat;
+    MockProvider.prototype.chat = function (req) {
+      seen.push(req.messages.map((m) => ({ role: m.role, content: m.content })));
+      return chat.call(this, req);
+    };
+    try {
+      const context = { request: { method: 'GET', url: 'https://api.example.test/pets', headers: [{ key: 'Authorization', value: 'Bearer abc123' }] } };
+      const first = (await call('assistant.ask', { task: 'free', context, question: 'Why 404?', requestId: 'as-1' })) as { text: string };
+      expect(first.text).toContain('Why 404?');
+      expect(seen[0]![1]!.content).toContain('Context:');
+      expect(seen[0]![1]!.content).toContain('api.example.test/pets');
+      expect(seen[0]![1]!.content).not.toContain('abc123');
+      expect(events).toContain('assistant.deltas');
+      const history = [
+        { role: 'user', content: 'Why 404?' },
+        { role: 'assistant', content: first.text },
+      ];
+      const second = (await call('assistant.ask', { task: 'free', context, question: 'And how do I fix it?', history })) as { text: string };
+      expect(second.text).toContain('And how do I fix it?');
+      const msgs = seen[1]!;
+      expect(msgs.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
+      // the context stays with the first turn; the follow-up is just the question
+      expect(msgs[1]!.content).toContain('api.example.test/pets');
+      expect(msgs[3]!.content).toBe('And how do I fix it?');
+    } finally {
+      MockProvider.prototype.chat = chat;
+    }
   });
 });

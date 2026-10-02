@@ -24,6 +24,16 @@ module.exports = async function run(win) {
     const msg = typeof message === 'string' ? message : e?.message;
     if (lvl === 3 || lvl === 'error') errors.push(String(msg).slice(0, 400));
   });
+  // uncaught exceptions with their stack (the console message alone is often just "x is not a function")
+  try {
+    win.webContents.debugger.attach('1.3');
+    win.webContents.debugger.on('message', (_e, method, params) => {
+      if (method === 'Runtime.exceptionThrown') errors.push(String(params.exceptionDetails?.exception?.description ?? params.exceptionDetails?.text).slice(0, 1200));
+    });
+    await win.webContents.debugger.sendCommand('Runtime.enable');
+  } catch {
+    // another debugger is attached (DevTools): console errors still count
+  }
   win.setContentSize(1440, 900);
   win.show();
   await sleep(6000);

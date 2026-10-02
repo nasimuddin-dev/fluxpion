@@ -71,7 +71,7 @@ export function aiHandlers(be: Backend): Handlers {
       return results;
     },
 
-    'assistant.ask': (p: { task: string; context: unknown; question?: string; environment?: string }) => be.assistant(p),
+    'assistant.ask': (p: Parameters<Backend['assistant']>[0]) => be.assistant(p),
     /** Natural language → an HTTP request (shown to the user before anything is sent). */
     'ai.generateRequest': async ({ description, environment }: { description: string; environment?: string }) => {
       const r = await be.assistant({ task: 'generate-request', context: {}, question: description, environment });

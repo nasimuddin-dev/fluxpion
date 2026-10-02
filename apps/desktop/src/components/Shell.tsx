@@ -2,7 +2,6 @@ import {
   Activity,
   AlertOctagon,
   AlertTriangle,
-  BookOpen,
   Bot,
   Boxes,
   CheckCircle2,
@@ -18,7 +17,6 @@ import {
   KeyRound,
   Network,
   Plug,
-  Plus,
   Radio,
   Bookmark,
   Waypoints,
@@ -37,14 +35,13 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { call, asError, modKey, on } from '../api';
+import { call, modKey, on } from '../api';
 import wordmarkUrl from '../../build/wordmark-nav.png';
 import markUrl from '../../build/icons/64x64.png';
 import { ConsolePanel } from './ConsolePanel';
 import { WorkspaceMenu } from './WorkspaceMenu';
 import { EnvQuickLook } from './EnvQuickLook';
 import { isRequestView, useApp, type ViewId, type DialogRequest, type DialogTone, type NavLocation } from '../store';
-import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Kbd, Menu, Modal, Spinner, Tooltip } from './ui';
 import { Toaster as SonnerToaster } from 'sonner';
 
@@ -555,84 +552,6 @@ export function SearchDialog() {
         </div>
       </div>
     </div>
-  );
-}
-
-/** AI assistant drawer. Output is always labelled as an AI-generated suggestion. */
-export function AssistantPanel() {
-  const req = useApp((s) => s.assistant)!;
-  const set = useApp((s) => s.set);
-  const [question, setQuestion] = useState(req.question ?? '');
-  const [answer, setAnswer] = useState<{ text: string; provider: string; model: string } | undefined>();
-  const [error, setError] = useState<ReturnType<typeof asError>>();
-  const [loading, setLoading] = useState(false);
-  const env = useApp((s) => s.environment);
-  const ask = async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      setAnswer(await call('assistant.ask', { task: req.task, context: req.context, question, environment: env }));
-    } catch (e) {
-      setError(asError(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => {
-    if (req.task !== 'free') void ask();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [req]);
-  return (
-    <aside className="w-[420px] shrink-0 border-l border-line bg-bg flex flex-col" aria-label="AI assistant">
-      <div className="h-10 flex items-center gap-2 px-3 border-b border-line">
-        <Bot size={16} className="text-judge" />
-        <span className="font-medium text-sm truncate">{req.title}</span>
-        <IconButton label="Close assistant" className="ml-auto" onClick={() => set({ assistant: undefined })}>
-          <X size={15} />
-        </IconButton>
-      </div>
-      <AiGeneratedNotice />
-      <div className="flex-1 overflow-auto p-3 text-sm">
-        {loading && (
-          <div className="flex items-center gap-2 text-muted">
-            <Spinner /> Thinking…
-          </div>
-        )}
-        {error && /AI assistant is off|No Claude API key|No AI provider/.test(error.message) ? (
-          <div className="rounded-xl border border-line bg-panel p-4 flex flex-col gap-2">
-            <div className="font-medium">Set up the AI assistant</div>
-            <p className="text-sm text-muted">Save your Claude (Anthropic) API key in Settings, or choose a provider of this workspace such as a local model. The key is kept in the OS secret store.</p>
-            <div>
-              <Button variant="primary" size="sm" onClick={() => (useApp.getState().set({ assistant: undefined }), useApp.getState().openIntent('settings', { tab: 'assistant' }))}>
-                Open Settings ▸ AI assistant
-              </Button>
-            </div>
-          </div>
-        ) : (
-          error && <ErrorPanel error={error} />
-        )}
-        {answer && (
-          <>
-            <pre className="whitespace-pre-wrap font-sans leading-relaxed">{answer.text}</pre>
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted">
-              <Badge tone="judge">
-                <BookOpen size={10} /> {answer.provider} · {answer.model}
-              </Badge>
-              <button className="hover:text-fg" onClick={() => navigator.clipboard.writeText(answer.text)}>
-                Copy
-              </button>
-            </div>
-          </>
-        )}
-        {!loading && !answer && !error && req.task === 'free' && <p className="text-muted">Ask about an API error, a GraphQL schema, an MCP tool, or how to write a test. Context from the current view is included when available.</p>}
-      </div>
-      <div className="p-3 border-t border-line flex gap-2">
-        <Input className="flex-1" placeholder="Ask a follow-up…" value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ask()} />
-        <Button variant="primary" onClick={ask} loading={loading} icon={<Plus size={0} className="hidden" />}>
-          Ask
-        </Button>
-      </div>
-    </aside>
   );
 }
 

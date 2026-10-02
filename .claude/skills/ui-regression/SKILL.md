@@ -68,5 +68,7 @@ module.exports = withExpect(steps, {
 - Steps run in order in one app session, so a plan can build on earlier steps. Put things back if a later step depends on them.
 - Expectations are by step name (a RegExp, or `(result) => true | 'reason'`); `withExpect` throws on an unknown name.
 - Native open/save dialogs: `E2E_STUB_OPEN` / `E2E_STUB_SAVE` (`CANCEL` cancels).
+- App settings for the plan: `settings: { … }` (merged into settings.json), e.g. `{ assistantProvider: 'demo', assistantModel: 'demo' }` to use the examples' offline model for AI features.
+- Uncaught exceptions are recorded with their stack in the step's `errors` (report.json); a minified name like `l is not a function` is easier to read after `npx vite build --minify false`.
 - Files starting with `_` in `plans/` are skipped (drafts).
 - Run the new plan three times (`--only <name>`) to confirm it is stable before committing.

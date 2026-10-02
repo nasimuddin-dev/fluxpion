@@ -20,6 +20,15 @@ The key then powers the AI assistant: explaining errors and responses, where a r
 
 For the CLI and CI, set the key as the `TESTPION_SECRET_APP_ANTHROPIC_APIKEY` environment variable: `claude-app` is then available there too.
 
+### Talking to the assistant
+
+Open it with the robot button in the top bar, **Ask AI Assistant** in the command palette, or one of the AI buttons in a view (Explain this response, Suggest assertions, …).
+
+- **A conversation.** Follow-up questions remember what was asked and answered, so "and how do I fix it?" works. **New conversation** (↺) starts over; the task you opened it for runs again.
+- **What you are looking at goes with the question.** With an HTTP request open, a free question carries the request and its latest response, shown as *Context: GET …/pets · 404* above the field. Choose × to leave it out. Secret values (tokens, keys, passwords) are hidden before anything is sent.
+- **Answers stream in** as they are written, and **Stop** ends one early (what arrived so far is kept). They are formatted (headings, lists, code), and each code block has its own **Copy**.
+- Every answer is labelled as an AI-generated suggestion, with the model that wrote it.
+
 ## Saved prompts
 
 The Playground's **Saved prompts** list keeps prompts with their model, parameters, system prompt, variables, structured output and evaluators, grouped in folders. **Save** stores the current prompt (or the changes to the opened one, shown as *edited*); open a prompt to run it again. Folders work as in the REST collections: create them with the folder button, and move prompts with the `⋯` / right-click menu or by dragging. Saved prompts live in the workspace (`library/ai-prompts.json`).

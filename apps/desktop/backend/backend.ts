@@ -1013,7 +1013,12 @@ export class Backend {
     return { text: r.text, model: `${providerRef}/${model}` };
   }
 
-  async assistant(p: { task: string; context: unknown; question?: string; environment?: string }) {
+  /**
+   * The AI assistant: one task (explain an error, suggest checks, …) or a free question, with the context of the view.
+   * `history` holds the earlier turns of the conversation, so a follow-up knows what was said; with `requestId` the
+   * answer streams as `assistant.deltas` events and `ai.cancel` stops it.
+   */
+  async assistant(p: { task: string; context: unknown; question?: string; environment?: string; history?: Array<{ role: 'user' | 'assistant'; content: string }>; requestId?: string }) {
     const providerRef = this.settings.assistantProvider;
     if (!providerRef)
       throw new ApsError('ConfigurationError', 'The AI assistant is off', { suggestions: ['Open Settings ▸ AI assistant and save your Claude (Anthropic) API key, or choose a provider of this workspace (a local model works offline).'] });
@@ -1060,16 +1065,38 @@ export class Backend {
     // request generation may use the names (never the values) of the variables in scope
     const extra = p.task === 'generate-request' ? { variables: Object.keys(ctx.vars.toObject()).filter((k) => !k.startsWith('$')).slice(0, 200) } : {};
     const context = JSON.stringify(ctx.redactor.redact({ ...(p.context as object), ...extra }), null, 2).slice(0, 24_000);
-    const r = await provider.chat({
-      model,
-      temperature: 0.2,
-      maxTokens: 1200,
-      messages: [
-        { role: 'system', content: `You are the AI assistant inside TestPion, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free}` },
-        { role: 'user', content: `${p.question ? `Question: ${p.question}\n\n` : ''}Context:\n${context}` },
-      ],
-    });
-    return { text: r.text, provider: provider.config.name, model: r.model || model, aiGenerated: true, usage: r.usage };
+    const hasContext = !!p.context && typeof p.context === 'object' && Object.keys(p.context as object).length > 0;
+    // the conversation so far: the first turn carries the context, follow-ups only the question (the context stays in the first turn)
+    const history = (p.history ?? []).slice(-12).map((m) => ({ role: m.role, content: ctx.redactor.redactString(m.content).slice(0, 8000) }));
+    const first = history.length === 0;
+    const turn = first ? `${p.question ? `Question: ${p.question}\n\n` : ''}${hasContext || !p.question ? `Context:\n${context}` : ''}`.trim() : (p.question ?? '');
+    if (!first) history[0] = { role: 'user', content: `${history[0]!.content}\n\nContext:\n${context}` };
+    const id = p.requestId ?? shortId('as-');
+    const ctrl = new AbortController();
+    this.controllers.set(id, ctrl);
+    const deltas = this.batched<unknown>('assistant.deltas', 40);
+    try {
+      const r = await provider.chat({
+        model,
+        temperature: 0.2,
+        maxTokens: 2000,
+        signal: ctrl.signal,
+        stream: !!p.requestId,
+        onDelta: p.requestId ? (d) => deltas.push({ id, delta: d }) : undefined,
+        messages: [
+          {
+            role: 'system',
+            content: `You are the AI assistant inside TestPion, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free} Format answers in Markdown (short headings, lists, fenced code blocks with a language). Values shown as *** were hidden by TestPion; never ask for them.`,
+          },
+          ...history,
+          { role: 'user', content: turn },
+        ],
+      });
+      deltas.flush();
+      return { text: r.text, provider: provider.config.name, model: r.model || model, aiGenerated: true, usage: r.usage };
+    } finally {
+      this.controllers.delete(id);
+    }
   }
 
   /* ------------------------------------------------------------------ runs */

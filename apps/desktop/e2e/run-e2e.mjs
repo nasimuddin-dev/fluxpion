@@ -41,14 +41,14 @@ const timeoutSec = Number(opt('timeout') ?? 600);
 const FAILURE = /^(NO\b|ERR\b)|\bNO (INPUT|MENU|ROW|DIALOG|BUTTON|TAB|PICKER|OVERFLOW)|NOT RENAMED|NOTHING$/;
 
 /** A fresh home: the examples workspace (as committed) and settings that open it. */
-function freshHome(name) {
+function freshHome(name, settings = {}) {
   const home = join(out, 'homes', name);
   rmSync(home, { recursive: true, force: true });
   mkdirSync(home, { recursive: true });
   const ws = join(home, 'ws');
   const src = join(repo, 'examples', 'public-workspace');
   cpSync(src, ws, { recursive: true, filter: (p) => !/[\\/](runs|traces|payloads|reports)([\\/]|$)|database\.sqlite|AGENTS\.md$/.test(p) });
-  writeFileSync(join(home, 'settings.json'), JSON.stringify({ schemaVersion: '1.0', theme: 'dark', fontSize: 14, telemetry: false, lastWorkspace: ws, workspacePaths: [ws] }, null, 2));
+  writeFileSync(join(home, 'settings.json'), JSON.stringify({ schemaVersion: '1.0', theme: 'dark', fontSize: 14, telemetry: false, lastWorkspace: ws, workspacePaths: [ws], ...settings }, null, 2));
   return { home, ws };
 }
 
@@ -81,7 +81,7 @@ function check(step, plan) {
 async function runPlan(file, attempt) {
   const name = basename(file, '.cjs');
   const plan = require(file);
-  const { home, ws } = freshHome(`${name}-${attempt}`);
+  const { home, ws } = freshHome(`${name}-${attempt}`, plan.settings);
   const planOut = join(out, `${name}${attempt > 1 ? `-retry` : ''}`);
   rmSync(planOut, { recursive: true, force: true });
   mkdirSync(planOut, { recursive: true });

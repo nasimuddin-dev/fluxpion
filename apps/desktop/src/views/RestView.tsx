@@ -1,6 +1,7 @@
 import { JSONPath } from 'jsonpath-plus';
 import { ArrowLeftRight, ChevronDown, Code2, Pencil, Cookie, Download, FolderPlus, FolderTree, History, KeyRound, Sparkles, Save, Send, Square, Star, Upload } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAssistantContext } from '../lib/assistant-context';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
@@ -361,6 +362,23 @@ export function RestView() {
     void saveAsTestFile(t.name, { kind: 'http', request: toEngineRequest(t.request), preRequestScript: t.preRequestScript, testScript: t.testScript, status: results[t.id]?.response?.status }, t.assertions);
 
   const result = results[tab.id];
+  // "Ask the assistant" includes the open request and its latest response (secrets are hidden by the backend)
+  useAssistantContext(
+    'rest',
+    useCallback(() => {
+      if (tab === placeholder || !tab.request.url) return undefined;
+      const res = result?.response;
+      const err = result?.error as { kind?: string; message?: string } | undefined;
+      return {
+        label: `${tab.request.method} ${tab.request.url}${res ? ` · ${res.status}` : err ? ' · error' : ''}`,
+        context: {
+          request: { name: tab.name, method: tab.request.method, url: tab.request.url, headers: tab.request.headers?.filter((h) => h.enabled !== false).map((h) => ({ key: h.key, value: h.value })), body: tab.request.body },
+          ...(res ? { response: { status: res.status, statusText: res.statusText, headers: res.headers.slice(0, 20), body: res.bodyPreview.slice(0, 4000) } } : {}),
+          ...(err ? { error: { kind: err.kind, message: err.message } } : {}),
+        },
+      };
+    }, [tab, result]),
+  );
   const saveExample = async () => {
     const res = result?.response;
     if (!res) return;
