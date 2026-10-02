@@ -392,7 +392,7 @@ export function CollectionTree({
   }, [collapseAll]);
   /**
    * Expand or collapse everything inside a collection (its categories, folders and saved-item folders), or inside one
-   * folder. The collection or folder itself stays open, so what it holds shows (expanded) or folds to one level.
+   * folder: the collection or folder itself opens or closes with it (a folder of requests only would otherwise not change).
    */
   const setSubtree = (c: Collection, folder: CollectionFolder | undefined, shown: boolean) => {
     const keys: string[] = [];
@@ -404,7 +404,7 @@ export function CollectionTree({
       for (const k of Object.keys(open)) if (k.startsWith(`${c.id}:`)) keys.push(k);
     }
     setOpen((o) => {
-      const next = { ...o, ...Object.fromEntries(keys.map((k) => [k, shown])), [folder?.id ?? c.id]: true };
+      const next = { ...o, ...Object.fromEntries(keys.map((k) => [k, shown])), [folder?.id ?? c.id]: shown };
       try {
         localStorage.setItem('aps.tree.open', JSON.stringify(next));
       } catch {

@@ -114,6 +114,8 @@ import {
   timingSpans,
   addTemplateAdditions,
   readJson,
+  describeChanges,
+  watchWorkspace,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -326,6 +328,27 @@ export class Backend {
     }
   }
 
+  /** Stops watching the open workspace's folder (GIT-103). */
+  private stopWatching?: () => void;
+  /** When the app last changed workspace data itself (an RPC that saves): the watcher's events then are its own. */
+  private lastOwnChange = 0;
+
+  /** Notice changes made outside the app (git pull, a branch switch, another editor) and refresh the UI. */
+  private watchStore(root: string): void {
+    this.stopWatching?.();
+    this.stopWatching = watchWorkspace(
+      root,
+      (changes) => {
+        if (!this.store || this.store.root !== root) return;
+        if (changes.some((c) => c.kind === 'workspace')) this.store.reloadWorkspaceFile();
+        this.logger.info(describeChanges(changes), { files: changes.map((c) => c.path).slice(0, 50) });
+        this.host.emit('data.changed', { method: 'disk' });
+        this.host.emit('workspace.changedOnDisk', { message: describeChanges(changes), kinds: [...new Set(changes.map((c) => c.kind))], files: changes.map((c) => c.path).slice(0, 50) });
+      },
+      { isOwnChange: () => Date.now() - this.lastOwnChange < 1500 },
+    );
+  }
+
   openStore(path: string): void {
     this.store?.close();
     for (const s of this.mcpSessions.values()) void s.close();
@@ -335,6 +358,7 @@ export class Backend {
     void this.gqlMock?.close();
     this.gqlMock = undefined;
     this.store = WorkspaceStore.open(path);
+    this.watchStore(this.store.root);
     this.currentValues = new CurrentValues(join(this.host.appDir, 'current-values', `${this.store.id}.json`), this.secrets, this.store.id);
     void this.cookieStore?.flush().catch(() => undefined);
     this.cookieStore = new CookieJarStore(this.secrets, this.store.id);
@@ -531,7 +555,10 @@ export class Backend {
     if (!h) throw new ApsError('ConfigurationError', `Unknown backend method ${String(method).slice(0, 80)}`);
     const t0 = performance.now();
     try {
+      const own = DATA_CHANGING.test(method);
+      if (own) this.lastOwnChange = Date.now();
       const r = await h(params ?? {});
+      if (own) this.lastOwnChange = Date.now();
       this.logger.trace(`rpc ${method}`, { ms: Math.round(performance.now() - t0) });
       // the Collections explorer (and anything else listing workspace items) refreshes on this
       if (DATA_CHANGING.test(method)) this.host.emit('data.changed', { method });
@@ -1374,6 +1401,7 @@ export class Backend {
   }
 
   async dispose(): Promise<void> {
+    this.stopWatching?.();
     this.monitorScheduler.stop();
     for (const c of this.controllers.values()) c.abort();
     for (const r of this.runs.values()) r.ctrl.abort();

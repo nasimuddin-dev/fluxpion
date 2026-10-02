@@ -8,6 +8,8 @@ import {
   purgeTrash,
   restoreFromTrash,
   makeGitReady,
+  findCommittableSecrets,
+  installPreCommitHook,
 } from '@testpion/core';
 import { EXIT, green, dim, bold, CliError, openWorkspace } from '../shared.js';
 
@@ -78,6 +80,45 @@ export function registerWorkspaceCommands(program: Command): void {
         for (const f of r.files) console.log(`${green('wrote')} ${f}`);
         for (const c of r.collections) console.log(`${green('tidied')} ${c} ${dim('(no save counter / time in the file)')}`);
         if (!r.inRepository) console.log(dim(`Not a git repository yet: run  git init  in ${store.root}`));
+      } finally {
+        store.close();
+      }
+    });
+
+  git
+    .command('check')
+    .description('before a commit: list secrets typed into the workspace (headers, auth, body fields, plain-text variables, MCP servers, providers) that a commit would publish; exit 1 if any')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest)')
+    .option('--json', 'print the findings as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const found = findCommittableSecrets(store);
+        if (o.json) console.log(JSON.stringify(found, null, 2));
+        else if (!found.length) console.log(green('No secrets typed in: safe to commit.'));
+        else {
+          console.log(bold(`${found.length} secret${found.length === 1 ? '' : 's'} would be committed:`));
+          for (const f of found) console.log(`  ${f.where} ${dim(`(${f.file})`)}\n    ${f.message}`);
+        }
+        if (found.length) process.exitCode = EXIT.TEST_FAILURE;
+      } finally {
+        store.close();
+      }
+    });
+  git
+    .command('hook')
+    .description('git hooks for a workspace')
+    .command('install')
+    .description('install a pre-commit hook that runs `testpion git check` and refuses a commit that would publish a secret (an existing hook of yours is never overwritten)')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest)')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        // the hook can call this very CLI when `testpion` is not on the PATH (e.g. run from a checkout)
+        const self = `"${process.execPath.split('\\').join('/')}" "${process.argv[1]!.split('\\').join('/')}"`;
+        const r = installPreCommitHook(store.root, self);
+        console.log(r.installed ? `${green('installed')} ${r.path}` : r.message);
+        if (!r.installed) process.exitCode = EXIT.TEST_FAILURE;
       } finally {
         store.close();
       }

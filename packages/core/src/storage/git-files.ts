@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, existsSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
 import { atomicWrite } from './fsutil.js';
 
 /** The files that make a workspace folder git-ready (GIT-102); see git-ready.ts and planning/git-integration.md. */
@@ -58,4 +58,54 @@ export function isInGitRepository(root: string): boolean {
     dir = up;
   }
   return false;
+}
+
+const HOOK_MARK = '# testpion-secret-guard';
+
+/**
+ * Install a git pre-commit hook that runs `testpion git check` for this workspace (GIT-104). An existing hook that
+ * is not TestPion's is never overwritten: the message says how to add the check to it.
+ */
+export function installPreCommitHook(root: string, cli?: string): { installed: boolean; path?: string; message: string } {
+  let dir = root;
+  let gitDir: string | undefined;
+  for (let i = 0; i < 64 && !gitDir; i++) {
+    const g = join(dir, '.git');
+    if (existsSync(g)) {
+      // usually a folder; in a worktree or submodule a file that points to the real folder
+      const text = statSync(g).isFile() ? readFileSync(g, 'utf8').trim() : '';
+      gitDir = text.startsWith('gitdir:') ? resolve(dir, text.slice('gitdir:'.length).trim()) : g;
+      break;
+    }
+    const up = join(dir, '..');
+    if (up === dir) break;
+    dir = up;
+  }
+  if (!gitDir) return { installed: false, message: `Not a git repository: run  git init  in ${root} first.` };
+  const hook = join(gitDir, 'hooks', 'pre-commit');
+  const rel = relative(dir, root).split(sep).join('/') || '.';
+  const script = [
+    '#!/bin/sh',
+    HOOK_MARK,
+    '# Refuse a commit that would publish a secret typed into the TestPion workspace. Skip once with: git commit --no-verify',
+    // testpion on the PATH, else the CLI that installed this hook, else npx
+    `if command -v testpion >/dev/null 2>&1; then T=testpion; ${cli ? `else T='${cli.split("'").join(`'"'"'`)}'; ` :'else T="npx --no-install testpion"; '}fi`,
+    // eval: the remembered command is quoted (e.g. a path with spaces), which a plain $T would split
+    `eval "$T git check -w '${rel}'"`,
+    'code=$?',
+    // 1: secrets found, the commit stops. Anything else: the check could not run; say so and let the commit through
+    'if [ $code -eq 1 ]; then echo "TestPion: secrets are typed into the workspace (above). Use secret variables, then commit again."; exit 1; fi',
+    'if [ $code -ne 0 ]; then echo "TestPion: the secret check could not run (exit $code); committing without it."; fi',
+    'exit 0',
+    '',
+  ].join('\n');
+  if (existsSync(hook) && !readFileSync(hook, 'utf8').includes(HOOK_MARK))
+    return { installed: false, path: hook, message: `A pre-commit hook already exists (${hook}). Add this line to it:  testpion git check -w "${rel}" || exit 1` };
+  atomicWrite(hook, script);
+  try {
+    chmodSync(hook, 0o755);
+  } catch {
+    /* Windows: git for Windows runs it anyway */
+  }
+  return { installed: true, path: hook, message: `Installed ${hook}` };
 }

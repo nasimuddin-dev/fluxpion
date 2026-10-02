@@ -178,6 +178,13 @@ export default function App() {
     const offMonitors = watchMonitorAlerts();
     const offRuns = watchRunNotifications();
     const offUpdate = on('update.checkManual', () => void checkForUpdates({ manual: true }));
+    // files changed outside the app (git pull, a branch switch, another editor): show the new state and say so
+    const offDisk = on<{ message: string; kinds: string[] }>('workspace.changedOnDisk', (p) => {
+      const s = useApp.getState();
+      void s.refreshWorkspace();
+      if (p.kinds.includes('environments') || p.kinds.includes('workspace')) s.set({ envsVersion: (s.envsVersion ?? 0) + 1 });
+      s.toast(`${p.message}: TestPion shows the new version.`);
+    });
     // application menu (File ▸ New, Import, Export, Save …)
     const offMenu = on<{ command: MenuCommand }>('menu.command', ({ command }) => void runMenuCommand(command));
     // File menu: request tab commands (handled by the REST view)
@@ -185,6 +192,7 @@ export default function App() {
     return () => {
       off();
       offUpdate();
+      offDisk();
       offTabs();
       offMenu();
       offMonitors();

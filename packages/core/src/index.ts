@@ -100,6 +100,8 @@ export * from './mcp-server/mcp-mock.js';
 export * from './storage/fsutil.js';
 export * from './storage/template-update.js';
 export * from './storage/git-ready.js';
+export * from './storage/workspace-watcher.js';
+export * from './storage/git-guard.js';
 export * from './storage/secrets.js';
 export * from './storage/metastore.js';
 export * from './storage/storage-usage.js';

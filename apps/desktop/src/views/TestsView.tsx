@@ -1,6 +1,6 @@
 import { BarChart3, ChevronDown, ChevronRight, CopyPlus, FileCode2, FilePlus2, Folder, History, KeyRound, Layers, Pencil, Play, Save, ShieldCheck, Trash2, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { asError, call } from '../api';
+import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSaveShortcut } from '../hooks';
 import { timeAgo } from '../lib/format';
@@ -156,6 +156,8 @@ export function TestsView() {
     void loadTree();
     void loadRuns();
   }, [loadTree, loadRuns]);
+  // test files changed outside the app (git pull, another editor): the tree shows them
+  useEffect(() => on<{ kinds: string[] }>('workspace.changedOnDisk', (p) => void (p.kinds.includes('tests') && loadTree())), [loadTree]);
 
   /** Show an open file's tab (the one on screen keeps its edits for when it comes back). */
   const show = (path: string | undefined) => {

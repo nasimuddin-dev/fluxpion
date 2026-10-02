@@ -135,6 +135,16 @@ export class WorkspaceStore {
     return this.ws.id;
   }
 
+  /** workspace.json changed outside the app (git pull, another editor): read it again. */
+  reloadWorkspaceFile(): Workspace {
+    try {
+      this.ws = { ...readJson<Workspace>(join(this.root, 'workspace.json')), id: this.ws.id };
+    } catch {
+      /* a broken file mid-write: keep what we had */
+    }
+    return this.ws;
+  }
+
   updateWorkspace(patch: Partial<Omit<Workspace, 'schemaVersion' | 'id' | 'createdAt'>>): Workspace {
     const before = this.ws.updatedAt;
     this.ws = { ...this.ws, ...patch, updatedAt: new Date().toISOString() };

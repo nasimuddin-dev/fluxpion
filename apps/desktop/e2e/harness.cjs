@@ -45,7 +45,14 @@ module.exports = async function run(win) {
     const [name, code, shot = true] = step;
     const errorsBefore = errors.length;
     const started = Date.now();
-    const result = await js(`(async () => ${code})()`);
+    // "main:" steps run here, in the main process, outside the app's own code: like another editor or `git pull`
+    // changing files (they get `require` and `home`, the test's TESTPION_HOME)
+    const result = code.startsWith('main:')
+      ? await new (Object.getPrototypeOf(async () => {}).constructor)('require', 'home', code.slice(5))(require, process.env.TESTPION_HOME).then(
+          (r) => (r === undefined ? 'done' : r),
+          (e) => `ERR ${e.message}`,
+        )
+      : await js(`(async () => ${code})()`);
     const entry = { name, result: typeof result === 'string' ? result : JSON.stringify(result), ms: Date.now() - started, errors: errors.slice(errorsBefore) };
     if (shot !== false) {
       await sleep(700);

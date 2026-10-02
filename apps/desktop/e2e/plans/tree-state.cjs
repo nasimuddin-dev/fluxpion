@@ -49,6 +49,25 @@ const steps = [
     })()`,
   ],
   [
+    'folder-expand-collapse-all',
+    `(async () => {
+      await __t.requests();
+      for (const t of ['HTTP basics', 'REST17']) { await __t.expand(t); await __t.sleep(250); }
+      const folder = () => [...document.querySelectorAll('aside [data-tree-row]')].find((b) => b.offsetParent && b.textContent.trim().startsWith('Requests & responses'));
+      if (!folder()) return 'NO ROW';
+      const pick = async (label) => {
+        folder().parentElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 }));
+        const item = await __t.waitFor(() => [...document.querySelectorAll('[role=menuitem]')].find((m) => m.textContent.trim() === label), 2000);
+        if (!item) return false; item.click(); await __t.sleep(800); return true;
+      };
+      const state = () => (folder().getAttribute('aria-expanded') === 'true' ? 'open' : 'closed') + ', ' + ${requestRows} + ' requests';
+      if (!(await pick('Expand all'))) return 'NO MENU';
+      const a = state();
+      if (!(await pick('Collapse all'))) return 'NO MENU';
+      return 'after expand: ' + a + ' | after collapse: ' + state();
+    })()`,
+  ],
+  [
     'test-file-badges',
     `(async () => {
       await __t.view('Tests'); await __t.sleep(1000);
@@ -62,7 +81,10 @@ module.exports = withExpect(steps, {
   'open-two': /^tabs: [2-9] \| request rows shown: (1\d|[2-9]\d)$/,
   'collapse-close-switch': /^after collapse: 0 \| after close: 0 \| after switch: 0$/,
   // the collection's menu expands everything inside it (all 17 HTTP basics requests), then folds it back
-  'collection-expand-collapse-all': /^expanded request rows: 17 \| closed folders after expand: 0 \| after collapse: 0 \| collection still open: true$/,
+  // Collapse all closes the collection itself too
+  'collection-expand-collapse-all': /^expanded request rows: 17 \| closed folders after expand: 0 \| after collapse: 0 \| collection still open: false$/,
+  // a folder that holds only requests: Expand all shows them, Collapse all closes it
+  'folder-expand-collapse-all': /^after expand: open, 10 requests \| after collapse: closed, 0 requests$/,
   'test-file-badges': (r) => {
     const m = /^(\d+) of (\d+) files have a badge \| /.exec(r);
     return (m && +m[1] === +m[2] && +m[2] > 10) || 'every test file should have a badge';

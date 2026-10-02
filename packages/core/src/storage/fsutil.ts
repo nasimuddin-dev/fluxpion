@@ -1,5 +1,5 @@
 import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ApsError } from '../errors.js';
 
@@ -18,7 +18,19 @@ export function endAndClose(stream: NodeJS.WritableStream & { closed?: boolean; 
 }
 
 /** Atomic write: write a temp file, fsync, then rename over the target. A crash never leaves a half-written file. */
+/**
+ * Files this process wrote, and when (absolute path → ms): a folder watcher tells its own saves from changes made
+ * outside the app (git pull, another editor) with `writtenByUs`.
+ */
+const recentWrites = new Map<string, number>();
+export function writtenByUs(path: string, withinMs = 2000): boolean {
+  const at = recentWrites.get(resolve(path));
+  return at !== undefined && Date.now() - at < withinMs;
+}
+
 export function atomicWrite(path: string, data: string | Buffer): void {
+  recentWrites.set(resolve(path), Date.now());
+  if (recentWrites.size > 2000) for (const [k, t] of recentWrites) if (Date.now() - t > 10_000) recentWrites.delete(k);
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
   const fd = openSync(tmp, 'w');
