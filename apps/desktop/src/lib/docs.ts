@@ -61,6 +61,8 @@ export const useDocs = create<DocsState>((set, get) => ({
     return id;
   },
   select: (view, docId) => {
+    // a document that was closed is not brought back by selecting it (a stale tab)
+    if (!(get().docs[view] ?? []).includes(docId)) return;
     const active = { ...get().active, [view]: docId };
     set({ active });
     persist({ docs: get().docs, active });

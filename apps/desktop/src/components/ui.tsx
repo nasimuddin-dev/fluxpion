@@ -361,6 +361,14 @@ export function Menu({
           onKeyDownCapture={(e) => {
             if (e.key === 'Enter' || e.key === ' ') picked.current = true;
           }}
+          // the menu is rendered elsewhere in the page, but React passes its events up to the component that owns it
+          // (a tab, a tree row): a click on "Close all tabs" was also a click on the tab, which then opened again, and
+          // Enter / Delete on an item reached the row's keys. What happens in a menu stays in the menu.
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onAuxClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
           align={align}
           sideOffset={4}
           style={{ minWidth: width }}

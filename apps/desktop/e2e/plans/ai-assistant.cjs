@@ -150,6 +150,23 @@ const steps = [
     const toast = [...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.textContent.trim()).join(' / ');
     return 'button: ' + label + ' | editor: ' + text + ' | toast: ' + toast;
   })()`],
+  // the assistant is still open on the GraphQL task: New conversation runs the task again
+  ['restart-reruns-task', `(async () => {
+    const p = ${panel}; if (!p) return 'NO PANEL';
+    p.querySelector('[aria-label="New conversation"]').click(); await __t.sleep(300);
+    const busyAfter = !!${stopButton};
+    for (let i = 0; i < 60 && !p.querySelector('[data-answer-apply]'); i++) await __t.sleep(150);
+    return 'ran again: ' + busyAfter + ' | ' + ${state};
+  })()`],
+  // New conversation while an answer is being written: the old answer doesn't land in the new conversation
+  ['restart-during-answer', `(async () => {
+    const p = ${panel}; if (!p) return 'NO PANEL';
+    p.querySelector('[aria-label="New conversation"]').click(); await __t.sleep(400);
+    p.querySelector('[aria-label="New conversation"]').click();
+    await __t.sleep(2500);
+    for (let i = 0; i < 60 && ${stopButton}; i++) await __t.sleep(150);
+    return ${state} + ' | stopped shown: ' + /stopped/.test(p.textContent);
+  })()`],
 ];
 
 module.exports = withExpect(
@@ -178,6 +195,9 @@ module.exports = withExpect(
       const m = /^button: Add to the checks \| tests tab: Tests(\d*) -> Tests(\d+)$/.exec(r);
       return (m && +m[2] === (+m[1] || 0) + 2) || 'the two suggested checks should be added to the Tests tab';
     },
+    'restart-reruns-task': /^ran again: true \| questions: 0 \| answers: 1 \| .*last: Here it is: query Generated/,
+    // the second New conversation lands while the first answer is being written: one fresh answer, nothing stopped
+    'restart-during-answer': /^questions: 0 \| answers: 1 \| .*last: Here it is: query Generated.* \| stopped shown: false$/,
     'apply-graphql': /^button: Use this query \| editor: query Generated \{ countries \{ code name \} \} \| toast: .*Use this query: done/,
   },
   { settings: { assistantProvider: 'demo', assistantModel: 'demo' }, prepare: slowModel },

@@ -170,6 +170,8 @@ export function TestsView() {
   };
   const openFilesRef = useRef(openFiles);
   openFilesRef.current = openFiles;
+  const fileRef = useRef(file);
+  fileRef.current = file;
   const openFile = async (path: string) => {
     if (openFilesRef.current.includes(path)) return path === file ? setTab('editor') : show(path);
     const text = await call<string>('tests.read', { path });
@@ -181,17 +183,19 @@ export function TestsView() {
   };
   /** Close a file's tab (asks first when it has unsaved changes); the next tab comes on screen. */
   const closeFile = async (path: string, ask = true) => {
-    const b = path === file ? { content, saved } : buffers.current[path];
+    // the file on screen now (several closes in a row each change it: the state of this render would be stale)
+    const active = fileRef.current;
+    const b = path === active ? { content, saved } : buffers.current[path];
     if (ask && b && b.content !== b.saved && !(await confirmAction({ title: 'Unsaved changes', message: `tests/${path} has unsaved changes.`, detail: 'Close it and discard them? Save with Ctrl+S to keep them.', confirmLabel: 'Discard changes', danger: true }))) return;
     const i = openFilesRef.current.indexOf(path);
     const rest = openFilesRef.current.filter((p) => p !== path);
     delete buffers.current[path];
     setOpenFiles(rest);
     openFilesRef.current = rest;
-    if (path === file) {
-      setFile(undefined);
+    if (path === active) {
       const next = rest[Math.min(i, rest.length - 1)];
       const nb = next ? buffers.current[next] : undefined;
+      fileRef.current = next;
       setFile(next);
       setContent(nb?.content ?? '');
       setSaved(nb?.saved ?? '');

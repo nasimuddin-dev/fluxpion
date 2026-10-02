@@ -40,12 +40,15 @@ export function AssistantPanel() {
   const busyRef = useRef<string | undefined>(undefined);
   busyRef.current = busy;
 
-  const ask = async (q?: string) => {
+  // which conversation an answer belongs to: New conversation starts another, and answers to the old one are dropped
+  const conversation = useRef(0);
+  const ask = async (q?: string, fresh = false) => {
     const text = q?.trim();
-    if (busy || (!text && turns.length)) return;
+    if (!fresh && (busy || (!text && turns.length))) return;
+    const mine = conversation.current;
     const id = `as-${Date.now().toString(36)}`;
     const userTurn: Turn = text ? { role: 'user', content: text } : { role: 'user', content: `Task: ${req.title}`, task: true };
-    const history = turns.map(({ role, content }) => ({ role, content }));
+    const history = fresh ? [] : turns.map(({ role, content }) => ({ role, content }));
     setTurns((t) => [...t, userTurn]);
     setQuestion('');
     setError(undefined);
@@ -54,8 +57,10 @@ export function AssistantPanel() {
     try {
       const context = free ? (viewCtx?.context ?? {}) : req.context;
       const r = await call<{ text: string; provider: string; model: string }>('assistant.ask', { task: req.task, context, question: text, environment: env, history, requestId: id });
+      if (mine !== conversation.current) return;
       setTurns((t) => [...t, { role: 'assistant', content: r.text, provider: r.provider, model: r.model }]);
     } catch (e) {
+      if (mine !== conversation.current) return;
       const err = asError(e);
       // stopped: keep what had arrived
       if (err.kind === 'CancelledError' || /abort|cancel/i.test(err.message)) setTurns((t) => [...t, { role: 'assistant', content: `${streamingRef.current}\n\n*(stopped)*`.trim() }]);
@@ -65,9 +70,11 @@ export function AssistantPanel() {
         if (text) setQuestion(text);
       }
     } finally {
-      setBusy(undefined);
-      setStreaming('');
-      input.current?.focus();
+      if (mine === conversation.current) {
+        setBusy(undefined);
+        setStreaming('');
+        input.current?.focus();
+      }
     }
   };
   const streamingRef = useRef('');
@@ -84,11 +91,14 @@ export function AssistantPanel() {
   const stop = () => busy && void call('ai.cancel', { id: busy });
   const restart = () => {
     stop();
+    conversation.current++;
+    setBusy(undefined);
     setTurns([]);
     setError(undefined);
     setStreaming('');
     if (free) setViewCtx(currentViewContext());
-    else void Promise.resolve().then(() => ask());
+    // a task runs again, in the new conversation
+    else void ask(undefined, true);
   };
   const notSetUp = error && /AI assistant is off|No Claude API key|No AI provider/.test(error.message);
 

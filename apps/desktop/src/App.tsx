@@ -211,9 +211,12 @@ export default function App() {
     const before = lastCount.current;
     lastCount.current = { view, count: ownTabs };
     if (!before || before.view !== view || before.count <= 0 || ownTabs !== 0) return;
+    // tabs still listed whose document was just closed (a batch close: they leave the list a moment later) don't count
+    const liveDocs = useDocs.getState().docs;
     const open = Object.entries(useEditorTabsStore.getState().byView)
       .filter(([group]) => group !== view && !group.startsWith(`${view}:`))
-      .flatMap(([, tabs]) => tabs);
+      .flatMap(([, tabs]) => tabs)
+      .filter((t) => !isDocView(t.view) || (liveDocs[t.view] ?? []).includes(t.key.slice(t.view.length + 1)));
     const next = open[open.length - 1];
     if (!next) return;
     useApp.getState().setView(next.view);

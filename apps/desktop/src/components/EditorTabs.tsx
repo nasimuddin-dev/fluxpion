@@ -182,10 +182,10 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
             view,
             onSelect: () => useDocs.getState().select(view, docId),
             onClose: () => {
-              const docs = useDocs.getState();
-              docs.close(view, docId);
-              // the last document of this editor: go to another open tab (or REST)
-              if (!(docs.docs[view] ?? []).length) leaveEditor(view);
+              useDocs.getState().close(view, docId);
+              // the last document of this editor: go to another open tab (or REST). Read the state after the close
+              // (a snapshot from before it still lists the closed document, so the editor was never left)
+              if (!(useDocs.getState().docs[view] ?? []).length) leaveEditor(view);
             },
           },
         ]
@@ -210,6 +210,9 @@ export function useSingleEditorTab(view: ViewId, tab: (Omit<EditorTab, 'key' | '
 
 /** An editor's last tab closed while it's on screen: show the last other open tab (or REST). */
 function leaveEditor(view: ViewId) {
+  // several tabs closing at once: the batch moves once, at its end (moving now could open an editor whose tab is
+  // about to close, and an editor shown with no document starts a new one: that tab would never close)
+  if (batchClosing) return;
   if (useApp.getState().view !== view) return;
   const others = Object.values(useEditorTabsStore.getState().byView)
     .flat()
@@ -292,16 +295,33 @@ export function newRequestItems(): MenuItem[] {
   ];
 }
 
+/** Set while a batch of tabs closes (Close all / others / to the right). */
+let batchClosing = false;
+
 /** The right-click menu of every tab: pin, rename, duplicate, save as test, and closing across every tab in the strip. */
 function defaultTabMenu(t: EditorTab, all: EditorTab[], startRename: (t: EditorTab) => void): MenuItem[] {
   const i = all.indexOf(t);
   // per editor: one batch close where the editor offers it (REST), else tab by tab
   const close = (list: EditorTab[]) => {
     const open = list.filter((x) => !x.pinned);
-    for (const view of new Set(open.map((x) => x.view))) {
-      const mine = open.filter((x) => x.view === view);
-      if (mine[0]?.closeMany) mine[0].closeMany(mine.map((x) => x.key));
-      else mine.forEach((x) => x.onClose());
+    batchClosing = true;
+    try {
+      for (const view of new Set(open.map((x) => x.view))) {
+        const mine = open.filter((x) => x.view === view);
+        if (mine[0]?.closeMany) mine[0].closeMany(mine.map((x) => x.key));
+        else mine.forEach((x) => x.onClose());
+      }
+    } finally {
+      batchClosing = false;
+    }
+    // then, once: if the editor on screen lost all its tabs, show the last tab left (or the empty HTTP editor)
+    const closed = new Set(open);
+    const left = all.filter((x) => !closed.has(x));
+    const current = useApp.getState().view;
+    if (!left.some((x) => x.view === current)) {
+      const next = left[left.length - 1];
+      useApp.getState().setView(next?.view ?? 'rest');
+      next?.onSelect?.();
     }
   };
   const others = all.filter((x) => x !== t && !x.pinned);
