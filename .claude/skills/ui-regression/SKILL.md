@@ -27,7 +27,9 @@ npm run e2e -w @testpion/desktop
 - Installed app: `npm run e2e -w @testpion/desktop -- --exe "$LOCALAPPDATA/Programs/TestPion/TestPion.exe"`
 - Output (screenshots `NN-step.png`, `report.json` per plan, `summary.json`): `-- --out <dir>` (default: a temp folder, printed at the end).
 
-The run takes several minutes (the app starts once per plan; `core` alone is 62 steps). Run it in the background
+Plans run one at a time on purpose: running several apps at once was tried (2026-10-01) and was no faster on a
+CPU-bound machine and flakier (inline rename and typing steps need the window's keyboard focus, which only one
+window has). The run takes several minutes (the app starts once per plan; `core` alone is 62 steps). Run it in the background
 and read the output when it finishes. Do not use the machine's real `~/.testpion`: the runner sets `TESTPION_HOME`.
 
 ## Reading results
