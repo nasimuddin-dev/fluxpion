@@ -3,9 +3,7 @@
   "id": "petstore",
   "name": "Swagger Petstore (OpenAPI contract)",
   "description": "The public [Swagger Petstore](https://petstore3.swagger.io) sample API. Every request also has an **openapi** check against `specs/petstore.json`, so a response that doesn't match the documented contract fails, even with status 200.\n\nThe Petstore is shared by everyone on the internet: pets can change or disappear between requests, so a run may occasionally fail for reasons outside your control.",
-  "version": 1,
   "variables": [],
-  "updatedAt": "2026-09-29T00:00:00.000Z",
   "items": [
     {
       "kind": "http",

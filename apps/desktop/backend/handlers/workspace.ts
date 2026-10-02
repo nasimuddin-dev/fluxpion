@@ -23,6 +23,7 @@ import {
   type WorkspaceBundle,
   findLiteralSecrets,
   referencedVariableNames,
+  makeGitReady,
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
 
@@ -44,6 +45,8 @@ export function workspaceHandlers(be: Backend): Handlers {
       be.openStore(root);
       return be.handlers['ws.current']!({});
     },
+    /** Make the open workspace git-ready (.gitignore, .gitattributes, git-friendly collection files); safe to repeat. */
+    'ws.gitReady': () => makeGitReady(be.ws),
     /** What this start added to the user's examples workspace from a newer app version (told once). */
     'ws.examplesAdded': () => {
       const added = be.examplesAdded;

@@ -1,0 +1,11 @@
+# TestPion: results and this computer's state stay out of git
+runs/
+traces/
+payloads/
+reports/
+baselines/
+trash/
+.local/
+database.sqlite*
+metadata.jsonl
+.template-offered.json

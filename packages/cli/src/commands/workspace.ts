@@ -7,6 +7,7 @@ import {
   listTrash,
   purgeTrash,
   restoreFromTrash,
+  makeGitReady,
 } from '@testpion/core';
 import { EXIT, green, dim, bold, CliError, openWorkspace } from '../shared.js';
 
@@ -60,6 +61,26 @@ export function registerWorkspaceCommands(program: Command): void {
       writeFileSync(o.output, JSON.stringify(store.exportBundle(), null, 2));
       console.log(green(`Exported to ${o.output} (secret values are never exported)`));
       store.close();
+    });
+
+  const git = program.command('git').description('keep a workspace in git (see the docs: Keep your workspace in git)');
+  git
+    .command('setup')
+    .description('make a workspace git-ready: a .gitignore for results and local state, a .gitattributes for line endings, collection files in their git-friendly form; safe to run again')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest)')
+    .option('--json', 'print what changed as JSON')
+    .action((o) => {
+      const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+      try {
+        const r = makeGitReady(store);
+        if (o.json) return console.log(JSON.stringify(r, null, 2));
+        if (!r.files.length && !r.collections.length) console.log(green('Already git-ready.'));
+        for (const f of r.files) console.log(`${green('wrote')} ${f}`);
+        for (const c of r.collections) console.log(`${green('tidied')} ${c} ${dim('(no save counter / time in the file)')}`);
+        if (!r.inRepository) console.log(dim(`Not a git repository yet: run  git init  in ${store.root}`));
+      } finally {
+        store.close();
+      }
     });
 
   const trash = program.command('trash').description('recently deleted collections and environments (kept 30 days): list, restore, empty');

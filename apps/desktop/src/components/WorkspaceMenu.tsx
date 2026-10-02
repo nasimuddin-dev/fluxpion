@@ -1,4 +1,5 @@
-import { Check, ChevronDown, Copy, Download, FolderOpen, FolderPlus, Layers, MoreHorizontal, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { Check, ChevronDown, Copy, Download, FolderOpen, FolderPlus, GitBranch, Layers, MoreHorizontal, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { runMenuCommand } from '../menu-commands';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asError, call } from '../api';
 import { promptText, useApp } from '../store';
@@ -108,6 +109,7 @@ export function WorkspaceMenu() {
     { label: 'Rename', icon: <Pencil size={14} />, onSelect: () => setNameDialog({ mode: 'rename', target: w, value: w.name }) },
     { label: 'Duplicate…', icon: <Copy size={14} />, onSelect: () => setNameDialog({ mode: 'duplicate', target: w, value: `${w.name} copy` }) },
     { label: 'Show in folder', icon: <FolderOpen size={14} />, onSelect: () => void call('app.openPath', { path: w.path }) },
+    ...(isCurrent(w) ? [{ label: 'Make ready for git', icon: <GitBranch size={14} />, onSelect: () => (setOpen(false), void runMenuCommand('git-ready')) }] : []),
     {
       label: 'Export…',
       icon: <Download size={14} />,

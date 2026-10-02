@@ -3,8 +3,6 @@
   "id": "grpc",
   "name": "gRPC (grpcb.in)",
   "description": "gRPC calls against the public grpcb.in test server, in plain text and over TLS: unary and streaming calls, every field type, metadata and errors. The server describes itself through reflection, so no .proto file is needed. Open a call and press **Invoke**.",
-  "version": 1,
   "variables": [],
-  "updatedAt": "2026-09-29T00:00:00.000Z",
   "items": []
 }

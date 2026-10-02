@@ -47,7 +47,7 @@ function freshHome(name, settings = {}) {
   mkdirSync(home, { recursive: true });
   const ws = join(home, 'ws');
   const src = join(repo, 'examples', 'public-workspace');
-  cpSync(src, ws, { recursive: true, filter: (p) => !/[\\/](runs|traces|payloads|reports)([\\/]|$)|database\.sqlite|AGENTS\.md$/.test(p) });
+  cpSync(src, ws, { recursive: true, filter: (p) => !/[\\/](runs|traces|payloads|reports|\.local)([\\/]|$)|database\.sqlite|AGENTS\.md$/.test(p) });
   writeFileSync(join(home, 'settings.json'), JSON.stringify({ schemaVersion: '1.0', theme: 'dark', fontSize: 14, telemetry: false, lastWorkspace: ws, workspacePaths: [ws], ...settings }, null, 2));
   return { home, ws };
 }

@@ -3,9 +3,7 @@
   "id": "httpbin",
   "name": "HTTP basics (httpbin)",
   "description": "Requests against [httpbin.org](https://httpbin.org), a free service that echoes back what you send. Use it to see how methods, parameters, headers, bodies, authentication, cookies, redirects and status codes work.\n\nSelect the **Public APIs** environment, open a request and press **Send**, or run the whole collection (right-click ▸ **Run collection**). Each request has assertions and a test script, so a run shows passed and failed checks.",
-  "version": 1,
   "variables": [],
-  "updatedAt": "2026-09-29T00:00:00.000Z",
   "items": [
     {
       "kind": "folder",
@@ -21,15 +19,39 @@
             "method": "GET",
             "url": "{{httpbin}}/get",
             "params": [
-              { "key": "search", "value": "testpion", "enabled": true },
-              { "key": "page", "value": "1", "enabled": true }
+              {
+                "key": "search",
+                "value": "testpion",
+                "enabled": true
+              },
+              {
+                "key": "page",
+                "value": "1",
+                "enabled": true
+              }
             ],
-            "headers": [{ "key": "Accept", "value": "application/json", "enabled": true }]
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "enabled": true
+              }
+            ]
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.args.search", "expected": "testpion" },
-            { "type": "latency", "max": 5000 }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.args.search",
+              "expected": "testpion"
+            },
+            {
+              "type": "latency",
+              "max": 5000
+            }
           ],
           "testScript": "pm.test('echoes the page parameter', () => {\n  pm.expect(pm.response.json().args.page).to.eql('1');\n});"
         },
@@ -40,17 +62,38 @@
           "request": {
             "method": "POST",
             "url": "{{httpbin}}/post",
-            "headers": [{ "key": "Content-Type", "value": "application/json", "enabled": true }],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "enabled": true
+              }
+            ],
             "body": {
               "type": "json",
               "content": "{\n  \"name\": \"Biscuit\",\n  \"species\": \"dog\",\n  \"sentBy\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\",\n  \"at\": \"{{$isoTimestamp}}\"\n}"
             }
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.json.name", "expected": "Biscuit" },
-            { "type": "equals", "path": "$.json.sentBy", "expected": "TestPion" },
-            { "type": "header", "header": "content-type", "expected": "application/json" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.json.name",
+              "expected": "Biscuit"
+            },
+            {
+              "type": "equals",
+              "path": "$.json.sentBy",
+              "expected": "TestPion"
+            },
+            {
+              "type": "header",
+              "header": "content-type",
+              "expected": "application/json"
+            }
           ]
         },
         {
@@ -63,14 +106,29 @@
             "body": {
               "type": "form-urlencoded",
               "fields": [
-                { "key": "customer", "value": "Ada", "enabled": true },
-                { "key": "size", "value": "large", "enabled": true }
+                {
+                  "key": "customer",
+                  "value": "Ada",
+                  "enabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "large",
+                  "enabled": true
+                }
               ]
             }
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.form.customer", "expected": "Ada" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.form.customer",
+              "expected": "Ada"
+            }
           ]
         },
         {
@@ -81,13 +139,28 @@
             "method": "GET",
             "url": "{{httpbin}}/headers",
             "headers": [
-              { "key": "X-Request-Source", "value": "{{appName}}", "enabled": true },
-              { "key": "X-Correlation-Id", "value": "{{$guid}}", "enabled": true }
+              {
+                "key": "X-Request-Source",
+                "value": "{{appName}}",
+                "enabled": true
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}",
+                "enabled": true
+              }
             ]
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.headers.X-Request-Source", "expected": "TestPion" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.headers.X-Request-Source",
+              "expected": "TestPion"
+            }
           ]
         },
         {
@@ -95,36 +168,79 @@
           "id": "hb-status-404",
           "name": "Expect a 404",
           "description": "A negative test: the assertion expects 404, so the request passes when the server says Not Found.",
-          "request": { "method": "GET", "url": "{{httpbin}}/status/404" },
-          "assertions": [{ "type": "status", "expected": 404 }]
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/status/404"
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 404
+            }
+          ]
         },
         {
           "kind": "http",
           "id": "hb-delay",
           "name": "Slow response (1 s) with a time limit",
-          "request": { "method": "GET", "url": "{{httpbin}}/delay/1" },
-          "assertions": [{ "type": "status", "expected": 200 }, { "type": "latency", "max": 8000 }],
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/delay/1"
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "latency",
+              "max": 8000
+            }
+          ],
           "testScript": "pm.test('took at least a second', () => pm.expect(pm.response.responseTime).to.be.above(900));"
         },
         {
           "kind": "http",
           "id": "hb-redirect",
           "name": "Follows redirects",
-          "request": { "method": "GET", "url": "{{httpbin}}/redirect/2" },
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/redirect/2"
+          },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "contains", "path": "$.url", "expected": "/get" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "path": "$.url",
+              "expected": "/get"
+            }
           ]
         },
         {
           "kind": "http",
           "id": "hb-xml",
           "name": "XML response",
-          "request": { "method": "GET", "url": "{{httpbin}}/xml" },
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/xml"
+          },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "header", "header": "content-type", "expected": "xml" },
-            { "type": "contains", "expected": "slideshow" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "header",
+              "header": "content-type",
+              "expected": "xml"
+            },
+            {
+              "type": "contains",
+              "expected": "slideshow"
+            }
           ],
           "testScript": "// xml2Json turns XML (SOAP too) into an object: attributes under \"$\"\nconst doc = xml2Json(pm.response.text());\npm.test('slideshow title', () => pm.expect(doc.slideshow.$.title).to.equal('Sample Slide Show'));\npm.test('two slides', () => pm.expect(doc.slideshow.slide).to.have.lengthOf(2));"
         },
@@ -132,25 +248,48 @@
           "kind": "http",
           "id": "hb-image",
           "name": "Image response",
-          "request": { "method": "GET", "url": "{{httpbin}}/image/png" },
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/image/png"
+          },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "header", "header": "content-type", "expected": "image/png" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "header",
+              "header": "content-type",
+              "expected": "image/png"
+            }
           ]
         },
         {
           "kind": "http",
           "id": "hb-uuid-schema",
           "name": "JSON Schema check",
-          "request": { "method": "GET", "url": "{{httpbin}}/uuid" },
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/uuid"
+          },
           "assertions": [
-            { "type": "status", "expected": 200 },
+            {
+              "type": "status",
+              "expected": 200
+            },
             {
               "type": "json-schema",
               "schema": {
                 "type": "object",
-                "required": ["uuid"],
-                "properties": { "uuid": { "type": "string", "pattern": "^[0-9a-f-]{36}$" } }
+                "required": [
+                  "uuid"
+                ],
+                "properties": {
+                  "uuid": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f-]{36}$"
+                  }
+                }
               }
             }
           ]
@@ -169,11 +308,22 @@
           "request": {
             "method": "GET",
             "url": "{{httpbin}}/basic-auth/{{basicUser}}/{{basicPassword}}",
-            "auth": { "type": "basic", "username": "{{basicUser}}", "password": "{{basicPassword}}" }
+            "auth": {
+              "type": "basic",
+              "username": "{{basicUser}}",
+              "password": "{{basicPassword}}"
+            }
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.authenticated", "expected": true }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.authenticated",
+              "expected": true
+            }
           ]
         },
         {
@@ -183,9 +333,18 @@
           "request": {
             "method": "GET",
             "url": "{{httpbin}}/basic-auth/{{basicUser}}/{{basicPassword}}",
-            "auth": { "type": "basic", "username": "{{basicUser}}", "password": "not-it" }
+            "auth": {
+              "type": "basic",
+              "username": "{{basicUser}}",
+              "password": "not-it"
+            }
           },
-          "assertions": [{ "type": "status", "expected": 401 }]
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 401
+            }
+          ]
         },
         {
           "kind": "http",
@@ -194,11 +353,21 @@
           "request": {
             "method": "GET",
             "url": "{{httpbin}}/bearer",
-            "auth": { "type": "bearer", "token": "{{demoToken}}" }
+            "auth": {
+              "type": "bearer",
+              "token": "{{demoToken}}"
+            }
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.token", "expected": "demo-token-123" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.token",
+              "expected": "demo-token-123"
+            }
           ]
         },
         {
@@ -208,11 +377,22 @@
           "request": {
             "method": "GET",
             "url": "{{httpbin}}/digest-auth/auth/{{basicUser}}/{{basicPassword}}",
-            "auth": { "type": "digest", "username": "{{basicUser}}", "password": "{{basicPassword}}" }
+            "auth": {
+              "type": "digest",
+              "username": "{{basicUser}}",
+              "password": "{{basicPassword}}"
+            }
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.user", "expected": "testpion" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.user",
+              "expected": "testpion"
+            }
           ]
         },
         {
@@ -222,11 +402,23 @@
           "request": {
             "method": "GET",
             "url": "{{httpbin}}/headers",
-            "auth": { "type": "apiKey", "key": "X-API-Key", "value": "{{demoToken}}", "in": "header" }
+            "auth": {
+              "type": "apiKey",
+              "key": "X-API-Key",
+              "value": "{{demoToken}}",
+              "in": "header"
+            }
           },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.headers.X-Api-Key", "expected": "demo-token-123" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.headers.X-Api-Key",
+              "expected": "demo-token-123"
+            }
           ]
         }
       ]
@@ -241,17 +433,35 @@
           "id": "hb-cookie-set",
           "name": "Server sets a cookie",
           "description": "The response sets `flavour=chocolate`; the cookie jar keeps it for the next request (see **Cookies** in the response and the Cookies manager).",
-          "request": { "method": "GET", "url": "{{httpbin}}/cookies/set?flavour=chocolate" },
-          "assertions": [{ "type": "status", "expected": 200 }]
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/cookies/set?flavour=chocolate"
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ]
         },
         {
           "kind": "http",
           "id": "hb-cookie-read",
           "name": "Cookie is sent back",
-          "request": { "method": "GET", "url": "{{httpbin}}/cookies" },
+          "request": {
+            "method": "GET",
+            "url": "{{httpbin}}/cookies"
+          },
           "assertions": [
-            { "type": "status", "expected": 200 },
-            { "type": "equals", "path": "$.cookies.flavour", "expected": "chocolate" }
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.cookies.flavour",
+              "expected": "chocolate"
+            }
           ]
         }
       ]

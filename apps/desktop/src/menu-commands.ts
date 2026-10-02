@@ -9,6 +9,7 @@ import { uid } from './lib/format';
  * commands work in the browser version (from the palette).
  */
 export type MenuCommand =
+  | 'git-ready'
   | 'new-http'
   | 'new-graphql'
   | 'new-grpc'
@@ -80,6 +81,13 @@ export async function runMenuCommand(cmd: MenuCommand): Promise<void> {
           await call('ws.open', { ref: path });
         }
         return void (await s.refreshWorkspace());
+      }
+      case 'git-ready': {
+        // the open workspace: .gitignore, .gitattributes and git-friendly collection files (safe to repeat)
+        const r = await call<{ files: string[]; collections: string[]; inRepository: boolean }>('ws.gitReady');
+        const did = [...r.files, ...(r.collections.length ? [`${r.collections.length} collection file${r.collections.length === 1 ? '' : 's'} tidied`] : [])];
+        const repo = r.inRepository ? '' : ' It is not a git repository yet: run git init in its folder (Show in folder).';
+        return s.toast(did.length ? `Ready for git: ${did.join(', ')}.${repo}` : `This workspace is already ready for git.${repo}`, 'success');
       }
       case 'open-examples': {
         await call('ws.openExamples', {});

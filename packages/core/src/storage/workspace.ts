@@ -10,6 +10,7 @@ import { openMetaStore, type MetaStore } from './metastore.js';
 import type { Baseline } from '../report/regression.js';
 import { moveToTrash } from './trash.js';
 import { markTemplateInstalled } from './template-update.js';
+import { writeGitFiles } from './git-files.js';
 
 /* ------------------------------------------------------------------ migrations */
 
@@ -103,6 +104,8 @@ export class WorkspaceStore {
     const now = new Date().toISOString();
     const ws: Workspace = { schemaVersion: SCHEMA_VERSION, id: shortId('ws-'), name, variables: [], createdAt: now, updatedAt: now };
     writeJson(join(root, 'workspace.json'), ws);
+    // ready for git from the start: results and local state ignored, the same line endings everywhere
+    writeGitFiles(root);
     const store = new WorkspaceStore(root, ws);
     store.saveEnvironment({ id: 'development', name: 'Development', variables: [{ key: 'baseUrl', value: 'http://localhost:3000', enabled: true }] });
     return store;
@@ -133,8 +136,10 @@ export class WorkspaceStore {
   }
 
   updateWorkspace(patch: Partial<Omit<Workspace, 'schemaVersion' | 'id' | 'createdAt'>>): Workspace {
+    const before = this.ws.updatedAt;
     this.ws = { ...this.ws, ...patch, updatedAt: new Date().toISOString() };
-    writeJson(join(this.root, 'workspace.json'), this.ws);
+    // the file keeps its time stamp: a change of the workspace variables is not also a change of a date line
+    writeJson(join(this.root, 'workspace.json'), { ...this.ws, updatedAt: before });
     return this.ws;
   }
 
@@ -169,7 +174,7 @@ export class WorkspaceStore {
         const base = f.slice(0, -'.json'.length);
         if (!c.id || seen.has(c.id)) c.id = base;
         seen.add(c.id);
-        out.push(c);
+        out.push(this.withLocalMeta(c));
       } catch (e) {
         out.push({ schemaVersion: SCHEMA_VERSION, id: f.replace(/\.json$/, ''), name: `${f} (corrupted)`, version: 0, variables: [], items: [], updatedAt: '', problem: (e as Error).message });
       }
@@ -199,7 +204,28 @@ export class WorkspaceStore {
   getCollection(id: string): Collection {
     const c = readJson<Collection>(this.collectionFile(id));
     // a de-duplicated id (see listCollections) is the file name: the copy says so too
-    return c.id === id ? c : { ...c, id };
+    return this.withLocalMeta(c.id === id ? c : { ...c, id });
+  }
+
+  /*
+   * Git-friendly files: a collection file holds only what people write. How often and when it was saved on this
+   * computer (`version`, `updatedAt`) lives in `.local/meta.json`, which git ignores; otherwise every save would
+   * change the file and two people editing different requests would always conflict on those lines.
+   */
+  private localMetaFile(): string {
+    return join(this.root, '.local', 'meta.json');
+  }
+  private readLocalMeta(): LocalMeta {
+    try {
+      const m = readJson<LocalMeta>(this.localMetaFile());
+      return { collections: m.collections ?? {} };
+    } catch {
+      return { collections: {} };
+    }
+  }
+  private withLocalMeta(c: Collection): Collection {
+    const m = this.readLocalMeta().collections[c.id];
+    return { ...c, version: m?.version ?? c.version ?? 0, updatedAt: m?.updatedAt ?? c.updatedAt ?? '' };
   }
 
   /* Script packages (pm.require): packages/<name>.js, e.g. packages/@clinic/auth.js for "@clinic/auth". */
@@ -233,8 +259,13 @@ export class WorkspaceStore {
   }
 
   saveCollection(c: Collection): Collection {
-    const next: Collection = { ...c, schemaVersion: SCHEMA_VERSION, version: (c.version ?? 0) + 1, updatedAt: new Date().toISOString() };
-    writeJson(this.collectionFile(c.id), next);
+    const meta = this.readLocalMeta();
+    const before = meta.collections[c.id];
+    const next: Collection = { ...c, schemaVersion: SCHEMA_VERSION, version: Math.max(before?.version ?? 0, c.version ?? 0) + 1, updatedAt: new Date().toISOString() };
+    writeJson(this.collectionFile(c.id), collectionFileContent(next));
+    meta.collections[c.id] = { version: next.version, updatedAt: next.updatedAt };
+    mkdirSync(join(this.root, '.local'), { recursive: true });
+    writeJson(this.localMetaFile(), meta);
     return next;
   }
 
@@ -659,7 +690,7 @@ export class WorkspaceManager {
       recursive: true,
       filter: (s) => {
         const top = relative(templateDir, s).split(/[\\/]/)[0] ?? '';
-        return !['runs', 'traces', 'payloads', 'reports', 'baselines', 'trash'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
+        return !['runs', 'traces', 'payloads', 'reports', 'baselines', 'trash', '.local'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
       },
     });
     // everything in the template was offered: later versions add only what is new (addTemplateAdditions)
@@ -745,4 +776,24 @@ export class WorkspaceManager {
     }
     return store;
   }
+}
+
+/** Save counters and times of this computer's saves (`.local/meta.json`, not shared). */
+interface LocalMeta {
+  collections: Record<string, { version: number; updatedAt: string }>;
+}
+
+/** The first keys of a collection file, in this order; any others follow, sorted (stable files for git). */
+const COLLECTION_KEY_ORDER = ['schemaVersion', 'id', 'name', 'description', 'variables', 'auth', 'preRequestScript', 'testScript', 'items'];
+
+/** What a collection file holds: no `version` / `updatedAt` (they are this computer's, see LocalMeta), keys in a fixed order. */
+export function collectionFileContent(c: Collection): Record<string, unknown> {
+  const { version: _v, updatedAt: _u, ...rest } = c as Collection & Record<string, unknown>;
+  void _v;
+  void _u;
+  const known = COLLECTION_KEY_ORDER.filter((k) => k in rest);
+  const others = Object.keys(rest)
+    .filter((k) => !COLLECTION_KEY_ORDER.includes(k))
+    .sort();
+  return Object.fromEntries([...known, ...others].map((k) => [k, (rest as Record<string, unknown>)[k]]));
 }

@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "id": "soap",
   "name": "SOAP services",
-  "version": 1,
+  "description": "A public SOAP service, imported from its WSDL (Import ▸ link: https://www.dataaccess.com/webservicesserver/NumberConversion.wso?WSDL). Each operation has its SOAPAction and an envelope built from the XML Schema; the tests read the XML reply with xml2Json.",
   "variables": [
     {
       "key": "baseUrl",
@@ -450,7 +450,5 @@
         }
       ]
     }
-  ],
-  "description": "A public SOAP service, imported from its WSDL (Import ▸ link: https://www.dataaccess.com/webservicesserver/NumberConversion.wso?WSDL). Each operation has its SOAPAction and an envelope built from the XML Schema; the tests read the XML reply with xml2Json.",
-  "updatedAt": "2026-09-30T00:00:00.000Z"
+  ]
 }

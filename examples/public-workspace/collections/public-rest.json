@@ -3,9 +3,7 @@
   "id": "public-rest",
   "name": "Public REST APIs (playground)",
   "description": "Free public APIs made for trying an API client: logins that return tokens, full create-read-update-delete flows, API keys, pagination, errors and plain open data. No account needed. Run a folder in order (▶) to see values flow from one request to the next.",
-  "version": 1,
   "variables": [],
-  "updatedAt": "2026-10-01T00:00:00.000Z",
   "items": [
     {
       "kind": "folder",

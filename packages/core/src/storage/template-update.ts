@@ -15,7 +15,7 @@ import { readJson, writeJson } from './fsutil.js';
 export const OFFERED_FILE = '.template-offered.json';
 
 /** Folders of a workspace that hold the user's results, never template content. */
-const SKIP_TOP = new Set(['runs', 'traces', 'payloads', 'reports', 'baselines', 'trash']);
+const SKIP_TOP = new Set(['runs', 'traces', 'payloads', 'reports', 'baselines', 'trash', '.local']);
 const SKIP_FILE = /^(database\.sqlite.*|metadata\.jsonl|\.template-offered\.json)$/;
 
 interface Node {

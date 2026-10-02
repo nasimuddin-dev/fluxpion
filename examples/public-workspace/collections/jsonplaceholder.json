@@ -3,10 +3,14 @@
   "id": "jsonplaceholder",
   "name": "Scripts & chaining (JSONPlaceholder)",
   "description": "A fake blog API from [JSONPlaceholder](https://jsonplaceholder.typicode.com). Writes are simulated: the server answers as if it saved them.\n\nThe requests pass data along with scripts: **List posts** saves the first post's id in `postId`, and the next requests use `{{postId}}`. Run the collection in order to see it (right-click ▸ **Run collection**). **Posts as a table** draws the response with `pm.visualizer` (open the **Visualize** tab of the response).",
-  "version": 1,
-  "variables": [{ "key": "userId", "value": "1", "enabled": true }],
+  "variables": [
+    {
+      "key": "userId",
+      "value": "1",
+      "enabled": true
+    }
+  ],
   "preRequestScript": "// runs before every request in this collection\npm.variables.set('requestedAt', new Date().toISOString());",
-  "updatedAt": "2026-09-29T00:00:00.000Z",
   "items": [
     {
       "kind": "http",
@@ -15,11 +19,24 @@
       "request": {
         "method": "GET",
         "url": "{{jsonplaceholder}}/posts",
-        "params": [{ "key": "userId", "value": "{{userId}}", "enabled": true }]
+        "params": [
+          {
+            "key": "userId",
+            "value": "{{userId}}",
+            "enabled": true
+          }
+        ]
       },
       "assertions": [
-        { "type": "status", "expected": 200 },
-        { "type": "greater-than", "path": "$.length", "expected": 0 }
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "greater-than",
+          "path": "$.length",
+          "expected": 0
+        }
       ],
       "testScript": "const posts = pm.response.json();\npm.test('every post belongs to the user', () => {\n  for (const p of posts) pm.expect(p.userId).to.eql(Number(pm.collectionVariables.get('userId')));\n});\n// pass the first post's id to the next requests\npm.collectionVariables.set('postId', posts[0].id);\nconsole.log('Saved postId', posts[0].id);"
     },
@@ -27,8 +44,20 @@
       "kind": "http",
       "id": "jp-get",
       "name": "Get the post",
-      "request": { "method": "GET", "url": "{{jsonplaceholder}}/posts/{{postId}}" },
-      "assertions": [{ "type": "status", "expected": 200 }, { "type": "exists", "path": "$.title" }],
+      "request": {
+        "method": "GET",
+        "url": "{{jsonplaceholder}}/posts/{{postId}}"
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "exists",
+          "path": "$.title"
+        }
+      ],
       "testScript": "pm.test('it is the post we asked for', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('postId'))));"
     },
     {
@@ -38,11 +67,24 @@
       "request": {
         "method": "GET",
         "url": "{{jsonplaceholder}}/posts/:id/comments",
-        "pathVariables": [{ "key": "id", "value": "{{postId}}", "enabled": true }]
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "{{postId}}",
+            "enabled": true
+          }
+        ]
       },
       "assertions": [
-        { "type": "status", "expected": 200 },
-        { "type": "contains", "path": "$[0].email", "expected": "@" }
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "contains",
+          "path": "$[0].email",
+          "expected": "@"
+        }
       ]
     },
     {
@@ -52,16 +94,32 @@
       "request": {
         "method": "POST",
         "url": "{{jsonplaceholder}}/posts",
-        "headers": [{ "key": "Content-Type", "value": "application/json; charset=UTF-8", "enabled": true }],
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json; charset=UTF-8",
+            "enabled": true
+          }
+        ],
         "body": {
           "type": "json",
           "content": "{\n  \"title\": \"Hello from {{appName}}\",\n  \"body\": \"Created at {{requestedAt}}\",\n  \"userId\": {{userId}}\n}"
         }
       },
       "assertions": [
-        { "type": "status", "expected": 201 },
-        { "type": "equals", "path": "$.title", "expected": "Hello from TestPion" },
-        { "type": "exists", "path": "$.id" }
+        {
+          "type": "status",
+          "expected": 201
+        },
+        {
+          "type": "equals",
+          "path": "$.title",
+          "expected": "Hello from TestPion"
+        },
+        {
+          "type": "exists",
+          "path": "$.id"
+        }
       ]
     },
     {
@@ -71,20 +129,44 @@
       "request": {
         "method": "PATCH",
         "url": "{{jsonplaceholder}}/posts/{{postId}}",
-        "headers": [{ "key": "Content-Type", "value": "application/json", "enabled": true }],
-        "body": { "type": "json", "content": "{ \"title\": \"Updated title\" }" }
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "type": "json",
+          "content": "{ \"title\": \"Updated title\" }"
+        }
       },
       "assertions": [
-        { "type": "status", "expected": 200 },
-        { "type": "equals", "path": "$.title", "expected": "Updated title" }
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "equals",
+          "path": "$.title",
+          "expected": "Updated title"
+        }
       ]
     },
     {
       "kind": "http",
       "id": "jp-delete",
       "name": "Delete the post",
-      "request": { "method": "DELETE", "url": "{{jsonplaceholder}}/posts/{{postId}}" },
-      "assertions": [{ "type": "status", "expected": 200 }]
+      "request": {
+        "method": "DELETE",
+        "url": "{{jsonplaceholder}}/posts/{{postId}}"
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        }
+      ]
     },
     {
       "kind": "http",
@@ -93,9 +175,20 @@
       "request": {
         "method": "GET",
         "url": "{{jsonplaceholder}}/posts",
-        "params": [{ "key": "_limit", "value": "8", "enabled": true }]
+        "params": [
+          {
+            "key": "_limit",
+            "value": "8",
+            "enabled": true
+          }
+        ]
       },
-      "assertions": [{ "type": "status", "expected": 200 }],
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        }
+      ],
       "testScript": "const template = `\n<style>table{border-collapse:collapse;font:13px system-ui}td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}</style>\n<table>\n  <tr><th>#</th><th>Title</th></tr>\n  {{#each posts}}<tr><td>{{id}}</td><td>{{title}}</td></tr>{{/each}}\n</table>`;\npm.visualizer.set(template, { posts: pm.response.json() });"
     },
     {
@@ -111,24 +204,43 @@
           "request": {
             "method": "POST",
             "url": "{{jsonplaceholder}}/users",
-            "headers": [{ "key": "Content-Type", "value": "application/json; charset=UTF-8", "enabled": true }],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=UTF-8",
+                "enabled": true
+              }
+            ],
             "body": {
               "type": "json",
               "content": "{\n  \"name\": \"{{$randomFullName}}\",\n  \"email\": \"{{$randomEmail}}\",\n  \"address\": { \"city\": \"{{$randomCity}}\" },\n  \"externalId\": \"{{$guid}}\",\n  \"joined\": \"{{$isoTimestamp}}\"\n}"
             }
           },
           "testScript": "const user = pm.response.json();\npm.test('the server echoes the fake user', () => {\n  pm.expect(user.email).to.match(/@example\\.test$/);\n  pm.expect(user.externalId).to.match(/^[0-9a-f-]{36}$/);\n  pm.expect(user.address.city).to.not.include('{{');\n});\nconsole.log('created', user.name, 'from', user.address.city);",
-          "assertions": [{ "type": "status", "expected": 201 }]
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 201
+            }
+          ]
         },
         {
           "kind": "http",
           "id": "jp-lodash-moment",
           "name": "lodash, moment and a JSON Schema",
           "description": "Scripts can use lodash (`_`), `moment` and JSON Schema checks, like in Postman.",
-          "request": { "method": "GET", "url": "{{jsonplaceholder}}/posts?userId={{userId}}" },
+          "request": {
+            "method": "GET",
+            "url": "{{jsonplaceholder}}/posts?userId={{userId}}"
+          },
           "preRequestScript": "// moment: a date for the request (times are UTC)\npm.variables.set('since', moment().subtract(30, 'days').format('YYYY-MM-DD'));",
           "testScript": "const posts = pm.response.json();\npm.test('every post has a title (lodash)', () => pm.expect(_.every(posts, 'title')).to.be.true);\npm.test('all from the same user (lodash)', () => pm.expect(_.uniq(_.map(posts, 'userId'))).to.eql([Number(pm.variables.get('userId'))]));\npm.test('matches the schema', () => pm.response.to.have.jsonSchema({\n  type: 'array',\n  items: { type: 'object', required: ['id', 'title', 'body', 'userId'], properties: { id: { type: 'integer' }, title: { type: 'string' } } },\n}));\nconsole.log('since', pm.variables.get('since'), '→', posts.length, 'posts');",
-          "assertions": [{ "type": "status", "expected": 200 }]
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ]
         }
       ]
     }

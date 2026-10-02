@@ -3,9 +3,7 @@
   "id": "graphql-public",
   "name": "GraphQL (public APIs)",
   "description": "Public GraphQL APIs: countries, Rick and Morty, Star Wars, GraphQLZero (with mutations), AniList and Pokémon. Press **Introspect** for autocomplete and the schema explorer.",
-  "version": 1,
   "variables": [],
-  "updatedAt": "2026-09-29T00:00:00.000Z",
   "items": [
     {
       "kind": "folder",

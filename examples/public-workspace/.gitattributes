@@ -1,0 +1,5 @@
+# TestPion: the same line endings on Windows, macOS and Linux
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.sqlite binary

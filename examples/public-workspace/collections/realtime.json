@@ -3,8 +3,6 @@
   "id": "realtime",
   "name": "WebSocket & MQTT",
   "description": "Live connections: WebSocket echo servers and a public MQTT broker. Open one, press **Connect**, then send a message.",
-  "version": 1,
   "variables": [],
-  "updatedAt": "2026-09-29T00:00:00.000Z",
   "items": []
 }
