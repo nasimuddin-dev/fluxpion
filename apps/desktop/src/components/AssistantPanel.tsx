@@ -135,7 +135,18 @@ export function AssistantPanel() {
         ) : (
           error && <ErrorPanel error={error} />
         )}
-        {free && !turns.length && !busy && !error && <p className="text-muted">Ask about an API error, a GraphQL schema, an MCP tool, or how to write a test. Follow-up questions remember the conversation.</p>}
+        {free && !turns.length && !busy && !error && (
+          <div className="flex flex-col gap-3">
+            <p className="text-muted">Ask about an API error, a GraphQL schema, an MCP tool, or how to write a test. Follow-up questions remember the conversation.</p>
+            <div className="flex flex-col items-start gap-1.5" aria-label="Suggested questions">
+              {suggestedQuestions(viewCtx).map((q) => (
+                <button key={q} className="text-left text-sm rounded-lg border border-line px-2.5 py-1.5 hover:bg-hover hover:border-accent/40 transition-colors" onClick={() => void ask(q)} data-suggestion>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div ref={end} />
       </div>
       <div className="p-3 border-t border-line flex flex-col gap-2">
@@ -173,6 +184,21 @@ export function AssistantPanel() {
       </div>
     </aside>
   );
+}
+
+/** Questions worth asking about what is on screen: a failure first, then explaining it, then what to check. */
+export function suggestedQuestions(view?: ViewContext): string[] {
+  const c = view?.context as
+    | { response?: { status?: number; errors?: unknown[] }; error?: unknown; graphql?: unknown; grpc?: unknown; result?: { code?: number }; connection?: unknown; mcpServer?: unknown; tools?: unknown[] }
+    | undefined;
+  if (!c) return ['How do I use a value from one response in the next request?', 'How do I run my tests in CI?', 'What can I test with an MCP server?'];
+  const failed = !!c.error || (c.response?.status ?? 0) >= 400 || !!c.response?.errors?.length || (c.result?.code ?? 0) > 0;
+  if (c.mcpServer) return c.error ? ['Why does the connection fail?', 'How do I set up this server?'] : ['What can this server do?', 'Which tool should I try first, and with what arguments?', 'How do I test these tools automatically?'];
+  if (c.connection) return ['Explain these messages', 'How do I test this connection automatically?'];
+  const what = c.graphql ? 'query' : c.grpc ? 'call' : 'request';
+  if (failed) return [`Why did this ${what} fail?`, 'How do I fix it?', 'Which checks would catch this?'];
+  if (c.response || c.result) return [`Explain this ${c.grpc ? 'call' : 'response'}`, 'Which checks should I add?', 'How do I use a value from it in the next request?'];
+  return c.graphql ? ['Explain this query', 'Which checks should I add?', 'Write a query for related data'] : [`What will this ${what} do?`, 'How do I add authentication?', 'Which checks should I add?'];
 }
 
 /** The first fenced code block of an answer, or the whole answer when it has none. */

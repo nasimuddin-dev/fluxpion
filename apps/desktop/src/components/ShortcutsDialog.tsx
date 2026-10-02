@@ -15,6 +15,7 @@ const GROUPS: Array<{ title: string; items: Array<{ keys: string[][]; text: stri
       { keys: [[alt, '←'], [alt, '→']], text: 'Back / forward to where you were (also the mouse back and forward buttons)' },
       { keys: [[modKey, 'B']], text: 'Show or hide the Collections explorer' },
       { keys: [[modKey, ',']], text: 'Settings' },
+      { keys: [[modKey, 'J']], text: 'Ask the AI assistant about what is on screen (again: close it)' },
       { keys: [[modKey, alt, 'C']], text: 'Show or hide the console' },
       { keys: [[modKey, alt, '1…9']], text: 'Go to a view (REST, GraphQL, WebSocket …)' },
       { keys: [['?']], text: 'This list (outside a text field)' },

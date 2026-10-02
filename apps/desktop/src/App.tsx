@@ -235,6 +235,11 @@ export default function App() {
         const st = useApp.getState();
         if (isRequestView(st.view)) st.toggleExplorer();
         else (st.setView(st.lastRequestView), st.toggleExplorer(true));
+      } else if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
+        // the AI assistant, with what is on screen (again: close it)
+        e.preventDefault();
+        const open = useApp.getState().assistant;
+        set({ assistant: open?.task === 'free' ? undefined : { task: 'free', title: 'Ask the assistant', context: {} } });
       } else if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         set({ paletteOpen: true, searchOpen: false });

@@ -81,6 +81,18 @@ const steps = [
   ['context-grpc', contextOf('Add two numbers')],
   ['context-websocket', contextOf('Postman echo')],
   ['context-mcp', contextOf('Weather (offline mock)')],
+  ['shortcut-and-suggestions', `(async () => {
+    const ctrlJ = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', ctrlKey: true, bubbles: true }));
+    ctrlJ(); await __t.sleep(700);
+    const chips = [...(${panel}?.querySelectorAll('[data-suggestion]') ?? [])].map((b) => b.textContent.trim());
+    if (!chips.length) return 'NO BUTTON suggestion';
+    ${panel}.querySelector('[data-suggestion]').click(); await __t.sleep(300);
+    for (let i = 0; i < 60 && ${stopButton}; i++) await __t.sleep(150);
+    await __t.sleep(300);
+    const s = ${state};
+    ctrlJ(); await __t.sleep(500);
+    return 'chips: ' + chips.join(' / ') + ' | ' + s + ' | open after Ctrl+J: ' + !!${panel};
+  })()`],
   ['apply-checks', `(async () => {
     await __t.requests();
     const plus = document.querySelector('[aria-label="New tab"]'); plus.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); await __t.sleep(500);
@@ -152,6 +164,8 @@ module.exports = withExpect(
     'context-grpc': /\| Context: gRPC Sum · \{\{grpcHost\}\}$/,
     'context-websocket': /\| Context: WebSocket \{\{wsEcho\}\} · closed$/,
     'context-mcp': /\| Context: MCP Weather \(offline mock\)$/,
+    // Ctrl+J opens the assistant with questions that fit the open MCP server; a click asks one; Ctrl+J closes it
+    'shortcut-and-suggestions': /^chips: What can this server do\? \/ .* \| questions: 1 \| answers: 1 \| context: none \| last: Mock response: Question: What can this server do\? Context: .*Weather.* \| open after Ctrl\+J: false$/,
     // an answer can be put to use where it was asked for
     'apply-coverage': /^button: Save as a test file \| toast: Saved tests\/coverage\/[\w-]+-gaps\.yaml.*Open \| file: tests: - id: pet-not-found/,
     'apply-checks': (r) => {
