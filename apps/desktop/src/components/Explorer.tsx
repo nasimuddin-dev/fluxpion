@@ -1,10 +1,10 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Trash2, Unplug, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Star, Trash2, Unplug, Upload } from 'lucide-react';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
 import { uid } from '../lib/format';
-import { addToFolder, CATEGORY_META, CollectionTree, savedItemDragProps, type ExtraGroup } from './CollectionTree';
+import { addToFolder, CATEGORY_META, CollectionTree, mapNodes, savedItemDragProps, type ExtraGroup } from './CollectionTree';
 import type { RequestCategory } from '../lib/collection-filter';
 import { closeTabsFor, newRequestItems, useEditorTabsStore } from './EditorTabs';
 import { ExportDialog } from './ExportDialog';
@@ -287,6 +287,13 @@ export function Explorer() {
   const shownFilter = useDeferredValue(filter);
   const allCollections = useCollections();
   const collections = useMemo(() => allCollections.filter((x) => !x.problem), [allCollections]);
+  // requests starred with ⋯ ▸ Add to favorites, in every collection
+  const favorites = useMemo(() => {
+    const out: Array<{ c: Collection; n: Extract<CollectionNode, { kind: 'http' | 'graphql' }> }> = [];
+    const walk = (c: Collection, nodes: CollectionNode[]) => nodes.forEach((n) => (n.kind === 'folder' ? walk(c, n.items) : n.favorite && (n.kind === 'http' || n.kind === 'graphql') && out.push({ c, n })));
+    collections.forEach((c) => walk(c, c.items));
+    return out;
+  }, [collections]);
   const [grpc, setGrpc] = useState<SavedItem[]>([]);
   const [looseOpen, setLooseOpen] = useState(true);
   const [sockets, setSockets] = useState<SavedItem[]>([]);
@@ -354,6 +361,7 @@ export function Explorer() {
   const looseGrpc = loose(grpc).filter((i) => match(i.name, i.folder));
   const looseSockets = loose(sockets).filter((i) => match(i.name, i.folder));
   const shownServers = servers.filter((s) => match(s.name, s.transport));
+  const shownFavorites = favorites.filter(({ c, n }) => match(n.name, c.name));
   const shownSpecs = specs.filter((s) => match(s));
 
   const intent = useApp.getState().openIntent;
@@ -651,6 +659,36 @@ export function Explorer() {
       </div>
       {/* keyboard, like a file tree: ↑ ↓ move between rows, → expands, ← collapses (Enter opens, F2 renames, Delete deletes) */}
       <div className="flex-1 overflow-auto" onKeyDown={treeKeys}>
+        {/* favorite requests from every collection, one click away (⋯ ▸ Add to favorites on a request) */}
+        {favorites.length > 0 && (
+          <Section id="favorites" title="Favorites" icon={<Star size={14} />} count={favorites.length} sections={sections} def forceOpen={!!f && shownFavorites.length > 0}>
+            {shownFavorites.map(({ c, n }) => (
+              <Row
+                key={`fav-${n.id}`}
+                id={`fav-${n.id}`}
+                icon={
+                  <span className={cx('mono method-badge text-[0.6rem] font-bold w-8 inline-block', n.kind === 'http' ? `method-${n.request.method}` : 'text-[#e535ab]')}>
+                    {(n.kind === 'http' ? n.request.method : 'GQL').slice(0, 5)}
+                  </span>
+                }
+                label={n.name}
+                sub={c.name}
+                title={`${n.name} (${c.name})`}
+                active={openRequestId === n.id}
+                onClick={() => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
+                menu={[
+                  { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id }) },
+                  {
+                    label: 'Remove from favorites',
+                    icon: <Star size={14} />,
+                    separator: true,
+                    onSelect: () => void saveCollection({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: false } : x)) }),
+                  },
+                ]}
+              />
+            ))}
+          </Section>
+        )}
         {collections.length ? (
           <div className="pb-2 border-b border-line/60">
             <CollectionTree

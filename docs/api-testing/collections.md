@@ -21,7 +21,9 @@ For scripts and agents: `testpion requests "My API" --health --json` in the CLI 
 
 ## Favorites
 
-To keep frequently used endpoints close at hand, choose **Add to favorites** from a REST or GraphQL request's **⋯** menu. In the REST view, select the star beside **Filter requests** to show only favorites. Their parent folders stay visible so the request's place in the collection remains clear. Favorites are stored with the request in the collection JSON and can be removed from the same menu.
+To keep frequently used endpoints close at hand, choose **Add to favorites** from a REST or GraphQL request's **⋯** menu (or right-click). The request gets a star in the tree and appears in the **Favorites** section at the top of the explorer, with its collection's name; click it to open it, or use its menu to remove it. Favorites are stored with the request in the collection JSON.
+
+To open or fold a whole collection or folder at once, use **Expand all** / **Collapse all** in its **⋯** menu (the explorer's **Collapse all** button folds every collection).
 
 ## Request menu
 

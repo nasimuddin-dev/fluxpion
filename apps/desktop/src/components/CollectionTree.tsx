@@ -1,4 +1,4 @@
-import { Plus, AlarmClock, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
+import { Plus, AlarmClock, ChevronsDownUp, ChevronsUpDown, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call, on } from '../api';
@@ -390,6 +390,29 @@ export function CollectionTree({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapseAll]);
+  /**
+   * Expand or collapse everything inside a collection (its categories, folders and saved-item folders), or inside one
+   * folder. The collection or folder itself stays open, so what it holds shows (expanded) or folds to one level.
+   */
+  const setSubtree = (c: Collection, folder: CollectionFolder | undefined, shown: boolean) => {
+    const keys: string[] = [];
+    const walk = (nodes: CollectionNode[]) => nodes.forEach((n) => n.kind === 'folder' && (keys.push(n.id), walk(n.items)));
+    walk(folder ? folder.items : c.items);
+    if (!folder) {
+      for (const cat of ['rest', 'soap', 'graphql', 'grpc', 'websocket'] as RequestCategory[]) keys.push(`${c.id}:cat:${cat}`);
+      // folders of saved gRPC calls and connections, and anything else remembered under this collection
+      for (const k of Object.keys(open)) if (k.startsWith(`${c.id}:`)) keys.push(k);
+    }
+    setOpen((o) => {
+      const next = { ...o, ...Object.fromEntries(keys.map((k) => [k, shown])), [folder?.id ?? c.id]: true };
+      try {
+        localStorage.setItem('aps.tree.open', JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  };
   // reveal the open request: scroll its row into view when it changes (a tab, search or history opened it)
   const treeRef = useRef<HTMLDivElement>(null);
   const lastReveal = useRef(revealKey);
@@ -471,6 +494,8 @@ export function CollectionTree({
                 open={menuFor === n.id}
                 onOpenChange={(o) => setMenuFor(o ? n.id : undefined)}
                 onEdit={() => setEditing({ c, folder: n })}
+                onExpandAll={() => setSubtree(c, n, true)}
+                onCollapseAll={() => setSubtree(c, n, false)}
                 onMove={() => setMoving({ c, n })}
                 onRename={() => void renameNode(c, n)}
                 onDuplicate={() => onChange({ ...c, items: duplicateNode(c.items, n.id, (x) => ({ ...withNewIds(x), name: `${x.name} copy` })) })}
@@ -522,6 +547,7 @@ export function CollectionTree({
           <button className="flex items-center gap-2 flex-1 min-w-0 text-left pl-4" onClick={() => onOpen(c, n)} onKeyDown={rowKeys(c, n)} data-tree-row data-rename-id={n.id} title="Enter opens · F2 renames · Delete deletes">
             <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
+            {n.favorite && <Star size={11} className="shrink-0 text-warn fill-current" aria-label="Favorite" data-favorite />}
           </button>
           )}
           <NodeMenu
@@ -795,6 +821,8 @@ export function CollectionTree({
                   open={menuFor === c.id}
                   onOpenChange={(o) => setMenuFor(o ? c.id : undefined)}
                   onRename={() => setRenaming(c.id)}
+                  onExpandAll={() => setSubtree(c, undefined, true)}
+                  onCollapseAll={() => setSubtree(c, undefined, false)}
                   onDuplicate={() => void duplicateCollection(c)}
                   onDelete={() => void deleteCollection(c)}
                   otherNew={
@@ -863,6 +891,8 @@ function NodeMenu({
   onRun,
   runLabel = 'Run',
   onMonitor,
+  onExpandAll,
+  onCollapseAll,
   onOpen,
   copyItems,
   otherNew,
@@ -891,6 +921,9 @@ function NodeMenu({
   favorite?: boolean;
   onRun?(): void;
   runLabel?: string;
+  /** Expand / collapse everything inside it (collections and folders). */
+  onExpandAll?(): void;
+  onCollapseAll?(): void;
   /** Run it on a schedule (opens Monitors with a new monitor). */
   onMonitor?(): void;
   /** Open the request (in a tab). */
@@ -914,6 +947,7 @@ function NodeMenu({
   const item = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}): MenuItem | undefined => (fn ? { label, icon, onSelect: fn, ...extra } : undefined);
   group(item(newRequestLabel, <FilePlus2 size={14} />, onNewRequest), ...(otherNew ?? []), item('New folder', <FolderPlus size={14} />, onNewFolder));
   group(item('Open in tab', <ExternalLink size={14} />, onOpen));
+  group(item('Expand all', <ChevronsUpDown size={14} />, onExpandAll), item('Collapse all', <ChevronsDownUp size={14} />, onCollapseAll));
   group(item(runLabel, <Play size={14} />, onRun), item('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor), ...(runItems ?? []));
   group(item('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit), ...(configItems ?? []));
   group(...(copyItems ?? []));

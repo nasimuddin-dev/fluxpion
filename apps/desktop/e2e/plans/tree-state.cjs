@@ -32,6 +32,23 @@ const steps = [
     })()`,
   ],
   [
+    'collection-expand-collapse-all',
+    `(async () => {
+      await __t.requests();
+      const coll = () => [...document.querySelectorAll('aside [data-tree-row]')].find((b) => b.offsetParent && b.textContent.trim().startsWith('HTTP basics'));
+      const pick = async (label) => {
+        coll().parentElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 }));
+        const item = await __t.waitFor(() => [...document.querySelectorAll('[role=menuitem]')].find((m) => m.textContent.trim() === label), 2000);
+        if (!item) return false; item.click(); await __t.sleep(800); return true;
+      };
+      if (!(await pick('Expand all'))) return 'NO MENU Expand all';
+      const expanded = ${requestRows};
+      const folders = [...document.querySelectorAll('aside [data-tree-row][aria-expanded="false"]')].filter((b) => b.offsetParent && /Authentication|Cookies|Requests/.test(b.textContent)).length;
+      if (!(await pick('Collapse all'))) return 'NO MENU Collapse all';
+      return 'expanded request rows: ' + expanded + ' | closed folders after expand: ' + folders + ' | after collapse: ' + ${requestRows} + ' | collection still open: ' + coll().getAttribute('aria-expanded');
+    })()`,
+  ],
+  [
     'test-file-badges',
     `(async () => {
       await __t.view('Tests'); await __t.sleep(1000);
@@ -44,6 +61,8 @@ const steps = [
 module.exports = withExpect(steps, {
   'open-two': /^tabs: [2-9] \| request rows shown: (1\d|[2-9]\d)$/,
   'collapse-close-switch': /^after collapse: 0 \| after close: 0 \| after switch: 0$/,
+  // the collection's menu expands everything inside it (all 17 HTTP basics requests), then folds it back
+  'collection-expand-collapse-all': /^expanded request rows: 17 \| closed folders after expand: 0 \| after collapse: 0 \| collection still open: true$/,
   'test-file-badges': (r) => {
     const m = /^(\d+) of (\d+) files have a badge \| /.exec(r);
     return (m && +m[1] === +m[2] && +m[2] > 10) || 'every test file should have a badge';
