@@ -21,14 +21,14 @@ describe('CLI: collections and requests', () => {
     const r = cli('collections', '--json');
     expect(r.status, r.err).toBe(0);
     const rows = JSON.parse(r.out) as Array<{ id: string; requests: number; grpcCalls: number; connections: number }>;
-    expect(rows.find((c) => c.id === 'grpc')).toMatchObject({ requests: 0, grpcCalls: 3, connections: 0 });
-    expect(rows.find((c) => c.id === 'realtime')).toMatchObject({ grpcCalls: 0, connections: 3 });
+    expect(rows.find((c) => c.id === 'grpc')).toMatchObject({ requests: 0, grpcCalls: 9, connections: 0 });
+    expect(rows.find((c) => c.id === 'realtime')).toMatchObject({ grpcCalls: 0, connections: 6 });
     expect(rows.find((c) => c.id === 'httpbin')!.requests).toBeGreaterThan(5);
   });
 
   it('lists what one collection holds', () => {
     const grpc = JSON.parse(cli('requests', 'gRPC (grpcb.in)', '--json').out) as Array<{ kind: string; target: string }>;
-    expect(grpc.map((r) => r.kind)).toEqual(['grpc', 'grpc', 'grpc']);
+    expect(grpc.map((r) => r.kind)).toEqual(Array(9).fill('grpc'));
     expect(grpc[0]!.target).toMatch(/\{\{grpcHost\}\} hello\.HelloService\//);
     const text = cli('requests', 'realtime').out;
     expect(text).toMatch(/MQTT\s+MQTT brokers \/ Mosquitto test broker/);
@@ -43,9 +43,9 @@ describe('CLI: collections and requests', () => {
     try {
       const call = async (tool: string, args: Record<string, unknown>) => JSON.parse(mcpResultBody(await s.callTool(tool, args)).text) as any;
       const cols = await call('list_collections', {});
-      expect(cols.find((c: any) => c.id === 'grpc')).toMatchObject({ grpcCalls: 3, connections: 0 });
+      expect(cols.find((c: any) => c.id === 'grpc')).toMatchObject({ grpcCalls: 9, connections: 0 });
       const items = await call('list_requests', { collection: 'WebSocket & MQTT' });
-      expect(items.map((i: any) => i.kind)).toEqual(['websocket', 'websocket', 'websocket']);
+      expect(items.map((i: any) => i.kind)).toEqual(Array(6).fill('websocket'));
       const one = await call('get_request', { collection: 'gRPC (grpcb.in)', request: 'Add two numbers' });
       expect(one).toMatchObject({ kind: 'grpc', name: 'Add two numbers', method: 'addsvc.Add/Sum', target: '{{grpcHost}}' });
     } finally {
