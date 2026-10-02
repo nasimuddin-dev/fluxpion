@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.41.1 — 2026-10-02
+
+- **Collection variables in the Environments view:** a new tab lists every collection's variables (an imported Postman collection keeps its variables there) and edits them, next to Environments, Workspace and Global variables.
+- **Workspace and Global variables** say what they are for, and when empty point to the collection variables.
+
 ## 0.41.0 — 2026-10-02
 
 ### Variables
