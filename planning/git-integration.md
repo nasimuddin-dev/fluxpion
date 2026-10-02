@@ -1,0 +1,72 @@
+# Git integration
+
+Keep a TestPion workspace in git: commit, branch, review and merge API collections, environments and tests like code, inside the app or with any git tool.
+
+## Why it fits TestPion
+
+A workspace is already a folder of text files: `collections/*.json`, `environments/*.json`, `tests/**/*.yaml`, `library/*.json`, `mocks/`, `specs/`, `datasets/`. Secret values are not in it (they live in the OS secret store, referenced as `{{$secret.…}}`), and current values live outside it (`current-values/`). The CLI (`testpion test`, `testpion run-collection`) already runs straight from the folder in CI. Git is a natural home; what is missing is that the files must merge cleanly, and the app must do git for people who don't use a terminal.
+
+### How the others do it
+
+- **Insomnia Git Sync:** clone a repository into the app, branches, commit, push and pull inside the app; its files live in a special folder; conflicts are handled per file.
+- **Bruno:** plain `.bru` files (one per request) in a folder you manage with git yourself; in-app git only in a paid edition.
+- **Postman:** forks, pull requests and merges inside its cloud; git sync only for API definitions on paid plans.
+
+**TestPion's position:** plain files that any git tool works with (like Bruno), plus an in-app Git panel that speaks in requests rather than lines (like Insomnia, but better), plus merging that understands collections (no one has this).
+
+## What is in the way today (found in the code, 2026-10-02)
+
+1. **Every save changes `version` and `updatedAt` in the collection file** (`WorkspaceStore.saveCollection`). Two people who edit different requests of one collection always get a merge conflict on those lines, and every save makes a diff.
+2. **The app does not watch the workspace folder.** After `git pull`, a branch switch or an edit in another tool, the app shows stale data until it is restarted, and a save would overwrite the newer files.
+3. **No `.gitignore` / `.gitattributes`.** Runs, traces, payloads, reports and the local database (`database.sqlite`) would be committed; Windows line endings would make every line differ.
+4. **One JSON file per collection.** Fine for merging by id with a merge driver (Phase 3); without one, git merges JSON line by line.
+5. **Secrets can still be typed in** as plain values (the collection lint finds them): a commit could publish a token.
+
+## Phase 1: git-friendly workspace (local, no UI for git)
+
+Useful on its own: committing a workspace by hand works well after this phase.
+
+- [ ] **GIT-101 Stable files** (M). Collection, environment and library files no longer contain `version` / `updatedAt` (they move to the MetaStore, keyed by id); keys are written in a fixed order; arrays keep their order; JSON is pretty-printed with a trailing newline. A migration rewrites old files once. *Accept:* saving one request changes only that request's lines; round-trip tests for every file kind; old workspaces open and are migrated.
+- [ ] **GIT-102 `.gitignore` and `.gitattributes`** (S). New workspaces (and `testpion init`) get a `.gitignore` for `runs/ traces/ payloads/ reports/ baselines/ trash/ database.sqlite* metadata.jsonl .template-offered.json` and a `.gitattributes` with `* text=auto eol=lf`; existing workspaces get them offered once ("Make this workspace git-ready"). *Accept:* `git status` after a run shows no run files.
+- [ ] **GIT-103 Watch the workspace folder** (L). The backend watches the workspace (debounced, ignoring its own writes) and reloads changed collections, environments, tests and library files; the UI refreshes through an event. A request open with unsaved edits whose file changed underneath asks "Keep mine / Take the new version / Compare". *Accept:* `git checkout other-branch` in a terminal updates the open app within a second; no lost edits; e2e plan that changes files on disk while the app runs. *Cloud:* the same event stream carries changes from other users later (CLD-401).
+- [ ] **GIT-104 Secret guard** (M). Before a commit (in the app, CLI and an optional git pre-commit hook `testpion git hook install`), the collection lint checks for secrets typed in as values (tokens, keys, passwords, private keys) and blocks with a list and a one-click "Move to a secret variable". *Accept:* a commit with a bearer token in a header is refused with the fix offered.
+- [ ] **GIT-105 Docs: "Keep your workspace in git"** (S). How to init, what is committed, secrets, CI with the CLI, team workflow.
+
+## Phase 2: Git panel in the app
+
+- [ ] **GIT-201 Git service** (L). `packages/core` gets a `GitService` interface: `status`, `diff`, `stage`, `commit`, `log`, `branches`, `switch`, `createBranch`, `fetch`, `pull` (merge or rebase), `push`, `clone`, `init`, `addRemote`, `conflicts`, `resolve`. Implementation 1: the system `git` (respects SSH keys, credential helpers, signing, hooks, LFS); implementation 2: isomorphic-git (pure JS) when `git` is missing and for the browser / cloud host. RPC handlers `git.*` in a new `handlers/git.ts`. *Accept:* the same tests pass against both implementations on a temp repository.
+- [ ] **GIT-202 Clone or connect** (M). Workspace menu: **Clone from Git…** (URL, folder, branch; opens it as a workspace) and **Connect to a Git repository…** for an existing workspace (init, add remote, first commit and push). Clone of a repo whose workspace is in a sub-folder is supported (`workspace.json` lookup).
+- [ ] **GIT-203 Credentials** (M). SSH keys via the system git; HTTPS tokens stored in the OS secret store (per host), offered by a "Sign in to GitHub / GitLab / Bitbucket / Azure DevOps" flow (OAuth device flow for GitHub and GitLab; a token for the others). Never written to the repository or logs.
+- [ ] **GIT-204 Status bar and badges** (M). Status bar: branch, ahead / behind, number of changed items; a click opens the Git panel. Explorer rows show **M** / **A** / **D** markers on changed requests, folders and collections (uniform badge component).
+- [ ] **GIT-205 Changes view, by meaning** (L). The Git panel lists changes as items, not files: "Payments ▸ Create invoice: URL and 2 headers changed", "Environment Staging: baseUrl changed", "tests/rest/orders.yaml: 1 test added". Each opens a side-by-side diff of that item (reusing the response / OpenAPI diff components); stage or discard per item.
+- [ ] **GIT-206 Commit, with AI** (M). Commit message box with **Write it with AI** (from the semantic changes, never with secret values); amend; sign-off; the secret guard (GIT-104) runs first.
+- [ ] **GIT-207 Branches** (M). Switch, create, rename, delete; switching with unsaved edits asks first; the app reloads through GIT-103.
+- [ ] **GIT-208 Pull and push** (M). Pull (merge by default, rebase optional), push, set upstream, progress and errors in plain words ("the remote has commits you don't have: pull first").
+- [ ] **GIT-209 History per request** (L). "History" on any request / collection / environment: the commits that changed it, a diff per commit, **Restore this version** (as a new change, never a hard reset).
+- [ ] **GIT-210 e2e plans** (M). A local bare repository as the remote in the e2e home: clone, change, commit, push, pull another clone's change, conflict path.
+
+## Phase 3: painless merging
+
+- [ ] **GIT-301 TestPion merge driver** (L). `testpion merge-driver %O %A %B %P` merges collection / environment / library JSON by id: edits to different requests, folders or variables combine automatically; the same field changed on both sides is a real conflict, written in a form the app can show. Registered in `.gitattributes` (`collections/*.json merge=testpion`) and in the repository's git config by GIT-202 (or `testpion git setup`). Works for terminal git users too.
+- [ ] **GIT-302 Conflict screen** (L). Per conflicting item: mine / theirs / both (for lists) / edit; a three-way view of the request (URL, params, headers, body, scripts, checks); finish with "Mark resolved and commit".
+- [ ] **GIT-303 One file per request (optional layout)** (XL). A collection stored as a folder: `collections/<collection>/collection.json` + `<folder>/<request>.yaml` (readable diffs, fewest conflicts; similar to Bruno). Chosen per workspace; the store reads both layouts; a converter moves between them. Needs its own design review (renames, ordering, ids in file names).
+- [ ] **GIT-304 Pull request helper** (M). After a push to a branch: "Open a pull request" (GitHub / GitLab / Azure DevOps link with the semantic change list as the description).
+
+## Phase 4: AI and automation
+
+- [ ] **GIT-401 CLI** (M). `testpion git status|diff|commit|log|branch|pull|push|setup|hook install` with `--json`; `testpion diff <rev1> <rev2>` prints the semantic diff of a workspace between two commits (useful in CI to comment on pull requests).
+- [ ] **GIT-402 MCP tools** (M). `git_status`, `git_diff` (semantic), `git_log`, `git_propose_commit` (stages and writes a message; the commit needs a human's confirmation in the app or `--yes` in CI), read-only by default.
+- [ ] **GIT-403 CI recipe** (S). GitHub Action / GitLab job that runs the workspace's tests on a pull request and posts the semantic diff and the results as a comment.
+
+## Cloud impact
+
+- The `GitService` interface lets the cloud host run the same operations server-side (isomorphic-git, or a git server per tenant), and the browser UI is unchanged (RPC).
+- In the cloud, a workspace can be **backed by a git repository** (GitHub App or GitLab integration): every cloud change is a commit; pushes from developers show up in the cloud workspace (CLD-602).
+- Credentials for cloud git are per user (OAuth apps), stored in the cloud secret vault, never shared with the team unless an admin sets up an organization-level integration.
+
+## Risks and decisions
+
+- **Line-based merge of JSON** without GIT-301 conflicts often: ship GIT-101 and GIT-301 before promoting team git use.
+- **Large binaries** (payloads, recordings) don't belong in the repo: `.gitignore` covers them; offer LFS only on request.
+- **Two writers** (the app and git) on the same files: GIT-103 must never overwrite a newer file; writes are atomic already (`atomicWrite`).
+- **Decision needed (owner):** keep one JSON per collection with the merge driver (simpler, Phase 3a) or invest in the per-request layout (GIT-303) as well.
