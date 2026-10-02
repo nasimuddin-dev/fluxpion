@@ -93,7 +93,17 @@ export function AssistantPanel() {
   const notSetUp = error && /AI assistant is off|No Claude API key|No AI provider/.test(error.message);
 
   return (
-    <aside className="w-[420px] shrink-0 border-l border-line bg-bg flex flex-col" aria-label="AI assistant">
+    <aside
+      className="w-[420px] shrink-0 border-l border-line bg-bg flex flex-col"
+      aria-label="AI assistant"
+      // Esc closes it like any panel (while an answer is being written, Esc stops it first)
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
+        e.preventDefault();
+        if (busy) stop();
+        else set({ assistant: undefined });
+      }}
+    >
       <div className="h-10 flex items-center gap-1 px-3 border-b border-line">
         <Bot size={16} className="text-judge shrink-0" />
         <span className="font-medium text-sm truncate ml-1">{req.title}</span>

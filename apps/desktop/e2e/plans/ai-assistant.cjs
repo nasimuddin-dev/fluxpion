@@ -91,7 +91,12 @@ const steps = [
     await __t.sleep(300);
     const s = ${state};
     ctrlJ(); await __t.sleep(500);
-    return 'chips: ' + chips.join(' / ') + ' | ' + s + ' | open after Ctrl+J: ' + !!${panel};
+    const closedByCtrlJ = !${panel};
+    // Esc in the question field closes it too
+    ctrlJ(); await __t.sleep(600);
+    ${panel}?.querySelector('input[aria-label="Question for the assistant"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await __t.sleep(400);
+    return 'chips: ' + chips.join(' / ') + ' | ' + s + ' | open after Ctrl+J: ' + !closedByCtrlJ + ' | open after Esc: ' + !!${panel};
   })()`],
   ['apply-checks', `(async () => {
     await __t.requests();
@@ -165,7 +170,7 @@ module.exports = withExpect(
     'context-websocket': /\| Context: WebSocket \{\{wsEcho\}\} · closed$/,
     'context-mcp': /\| Context: MCP Weather \(offline mock\)$/,
     // Ctrl+J opens the assistant with questions that fit the open MCP server; a click asks one; Ctrl+J closes it
-    'shortcut-and-suggestions': /^chips: What can this server do\? \/ .* \| questions: 1 \| answers: 1 \| context: none \| last: Mock response: Question: What can this server do\? Context: .*Weather.* \| open after Ctrl\+J: false$/,
+    'shortcut-and-suggestions': /^chips: What can this server do\? \/ .* \| questions: 1 \| answers: 1 \| context: none \| last: Mock response: Question: What can this server do\? Context: .*Weather.* \| open after Ctrl\+J: false \| open after Esc: false$/,
     // an answer can be put to use where it was asked for
     'apply-coverage': /^button: Save as a test file \| toast: Saved tests\/coverage\/[\w-]+-gaps\.yaml.*Open \| file: tests: - id: pet-not-found/,
     'apply-checks': (r) => {
