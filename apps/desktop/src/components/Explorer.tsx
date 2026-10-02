@@ -278,6 +278,11 @@ function useExplorerWidth() {
   return { width, handle };
 }
 
+/** The kind of a row (gRPC, WS, MQTT, MCP, API …), in the same small badge as a request's method; colours match the editor tabs. */
+function KindBadge({ text, cls }: { text: string; cls: string }) {
+  return <span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', cls)}>{text}</span>;
+}
+
 export function Explorer() {
   const ws = useApp((s) => s.workspace);
   const { width, handle } = useExplorerWidth();
@@ -704,7 +709,7 @@ export function Explorer() {
                     <div key={`${kind}:${g.folder ?? ''}`}>
                       {g.folder && <FolderLabel name={g.folder} />}
                       {g.items.map((i) => (
-                        <Row key={i.id} icon={<span className={cx('mono text-[0.6rem] font-bold w-8 inline-block', CATEGORY_META[kind].cls)}>{i.badge ?? CATEGORY_META[kind].badge}</span>} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} drag={savedItemDragProps(kind, i.id, i.name)} id={i.id} rename={renameSaved(kind, i.id)} />
+                        <Row key={i.id} icon={<KindBadge text={i.badge ?? CATEGORY_META[kind].badge} cls={CATEGORY_META[kind].cls} />} label={i.name} active={openRequestId === i.id} onClick={() => intent(kind, { savedId: i.id })} menu={moveMenu(kind, i)} drag={savedItemDragProps(kind, i.id, i.name)} id={i.id} rename={renameSaved(kind, i.id)} />
                       ))}
                     </div>
                   )),
@@ -720,9 +725,9 @@ export function Explorer() {
               <Row
                 key={s.id}
                 indent={inFolder}
-                icon={<span className={cx('block w-2 h-2 rounded-full', s.connected ? 'bg-ok' : 'bg-line-strong')} />}
+                icon={<KindBadge text="MCP" cls={s.connected ? 'text-ok' : 'text-accent'} />}
                 label={s.name}
-                sub={s.connected ? 'connected' : s.transport}
+                sub={s.connected ? 'connected' : s.transport === 'streamable-http' ? 'http' : s.transport}
                 title={`${s.name} (${s.connected ? 'connected' : 'not connected'})`}
                 active={openRequestId === s.id}
                 onClick={() => intent('mcp', { serverId: s.id })}
@@ -742,7 +747,7 @@ export function Explorer() {
               <Row
                 key={s}
                 indent={inFolder}
-                icon={<FileCode2 size={13} />}
+                icon={<KindBadge text="API" cls="text-[#8b5cf6]" />}
                 label={s.replace(/^specs\//, '')}
                 title={s}
                 active={openRequestId === s}

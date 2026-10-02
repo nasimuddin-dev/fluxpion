@@ -24,11 +24,11 @@ const steps = [
 ];
 
 module.exports = withExpect(steps, {
-  'server-f2': /selected=true \| DeepWiki 2/,
-  'server-esc': /Petstore MCPstreamable-http \| editing: false/,
+  'server-f2': /selected=true \| MCPDeepWiki 2/,
+  'server-esc': /Petstore MCPhttp \| editing: false/,
   'folder-f2': /Public 23/,
   'folder-menu-back': /Public servers3/,
   'grpc-f2': /Add numbers/,
   'grpc-menu-back': /gRPCAdd two numbers$/,
-  'server-back-and-open': /DeepWikistreamable-http \| open tab: gRPCAdd two numbers/,
+  'server-back-and-open': /DeepWikihttp \| open tab: gRPCAdd two numbers/,
 });

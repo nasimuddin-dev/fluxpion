@@ -29,7 +29,7 @@ const steps = [
     `(async () => {
       await __t.requests(); await __t.sleep(600);
       const rows = [...document.querySelectorAll('aside [data-tree-row]')].map((b) => b.textContent.trim());
-      return 'playground: ' + rows.some((t) => t.startsWith('Public REST APIs (playground)')) + ' | context7: ' + rows.some((t) => t.startsWith('Context7')) + ' | renamed kept: ' + rows.some((t) => t.startsWith('My DeepWiki')) + ' | old name back: ' + rows.some((t) => /^DeepWiki/.test(t));
+      return 'playground: ' + rows.some((t) => t.startsWith('Public REST APIs (playground)')) + ' | context7: ' + rows.some((t) => t.startsWith('MCPContext7')) + ' | renamed kept: ' + rows.some((t) => t.startsWith('MCPMy DeepWiki')) + ' | old name back: ' + rows.some((t) => /^MCPDeepWiki/.test(t));
     })()`,
   ],
   [
