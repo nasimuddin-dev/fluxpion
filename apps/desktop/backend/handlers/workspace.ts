@@ -44,6 +44,12 @@ export function workspaceHandlers(be: Backend): Handlers {
       be.openStore(root);
       return be.handlers['ws.current']!({});
     },
+    /** What this start added to the user's examples workspace from a newer app version (told once). */
+    'ws.examplesAdded': () => {
+      const added = be.examplesAdded;
+      be.examplesAdded = [];
+      return added;
+    },
     /** Open the examples workspace that ships with the app (copied into the data folder the first time). */
     'ws.openExamples': () => {
       const info = be.installExamples();

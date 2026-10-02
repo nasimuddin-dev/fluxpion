@@ -123,6 +123,16 @@ const PALETTE_ICONS: Record<string, LucideIcon> = {
   'm-exp-ws': Download,
 };
 
+/** The examples workspace gained requests, collections or servers in this version: tell the user once, with Open. */
+async function announceNewExamples() {
+  const added = await call<string[]>('ws.examplesAdded').catch(() => [] as string[]);
+  if (!added.length) return;
+  const named = added.filter((a) => /^(collection|MCP server)/.test(a));
+  const list = (named.length ? named : added).slice(0, 3).join(', ');
+  const more = added.length - Math.min(3, (named.length ? named : added).length);
+  useApp.getState().toast(`New in the TestPion Examples workspace: ${list}${more > 0 ? ` and ${more} more` : ''}`, 'success', { label: 'Open', onClick: () => void runMenuCommand('open-examples') });
+}
+
 export default function App() {
   const view = useApp((s) => s.view);
   const paletteOpen = useApp((s) => s.paletteOpen);
@@ -152,6 +162,8 @@ export default function App() {
         scheduleUpdateCheck();
         // warm the code editor in the background once the first screen is up
         setTimeout(() => void loadMonaco(), 1500);
+        // examples that came with this version (added to the user's copy at start): say so once
+        setTimeout(() => void announceNewExamples(), 2500);
         // certificates that expire within 7 days: a reminder once a day
         setTimeout(remindExpiringCertificates, 4000);
       } catch (error) {

@@ -196,6 +196,8 @@ export class Backend {
   mcpRedactors = new Map<string, Redactor>();
   wsConsole = new Map<string, { url: string; redactor: Redactor; counts: { sent: number; received: number; opened: number } }>();
   controllers = new Map<string, AbortController>();
+  /** What this start added to the user's examples workspace (shown once by the UI, see ws.examplesAdded). */
+  examplesAdded: string[] = [];
   runs = new Map<string, RunState>();
   mcpSessions = new Map<string, McpSession>();
   wsSessions = new Map<string, WebSocketSession>();
@@ -298,6 +300,7 @@ export class Backend {
       const mine = this.manager.list().find((w) => w.id === id);
       if (!mine) return;
       const added = addTemplateAdditions(dir, mine.path);
+      this.examplesAdded = added;
       if (added.length) this.logger.info(`Added to the examples workspace: ${added.join(', ')}`);
     } catch (e) {
       this.logger.warn(`Could not add the new examples: ${(e as Error).message}`);
