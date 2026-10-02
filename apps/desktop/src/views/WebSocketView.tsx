@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, BookmarkPlus, Info, Plug, Plus, Radio, Save, Send, Trash2, Unplug, X, FileCheck2, Bookmark, History, KeyRound } from 'lucide-react';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useAssistantContext } from '../lib/assistant-context';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
@@ -76,7 +77,7 @@ const drafts = persisted<Draft>('websocket', { url: '{{wsUrl}}', protocols: '', 
 
 export function WebSocketView() {
   // this document's draft (each tab of this editor is its own document)
-  const { docId } = useDoc();
+  const { docId, active } = useDoc();
   const docDrafts = useMemo(() => drafts.forDoc(docId), [docId]);
   const [d, setD] = useState(docDrafts.load);
   const [session, setSession] = useState<string>();
@@ -89,6 +90,21 @@ export function WebSocketView() {
   const mqtt = d.mode === 'mqtt';
   const [newSub, setNewSub] = useState<{ topic: string; qos: Qos }>({ topic: '', qos: 0 });
   const env = useApp((s) => s.environment);
+  // "Ask the assistant" includes the connection and its latest messages (secrets are hidden by the backend)
+  useAssistantContext(
+    'websocket',
+    useCallback(() => {
+      if (!d.url) return undefined;
+      return {
+        label: `${d.mode === 'mqtt' ? 'MQTT' : d.mode === 'socketio' ? 'Socket.IO' : 'WebSocket'} ${d.url} · ${status}`,
+        context: {
+          connection: { mode: d.mode, url: d.url, status, protocols: d.protocols },
+          latestMessages: messages.slice(-20).map((m) => ({ direction: m.direction, event: m.event, data: m.data.slice(0, 600) })),
+        },
+      };
+    }, [d, status, messages]),
+    active,
+  );
   // saved connections (URL, subprotocols, handshake headers, message) with folders
   const saved = useLibrary<Draft>('websocket');
   const [savedId, setSavedId] = useSticky<string | undefined>(`ws:saved:${docId ?? 'main'}`, undefined, { persist: true });

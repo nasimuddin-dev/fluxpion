@@ -1086,7 +1086,7 @@ export class Backend {
         messages: [
           {
             role: 'system',
-            content: `You are the AI assistant inside TestPion, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free} Format answers in Markdown (short headings, lists, fenced code blocks with a language). Values shown as *** were hidden by TestPion; never ask for them.`,
+            content: `You are the AI assistant inside TestPion, a developer tool for testing REST, GraphQL, MCP and LLM systems. ${instructions[p.task] ?? instructions.free} Format answers in Markdown (short headings, lists, fenced code blocks with a language). Values shown as *** were hidden by TestPion; never ask for them.${first ? '' : ' This is a follow-up in the conversation: answer the question itself, in prose with code blocks where useful (the output-only rule above applied to the first answer); when you change code you gave before, give the whole new version in one code block.'}`,
           },
           ...history,
           { role: 'user', content: turn },

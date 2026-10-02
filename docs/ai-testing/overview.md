@@ -25,7 +25,8 @@ For the CLI and CI, set the key as the `TESTPION_SECRET_APP_ANTHROPIC_APIKEY` en
 Open it with the robot button in the top bar, **Ask AI Assistant** in the command palette, or one of the AI buttons in a view (Explain this response, Suggest assertions, …).
 
 - **A conversation.** Follow-up questions remember what was asked and answered, so "and how do I fix it?" works. **New conversation** (↺) starts over; the task you opened it for runs again.
-- **What you are looking at goes with the question.** With an HTTP request open, a free question carries the request and its latest response, shown as *Context: GET …/pets · 404* above the field. Choose × to leave it out. Secret values (tokens, keys, passwords) are hidden before anything is sent.
+- **What you are looking at goes with the question.** With a request open (HTTP, GraphQL, gRPC, WebSocket/MQTT or an MCP server), a free question carries it and its latest result, shown as *Context: GET …/pets · 404* above the field. Choose × to leave it out. Secret values (tokens, keys, passwords) are hidden before anything is sent.
+- **Use an answer where you asked for it.** Suggested assertions have **Add to the checks** (they go into the request's Tests tab), a generated GraphQL query has **Use this query**, and generated MCP arguments have **Use these arguments**. Review what was added before you save.
 - **Answers stream in** as they are written, and **Stop** ends one early (what arrived so far is kept). They are formatted (headings, lists, code), and each code block has its own **Copy**.
 - Every answer is labelled as an AI-generated suggestion, with the model that wrote it.
 

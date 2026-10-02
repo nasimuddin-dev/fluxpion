@@ -1,7 +1,8 @@
 import { Download, ScanSearch, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { asError, call } from '../api';
-import { useApp } from '../store';
+import { useApp, type AssistantApplied } from '../store';
+import { parseYaml } from '../lib/yaml';
 import { download } from '../lib/format';
 import { SidePicker, type Side } from './OpenApiDiffDialog';
 import { Badge, Button, cx, Field, Input, Metric, MetricGrid, ModalOrPanel, Select, Toggle } from './ui';
@@ -41,6 +42,30 @@ type Filter = 'all' | 'gaps' | 'uncovered';
  * API coverage (same engine as `testpion coverage` and the api_coverage MCP tool): which operations
  * and documented responses of an OpenAPI document the test runs and request history exercised.
  */
+/** Tests written by the assistant for the coverage gaps, saved as tests/coverage/<api>-gaps.yaml (a free name). */
+async function saveGapTests(api: string, code: string): Promise<AssistantApplied> {
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(code);
+  } catch {
+    return 'it is not valid YAML';
+  }
+  const tests = Array.isArray(parsed) ? parsed : (parsed as { tests?: unknown } | null)?.tests;
+  if (!Array.isArray(tests) || !tests.length) return 'it has no tests';
+  const slug = api.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'api';
+  let path = `coverage/${slug}-gaps.yaml`;
+  for (let i = 2; i < 100; i++) {
+    const taken = await call('tests.read', { path }).then(
+      () => true,
+      () => false,
+    );
+    if (!taken) break;
+    path = `coverage/${slug}-gaps-${i}.yaml`;
+  }
+  await call('tests.write', { path, content: code.endsWith('\n') ? code : `${code}\n` });
+  return { done: `Saved tests/${path}`, action: { label: 'Open', onClick: () => useApp.getState().openIntent('tests', { path }) } };
+}
+
 export function ApiCoverageDialog({ runId, spec: initialSpec, onClose, inline }: { runId?: string; spec?: string; onClose(): void; /** In an API definition's tab: that document, no dialog. */ inline?: boolean }) {
   const [specs, setSpecs] = useState<string[]>([]);
   const [spec, setSpec] = useState<Side>({ path: undefined });
@@ -90,7 +115,8 @@ export function ApiCoverageDialog({ runId, spec: initialSpec, onClose, inline }:
       .filter((o) => !o.covered || o.untestedStatuses.length)
       .slice(0, 40)
       .map((o) => ({ method: o.method, path: o.path, operationId: o.operationId, summary: o.summary, called: o.covered, untestedStatuses: o.untestedStatuses }));
-    useApp.getState().set({ assistant: { task: 'suggest-coverage-tests', title: 'Tests for the coverage gaps', context: { api: result.report.title, gaps } } });
+    const api = result.report.title;
+    useApp.getState().set({ assistant: { task: 'suggest-coverage-tests', title: 'Tests for the coverage gaps', context: { api, gaps }, apply: { label: 'Save as a test file', run: (code) => saveGapTests(api ?? 'api', code) } } });
     onClose();
   };
 

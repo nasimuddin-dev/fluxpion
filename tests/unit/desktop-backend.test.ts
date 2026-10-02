@@ -138,6 +138,9 @@ describe('desktop backend', () => {
       // the context stays with the first turn; the follow-up is just the question
       expect(msgs[1]!.content).toContain('api.example.test/pets');
       expect(msgs[3]!.content).toBe('And how do I fix it?');
+      // a follow-up may answer in prose (a task's output-only rule is for its first answer)
+      expect(msgs[0]!.content).toContain('follow-up');
+      expect(seen[0]![0]!.content).not.toContain('follow-up');
     } finally {
       MockProvider.prototype.chat = chat;
     }

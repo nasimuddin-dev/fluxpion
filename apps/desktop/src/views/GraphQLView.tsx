@@ -1,5 +1,6 @@
 import { BookOpen, ChevronLeft, Code2, FlaskConical, FolderPlus, FolderTree, History, KeyRound, Network, Play, Radio, RefreshCw, Save, Sparkles, Square, Upload, Wand2, FileCheck2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAssistantContext } from '../lib/assistant-context';
 import { parse, print } from 'graphql';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
@@ -90,7 +91,7 @@ const store = persisted<Draft>('graphql', { endpoint: '{{graphqlEndpoint}}', que
 
 export function GraphQLView() {
   // this document's draft (each tab of this editor is its own document)
-  const { docId } = useDoc();
+  const { docId, active } = useDoc();
   const docDrafts = useMemo(() => store.forDoc(docId), [docId]);
   // drafts saved by older versions may hold the variables as an object: the editors need text
   const [d, setD] = useState<Draft>(() => {
@@ -130,6 +131,24 @@ export function GraphQLView() {
   const [eventSel, setEventSel] = useState<number>();
   const [resTab, setResTab] = useState<'response' | 'table' | 'raw' | 'tests'>('response');
   const env = useApp((s) => s.environment);
+  // "Ask the assistant" includes the operation and its latest result (secrets are hidden by the backend)
+  useAssistantContext(
+    'graphql',
+    useCallback(() => {
+      if (!d.endpoint && !String(d.query ?? '').trim()) return undefined;
+      const res = result?.response;
+      return {
+        label: `GraphQL ${d.name || d.operationName || 'operation'} · ${d.endpoint}${res ? ` · ${res.status}` : result?.error ? ' · error' : ''}`,
+        context: {
+          graphql: { name: d.name, endpoint: d.endpoint, operationName: d.operationName, query: String(d.query ?? '').slice(0, 6000), variables: (typeof d.variables === 'string' ? d.variables : JSON.stringify(d.variables ?? '')).slice(0, 2000), headers: (d.headers ?? []).filter((h) => h.enabled !== false).map((h) => ({ key: h.key, value: h.value })) },
+          ...(res ? { response: { status: res.status, body: res.bodyPreview.slice(0, 4000), errors: result?.errors?.slice(0, 10) } } : {}),
+          ...(result?.error ? { error: { kind: result.error.kind, message: result.error.message } } : {}),
+          ...(sdl ? { schemaExcerpt: sdl.slice(0, 4000) } : {}),
+        },
+      };
+    }, [d, result, sdl]),
+    active,
+  );
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
   useEffect(() => docDrafts.save(d), [d, docDrafts]);
 
@@ -491,7 +510,17 @@ export function GraphQLView() {
                     size="sm"
                     variant="ghost"
                     icon={<Sparkles size={12} />}
-                    onClick={() => useApp.getState().set({ assistant: { task: 'generate-query', title: 'Generate GraphQL query', context: { schemaSdl: sdl?.slice(0, 20000) ?? 'unknown — introspect first', currentQuery: d.query }, question: '' } })}
+                    onClick={() =>
+                      useApp.getState().set({
+                        assistant: {
+                          task: 'generate-query',
+                          title: 'Generate GraphQL query',
+                          context: { schemaSdl: sdl?.slice(0, 20000) ?? 'unknown — introspect first', currentQuery: d.query },
+                          question: '',
+                          apply: { label: 'Use this query', run: (code) => (/^\s*(query|mutation|subscription|fragment|\{)/.test(code) ? set({ query: code }) : 'it has no GraphQL operation') },
+                        },
+                      })
+                    }
                   >
                     Generate
                   </Button>

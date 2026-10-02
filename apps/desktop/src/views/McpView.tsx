@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileText, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Radio, Save, Sparkles, Trash2, Unplug, Wrench, History, KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAssistantContext } from '../lib/assistant-context';
 import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
 import { useDoc, useDocs } from '../lib/docs';
@@ -68,7 +69,7 @@ function mergeEvents(a: McpEvent[], b: McpEvent[]): McpEvent[] {
 const tabServer = persisted<{ serverId?: string }>('mcp', {});
 
 export function McpView() {
-  const { docId } = useDoc();
+  const { docId, active } = useDoc();
   const docState = useMemo(() => tabServer.forDoc(docId), [docId]);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [selected, setSelected] = useState<string | undefined>(() => docState.load().serverId);
@@ -114,6 +115,22 @@ export function McpView() {
 
   const server = servers.find((s) => s.id === selected);
   const disc = !draft && selected ? discovery[selected] : undefined;
+  // "Ask the assistant" includes the server and what it offers (secrets are hidden by the backend)
+  useAssistantContext(
+    'mcp',
+    useCallback(() => {
+      if (!server) return undefined;
+      return {
+        label: `MCP ${server.name}${disc ? ` · ${disc.tools.length} tools` : connError ? ' · error' : ''}`,
+        context: {
+          mcpServer: { name: server.name, transport: server.transport, ...('url' in server ? { url: server.url } : {}), ...('command' in server ? { command: server.command } : {}) },
+          ...(disc ? { serverInfo: disc.serverInfo, instructions: disc.instructions?.slice(0, 2000), tools: disc.tools.slice(0, 60).map((t) => ({ name: t.name, description: t.description?.slice(0, 200) })), resources: disc.resources.slice(0, 30).map((r) => r.uri), prompts: disc.prompts.map((p) => p.name) } : {}),
+          ...(connError ? { error: { kind: connError.kind, message: connError.message } } : {}),
+        },
+      };
+    }, [server, disc, connError]),
+    active,
+  );
   // the server on screen: the one being added, or the selected one; `form` holds its edits until saved
   const current = draft ?? server;
   const savedJson = !draft && server ? JSON.stringify(configOf(server)) : '';
@@ -650,7 +667,30 @@ function ToolsPanel({ serverId, tools }: { serverId: string; tools: Tool[] }) {
               <label className="ml-auto text-xs flex items-center gap-1 text-muted">
                 <input type="checkbox" checked={raw} onChange={(e) => (setRaw(e.target.checked), e.target.checked && setRawText(JSON.stringify(value, null, 2)))} /> Raw JSON
               </label>
-              <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={() => useApp.getState().set({ assistant: { task: 'generate-args', title: `Arguments for ${tool.name}`, context: { tool: tool.name, description: tool.description, inputSchema: tool.inputSchema } } })}>
+              <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={() =>
+                  useApp.getState().set({
+                    assistant: {
+                      task: 'generate-args',
+                      title: `Arguments for ${tool.name}`,
+                      context: { tool: tool.name, description: tool.description, inputSchema: tool.inputSchema },
+                      apply: {
+                        label: 'Use these arguments',
+                        run: (code) => {
+                          let v: unknown;
+                          try {
+                            v = JSON.parse(code);
+                          } catch {
+                            return 'it is not valid JSON';
+                          }
+                          if (!v || typeof v !== 'object' || Array.isArray(v)) return 'it is not a JSON object';
+                          setArgs((a) => ({ ...a, [tool.name]: v as Record<string, unknown> }));
+                          setRawText(JSON.stringify(v, null, 2));
+                        },
+                      },
+                    },
+                  })
+                }
+              >
                 Generate args
               </Button>
               <Button size="sm" icon={<Save size={12} />} onClick={saveTest}>

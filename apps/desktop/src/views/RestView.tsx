@@ -5,7 +5,8 @@ import { useAssistantContext } from '../lib/assistant-context';
 import { asError, call, on } from '../api';
 import { ask, confirmAction, promptText, useApp } from '../store';
 import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
-import type { Collection, CollectionNode, HttpRequestSpec, KeyValue, SavedExample, SavedHttpRequest, SseEvent } from '../types';
+import type { CheckConfig, Collection, CollectionNode, HttpRequestSpec, KeyValue, SavedExample, SavedHttpRequest, SseEvent } from '../types';
+import { parseYaml } from '../lib/yaml';
 import { fromEngineRequest, paramsFromUrl, syncPathVariables, toEngineRequest, urlFromParams } from '../lib/url';
 import { CodeModal } from '../components/CodeModal';
 import { CookiesModal, hostOf } from '../components/CookiesModal';
@@ -476,10 +477,29 @@ export function RestView() {
     if (testScript !== undefined) update({ testScript });
   };
 
+  /** Checks suggested by the assistant (a YAML list) go into a tab's Tests tab. */
+  const addSuggestedChecks = (tabId: string, code: string): string | void => {
+    let parsed: unknown;
+    try {
+      parsed = parseYaml(code);
+    } catch {
+      return 'it is not valid YAML';
+    }
+    const list = Array.isArray(parsed) ? parsed : ((parsed as { tests?: unknown[]; assertions?: unknown[] } | null)?.tests ?? (parsed as { assertions?: unknown[] } | null)?.assertions ?? []);
+    const checks = list.filter((x): x is CheckConfig => !!x && typeof x === 'object' && typeof (x as { type?: unknown }).type === 'string');
+    if (!checks.length) return 'it has no checks';
+    if (!tabs.some((t) => t.id === tabId)) return 'the request was closed';
+    setTabs((ts) => ts.map((t) => (t.id === tabId ? { ...t, assertions: [...t.assertions, ...checks], dirty: true } : t)));
+  };
   const suggest = result?.response
     ? () =>
         useApp.getState().set({
-          assistant: { task: 'generate-assertions', title: 'Suggested assertions', context: { request: { method: tab.request.method, url: tab.request.url }, status: result.response!.status, headers: result.response!.headers.slice(0, 20), body: result.response!.bodyPreview.slice(0, 6000) } },
+          assistant: {
+            task: 'generate-assertions',
+            title: 'Suggested assertions',
+            context: { request: { method: tab.request.method, url: tab.request.url }, status: result.response!.status, headers: result.response!.headers.slice(0, 20), body: result.response!.bodyPreview.slice(0, 6000) },
+            apply: { label: 'Add to the checks', run: (code) => addSuggestedChecks(tab.id, code) },
+          },
         })
     : undefined;
 

@@ -28,7 +28,9 @@ export function useAssistantContext(view: ViewId, get: () => ViewContext | undef
 export function currentViewContext(): ViewContext | undefined {
   try {
     return providers.get(useApp.getState().view)?.();
-  } catch {
+  } catch (e) {
+    // a view's context must never stop the assistant from opening
+    console.warn('assistant context', e);
     return undefined;
   }
 }

@@ -37,11 +37,19 @@ export interface CiRequest {
   folders?: string[];
 }
 
+/** What an assistant answer's Apply did: nothing (done), a problem (a string), or a message with an action (Open …). */
+export type AssistantApplied = string | void | { done: string; action?: { label: string; onClick(): void } };
+
 export interface AssistantRequest {
   task: string;
   title: string;
   context: unknown;
   question?: string;
+  /**
+   * Puts an answer to use where it was asked for (Add the checks to the request, Use this query, …): `run` gets the
+   * answer's first code block (or its whole text) and returns a message when it can't use it, or what it did.
+   */
+  apply?: { label: string; run(code: string): AssistantApplied | Promise<AssistantApplied> };
 }
 
 export interface DialogButton {

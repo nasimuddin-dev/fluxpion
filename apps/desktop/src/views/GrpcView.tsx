@@ -1,6 +1,7 @@
 import { ArrivalSpark } from '../components/charts';
 import { FileCode2, Plus, RefreshCw, Save, ScanSearch, Send, Sparkles, Square, Terminal, Trash2, Waypoints, FileCheck2, Bookmark, History, KeyRound } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAssistantContext } from '../lib/assistant-context';
 import { asError, call, on } from '../api';
 import { persisted, promptText, useApp } from '../store';
 import { FolderList } from '../components/FolderList';
@@ -76,7 +77,7 @@ const kind = (m: MethodInfo) => (m.clientStreaming && m.serverStreaming ? 'bidi 
 /** gRPC client: pick a method from .proto files, send a message (or a list, for client streams), see the response live. */
 export function GrpcView() {
   // this document's draft (each tab of this editor is its own document)
-  const { docId } = useDoc();
+  const { docId, active } = useDoc();
   const docDrafts = useMemo(() => drafts.forDoc(docId), [docId]);
   const [d, setD] = useState(docDrafts.load);
   const [methods, setMethods] = useState<MethodInfo[]>([]);
@@ -140,6 +141,23 @@ export function GrpcView() {
   useEffect(() => set({ keyRef: /^\s*\{\{[^}]+\}\}\s*$/.test(keyText) ? keyText.trim() : undefined }), [keyText]); // eslint-disable-line react-hooks/exhaustive-deps
   const tlsOptions = d.ca?.trim() || d.cert?.trim() || keyText.trim() ? { ca: d.ca, cert: d.cert, key: keyText } : undefined;
   const env = useApp((s) => s.environment);
+  // "Ask the assistant" includes the call and its latest result (secrets are hidden by the backend)
+  useAssistantContext(
+    'grpc',
+    useCallback(() => {
+      if (!d.target && !d.method) return undefined;
+      return {
+        label: `gRPC ${d.method.split('/').pop() || '(no method)'} · ${d.target}${result ? ` · ${result.codeName}` : error ? ' · error' : ''}`,
+        context: {
+          grpc: { target: d.target, method: d.method, message: d.message.slice(0, 4000), metadata: d.metadata, tls: d.tls, protoFiles: d.protoFiles.map((f) => f.name) },
+          ...(result ? { result: { code: result.code, codeName: result.codeName, details: result.details, response: result.response, trailers: result.trailers.slice(0, 20), durationMs: result.durationMs } } : {}),
+          ...(error ? { error } : {}),
+          ...(protoError ? { protoError } : {}),
+        },
+      };
+    }, [d, result, error, protoError]),
+    active,
+  );
   const sendingRef = useRef<string | undefined>(undefined);
   sendingRef.current = sending;
   useEffect(() => docDrafts.save(d), [d, docDrafts]);

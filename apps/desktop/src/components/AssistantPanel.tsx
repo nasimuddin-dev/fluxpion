@@ -1,8 +1,8 @@
-import { BookOpen, Bot, Copy, Paperclip, RotateCcw, Square, X } from 'lucide-react';
+import { BookOpen, Bot, Check, Copy, Paperclip, RotateCcw, Square, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { asError, call, on } from '../api';
 import { currentViewContext, type ViewContext } from '../lib/assistant-context';
-import { useApp } from '../store';
+import { useApp, type AssistantRequest } from '../store';
 import { Markdown } from './Markdown';
 import { AiGeneratedNotice, ErrorPanel } from './Results';
 import { Badge, Button, cx, IconButton, Input, Spinner } from './ui';
@@ -114,7 +114,7 @@ export function AssistantPanel() {
               </div>
             )
           ) : (
-            <Answer key={i} turn={t} />
+            <Answer key={i} turn={t} apply={req.apply} />
           ),
         )}
         {busy && (streaming ? <Answer turn={{ role: 'assistant', content: streaming }} live /> : (
@@ -175,8 +175,26 @@ export function AssistantPanel() {
   );
 }
 
-/** One answer: Markdown, each code block with its own Copy button, the model that wrote it. */
-function Answer({ turn, live }: { turn: Turn; live?: boolean }) {
+/** The first fenced code block of an answer, or the whole answer when it has none. */
+export function answerCode(text: string): string {
+  const m = /```[^\n`]*\n([\s\S]*?)```/.exec(text);
+  return (m ? m[1]! : text).trim();
+}
+
+/** One answer: Markdown, each code block with its own Copy button, the model that wrote it, and Apply when the task has one. */
+function Answer({ turn, live, apply }: { turn: Turn; live?: boolean; apply?: AssistantRequest['apply'] }) {
+  const use = async () => {
+    if (!apply) return;
+    const toast = useApp.getState().toast;
+    try {
+      const r = await apply.run(answerCode(turn.content));
+      if (typeof r === 'string') toast(`Couldn't use the answer: ${r}`, 'error');
+      else if (r) toast(r.done, 'success', r.action);
+      else toast(`${apply.label}: done`, 'success');
+    } catch (e) {
+      toast(`Couldn't use the answer: ${asError(e).message}`, 'error');
+    }
+  };
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (live || !box.current) return;
@@ -203,6 +221,11 @@ function Answer({ turn, live }: { turn: Turn; live?: boolean }) {
       </div>
       {!live && turn.model && (
         <div className="flex items-center gap-2 text-xs text-muted">
+          {apply && (
+            <Button size="sm" variant="primary" icon={<Check size={12} />} onClick={() => void use()} data-answer-apply>
+              {apply.label}
+            </Button>
+          )}
           <span data-answer-model>
             <Badge tone="judge">
               <BookOpen size={10} /> {turn.provider} · {turn.model}
