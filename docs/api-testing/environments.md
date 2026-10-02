@@ -62,6 +62,10 @@ The values are made up: emails use `example.test` / `example.com`, phone numbers
 
 Mark a variable as **secret** (lock icon) and its value is encrypted in the OS credential store: Windows DPAPI, macOS Keychain or Linux Secret Service. The workspace file only records that the variable exists. In CI, supply the value as the environment variable `TESTPION_SECRET_ENV_<ENVID>_<KEY>`, for example `TESTPION_SECRET_ENV_STAGING_ACCESSTOKEN`.
 
+## All variable scopes in one place
+
+The **Environments** view has a tab for each scope: **Environments**, **Collection variables**, **Workspace variables** and **Global variables**. Collection variables (an imported Postman collection keeps its variables there) are listed per collection: pick one on the left, edit its variables, **Save**; they are the same as in the collection's own settings. A scope with no variables yet says what it is for and, when your collections have variables, links to them.
+
 ## See or change one variable
 
 Wherever a `{{variable}}` appears (the URL bar, params, headers, auth fields, the body and other code editors, test files), **double-click** it to see its value and where it comes from (environment, collection, workspace, dynamic). In the URL bar, params and headers a single click is enough. A variable of the active environment can be edited right there, and one that isn't defined yet can be added to it; **Copy** copies the value (secret values are never shown).

@@ -1,9 +1,10 @@
 import { ArchiveRestore, ArrowLeftRight, Check, Copy, Grid3x3, Download, FileJson, FileText, KeyRound, Pencil, Save, ScanSearch, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { asError, call } from '../api';
+import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import { useIntent } from '../hooks';
-import type { Environment, KeyValue } from '../types';
+import type { Collection, Environment, KeyValue } from '../types';
+import { CollectionVariablesPane } from '../components/CollectionVariablesPane';
 import { download, uid } from '../lib/format';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { EnvCompare } from '../components/EnvCompare';
@@ -73,7 +74,14 @@ export function EnvironmentsView() {
   const refreshUnused = (env?: string) => void (env ? call<string[]>('vars.unused', { environment: env }).then(setUnused, () => setUnused([])) : setUnused([]));
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({});
-  const [scope, setScope] = useState<'environment' | 'workspace' | 'global'>('environment');
+  const [scope, setScope] = useState<'environment' | 'collection' | 'workspace' | 'global'>('environment');
+  const [colVarsFor, setColVarsFor] = useState<string>();
+  const [colVarCount, setColVarCount] = useState(0);
+  useEffect(() => {
+    const count = () => void call<Collection[]>('col.list').then((l) => setColVarCount(l.reduce((n, c) => n + (c.variables?.length ?? 0), 0)), () => undefined);
+    count();
+    return on('data.changed', count);
+  }, []);
   const [wsVars, setWsVars] = useState<KeyValue[]>(ws?.variables ?? []);
   const [globals, setGlobals] = useState<KeyValue[]>(settings?.globalVariables ?? []);
   const load = async () => {
@@ -127,6 +135,7 @@ export function EnvironmentsView() {
     if (p?.environmentId) (setScope('environment'), setSel(p.environmentId));
     else if (p?.tab === 'globals') setScope('global');
     else if (p?.tab === 'workspace') setScope('workspace');
+    else if (p?.tab === 'collection') (setScope('collection'), setColVarsFor(p.collectionId));
   });
 
   const rows: KeyValue[] = (draft?.variables ?? []).map((v) => ({ ...v, value: v.secret ? secretValues[v.key] ?? '' : v.value }));
@@ -156,6 +165,7 @@ export function EnvironmentsView() {
         onChange={setScope}
         tabs={[
           { id: 'environment', label: 'Environments', badge: envs.length },
+          { id: 'collection', label: 'Collection variables', badge: colVarCount },
           { id: 'workspace', label: 'Workspace variables', badge: wsVars.length },
           { id: 'global', label: 'Global variables', badge: globals.length },
         ]}
@@ -340,8 +350,15 @@ export function EnvironmentsView() {
             )}
           </Split>
         )}
+        {scope === 'collection' && <CollectionVariablesPane initial={colVarsFor} />}
         {scope === 'workspace' && (
           <div className="p-3 flex flex-col gap-3 overflow-auto h-full">
+            <ScopeHint
+              empty={!wsVars.length}
+              text="Workspace variables are shared by every collection and environment in this workspace, e.g. an app name or a team id. An environment or collection variable with the same name wins."
+              collections={colVarCount}
+              onCollections={() => setScope('collection')}
+            />
             <KeyValueEditor rows={wsVars} onChange={setWsVars} keyPlaceholder="Variable" allowSecret />
             <div>
               <Button
@@ -360,6 +377,12 @@ export function EnvironmentsView() {
         )}
         {scope === 'global' && (
           <div className="p-3 flex flex-col gap-3 overflow-auto h-full">
+            <ScopeHint
+              empty={!globals.length}
+              text="Global variables are available in every workspace on this computer (Postman's globals; scripts set them with pm.globals.set). Every other scope wins over them."
+              collections={colVarCount}
+              onCollections={() => setScope('collection')}
+            />
             <KeyValueEditor rows={globals} onChange={setGlobals} keyPlaceholder="Variable" />
             <div>
               <Button variant="primary" onClick={() => settings && useApp.getState().saveSettings({ ...settings, globalVariables: globals }).then(() => useApp.getState().toast('Global variables saved', 'success'))}>
@@ -415,6 +438,30 @@ function CurrentValues({ envName }: { envName: string }) {
         </table>
       ) : (
         <div className="px-3 py-2 text-xs text-muted">None yet. Scripts can set them with pm.environment.set("key", value).</div>
+      )}
+    </div>
+  );
+}
+
+/** What a variable scope is for; when it has none yet, says so and points to where the variables usually are. */
+function ScopeHint({ empty, text, collections, onCollections }: { empty: boolean; text: string; collections: number; onCollections(): void }) {
+  return (
+    <div className={cx('text-xs rounded-lg px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1', empty ? 'border border-line bg-panel/60' : 'text-muted')} data-scope-hint>
+      <span className={empty ? 'text-fg' : undefined}>{text}</span>
+      {empty && (
+        <span className="text-muted">
+          None yet: type a name and a value below to add one.
+          {collections > 0 && (
+            <>
+              {' '}
+              Imported collections keep their variables in the collection:{' '}
+              <button className="text-accent hover:underline" onClick={onCollections}>
+                see the {collections} collection variables
+              </button>
+              .
+            </>
+          )}
+        </span>
       )}
     </div>
   );

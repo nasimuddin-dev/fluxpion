@@ -1,0 +1,100 @@
+import { ExternalLink, Save } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { asError, call, on } from '../api';
+import { confirmAction, useApp } from '../store';
+import type { Collection, KeyValue } from '../types';
+import { KeyValueEditor } from './KeyValueEditor';
+import { CountPill, TreeHeader, treeKeys } from './TreeParts';
+import { Button, cx, Empty, Split } from './ui';
+
+/**
+ * Environments ▸ Collection variables: every collection's variables in one place (they are also in each collection's
+ * settings). Pick a collection on the left, edit its variables on the right, Save.
+ */
+export function CollectionVariablesPane({ initial }: { initial?: string }) {
+  const [cols, setCols] = useState<Collection[]>([]);
+  const [sel, setSel] = useState<string | undefined>(initial);
+  const [rows, setRows] = useState<KeyValue[]>([]);
+  const [saved, setSaved] = useState<string>('[]');
+  const load = () =>
+    void call<Collection[]>('col.list').then((list) => {
+      const ok = list.filter((c) => !c.problem);
+      setCols(ok);
+      setSel((s) => (s && ok.some((c) => c.id === s) ? s : ok.find((c) => c.variables?.length)?.id ?? ok[0]?.id));
+    });
+  useEffect(() => {
+    load();
+    return on('data.changed', load);
+  }, []);
+  useEffect(() => setSel((s) => initial ?? s), [initial]);
+  const current = cols.find((c) => c.id === sel);
+  useEffect(() => {
+    const v = (current?.variables ?? []) as KeyValue[];
+    setRows(v);
+    setSaved(JSON.stringify(v));
+  }, [current?.id, current?.variables]);
+  const dirty = JSON.stringify(rows) !== saved;
+
+  const pick = async (id: string) => {
+    if (id === sel) return;
+    if (dirty && !(await confirmAction({ title: 'Unsaved changes', message: `The variables of "${current?.name}" have unsaved changes.`, confirmLabel: 'Discard changes', danger: true }))) return;
+    setSel(id);
+  };
+  const save = async () => {
+    if (!current) return;
+    try {
+      await call('col.save', { ...current, variables: rows });
+      setSaved(JSON.stringify(rows));
+      useApp.getState().toast(`Saved the variables of "${current.name}"`, 'success');
+      load();
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+
+  if (!cols.length)
+    return (
+      <Empty title="No collections yet" icon={<ExternalLink size={22} />}>
+        Collection variables belong to a collection: create or import one in Collections first.
+      </Empty>
+    );
+  return (
+    <Split id="collection-vars" sidebar initial={22}>
+      <div className="h-full flex flex-col bg-panel/50" onKeyDown={treeKeys}>
+        <TreeHeader title="Collections" count={cols.length} />
+        <div className="flex-1 overflow-auto py-1" role="list" aria-label="Collections">
+          {cols.map((c) => (
+            <button
+              key={c.id}
+              data-tree-row
+              aria-current={c.id === sel ? 'true' : undefined}
+              onClick={() => void pick(c.id)}
+              className={cx('w-[calc(100%-0.5rem)] mx-1 flex items-center gap-2 h-8 px-3 rounded-md text-sm text-left transition-colors', c.id === sel ? 'bg-accent-soft' : 'hover:bg-hover')}
+            >
+              <span className="truncate flex-1">{c.name}</span>
+              <CountPill n={c.variables?.length ?? 0} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="h-full overflow-auto p-3 flex flex-col gap-3">
+        {current && (
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="font-semibold truncate">{current.name}</h2>
+              <span className="text-xs text-muted shrink-0">{rows.length} variables</span>
+              <Button size="sm" variant="ghost" className="ml-auto" icon={<ExternalLink size={13} />} onClick={() => useApp.getState().openIntent('collections', { collectionId: current.id, tab: 'variables' })}>
+                Open collection
+              </Button>
+              <Button size="sm" variant="primary" icon={<Save size={13} />} disabled={!dirty} onClick={() => void save()}>
+                Save
+              </Button>
+            </div>
+            <p className="text-xs text-muted">Used by this collection's requests. A collection variable overrides an environment, workspace or global variable with the same name, and is overridden by request and runtime variables.</p>
+            <KeyValueEditor rows={rows} onChange={setRows} keyPlaceholder="Variable" />
+          </>
+        )}
+      </div>
+    </Split>
+  );
+}
