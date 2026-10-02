@@ -112,6 +112,8 @@ import {
   recordCertificate,
   timingSummary,
   timingSpans,
+  addTemplateAdditions,
+  readJson,
 } from '@testpion/core';
 import { appHandlers } from './handlers/app.js';
 import { workspaceHandlers } from './handlers/workspace.js';
@@ -287,8 +289,24 @@ export class Backend {
     }
   }
 
+  /** Examples that shipped with this version go into the user's copy: additions only, never a change (addTemplateAdditions). */
+  private updateExamples(): void {
+    const dir = this.host.examplesDir;
+    if (!dir || !existsSync(join(dir, 'workspace.json'))) return;
+    try {
+      const id = readJson<{ id: string }>(join(dir, 'workspace.json')).id;
+      const mine = this.manager.list().find((w) => w.id === id);
+      if (!mine) return;
+      const added = addTemplateAdditions(dir, mine.path);
+      if (added.length) this.logger.info(`Added to the examples workspace: ${added.join(', ')}`);
+    } catch (e) {
+      this.logger.warn(`Could not add the new examples: ${(e as Error).message}`);
+    }
+  }
+
   /** Open the last workspace, or create a starter workspace on first launch. */
   private bootstrapWorkspace(): void {
+    this.updateExamples();
     try {
       const last = this.settings.lastWorkspace && this.manager.resolve(this.settings.lastWorkspace);
       if (last) return this.openStore(last);

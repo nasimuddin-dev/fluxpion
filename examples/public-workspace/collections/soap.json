@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "id": "soap",
-  "name": "SOAP: Number Conversion",
+  "name": "SOAP services",
   "version": 1,
   "variables": [
     {
@@ -160,6 +160,293 @@
             }
           ],
           "testScript": "pm.test('dollars and cents', () => pm.expect(pm.response.text()).to.include('twelve dollars and fifty cents'));"
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-soap-calculator",
+      "name": "Calculator (dneonline.com)",
+      "items": [
+        {
+          "kind": "http",
+          "id": "soap-calc-add",
+          "name": "Add 20 and 22",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCalculator}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://tempuri.org/Add\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <Add xmlns=\"http://tempuri.org/\">\n      <intA>20</intA>\n      <intB>22</intB>\n    </Add>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<AddResult>42</AddResult>"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "soap-calc-subtract",
+          "name": "Subtract 50 and 8",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCalculator}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://tempuri.org/Subtract\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <Subtract xmlns=\"http://tempuri.org/\">\n      <intA>50</intA>\n      <intB>8</intB>\n    </Subtract>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<SubtractResult>42</SubtractResult>"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "soap-calc-multiply",
+          "name": "Multiply 6 and 7",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCalculator}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://tempuri.org/Multiply\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <Multiply xmlns=\"http://tempuri.org/\">\n      <intA>6</intA>\n      <intB>7</intB>\n    </Multiply>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<MultiplyResult>42</MultiplyResult>"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "soap-calc-divide",
+          "name": "Divide 84 and 2",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCalculator}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://tempuri.org/Divide\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <Divide xmlns=\"http://tempuri.org/\">\n      <intA>84</intA>\n      <intB>2</intB>\n    </Divide>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<DivideResult>42</DivideResult>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-soap-countryinfo",
+      "name": "Country info (oorsprong.org)",
+      "items": [
+        {
+          "kind": "http",
+          "id": "soap-ci-capitalcity",
+          "name": "Capital of a country",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCountryInfo}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <CapitalCity xmlns=\"http://www.oorsprong.org/websamples.countryinfo\">\n      <sCountryISOCode>JP</sCountryISOCode>\n    </CapitalCity>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<m:CapitalCityResult>Tokyo</m:CapitalCityResult>"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "soap-ci-countrycurrency",
+          "name": "Currency of a country",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCountryInfo}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <CountryCurrency xmlns=\"http://www.oorsprong.org/websamples.countryinfo\">\n      <sCountryISOCode>JP</sCountryISOCode>\n    </CountryCurrency>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<m:sISOCode>JPY</m:sISOCode>"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "soap-ci-countryintphonecode",
+          "name": "Phone code of a country",
+          "request": {
+            "method": "POST",
+            "url": "{{soapCountryInfo}}",
+            "params": [],
+            "headers": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8",
+                "enabled": true
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"\"",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "xml",
+              "content": "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <CountryIntPhoneCode xmlns=\"http://www.oorsprong.org/websamples.countryinfo\">\n      <sCountryISOCode>JP</sCountryISOCode>\n    </CountryIntPhoneCode>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "auth": {
+              "type": "inherit"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "contains",
+              "expected": "<m:CountryIntPhoneCodeResult>81</m:CountryIntPhoneCodeResult>"
+            }
+          ]
         }
       ]
     }

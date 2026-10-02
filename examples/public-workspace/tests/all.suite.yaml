@@ -5,9 +5,11 @@ tests:
   - rest/petstore-contract.yaml
   - graphql/countries.yaml
   - grpc/grpcbin.yaml
+  - grpc/grpcbin-tls.yaml
   - websocket/echo.yaml
   - mcp/petstore-mcp.yaml
   - mcp/weather-mock.yaml
+  - mcp/public-docs.yaml
   - ai/intent-evaluation.yaml
   - ai/safety.yaml
   - ai/rag.yaml

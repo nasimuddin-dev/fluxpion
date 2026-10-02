@@ -3,19 +3,201 @@
   "name": "Public APIs",
   "color": "#2f7bff",
   "variables": [
-    { "key": "httpbin", "value": "https://httpbin.org", "enabled": true, "description": "HTTP request & response service" },
-    { "key": "jsonplaceholder", "value": "https://jsonplaceholder.typicode.com", "enabled": true, "description": "Fake REST API (writes are simulated)" },
-    { "key": "petstore", "value": "https://petstore3.swagger.io/api/v3", "enabled": true, "description": "Swagger Petstore (OpenAPI 3)" },
-    { "key": "countriesGraphql", "value": "https://countries.trevorblades.com/", "enabled": true },
-    { "key": "rickAndMortyGraphql", "value": "https://rickandmortyapi.com/graphql", "enabled": true },
-    { "key": "grpcHost", "value": "grpcb.in:9000", "enabled": true, "description": "gRPC test server with reflection (plain text)" },
-    { "key": "wsEcho", "value": "wss://ws.postman-echo.com/raw", "enabled": true },
-    { "key": "wsEcho2", "value": "wss://echo.websocket.org", "enabled": true },
-    { "key": "sseStream", "value": "https://stream.wikimedia.org/v2/stream/recentchange", "enabled": true },
-    { "key": "petstoreMcp", "value": "https://petstore.run.mcp.com.ai/mcp", "enabled": true },
-    { "key": "basicUser", "value": "testpion", "enabled": true },
-    { "key": "basicPassword", "value": "demo-password", "enabled": true, "description": "httpbin accepts whatever the URL says; not a real secret" },
-    { "key": "demoToken", "value": "demo-token-123", "enabled": true, "description": "httpbin /bearer accepts any token" },
-    { "key": "petId", "value": "10", "enabled": true }
+    {
+      "key": "httpbin",
+      "value": "https://httpbin.org",
+      "enabled": true,
+      "description": "HTTP request & response service"
+    },
+    {
+      "key": "jsonplaceholder",
+      "value": "https://jsonplaceholder.typicode.com",
+      "enabled": true,
+      "description": "Fake REST API (writes are simulated)"
+    },
+    {
+      "key": "petstore",
+      "value": "https://petstore3.swagger.io/api/v3",
+      "enabled": true,
+      "description": "Swagger Petstore (OpenAPI 3)"
+    },
+    {
+      "key": "countriesGraphql",
+      "value": "https://countries.trevorblades.com/",
+      "enabled": true
+    },
+    {
+      "key": "rickAndMortyGraphql",
+      "value": "https://rickandmortyapi.com/graphql",
+      "enabled": true
+    },
+    {
+      "key": "grpcHost",
+      "value": "grpcb.in:9000",
+      "enabled": true,
+      "description": "gRPC test server with reflection (plain text)"
+    },
+    {
+      "key": "wsEcho",
+      "value": "wss://ws.postman-echo.com/raw",
+      "enabled": true
+    },
+    {
+      "key": "wsEcho2",
+      "value": "wss://echo.websocket.org",
+      "enabled": true
+    },
+    {
+      "key": "sseStream",
+      "value": "https://stream.wikimedia.org/v2/stream/recentchange",
+      "enabled": true
+    },
+    {
+      "key": "petstoreMcp",
+      "value": "https://petstore.run.mcp.com.ai/mcp",
+      "enabled": true
+    },
+    {
+      "key": "basicUser",
+      "value": "testpion",
+      "enabled": true
+    },
+    {
+      "key": "basicPassword",
+      "value": "demo-password",
+      "enabled": true,
+      "description": "httpbin accepts whatever the URL says; not a real secret"
+    },
+    {
+      "key": "demoToken",
+      "value": "demo-token-123",
+      "enabled": true,
+      "description": "httpbin /bearer accepts any token"
+    },
+    {
+      "key": "petId",
+      "value": "10",
+      "enabled": true
+    },
+    {
+      "key": "dummyjson",
+      "value": "https://dummyjson.com",
+      "enabled": true,
+      "description": "Fake shop API with login, JWTs, search and pagination"
+    },
+    {
+      "key": "dummyUser",
+      "value": "emilys",
+      "enabled": true,
+      "description": "A DummyJSON demo user (published in its docs)"
+    },
+    {
+      "key": "dummyPassword",
+      "value": "emilyspass",
+      "enabled": true,
+      "description": "The demo user’s published password; not a real secret"
+    },
+    {
+      "key": "restfulBooker",
+      "value": "https://restful-booker.herokuapp.com",
+      "enabled": true,
+      "description": "Hotel bookings API made for testing (CRUD with a token)"
+    },
+    {
+      "key": "bookerUser",
+      "value": "admin",
+      "enabled": true,
+      "description": "Restful-Booker’s published demo login"
+    },
+    {
+      "key": "bookerPassword",
+      "value": "password123",
+      "enabled": true,
+      "description": "Restful-Booker’s published demo password; not a real secret"
+    },
+    {
+      "key": "postmanEcho",
+      "value": "https://postman-echo.com",
+      "enabled": true,
+      "description": "Echoes requests; status codes, delays, auth, server-sent events"
+    },
+    {
+      "key": "reqres",
+      "value": "https://reqres.in/api",
+      "enabled": true,
+      "description": "Fake users API"
+    },
+    {
+      "key": "reqresKey",
+      "value": "reqres-free-v1",
+      "enabled": true,
+      "description": "ReqRes’s public free-tier key (sent as x-api-key)"
+    },
+    {
+      "key": "fakestore",
+      "value": "https://fakestoreapi.com",
+      "enabled": true,
+      "description": "Fake e-commerce API"
+    },
+    {
+      "key": "openMeteo",
+      "value": "https://api.open-meteo.com/v1",
+      "enabled": true,
+      "description": "Weather forecasts, no key"
+    },
+    {
+      "key": "pokeapi",
+      "value": "https://pokeapi.co/api/v2",
+      "enabled": true,
+      "description": "Pokémon data (REST)"
+    },
+    {
+      "key": "swapiGraphql",
+      "value": "https://swapi-graphql.netlify.app/graphql",
+      "enabled": true,
+      "description": "Star Wars API (GraphQL)"
+    },
+    {
+      "key": "graphqlZero",
+      "value": "https://graphqlzero.almansi.me/api",
+      "enabled": true,
+      "description": "JSONPlaceholder as GraphQL: queries and (simulated) mutations"
+    },
+    {
+      "key": "anilistGraphql",
+      "value": "https://graphql.anilist.co",
+      "enabled": true,
+      "description": "Anime and manga database (GraphQL)"
+    },
+    {
+      "key": "pokeGraphql",
+      "value": "https://graphql-pokeapi.graphcdn.app/",
+      "enabled": true,
+      "description": "Pokémon data (GraphQL)"
+    },
+    {
+      "key": "soapCalculator",
+      "value": "http://www.dneonline.com/calculator.asmx",
+      "enabled": true,
+      "description": "SOAP calculator (Add, Subtract, Multiply, Divide)"
+    },
+    {
+      "key": "soapCountryInfo",
+      "value": "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso",
+      "enabled": true,
+      "description": "SOAP country information"
+    },
+    {
+      "key": "grpcHostTls",
+      "value": "grpcb.in:9001",
+      "enabled": true,
+      "description": "The same gRPC test server over TLS"
+    },
+    {
+      "key": "wsEcho3",
+      "value": "wss://ws.ifelse.io",
+      "enabled": true,
+      "description": "Another WebSocket echo server"
+    }
   ]
 }

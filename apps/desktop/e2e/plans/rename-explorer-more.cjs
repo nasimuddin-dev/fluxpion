@@ -26,8 +26,8 @@ const steps = [
 module.exports = withExpect(steps, {
   'server-f2': /selected=true \| DeepWiki 2/,
   'server-esc': /Petstore MCPstreamable-http \| editing: false/,
-  'folder-f2': /Public 22/,
-  'folder-menu-back': /Public servers2/,
+  'folder-f2': /Public 23/,
+  'folder-menu-back': /Public servers3/,
   'grpc-f2': /Add numbers/,
   'grpc-menu-back': /gRPCAdd two numbers$/,
   'server-back-and-open': /DeepWikistreamable-http \| open tab: gRPCAdd two numbers/,

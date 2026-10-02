@@ -21,6 +21,59 @@
       "folder": "Mocks",
       "transport": "mock",
       "mockFile": "mocks/weather.mcp-mock.yaml"
+    },
+    {
+      "id": "ms-learn",
+      "name": "Microsoft Learn docs",
+      "folder": "Docs & search",
+      "transport": "streamable-http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    {
+      "id": "context7",
+      "name": "Context7 (library docs)",
+      "folder": "Docs & search",
+      "transport": "streamable-http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    {
+      "id": "cloudflare-docs",
+      "name": "Cloudflare docs",
+      "folder": "Docs & search",
+      "transport": "streamable-http",
+      "url": "https://docs.mcp.cloudflare.com/mcp"
+    },
+    {
+      "id": "astro-docs",
+      "name": "Astro docs",
+      "folder": "Docs & search",
+      "transport": "streamable-http",
+      "url": "https://mcp.docs.astro.build/mcp"
+    },
+    {
+      "id": "gitmcp-mcp-spec",
+      "name": "MCP spec repo (GitMCP)",
+      "folder": "Docs & search",
+      "transport": "streamable-http",
+      "url": "https://gitmcp.io/modelcontextprotocol/modelcontextprotocol"
+    },
+    {
+      "id": "huggingface",
+      "name": "Hugging Face Hub",
+      "folder": "Public servers",
+      "transport": "streamable-http",
+      "url": "https://huggingface.co/mcp"
+    },
+    {
+      "id": "everything",
+      "name": "Everything (reference server, needs Node.js)",
+      "folder": "Reference servers",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ]
     }
   ]
 }

@@ -1,0 +1,26 @@
+# MCP tool tests against public documentation servers (Streamable HTTP, no account), defined in mcp-servers.json.
+defaults:
+  type: mcp
+  tags: [mcp, public]
+tests:
+  - name: Microsoft Learn finds documentation
+    server: { name: Microsoft Learn docs }
+    tool: { name: microsoft_docs_search }
+    arguments: { query: "Azure Functions HTTP trigger" }
+    assertions:
+      - { type: status, expected: success }
+      - { type: contains, expected: Azure }
+
+  - name: DeepWiki describes a GitHub repository
+    server: { name: DeepWiki }
+    tool: { name: read_wiki_structure }
+    arguments: { repoName: modelcontextprotocol/modelcontextprotocol }
+    assertions:
+      - { type: status, expected: success }
+
+  - name: Astro docs search
+    server: { name: Astro docs }
+    tool: { name: search_astro_docs }
+    arguments: { query: "content collections" }
+    assertions:
+      - { type: status, expected: success }

@@ -25,5 +25,5 @@ module.exports = withExpect(steps, {
   'f2-active': /active: Public APIs 2/,
   'duplicate-refused': /alert: Another environment has this name/,
   'menu-rename-back': /active: Public APIs$/,
-  cleanup: /^Public APIs14 \| active: Public APIs$/,
+  cleanup: /^Public APIs34 \| active: Public APIs$/,
 });

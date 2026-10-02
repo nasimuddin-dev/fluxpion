@@ -1,0 +1,34 @@
+# The same public gRPC server over TLS: every field type, metadata, a chosen error and concatenation.
+defaults:
+  type: grpc
+  target: "{{grpcHostTls}}"
+  tls: true
+  protos: []
+  tags: [grpc, public, tls]
+tests:
+  - name: gRPC over TLS
+    method: hello.HelloService/SayHello
+    message: { greeting: TestPion }
+    assertions:
+      - { type: grpc-status, expected: OK }
+      - { type: equals, path: $.reply, expected: hello TestPion }
+
+  - name: gRPC echoes every field type
+    method: grpcbin.GRPCBin/DummyUnary
+    message: { f_string: hello, f_int32: 42, f_bool: true, f_enum: ENUM_1, f_strings: [a, b] }
+    assertions:
+      - { type: grpc-status, expected: OK }
+      - { type: equals, path: $.f_int32, expected: 42 }
+      - { type: equals, path: $.f_enum, expected: ENUM_1 }
+
+  - name: gRPC returns the error you ask for
+    method: grpcbin.GRPCBin/SpecificError
+    message: { code: 5, reason: not found on purpose }
+    assertions:
+      - { type: grpc-status, expected: NOT_FOUND }
+
+  - name: gRPC concatenates
+    method: addsvc.Add/Concat
+    message: { a: Test, b: Pion }
+    assertions:
+      - { type: equals, path: $.v, expected: TestPion }

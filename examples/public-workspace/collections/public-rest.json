@@ -1,0 +1,1204 @@
+{
+  "schemaVersion": "1.0",
+  "id": "public-rest",
+  "name": "Public REST APIs (playground)",
+  "description": "Free public APIs made for trying an API client: logins that return tokens, full create-read-update-delete flows, API keys, pagination, errors and plain open data. No account needed. Run a folder in order (▶) to see values flow from one request to the next.",
+  "version": 1,
+  "variables": [],
+  "updatedAt": "2026-10-01T00:00:00.000Z",
+  "items": [
+    {
+      "kind": "folder",
+      "id": "fld-pub-dummyjson-log-in-then-use-the-token",
+      "name": "DummyJSON: log in, then use the token",
+      "description": "Log in returns a JWT, which the next request sends as a Bearer token. The demo login is published by DummyJSON.",
+      "items": [
+        {
+          "kind": "http",
+          "id": "pub-dj-1",
+          "name": "Log in (get a JWT)",
+          "request": {
+            "method": "POST",
+            "url": "{{dummyjson}}/auth/login",
+            "headers": [],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"username\": \"{{dummyUser}}\",\n  \"password\": \"{{dummyPassword}}\",\n  \"expiresInMins\": 30\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.accessToken"
+            },
+            {
+              "type": "equals",
+              "path": "$.username",
+              "expected": "emilys"
+            }
+          ],
+          "testScript": "// keep the token for the next requests\npm.collectionVariables.set('dummyToken', pm.response.json().accessToken);"
+        },
+        {
+          "kind": "http",
+          "id": "pub-dj-2",
+          "name": "Who am I (Bearer token)",
+          "request": {
+            "method": "GET",
+            "url": "{{dummyjson}}/auth/me",
+            "headers": [],
+            "auth": {
+              "type": "bearer",
+              "token": "{{dummyToken}}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.username",
+              "expected": "emilys"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-dj-3",
+          "name": "Search products",
+          "request": {
+            "method": "GET",
+            "url": "{{dummyjson}}/products/search",
+            "headers": [],
+            "params": [
+              {
+                "key": "q",
+                "value": "phone",
+                "enabled": true
+              },
+              {
+                "key": "limit",
+                "value": "5",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "greater-than",
+              "path": "$.products.length",
+              "expected": 0
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-dj-4",
+          "name": "Page through products",
+          "request": {
+            "method": "GET",
+            "url": "{{dummyjson}}/products",
+            "headers": [],
+            "params": [
+              {
+                "key": "limit",
+                "value": "10",
+                "enabled": true
+              },
+              {
+                "key": "skip",
+                "value": "10",
+                "enabled": true
+              },
+              {
+                "key": "select",
+                "value": "title,price",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.skip",
+              "expected": 10
+            },
+            {
+              "type": "equals",
+              "path": "$.limit",
+              "expected": 10
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-dj-5",
+          "name": "Add a product (simulated)",
+          "request": {
+            "method": "POST",
+            "url": "{{dummyjson}}/products/add",
+            "headers": [],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"title\": \"TestPion mug\",\n  \"price\": 9.99\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 201
+            },
+            {
+              "type": "equals",
+              "path": "$.title",
+              "expected": "TestPion mug"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-dj-6",
+          "name": "A product that does not exist",
+          "request": {
+            "method": "GET",
+            "url": "{{dummyjson}}/products/0",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 404
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-pub-restful-booker-create-read-update-delete",
+      "name": "Restful-Booker: create, read, update, delete",
+      "description": "A whole booking life cycle: the token from Get a token goes in a Cookie header, the new booking’s id flows into the next requests.",
+      "items": [
+        {
+          "kind": "http",
+          "id": "pub-rb-7",
+          "name": "Is it up?",
+          "request": {
+            "method": "GET",
+            "url": "{{restfulBooker}}/ping",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 201
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rb-8",
+          "name": "Get a token",
+          "request": {
+            "method": "POST",
+            "url": "{{restfulBooker}}/auth",
+            "headers": [],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"username\": \"{{bookerUser}}\",\n  \"password\": \"{{bookerPassword}}\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.token"
+            }
+          ],
+          "testScript": "pm.collectionVariables.set('bookerToken', pm.response.json().token);"
+        },
+        {
+          "kind": "http",
+          "id": "pub-rb-9",
+          "name": "Create a booking",
+          "request": {
+            "method": "POST",
+            "url": "{{restfulBooker}}/booking",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"firstname\": \"Test\",\n  \"lastname\": \"Pion\",\n  \"totalprice\": 120,\n  \"depositpaid\": true,\n  \"bookingdates\": {\n    \"checkin\": \"2026-11-01\",\n    \"checkout\": \"2026-11-03\"\n  },\n  \"additionalneeds\": \"Breakfast\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.bookingid"
+            },
+            {
+              "type": "equals",
+              "path": "$.booking.firstname",
+              "expected": "Test"
+            }
+          ],
+          "testScript": "pm.collectionVariables.set('bookingId', pm.response.json().bookingid);"
+        },
+        {
+          "kind": "http",
+          "id": "pub-rb-10",
+          "name": "Read the booking",
+          "request": {
+            "method": "GET",
+            "url": "{{restfulBooker}}/booking/{{bookingId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.lastname",
+              "expected": "Pion"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rb-11",
+          "name": "Update it (token in a cookie)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restfulBooker}}/booking/{{bookingId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "enabled": true
+              },
+              {
+                "key": "Cookie",
+                "value": "token={{bookerToken}}",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"additionalneeds\": \"Late checkout\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.additionalneeds",
+              "expected": "Late checkout"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rb-12",
+          "name": "Update without the token is refused",
+          "request": {
+            "method": "PATCH",
+            "url": "{{restfulBooker}}/booking/{{bookingId}}",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"additionalneeds\": \"Nope\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 403
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rb-13",
+          "name": "Delete it",
+          "request": {
+            "method": "DELETE",
+            "url": "{{restfulBooker}}/booking/{{bookingId}}",
+            "headers": [
+              {
+                "key": "Cookie",
+                "value": "token={{bookerToken}}",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 201
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-pub-postman-echo-methods-auth-status-codes",
+      "name": "Postman Echo: methods, auth, status codes",
+      "description": "Echoes what you send: handy to see exactly what TestPion puts on the wire.",
+      "items": [
+        {
+          "kind": "http",
+          "id": "pub-pe-14",
+          "name": "GET with query parameters",
+          "request": {
+            "method": "GET",
+            "url": "{{postmanEcho}}/get",
+            "headers": [],
+            "params": [
+              {
+                "key": "tool",
+                "value": "testpion",
+                "enabled": true
+              },
+              {
+                "key": "page",
+                "value": "2",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.args.tool",
+              "expected": "testpion"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-15",
+          "name": "POST JSON",
+          "request": {
+            "method": "POST",
+            "url": "{{postmanEcho}}/post",
+            "headers": [],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"order\": 42,\n  \"items\": [\n    \"kibble\",\n    \"leash\"\n  ]\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.json.order",
+              "expected": 42
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-16",
+          "name": "POST a form",
+          "request": {
+            "method": "POST",
+            "url": "{{postmanEcho}}/post",
+            "headers": [],
+            "body": {
+              "type": "form-urlencoded",
+              "fields": [
+                {
+                  "key": "customer",
+                  "value": "Ada",
+                  "enabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "large",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.form.customer",
+              "expected": "Ada"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-17",
+          "name": "PUT",
+          "request": {
+            "method": "PUT",
+            "url": "{{postmanEcho}}/put",
+            "headers": [],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"status\": \"shipped\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.json.status",
+              "expected": "shipped"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-18",
+          "name": "DELETE",
+          "request": {
+            "method": "DELETE",
+            "url": "{{postmanEcho}}/delete",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-19",
+          "name": "Basic auth",
+          "request": {
+            "method": "GET",
+            "url": "{{postmanEcho}}/basic-auth",
+            "headers": [],
+            "auth": {
+              "type": "basic",
+              "username": "postman",
+              "password": "password"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.authenticated",
+              "expected": true
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-20",
+          "name": "Any status code (418)",
+          "request": {
+            "method": "GET",
+            "url": "{{postmanEcho}}/status/418",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 418
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-21",
+          "name": "A slow response (2 s)",
+          "request": {
+            "method": "GET",
+            "url": "{{postmanEcho}}/delay/2",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "latency",
+              "max": 10000
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-pe-22",
+          "name": "Response headers you choose",
+          "request": {
+            "method": "GET",
+            "url": "{{postmanEcho}}/response-headers",
+            "headers": [],
+            "params": [
+              {
+                "key": "x-testpion",
+                "value": "hello",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "header",
+              "header": "x-testpion",
+              "expected": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-pub-reqres-an-api-key-in-a-header",
+      "name": "ReqRes: an API key in a header",
+      "description": "Every request sends the public free-tier key as x-api-key (an environment variable).",
+      "items": [
+        {
+          "kind": "http",
+          "id": "pub-rr-23",
+          "name": "List users (page 2)",
+          "request": {
+            "method": "GET",
+            "url": "{{reqres}}/users",
+            "headers": [
+              {
+                "key": "x-api-key",
+                "value": "{{reqresKey}}",
+                "enabled": true
+              }
+            ],
+            "params": [
+              {
+                "key": "page",
+                "value": "2",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.page",
+              "expected": 2
+            },
+            {
+              "type": "greater-than",
+              "path": "$.data.length",
+              "expected": 0
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rr-24",
+          "name": "One user",
+          "request": {
+            "method": "GET",
+            "url": "{{reqres}}/users/2",
+            "headers": [
+              {
+                "key": "x-api-key",
+                "value": "{{reqresKey}}",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.data.id",
+              "expected": 2
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rr-25",
+          "name": "Create a user",
+          "request": {
+            "method": "POST",
+            "url": "{{reqres}}/users",
+            "headers": [
+              {
+                "key": "x-api-key",
+                "value": "{{reqresKey}}",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"name\": \"Ada\",\n  \"job\": \"tester\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 201
+            },
+            {
+              "type": "exists",
+              "path": "$.id"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rr-26",
+          "name": "Log in",
+          "request": {
+            "method": "POST",
+            "url": "{{reqres}}/login",
+            "headers": [
+              {
+                "key": "x-api-key",
+                "value": "{{reqresKey}}",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"email\": \"eve.holt@reqres.in\",\n  \"password\": \"cityslicka\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.token"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-rr-27",
+          "name": "Log in with a missing field fails",
+          "request": {
+            "method": "POST",
+            "url": "{{reqres}}/login",
+            "headers": [
+              {
+                "key": "x-api-key",
+                "value": "{{reqresKey}}",
+                "enabled": true
+              }
+            ],
+            "body": {
+              "type": "json",
+              "content": "{\n  \"email\": \"eve.holt@reqres.in\"\n}"
+            }
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 400
+            },
+            {
+              "type": "equals",
+              "path": "$.error",
+              "expected": "Missing password"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-pub-fake-store-a-shop",
+      "name": "Fake Store: a shop",
+      "items": [
+        {
+          "kind": "http",
+          "id": "pub-fs-28",
+          "name": "Products (first 5)",
+          "request": {
+            "method": "GET",
+            "url": "{{fakestore}}/products",
+            "headers": [],
+            "params": [
+              {
+                "key": "limit",
+                "value": "5",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.length",
+              "expected": 5
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-fs-29",
+          "name": "One product",
+          "request": {
+            "method": "GET",
+            "url": "{{fakestore}}/products/1",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.id",
+              "expected": 1
+            },
+            {
+              "type": "exists",
+              "path": "$.price"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-fs-30",
+          "name": "Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{fakestore}}/products/categories",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "greater-than",
+              "path": "$.length",
+              "expected": 0
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-fs-31",
+          "name": "A user’s carts",
+          "request": {
+            "method": "GET",
+            "url": "{{fakestore}}/carts/user/1",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-pub-open-data-no-key-",
+      "name": "Open data (no key)",
+      "description": "Read-only public data, good for trying checks, the response viewer and visualizers.",
+      "items": [
+        {
+          "kind": "http",
+          "id": "pub-od-32",
+          "name": "Weather forecast (Open-Meteo)",
+          "request": {
+            "method": "GET",
+            "url": "{{openMeteo}}/forecast",
+            "headers": [],
+            "params": [
+              {
+                "key": "latitude",
+                "value": "52.52",
+                "enabled": true
+              },
+              {
+                "key": "longitude",
+                "value": "13.41",
+                "enabled": true
+              },
+              {
+                "key": "current",
+                "value": "temperature_2m,wind_speed_10m",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.current.temperature_2m"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-33",
+          "name": "A Pokémon (PokéAPI)",
+          "request": {
+            "method": "GET",
+            "url": "{{pokeapi}}/pokemon/pikachu",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.id",
+              "expected": 25
+            },
+            {
+              "type": "equals",
+              "path": "$.name",
+              "expected": "pikachu"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-34",
+          "name": "Books (Open Library)",
+          "request": {
+            "method": "GET",
+            "url": "https://openlibrary.org/search.json",
+            "headers": [],
+            "params": [
+              {
+                "key": "q",
+                "value": "dune",
+                "enabled": true
+              },
+              {
+                "key": "limit",
+                "value": "3",
+                "enabled": true
+              },
+              {
+                "key": "fields",
+                "value": "title,author_name,first_publish_year",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "greater-than",
+              "path": "$.numFound",
+              "expected": 0
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-35",
+          "name": "A GitHub user",
+          "description": "Unauthenticated GitHub API: 60 requests an hour per IP address.",
+          "request": {
+            "method": "GET",
+            "url": "https://api.github.com/users/octocat",
+            "headers": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.github+json",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.login",
+              "expected": "octocat"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-36",
+          "name": "Today’s xkcd",
+          "request": {
+            "method": "GET",
+            "url": "https://xkcd.com/info.0.json",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.num"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-37",
+          "name": "A random dog picture",
+          "request": {
+            "method": "GET",
+            "url": "https://dog.ceo/api/breeds/image/random",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.status",
+              "expected": "success"
+            }
+          ],
+          "testScript": "// the response is a link to an image: open it in the next request\npm.collectionVariables.set('dogImage', pm.response.json().message);"
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-38",
+          "name": "The dog picture itself (an image response)",
+          "request": {
+            "method": "GET",
+            "url": "{{dogImage}}",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "header",
+              "header": "content-type",
+              "expected": "image/jpeg"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-39",
+          "name": "A cat fact",
+          "request": {
+            "method": "GET",
+            "url": "https://catfact.ninja/fact",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.fact"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-40",
+          "name": "Guess an age from a name",
+          "request": {
+            "method": "GET",
+            "url": "https://api.agify.io",
+            "headers": [],
+            "params": [
+              {
+                "key": "name",
+                "value": "michael",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.name",
+              "expected": "michael"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-41",
+          "name": "A US zip code",
+          "request": {
+            "method": "GET",
+            "url": "https://api.zippopotam.us/us/90210",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.country",
+              "expected": "United States"
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-42",
+          "name": "A random person (test data)",
+          "request": {
+            "method": "GET",
+            "url": "https://randomuser.me/api/",
+            "headers": [],
+            "params": [
+              {
+                "key": "results",
+                "value": "1",
+                "enabled": true
+              },
+              {
+                "key": "nat",
+                "value": "us",
+                "enabled": true
+              }
+            ]
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "equals",
+              "path": "$.results.length",
+              "expected": 1
+            }
+          ]
+        },
+        {
+          "kind": "http",
+          "id": "pub-od-43",
+          "name": "A joke",
+          "request": {
+            "method": "GET",
+            "url": "https://official-joke-api.appspot.com/random_joke",
+            "headers": []
+          },
+          "assertions": [
+            {
+              "type": "status",
+              "expected": 200
+            },
+            {
+              "type": "exists",
+              "path": "$.punchline"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 {
   "schemaVersion": "1.0",
-  "folders": ["grpcb.in"],
+  "folders": [
+    "grpcb.in",
+    "grpcb.in over TLS"
+  ],
   "items": [
     {
       "id": "grpc-hello",
@@ -44,6 +47,102 @@
         "metadata": [],
         "protoFiles": [],
         "tls": false,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-tls-hello",
+      "name": "Say hello (TLS)",
+      "folder": "grpcb.in over TLS",
+      "collectionId": "grpc",
+      "data": {
+        "target": "{{grpcHostTls}}",
+        "method": "hello.HelloService/SayHello",
+        "message": "{\n  \"greeting\": \"TestPion\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": true,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-bin-dummy",
+      "name": "Every field type (DummyUnary)",
+      "folder": "grpcb.in over TLS",
+      "collectionId": "grpc",
+      "data": {
+        "target": "{{grpcHostTls}}",
+        "method": "grpcbin.GRPCBin/DummyUnary",
+        "message": "{\n  \"f_string\": \"hello\",\n  \"f_strings\": [\n    \"a\",\n    \"b\"\n  ],\n  \"f_int32\": 42,\n  \"f_bool\": true,\n  \"f_enum\": \"ENUM_1\",\n  \"f_float\": 1.5,\n  \"f_bytes\": \"aGVsbG8=\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": true,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-bin-headers",
+      "name": "Echo your metadata (HeadersUnary)",
+      "folder": "grpcb.in over TLS",
+      "collectionId": "grpc",
+      "data": {
+        "target": "{{grpcHostTls}}",
+        "method": "grpcbin.GRPCBin/HeadersUnary",
+        "message": "{}",
+        "metadata": [
+          {
+            "key": "x-testpion",
+            "value": "hello",
+            "enabled": true
+          }
+        ],
+        "protoFiles": [],
+        "tls": true,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-bin-error",
+      "name": "A specific error (NOT_FOUND)",
+      "folder": "grpcb.in over TLS",
+      "collectionId": "grpc",
+      "data": {
+        "target": "{{grpcHostTls}}",
+        "method": "grpcbin.GRPCBin/SpecificError",
+        "message": "{\n  \"code\": 5,\n  \"reason\": \"not found on purpose\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": true,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-concat",
+      "name": "Concatenate two strings",
+      "folder": "grpcb.in over TLS",
+      "collectionId": "grpc",
+      "data": {
+        "target": "{{grpcHostTls}}",
+        "method": "addsvc.Add/Concat",
+        "message": "{\n  \"a\": \"Test\",\n  \"b\": \"Pion\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": true,
+        "timeoutMs": 30000
+      }
+    },
+    {
+      "id": "grpc-dummy-stream",
+      "name": "Ten messages (server streaming)",
+      "folder": "grpcb.in over TLS",
+      "collectionId": "grpc",
+      "data": {
+        "target": "{{grpcHostTls}}",
+        "method": "grpcbin.GRPCBin/DummyServerStream",
+        "message": "{\n  \"f_string\": \"stream me\"\n}",
+        "metadata": [],
+        "protoFiles": [],
+        "tls": true,
         "timeoutMs": 30000
       }
     }

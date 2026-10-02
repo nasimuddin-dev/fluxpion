@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0",
   "id": "graphql-public",
-  "name": "GraphQL (Countries, Rick and Morty)",
-  "description": "Queries against two free GraphQL APIs: [Countries](https://countries.trevorblades.com) and [Rick and Morty](https://rickandmortyapi.com). Open one in the **GraphQL** view to explore the schema, get autocomplete and see the response.",
+  "name": "GraphQL (public APIs)",
+  "description": "Public GraphQL APIs: countries, Rick and Morty, Star Wars, GraphQLZero (with mutations), AniList and Pokémon. Press **Introspect** for autocomplete and the schema explorer.",
   "version": 1,
   "variables": [],
   "updatedAt": "2026-09-29T00:00:00.000Z",
@@ -19,13 +19,24 @@
           "request": {
             "endpoint": "{{countriesGraphql}}",
             "query": "query Country($code: ID!) {\n  country(code: $code) {\n    name\n    capital\n    currency\n    emoji\n    languages { name }\n  }\n}",
-            "variables": { "code": "JP" },
+            "variables": {
+              "code": "JP"
+            },
             "operationName": "Country"
           },
           "assertions": [
-            { "type": "http-status", "expected": 200 },
-            { "type": "graphql-no-errors" },
-            { "type": "equals", "path": "$.data.country.capital", "expected": "Tokyo" }
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.country.capital",
+              "expected": "Tokyo"
+            }
           ],
           "testScript": "const c = pm.response.json().data.country;\npm.test('speaks Japanese', () => pm.expect(c.languages.map((l) => l.name)).to.include('Japanese'));\npm.environment.set('currency', c.currency);"
         },
@@ -36,12 +47,24 @@
           "request": {
             "endpoint": "{{countriesGraphql}}",
             "query": "query Continent($code: ID!) {\n  continent(code: $code) {\n    name\n    countries { code name }\n  }\n}",
-            "variables": { "code": "EU" }
+            "variables": {
+              "code": "EU"
+            }
           },
           "assertions": [
-            { "type": "graphql-no-errors" },
-            { "type": "equals", "path": "$.data.continent.name", "expected": "Europe" },
-            { "type": "greater-than", "path": "$.data.continent.countries.length", "expected": 40 }
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.continent.name",
+              "expected": "Europe"
+            },
+            {
+              "type": "greater-than",
+              "path": "$.data.continent.countries.length",
+              "expected": 40
+            }
           ]
         },
         {
@@ -52,7 +75,12 @@
             "endpoint": "{{countriesGraphql}}",
             "query": "{\n  country(code: \"FR\") {\n    name\n    population\n  }\n}"
           },
-          "assertions": [{ "type": "exists", "path": "$.errors[0].message" }]
+          "assertions": [
+            {
+              "type": "exists",
+              "path": "$.errors[0].message"
+            }
+          ]
         }
       ]
     },
@@ -68,12 +96,25 @@
           "request": {
             "endpoint": "{{rickAndMortyGraphql}}",
             "query": "query Characters($page: Int, $name: String) {\n  characters(page: $page, filter: { name: $name }) {\n    info { count pages next }\n    results { id name status species }\n  }\n}",
-            "variables": { "page": 1, "name": "rick" }
+            "variables": {
+              "page": 1,
+              "name": "rick"
+            }
           },
           "assertions": [
-            { "type": "graphql-no-errors" },
-            { "type": "greater-than", "path": "$.data.characters.info.count", "expected": 0 },
-            { "type": "contains", "path": "$.data.characters.results[0].name", "expected": "Rick" }
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "greater-than",
+              "path": "$.data.characters.info.count",
+              "expected": 0
+            },
+            {
+              "type": "contains",
+              "path": "$.data.characters.results[0].name",
+              "expected": "Rick"
+            }
           ]
         },
         {
@@ -83,11 +124,240 @@
           "request": {
             "endpoint": "{{rickAndMortyGraphql}}",
             "query": "query Episode($id: ID!) {\n  episode(id: $id) {\n    name\n    air_date\n    episode\n    characters { name }\n  }\n}",
-            "variables": { "id": "1" }
+            "variables": {
+              "id": "1"
+            }
           },
           "assertions": [
-            { "type": "graphql-no-errors" },
-            { "type": "equals", "path": "$.data.episode.episode", "expected": "S01E01" }
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.episode.episode",
+              "expected": "S01E01"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-gq-swapi",
+      "name": "Star Wars (SWAPI)",
+      "items": [
+        {
+          "kind": "graphql",
+          "id": "gq-swapi-films",
+          "name": "Films",
+          "request": {
+            "endpoint": "{{swapiGraphql}}",
+            "query": "query Films {\n  allFilms {\n    films { title episodeID releaseDate director }\n  }\n}",
+            "variables": {},
+            "operationName": "Films"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "greater-than",
+              "path": "$.data.allFilms.films.length",
+              "expected": 0
+            }
+          ]
+        },
+        {
+          "kind": "graphql",
+          "id": "gq-swapi-person",
+          "name": "A person and their films",
+          "request": {
+            "endpoint": "{{swapiGraphql}}",
+            "query": "query Person($id: ID!) {\n  person(personID: $id) {\n    name\n    birthYear\n    homeworld { name }\n    filmConnection { films { title } }\n  }\n}",
+            "variables": {
+              "id": 1
+            },
+            "operationName": "Person"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.person.name",
+              "expected": "Luke Skywalker"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-gq-zero",
+      "name": "GraphQLZero (queries and mutations)",
+      "items": [
+        {
+          "kind": "graphql",
+          "id": "gq-zero-user",
+          "name": "A user with their posts",
+          "request": {
+            "endpoint": "{{graphqlZero}}",
+            "query": "query User($id: ID!) {\n  user(id: $id) {\n    name\n    email\n    posts(options: { paginate: { limit: 3 } }) { data { id title } }\n  }\n}",
+            "variables": {
+              "id": 1
+            },
+            "operationName": "User"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.user.name",
+              "expected": "Leanne Graham"
+            }
+          ]
+        },
+        {
+          "kind": "graphql",
+          "id": "gq-zero-create",
+          "name": "Create a post (mutation)",
+          "request": {
+            "endpoint": "{{graphqlZero}}",
+            "query": "mutation CreatePost($input: CreatePostInput!) {\n  createPost(input: $input) { id title body }\n}",
+            "variables": {
+              "input": {
+                "title": "Hello from TestPion",
+                "body": "Mutations are simulated: nothing is stored."
+              }
+            },
+            "operationName": "CreatePost"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.createPost.title",
+              "expected": "Hello from TestPion"
+            }
+          ]
+        },
+        {
+          "kind": "graphql",
+          "id": "gq-zero-update",
+          "name": "Update a post (mutation)",
+          "request": {
+            "endpoint": "{{graphqlZero}}",
+            "query": "mutation UpdatePost($id: ID!, $input: UpdatePostInput!) {\n  updatePost(id: $id, input: $input) { id title }\n}",
+            "variables": {
+              "id": 1,
+              "input": {
+                "title": "Renamed"
+              }
+            },
+            "operationName": "UpdatePost"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.updatePost.title",
+              "expected": "Renamed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-gq-anilist",
+      "name": "AniList",
+      "items": [
+        {
+          "kind": "graphql",
+          "id": "gq-anilist-media",
+          "name": "An anime by id",
+          "request": {
+            "endpoint": "{{anilistGraphql}}",
+            "query": "query Media($id: Int) {\n  Media(id: $id, type: ANIME) {\n    title { romaji english }\n    episodes\n    genres\n  }\n}",
+            "variables": {
+              "id": 1
+            },
+            "operationName": "Media"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.Media.title.romaji",
+              "expected": "Cowboy Bebop"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "folder",
+      "id": "fld-gq-pokemon",
+      "name": "Pokémon",
+      "items": [
+        {
+          "kind": "graphql",
+          "id": "gq-poke",
+          "name": "A Pokémon and its moves",
+          "request": {
+            "endpoint": "{{pokeGraphql}}",
+            "query": "query Pokemon($name: String!) {\n  pokemon(name: $name) {\n    id\n    name\n    types { type { name } }\n    moves { move { name } }\n  }\n}",
+            "variables": {
+              "name": "pikachu"
+            },
+            "operationName": "Pokemon"
+          },
+          "assertions": [
+            {
+              "type": "http-status",
+              "expected": 200
+            },
+            {
+              "type": "graphql-no-errors"
+            },
+            {
+              "type": "equals",
+              "path": "$.data.pokemon.id",
+              "expected": 25
+            }
           ]
         }
       ]

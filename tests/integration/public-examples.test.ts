@@ -33,10 +33,10 @@ describe('examples workspace (public APIs)', () => {
   it('has valid collections, environment, providers, MCP servers, saved items and monitors', () => {
     const cols = store.listCollections();
     expect(cols.filter((c) => c.problem)).toEqual([]);
-    expect(cols.map((c) => c.id).sort()).toEqual(['graphql-public', 'grpc', 'httpbin', 'jsonplaceholder', 'live-streams', 'petstore', 'realtime', 'soap']);
+    expect(cols.map((c) => c.id).sort()).toEqual(['graphql-public', 'grpc', 'httpbin', 'jsonplaceholder', 'live-streams', 'petstore', 'public-rest', 'realtime', 'soap']);
     expect(store.getEnvironment('Public APIs')?.variables.some((v) => v.key === 'petstoreMcp')).toBe(true);
     expect(store.getProviders().map((p) => p.id)).toContain('demo');
-    expect(store.getMcpServers().map((s) => s.name)).toEqual(['Petstore MCP', 'DeepWiki', 'Weather (offline mock)']);
+    expect(store.getMcpServers().map((s) => s.name)).toEqual(['Petstore MCP', 'DeepWiki', 'Weather (offline mock)', 'Microsoft Learn docs', 'Context7 (library docs)', 'Cloudflare docs', 'Astro docs', 'MCP spec repo (GitMCP)', 'Hugging Face Hub', 'Everything (reference server, needs Node.js)']);
     expect(store.libraryKinds().sort()).toEqual(['ai-prompts', 'grpc', 'monitors', 'websocket']);
     // gRPC calls and connections are shown in their collections
     const colIds = new Set(cols.map((c) => c.id));

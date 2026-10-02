@@ -51,6 +51,61 @@
           }
         ]
       }
+    },
+    {
+      "id": "ws-ifelse",
+      "name": "ws.ifelse.io (text)",
+      "folder": "Echo servers",
+      "collectionId": "realtime",
+      "data": {
+        "url": "{{wsEcho3}}",
+        "protocols": "",
+        "headers": [],
+        "message": "Hello from TestPion",
+        "mode": "websocket"
+      }
+    },
+    {
+      "id": "mqtt-hivemq",
+      "name": "HiveMQ public broker",
+      "folder": "MQTT brokers",
+      "collectionId": "realtime",
+      "data": {
+        "url": "mqtt://broker.hivemq.com:1883",
+        "protocols": "",
+        "headers": [],
+        "mode": "mqtt",
+        "topic": "testpion/examples/hello",
+        "qos": 0,
+        "message": "{\n  \"from\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\"\n}",
+        "subscriptions": [
+          {
+            "topic": "testpion/examples/#",
+            "qos": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "mqtt-emqx",
+      "name": "EMQX public broker",
+      "folder": "MQTT brokers",
+      "collectionId": "realtime",
+      "data": {
+        "url": "mqtt://broker.emqx.io:1883",
+        "protocols": "",
+        "headers": [],
+        "mode": "mqtt",
+        "topic": "testpion/examples/hello",
+        "qos": 0,
+        "message": "{\n  \"from\": \"{{appName}}\",\n  \"id\": \"{{$guid}}\"\n}",
+        "subscriptions": [
+          {
+            "topic": "testpion/examples/#",
+            "qos": 0
+          }
+        ]
+      }
     }
   ]
 }

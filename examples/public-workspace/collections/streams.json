@@ -15,8 +15,55 @@
       "request": {
         "method": "GET",
         "url": "{{sseStream}}",
-        "headers": [{ "key": "Accept", "value": "text/event-stream", "enabled": true }]
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "text/event-stream",
+            "enabled": true
+          }
+        ]
       }
+    },
+    {
+      "kind": "http",
+      "id": "sse-postman-echo",
+      "name": "A short stream (Postman Echo)",
+      "description": "Sends a few events and ends: good for checks on a stream.",
+      "request": {
+        "method": "GET",
+        "url": "{{postmanEcho}}/server-events/5",
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "text/event-stream",
+            "enabled": true
+          }
+        ]
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        }
+      ]
+    },
+    {
+      "kind": "http",
+      "id": "sse-hacker-news",
+      "name": "Hacker News top stories, live",
+      "description": "Firebase streams a database path as server-sent events: the current top stories, then every change.",
+      "request": {
+        "method": "GET",
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "text/event-stream",
+            "enabled": true
+          }
+        ]
+      },
+      "assertions": []
     }
   ]
 }

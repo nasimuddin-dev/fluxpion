@@ -9,6 +9,7 @@ import { atomicWrite, readJson, writeJson } from './fsutil.js';
 import { openMetaStore, type MetaStore } from './metastore.js';
 import type { Baseline } from '../report/regression.js';
 import { moveToTrash } from './trash.js';
+import { markTemplateInstalled } from './template-update.js';
 
 /* ------------------------------------------------------------------ migrations */
 
@@ -661,6 +662,8 @@ export class WorkspaceManager {
         return !['runs', 'traces', 'payloads', 'reports', 'baselines', 'trash'].includes(top) && !/^(database\.sqlite.*|metadata\.jsonl)$/.test(basename(s));
       },
     });
+    // everything in the template was offered: later versions add only what is new (addTemplateAdditions)
+    markTemplateInstalled(templateDir, dest);
     return { id: w.id, name: w.name, path: dest, updatedAt: w.updatedAt };
   }
 
