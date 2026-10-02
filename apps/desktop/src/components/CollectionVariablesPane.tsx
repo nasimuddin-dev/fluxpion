@@ -1,8 +1,8 @@
-import { ExternalLink, Save } from 'lucide-react';
+import { Copy, ExternalLink, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, useApp } from '../store';
-import type { Collection, KeyValue } from '../types';
+import type { Collection, Environment, KeyValue } from '../types';
 import { KeyValueEditor } from './KeyValueEditor';
 import { CountPill, TreeHeader, treeKeys } from './TreeParts';
 import { Button, cx, Empty, Split } from './ui';
@@ -52,6 +52,33 @@ export function CollectionVariablesPane({ initial }: { initial?: string }) {
     }
   };
 
+  /** Collection variables apply only to its requests: copy them into the active environment to use them anywhere. */
+  const copyToEnvironment = async () => {
+    const name = useApp.getState().environment;
+    if (!name) return useApp.getState().toast('Choose an environment in the top bar first: the variables are copied into it.', 'error');
+    const env = (await call<Environment[]>('env.list')).find((e) => e.name === name);
+    if (!env) return;
+    const have = new Set(env.variables.map((v) => v.key));
+    const add = rows.filter((r) => r.key && !have.has(r.key));
+    const kept = rows.filter((r) => r.key && have.has(r.key)).length;
+    if (!add.length) return useApp.getState().toast(`"${name}" already has all ${rows.filter((r) => r.key).length} of these variables`, 'success');
+    const ok = await confirmAction({
+      title: 'Copy to environment',
+      message: `Copy ${add.length} variable${add.length === 1 ? '' : 's'} of "${current?.name}" to the environment "${name}"?`,
+      detail: `${kept ? `${kept} it already has keep their value there. ` : ''}Then they work everywhere this environment is active (MCP servers, other collections). In this collection's requests the collection's own value still wins.`,
+      confirmLabel: 'Copy',
+      tone: 'question',
+    });
+    if (!ok) return;
+    try {
+      await call('env.save', { env: { ...env, variables: [...env.variables, ...add.map((r) => ({ key: r.key, value: r.value, enabled: r.enabled !== false }))] } });
+      await useApp.getState().refreshWorkspace();
+      useApp.getState().toast(`Copied ${add.length} variable${add.length === 1 ? '' : 's'} to "${name}"`, 'success');
+    } catch (e) {
+      useApp.getState().toast(asError(e).message, 'error');
+    }
+  };
+
   if (!cols.length)
     return (
       <Empty title="No collections yet" icon={<ExternalLink size={22} />}>
@@ -85,6 +112,9 @@ export function CollectionVariablesPane({ initial }: { initial?: string }) {
               <span className="text-xs text-muted shrink-0">{rows.length} variables</span>
               <Button size="sm" variant="ghost" className="ml-auto" icon={<ExternalLink size={13} />} onClick={() => useApp.getState().openIntent('collections', { collectionId: current.id, tab: 'variables' })}>
                 Open collection
+              </Button>
+              <Button size="sm" icon={<Copy size={13} />} disabled={!rows.some((r) => r.key)} onClick={() => void copyToEnvironment()} title="Use them outside this collection too (MCP servers, other collections)">
+                Copy to environment
               </Button>
               <Button size="sm" variant="primary" icon={<Save size={13} />} disabled={!dirty} onClick={() => void save()}>
                 Save

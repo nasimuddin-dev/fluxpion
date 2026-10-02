@@ -5,7 +5,7 @@ import { asError, call, on, type NormalizedError } from '../api';
 import { confirmAction, persisted, promptText, useApp } from '../store';
 import { useDoc, useDocs } from '../lib/docs';
 import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
-import type { CheckConfig, CheckResult, McpServerConfig } from '../types';
+import type { CheckConfig, CheckResult, KeyValue, McpServerConfig } from '../types';
 import { formatMs, uid, plural } from '../lib/format';
 import { AssertionEditor } from '../components/AssertionEditor';
 import { CodeEditor } from '../components/CodeEditor';
@@ -495,7 +495,25 @@ function TargetInput({ s, onChange }: { s: McpServerConfig; onChange(s: McpServe
 function ServerSettings({ s, onChange, folders = [] }: { s: McpServerConfig; onChange(s: McpServerConfig): void; folders?: string[] }) {
   const [json, setJson] = useState(false);
   const [jsonText, setJsonText] = useState('');
-  const envRows = s.transport === 'stdio' ? Object.entries(s.env ?? {}).map(([key, value]) => ({ key, value })) : [];
+  const envMap = s.transport === 'stdio' ? (s.env ?? {}) : {};
+  // the table keeps its own rows while you type: the saved config is a name → value map, which can't hold a row whose
+  // name isn't typed yet (a value typed first used to vanish), nor a row turned off
+  const [envRows, setEnvRows] = useState<KeyValue[]>(() => Object.entries(envMap).map(([key, value]) => ({ key, value, enabled: true })));
+  const envKey = JSON.stringify(envMap);
+  const lastEnv = useRef(envKey);
+  useEffect(() => {
+    // another server, or the JSON editor changed it: start from the config again
+    if (envKey === lastEnv.current) return;
+    lastEnv.current = envKey;
+    setEnvRows(Object.entries(envMap).map(([key, value]) => ({ key, value, enabled: true })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envKey, s.id]);
+  const changeEnv = (rows: KeyValue[]) => {
+    setEnvRows(rows);
+    const env = Object.fromEntries(rows.filter((r) => r.key.trim() && r.enabled !== false).map((r) => [r.key.trim(), r.value]));
+    lastEnv.current = JSON.stringify(env);
+    onChange({ ...s, env } as McpServerConfig);
+  };
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-3xl p-4 flex flex-col gap-3">
@@ -554,7 +572,7 @@ function ServerSettings({ s, onChange, folders = [] }: { s: McpServerConfig; onC
                   <textarea className="field mono min-h-20" value={(s.args ?? []).join('\n')} onChange={(e) => onChange({ ...s, args: e.target.value.split('\n').filter((x) => x !== '') })} />
                 </Field>
                 <Field label="Environment variables" hint="Use {{variables}} to reference secrets instead of pasting them here.">
-                  <KeyValueEditor rows={envRows} onChange={(rows) => onChange({ ...s, env: Object.fromEntries(rows.filter((r) => r.key).map((r) => [r.key, r.value])) })} />
+                  <KeyValueEditor rows={envRows} onChange={changeEnv} />
                 </Field>
               </>
             ) : s.transport === 'mock' ? (

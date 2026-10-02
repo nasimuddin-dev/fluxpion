@@ -432,6 +432,8 @@ export function CollectionTree({
       setOpen((o) => (keys.every((k) => o[k] !== false) ? o : { ...o, ...Object.fromEntries(keys.map((k) => [k, true])) }));
       break;
     }
+    // the tree moves only for an explicit reveal: opening from Favorites, a tab or the tree itself leaves it where it is
+    if (!opened) return;
     const t = setTimeout(() => treeRef.current?.querySelector(`[data-node-id="${CSS.escape(activeRequestId)}"]`)?.scrollIntoView({ block: 'nearest' }), 80);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -469,7 +471,7 @@ export function CollectionTree({
       const pad = { paddingLeft: 8 + depth * 12 };
       if (n.kind === 'folder') {
         // the folders on the way to the open request start open, so it's always in sight
-        const isOpen = open[n.id] ?? (!!f || (!!activeRequestId && !!findNode(n.items, activeRequestId)));
+        const isOpen = open[n.id] ?? !!f;
         return (
           <div key={n.id}>
             <div className={cx('group flex items-center h-8 text-sm rounded-md mx-1 hover:bg-hover pr-1 transition-colors', menuFor === n.id && 'bg-hover', dropClass(n.id))} style={pad} {...dragProps(c, n)} {...dropProps(c, n.id, 'into', { folderId: n.id })} draggable={renaming === n.id ? false : undefined} onContextMenu={(e) => (e.preventDefault(), setMenuFor(n.id))}>
@@ -768,8 +770,8 @@ export function CollectionTree({
       {moving && <MoveDialog node={moving.n} from={moving.c} collections={collections} onClose={() => setMoving(undefined)} onMove={(to, folderId) => move(moving.c, moving.n, to, folderId)} />}
       {collections.map((c) => {
         // grouped by category, collections start folded: the workspace lists them, expanding shows the categories
-        const holdsActive = !!activeRequestId && (!!findNode(c.items, activeRequestId) || (extraGroups?.(c) ?? []).some((g) => g.items.some((i) => i.id === activeRequestId)));
-        const isOpen = categorize && f ? true : open[c.id] ?? (!categorize || holdsActive);
+        // a collection opens when the user opens it (or something is revealed in it), not because its request is open
+        const isOpen = categorize && f ? true : open[c.id] ?? !categorize;
         if (categorize && f && !c.items.some(matches) && !extraMatches(c)) return null;
         return (
           <div key={c.id}>

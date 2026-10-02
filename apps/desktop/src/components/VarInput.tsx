@@ -186,6 +186,23 @@ export function VarInput({
               <span className="text-[0.7rem] text-muted border border-line rounded px-1">{v.scope}</span>
             </button>
           ))}
+          {/* outside a collection (MCP servers, settings …) collection variables don't apply: say so, and where they are */}
+          {!(collectionId ?? collectionOf(box.current)) && (
+            <div className="px-3 pt-1.5 pb-1 mt-1 border-t border-line text-xs text-muted" data-suggest-note>
+              From the active environment, the workspace and the globals. Collection variables only apply to that collection's requests:{' '}
+              <button
+                className="text-accent hover:underline"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setSuggest(null);
+                  useApp.getState().openIntent('environments', { tab: 'collection' });
+                }}
+              >
+                copy them to an environment
+              </button>{' '}
+              to use them here.
+            </div>
+          )}
         </div>
       )}
     </div>

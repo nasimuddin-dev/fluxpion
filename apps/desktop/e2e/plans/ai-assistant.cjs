@@ -145,8 +145,9 @@ const steps = [
     const apply = ${panel}?.querySelector('[data-answer-apply]'); if (!apply) return 'NO BUTTON apply';
     const label = apply.textContent.trim(); apply.click(); await __t.sleep(800);
     // the editor draws the new text a moment later: wait for it
-    const read = () => [...document.querySelectorAll('main .monaco-editor')].find((e) => e.offsetParent)?.querySelector('.view-lines')?.innerText.replace(/\\s+/g, ' ').trim() ?? '';
-    const text = (await __t.waitFor(() => (/Generated/.test(read()) ? read() : ''), 3000)) || read();
+    // textContent: innerText of a half-laid-out editor can be just the first token
+    const read = () => [...document.querySelectorAll('main .monaco-editor')].find((e) => e.offsetParent)?.querySelector('.view-lines')?.textContent.replace(/\\s+/g, ' ').trim() ?? '';
+    const text = (await __t.waitFor(() => (/countries \\{ code name \\} \\}/.test(read()) ? read() : ''), 6000)) || read();
     const toast = [...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.textContent.trim()).join(' / ');
     return 'button: ' + label + ' | editor: ' + text + ' | toast: ' + toast;
   })()`],

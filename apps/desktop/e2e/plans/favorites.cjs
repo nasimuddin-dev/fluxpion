@@ -26,6 +26,16 @@ const steps = [
      return 'section before: ' + before + ' | star: ' + star + ' | saved: ' + !!flat(saved.items).find((x) => x.name === 'Custom headers')?.favorite + ' | favorites: ' + favRows().map((b) => b.textContent.trim()).join(' / ');`,
   ),
   step('open-from-favorites', `const f = favRows()[0]; if (!f) return 'NO ROW'; f.click(); await __t.sleep(1500); return 'active tab: ' + document.querySelector('[role=tablist][aria-label="Open requests"] [role=tab][aria-selected="true"]')?.textContent.trim();`),
+  // opening a favorite leaves the tree as the user left it: nothing unfolds, nothing scrolls
+  step(
+    'favorite-keeps-tree-still',
+    `document.querySelector('aside [aria-label="Collapse all"]').click(); await __t.sleep(600);
+     const list = document.querySelector('aside .overflow-auto'); const top = list?.scrollTop ?? 0;
+     const before = rows().length;
+     [...document.querySelectorAll('[role=tablist][aria-label="Open requests"] [role=tab]')].forEach(() => {});
+     const f = favRows()[0]; f.click(); await __t.sleep(1500);
+     return 'rows before: ' + before + ' | after: ' + rows().length + ' | scrolled: ' + ((list?.scrollTop ?? 0) !== top) + ' | open tab: ' + document.querySelector('[role=tablist][aria-label="Open requests"] [role=tab][aria-selected="true"]')?.textContent.trim();`,
+  ),
   step(
     'remove-from-favorites',
     `const f = favRows()[0]; const items = await menuOf(f); const rm = items?.find((m) => m.textContent.trim() === 'Remove from favorites'); if (!rm) return 'NO MENU';
@@ -37,5 +47,9 @@ const steps = [
 module.exports = withExpect(steps, {
   'add-to-favorites': /^section before: false \| star: true \| saved: true \| favorites: GETCustom headersHTTP basics \(httpbin\)$/,
   'open-from-favorites': /^active tab: GETCustom headers$/,
+  'favorite-keeps-tree-still': (r) => {
+    const m = /^rows before: (\d+) \| after: (\d+) \| scrolled: false \| open tab: GETCustom headers$/.exec(r);
+    return (m && m[1] === m[2]) || 'the tree should not unfold or scroll';
+  },
   'remove-from-favorites': /^favorites: 0 \| section: false \| star: false$/,
 });

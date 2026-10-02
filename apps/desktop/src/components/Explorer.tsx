@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, ChevronsDownUp, Copy, CopyPlus, Download, ExternalLink, FileCode2, FolderInput, FolderPlus, FolderX, GitCompare, Inbox, Layers, PanelLeftClose, Pencil, Plug, Plus, RefreshCw, ScanSearch, Star, Trash2, Unplug, Upload } from 'lucide-react';
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { asError, call, on } from '../api';
 import { confirmAction, promptText, useApp } from '../store';
 import type { Collection, CollectionNode, Library, LibraryItem, McpServerConfig } from '../types';
@@ -380,7 +380,12 @@ export function Explorer() {
   // Import and Export open here, without leaving the request editors
   const [importing, setImporting] = useState(false);
   const [collapseAll, setCollapseAll] = useState(0);
-  const revealKey = useApp((s) => s.intent?.nonce);
+  // reveal the opened request in the tree when it was opened from elsewhere (search, history, a link): not when it was
+  // opened from the explorer itself (e.g. Favorites), which would unfold its collection under the user's hand
+  const lastIntent = useApp((s) => s.intent);
+  const revealRef = useRef<number | undefined>(undefined);
+  if (lastIntent && !(lastIntent.payload as { noReveal?: boolean } | undefined)?.noReveal) revealRef.current = lastIntent.nonce;
+  const revealKey = revealRef.current;
   const [exporting, setExporting] = useState(false);
   const importDefinition = () => setImporting(true);
   /** Show a saved gRPC call / connection in another collection (or in none). */
@@ -675,9 +680,9 @@ export function Explorer() {
                 sub={c.name}
                 title={`${n.name} (${c.name})`}
                 active={openRequestId === n.id}
-                onClick={() => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id })}
+                onClick={() => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id, noReveal: true })}
                 menu={[
-                  { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id }) },
+                  { label: 'Open in tab', icon: <ExternalLink size={14} />, onSelect: () => intent(n.kind === 'graphql' ? 'graphql' : 'rest', { collectionId: c.id, requestId: n.id, noReveal: true }) },
                   {
                     label: 'Remove from favorites',
                     icon: <Star size={14} />,
