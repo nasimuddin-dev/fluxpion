@@ -75,6 +75,10 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `compare_runs` | What changed between two runs: new failures, fixed tests, slower tests, new and removed tests and the change of totals; `passed` is false when something regressed. |
 | `list_datasets` | Data files in the workspace's `datasets/` folder (path, format, size; tables of SQLite databases), to pass to `run_collection` as `data`. |
 | `load_history` | Earlier load tests (from the app and `load_test`), newest first: target, virtual users, throughput, error rate, p50 / p95 / p99 and pass rules. |
+| `git_status` | Git state of the workspace: branch, ahead / behind the remote, changed files. |
+| `git_diff` | The workspace's changes by meaning (requests, folders, environment variables, test files); with `from` / `to`, between two commits; `markdown: true` for a pull-request comment. |
+| `git_log` | Commits of the workspace, of a file or of a collection. |
+| `git_propose_commit` | Stage the changes and propose a commit message (after the secret check). It does not commit: the message appears in the app's Git view for a person to commit. Not on a read-only server. See [Keep your workspace in git](/getting-started/git). |
 | `what_needs_attention` | Failing monitors, expiring certificates, the latest failed run, failing requests and flaky tests, most severe first. A good first call. |
 | `workspace_activity` | Per-day activity of the workspace (`days`, default 14): requests and failed requests, median response time, test runs and failed tests, requests per type and the slowest requests. |
 | `environment_matrix` | Every variable across every environment: set, empty, missing or disabled in each (statuses only). |

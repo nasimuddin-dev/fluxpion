@@ -194,7 +194,7 @@ export function WorkspaceMenu() {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-4 gap-1 p-2 border-t border-line">
+            <div className="grid grid-cols-5 gap-1 p-2 border-t border-line">
               <Button size="sm" variant="ghost" icon={<FolderPlus size={13} />} onClick={() => setNameDialog({ mode: 'create', value: '' })}>
                 New
               </Button>
@@ -206,6 +206,9 @@ export function WorkspaceMenu() {
                   if (path) void act(() => call('ws.open', { ref: path }));
                 }}>
                 Open folder
+              </Button>
+              <Button size="sm" variant="ghost" icon={<GitBranch size={13} />} title="Clone a git repository that holds a TestPion workspace, and open it" onClick={() => (setOpen(false), void runMenuCommand('git-clone'))}>
+                Clone
               </Button>
               <Button
                 size="sm"

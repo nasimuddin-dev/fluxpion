@@ -1,0 +1,224 @@
+/** RPC handlers: git for the open workspace (GIT-201 … GIT-304, planning/git-integration.md). Uses the system git. */
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import {
+  ApsError,
+  changesMarkdown,
+  describeGitChanges,
+  describeRevChanges,
+  runGit,
+  findCollectionItem,
+  findCommittableSecrets,
+  gitBranches,
+  gitClone,
+  gitCommit,
+  gitDefaultBranch,
+  gitDeleteBranch,
+  gitAbortMerge,
+  gitResolve,
+  gitSetupMergeDriver,
+  gitDiff,
+  gitDiscard,
+  gitFetch,
+  gitInit,
+  gitItemHistory,
+  gitLog,
+  gitPull,
+  gitPush,
+  gitRemoteUrl,
+  gitShow,
+  gitStage,
+  gitStatus,
+  gitSwitch,
+  gitUnstage,
+  gitVersion,
+  makeGitReady,
+  pullRequestUrl,
+  replaceCollectionItem,
+  type Collection,
+  type GitFile,
+} from '@testpion/core';
+import type { Backend, Handlers } from '../backend.js';
+
+export function gitHandlers(be: Backend): Handlers {
+  const ws = () => be.ws.root;
+  /**
+   * After git rewrote files (discard, switch, pull, restore): reload and tell the views, without the "changed
+   * outside TestPion" notice (the user asked for it).
+   */
+  const rewritten = async <T>(op: () => Promise<T>): Promise<T> => {
+    be.lastOwnChange = Date.now();
+    try {
+      return await op();
+    } finally {
+      be.lastOwnChange = Date.now();
+      be.ws.reloadWorkspaceFile();
+      be.host.emit('data.changed', { method: 'git' });
+      be.host.emit('git.changed', {});
+    }
+  };
+  const mergeDriverChecked = new Set<string>();
+  const proposalFile = () => join(ws(), '.local', 'git-proposal.json');
+  const changed = <T>(r: T): T => (be.host.emit('git.changed', {}), r);
+
+  /** Register a cloned or connected workspace folder in the workspace list and open it. */
+  const openFolder = (dir: string) => {
+    const s = be.manager.loadSettings();
+    if (!s.workspacePaths.includes(dir)) be.settings = be.manager.saveSettings({ ...s, workspacePaths: [...s.workspacePaths, dir] });
+    be.openStore(dir);
+    be.host.emit('data.changed', { method: 'ws.open' });
+  };
+
+  /** The workspace folders in a cloned repository: the root, or folders one or two levels down. */
+  const findWorkspaces = (dir: string, depth = 2): string[] => {
+    if (existsSync(join(dir, 'workspace.json'))) return [dir];
+    if (depth === 0) return [];
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules')
+      .flatMap((d) => findWorkspaces(join(dir, d.name), depth - 1));
+  };
+
+  /** Collection files merge request by request (GIT-301): this app is the merge driver (`--merge-driver`), else the CLI. */
+  const setupMergeDriver = async () => {
+    const self = be.host.mcpCommand;
+    const q = (a: string) => `"${a.split('\\').join('/')}"`;
+    const command = self ? [self.command, ...self.args].map(q).join(' ') + ' --merge-driver' : 'testpion merge-driver';
+    await gitSetupMergeDriver(ws(), command).catch((e) => be.appLog('warn', `git merge driver not set up: ${String(e)}`));
+  };
+
+  return {
+    /** Branch, ahead / behind, changed files; `available: false` when git is not installed. */
+    'git.status': async () => {
+      const version = await gitVersion();
+      if (!version) return { available: false, repository: false, ahead: 0, behind: 0, files: [], conflicted: false };
+      const st = await gitStatus(ws());
+      const remote = st.repository ? await gitRemoteUrl(ws()) : undefined;
+      if (st.repository && !mergeDriverChecked.has(ws())) {
+        // once per workspace and start: a repository cloned or made elsewhere gets the merge driver too
+        mergeDriverChecked.add(ws());
+        await setupMergeDriver();
+      }
+      return { available: true, version, remote, ...st };
+    },
+    /** The changes said by what they mean (requests, environments …), for the Git panel and the commit message. */
+    'git.changes': async () => {
+      const st = await gitStatus(ws());
+      return { files: st.files, changes: await describeGitChanges(ws(), st.files) };
+    },
+    'git.diff': ({ path, staged }: { path: string; staged?: boolean }) => gitDiff(ws(), path, staged),
+    /** A file as it is in a commit (default HEAD). */
+    'git.show': ({ path, rev }: { path: string; rev?: string }) => gitShow(ws(), path, rev),
+    'git.stage': async ({ paths }: { paths: string[] }) => changed(await gitStage(ws(), paths)),
+    'git.unstage': async ({ paths }: { paths: string[] }) => changed(await gitUnstage(ws(), paths)),
+    'git.discard': ({ files }: { files: Array<Pick<GitFile, 'path' | 'state'>> }) => rewritten(() => gitDiscard(ws(), files)),
+    /** Secrets typed into the workspace that a commit would publish (GIT-104). */
+    'git.check': () => findCommittableSecrets(be.ws),
+    /**
+     * Commit (GIT-206). The secret guard runs first: with findings nothing is committed and they are returned, unless
+     * `force` (the user read them and chose to go on).
+     */
+    'git.commit': async ({ message, paths, amend, force }: { message: string; paths?: string[]; amend?: boolean; force?: boolean }) => {
+      const secrets = findCommittableSecrets(be.ws);
+      if (secrets.length && !force) return { committed: false, secrets };
+      const commit = await gitCommit(ws(), message, { paths, amend });
+      rmSync(proposalFile(), { force: true });
+      return changed({ committed: true, commit, secrets: [] });
+    },
+    /** A commit an AI agent proposed (MCP git_propose_commit): its message fills the commit box for a person to review. */
+    'git.proposal': () => {
+      try {
+        return JSON.parse(readFileSync(proposalFile(), 'utf8')) as { message: string; at: string; files: string[] };
+      } catch {
+        return null;
+      }
+    },
+    /** A commit message written by the AI assistant from the changes' meaning (never from secret values). */
+    'git.suggestMessage': async () => {
+      const st = await gitStatus(ws());
+      const staged = st.files.some((f) => f.staged) ? st.files.filter((f) => f.staged) : st.files;
+      if (!staged.length) throw new ApsError('ValidationError', 'There is nothing to commit');
+      const changes = await describeGitChanges(ws(), staged);
+      const r = await be.assistant({ task: 'write-commit-message', context: { workspace: be.ws.workspace.name, changes: changes.slice(0, 200) } });
+      return { message: r.text.trim().replace(/^```\w*\n?|```$/g, '').trim(), model: `${r.provider}/${r.model}` };
+    },
+    /** Commits, newest first: of the workspace, of a file, or of one request (its collection's file). */
+    'git.log': ({ path, collectionId, limit }: { path?: string; collectionId?: string; limit?: number }) =>
+      gitLog(ws(), { path: path ?? (collectionId ? be.ws.collectionFileOf(collectionId) : undefined), limit }),
+    /**
+     * History of one request (GIT-209): the commits that changed it, each with the request as it was then. Commits
+     * that touched the collection but not this request are left out.
+     */
+    'git.itemHistory': ({ collectionId, itemId, limit }: { collectionId: string; itemId: string; limit?: number }) => gitItemHistory(ws(), be.ws.collectionFileOf(collectionId), itemId, limit),
+    /** Put one request back as it was in a commit (the rest of the collection is unchanged). */
+    'git.restoreItem': async ({ collectionId, itemId, rev }: { collectionId: string; itemId: string; rev: string }) => {
+      const text = await gitShow(ws(), be.ws.collectionFileOf(collectionId), rev);
+      const old = text ? findCollectionItem(JSON.parse(text) as Collection, itemId) : undefined;
+      if (!old) throw new ApsError('ValidationError', `The request is not in commit ${rev.slice(0, 7)}`);
+      const current = be.ws.getCollection(collectionId);
+      const next = replaceCollectionItem(current, itemId, old) ?? { ...current, items: [...current.items, old] };
+      be.lastOwnChange = Date.now();
+      const saved = be.ws.saveCollection(next as Collection);
+      be.host.emit('data.changed', { method: 'col.save' });
+      return changed({ collection: saved.id, item: old });
+    },
+    'git.branches': () => gitBranches(ws()),
+    'git.switch': ({ branch, create, from }: { branch: string; create?: boolean; from?: string }) => rewritten(() => gitSwitch(ws(), branch, { create, from })),
+    'git.deleteBranch': async ({ branch, force }: { branch: string; force?: boolean }) => changed(await gitDeleteBranch(ws(), branch, force)),
+    'git.fetch': async () => changed(await gitFetch(ws())),
+    /** Pull (GIT-208): `conflicted` when it stopped on conflicts (then the conflict screen). */
+    'git.pull': ({ rebase }: { rebase?: boolean }) => rewritten(() => gitPull(ws(), { rebase })),
+    'git.push': async () => changed(await gitPush(ws())),
+    /** Put the workspace under git: init (when not in a repository), the git files, the merge driver, optionally a remote. */
+    'git.init': async ({ remote }: { remote?: string }) => {
+      await gitInit(ws(), { remote });
+      const ready = makeGitReady(be.ws);
+      await setupMergeDriver();
+      return changed({ ...ready, inRepository: true });
+    },
+    /** Settle a conflicted file with one side (GIT-302). */
+    'git.resolve': ({ path, side }: { path: string; side: 'ours' | 'theirs' }) => rewritten(() => gitResolve(ws(), path, side)),
+    /** Give up a pull that stopped on conflicts. */
+    'git.abortMerge': () => rewritten(() => gitAbortMerge(ws())),
+    /**
+     * Clone a repository (GIT-202) into `dest` (or a folder the user picks, named after the repository) and open
+     * the TestPion workspace in it. With several, the list comes back for the user to choose (git.openFolder).
+     */
+    'git.clone': async ({ url, dest, branch }: { url: string; dest?: string; branch?: string }) => {
+      if (!url?.trim()) throw new ApsError('ValidationError', 'Enter the repository URL');
+      let target = dest;
+      if (!target && be.host.openDialog) {
+        const parent = await be.host.openDialog({ directory: true });
+        if (!parent) return null;
+        target = join(parent, basename(url.trim().replace(/\/+$/, '')).replace(/\.git$/, '') || 'repository');
+      }
+      if (!target) throw new ApsError('ValidationError', 'Choose where to clone the repository');
+      await gitClone(url.trim(), target, { branch });
+      const found = findWorkspaces(target);
+      if (found.length === 1) openFolder(found[0]!);
+      return { path: target, workspaces: found, opened: found.length === 1 ? found[0] : undefined };
+    },
+    /** Open a workspace folder of a cloned repository. */
+    'git.openFolder': ({ path }: { path: string }) => {
+      if (!existsSync(join(path, 'workspace.json'))) throw new ApsError('ConfigurationError', `${path} is not a TestPion workspace`);
+      openFolder(path);
+      return { opened: path };
+    },
+    /** A link to open a pull request for the current branch (GIT-304). */
+    'git.pullRequestUrl': async () => {
+      const st = await gitStatus(ws());
+      const remote = await gitRemoteUrl(ws());
+      if (!remote || !st.branch) return { url: undefined };
+      const base = await gitDefaultBranch(ws());
+      if (st.branch === base) return { url: undefined, base, branch: st.branch };
+      // the description: what the branch changes in the workspace, by meaning
+      let body: string | undefined;
+      try {
+        const from = (await runGit(ws(), ['merge-base', `origin/${base}`, 'HEAD'])).trim();
+        body = `Changes to the TestPion workspace:\n\n${changesMarkdown(await describeRevChanges(ws(), from, 'HEAD'))}`;
+      } catch {
+        /* no remote base yet: no description */
+      }
+      return { url: pullRequestUrl(remote, st.branch, base, body), base, branch: st.branch };
+    },
+  };
+}

@@ -60,6 +60,7 @@ const docsSidebar = [
       { text: 'Your first request', link: '/getting-started/first-request' },
       { text: 'Examples workspace', link: '/getting-started/examples' },
       { text: 'Workspaces', link: '/getting-started/workspaces' },
+      { text: 'Keep your workspace in git', link: '/getting-started/git' },
       { text: 'Your first AI test', link: '/getting-started/first-ai-test' },
     ],
   },

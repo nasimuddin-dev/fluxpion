@@ -49,6 +49,7 @@ const VIEWS: Record<ViewId, LazyExoticComponent<ComponentType>> = {
   collections: view(() => import('./views/CollectionsView'), 'CollectionsView'),
   history: view(() => import('./views/HistoryView'), 'HistoryView'),
   environments: view(() => import('./views/EnvironmentsView'), 'EnvironmentsView'),
+  git: view(() => import('./views/GitView'), 'GitView'),
   settings: view(() => import('./views/SettingsView'), 'SettingsView'),
 };
 
@@ -328,6 +329,8 @@ export default function App() {
       { id: 'eval', label: 'New Evaluation Run', hint: 'Evaluations', run: () => s.setView('evaluations') },
       { id: 'shortcuts', label: 'Keyboard Shortcuts', hint: '?', run: () => s.set({ shortcutsOpen: true }) },
       { id: 'git-ready', label: 'Make Workspace Ready for Git', hint: 'Workspace', run: () => void runMenuCommand('git-ready') },
+      { id: 'git-clone', label: 'Clone Workspace from Git…', hint: 'Workspace', run: () => void runMenuCommand('git-clone') },
+      { id: 'git-view', label: 'Git: Changes, Commit, Pull and Push', hint: 'Workspace', run: () => useApp.getState().setView('git') },
       { id: 'layout-side', label: 'Response Layout: Side by Side', hint: 'View', run: () => setResponseLayout('side') },
       { id: 'layout-below', label: 'Response Layout: Response Below', hint: 'View', run: () => setResponseLayout('below') },
       { id: 'layout-auto', label: 'Response Layout: Auto', hint: 'View', run: () => setResponseLayout('auto') },

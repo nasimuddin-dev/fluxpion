@@ -92,6 +92,7 @@ Workspace: **${o.workspace}**. TestPion is an API client and test runner (REST, 
 | Save what the user pasted | \`parse_request_snippet\`, \`save_request\` (secrets become {{variables}}) |
 | Performance | \`response_time_stats\`, \`collection_timing\`, \`load_test\` (local APIs only), \`load_history\` |
 | Contracts | \`import_definition\`, \`api_coverage\`, \`openapi_diff\`, \`collection_openapi\` |
+| Git | \`git_status\`, \`git_diff\` (changes by meaning, or between two commits), \`git_log\`, \`git_propose_commit\` (stages and proposes; a person commits) |
 
 Names or ids work wherever a collection, request, environment or monitor is asked for. Errors say what is available, so read them and retry.
 

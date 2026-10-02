@@ -1,0 +1,116 @@
+import { describe, it, expect, afterAll, beforeAll } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { WorkspaceStore, describeRevChanges, changesMarkdown, gitCommit, gitItemHistory, gitInit, gitSetupMergeDriver, gitStatus, gitVersion, mergeCollectionTexts, pullRequestUrl, runGit, type Collection } from '@testpion/core';
+
+// GIT-301 (merge by id), GIT-304 (pull request links), GIT-401 (semantic diff between commits).
+const root = mkdtempSync(join(tmpdir(), 'tp-merge-'));
+afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+const req = (id: string, name: string, url: string, extra: Record<string, unknown> = {}) => ({ kind: 'http', id, name, request: { method: 'GET', url, headers: [] }, ...extra });
+const col = (items: unknown[], extra: Record<string, unknown> = {}) => JSON.stringify({ schemaVersion: '1.0', id: 'api', name: 'API', items, ...extra }, null, 2);
+
+describe('merging collections by id', () => {
+  it('combines edits to different requests, additions and deletions', () => {
+    const base = col([req('a', 'A', 'https://x/a'), req('b', 'B', 'https://x/b'), req('c', 'C', 'https://x/c')]);
+    const ours = col([req('a', 'A', 'https://x/a2'), req('b', 'B', 'https://x/b'), req('c', 'C', 'https://x/c'), req('d', 'D', 'https://x/d')]);
+    const theirs = col([req('a', 'A', 'https://x/a'), req('b', 'B', 'https://x/b3'), req('e', 'E', 'https://x/e')]);
+    const r = mergeCollectionTexts(base, ours, theirs)!;
+    expect(r.conflicts).toEqual([]);
+    const items = (JSON.parse(r.text) as Collection).items as Array<{ id: string; request: { url: string } }>;
+    expect(items.map((i) => i.id)).toEqual(['a', 'b', 'e', 'd']);
+    expect(items.find((i) => i.id === 'a')!.request.url).toBe('https://x/a2');
+    expect(items.find((i) => i.id === 'b')!.request.url).toBe('https://x/b3');
+  });
+
+  it('merges inside folders and reports a real conflict, keeping ours', () => {
+    const folder = (items: unknown[], name = 'F') => ({ kind: 'folder', id: 'f', name, items });
+    const base = col([folder([req('a', 'A', 'https://x/a')])]);
+    const ours = col([folder([req('a', 'A', 'https://x/mine')], 'Folder')]);
+    const theirs = col([folder([req('a', 'A', 'https://x/theirs'), req('n', 'N', 'https://x/n')])]);
+    const r = mergeCollectionTexts(base, ours, theirs)!;
+    expect(r.conflicts).toEqual(['API ▸ Folder ▸ A: changed on both sides']);
+    const f = (JSON.parse(r.text) as { items: Array<{ name: string; items: Array<{ id: string; request: { url: string } }> }> }).items[0]!;
+    expect(f.name).toBe('Folder');
+    expect(f.items.map((i) => i.id)).toEqual(['a', 'n']);
+    expect(f.items[0]!.request.url).toBe('https://x/mine');
+  });
+
+  it('keeps a request deleted on one side but changed on the other', () => {
+    const base = col([req('a', 'A', 'https://x/a')]);
+    const r = mergeCollectionTexts(base, col([]), col([req('a', 'A', 'https://x/changed')]))!;
+    expect(r.conflicts[0]).toMatch(/deleted here, changed on the other side/);
+    expect((JSON.parse(r.text) as Collection).items).toHaveLength(1);
+  });
+
+  it('leaves files that are not collections to git', () => {
+    expect(mergeCollectionTexts('x', '{', '{}')).toBeUndefined();
+  });
+});
+
+describe('pull request links', () => {
+  it('knows GitHub, GitLab, Bitbucket and Azure DevOps', () => {
+    expect(pullRequestUrl('git@github.com:team/api.git', 'feature/x')).toBe('https://github.com/team/api/compare/main...feature%2Fx?expand=1');
+    expect(pullRequestUrl('https://github.com/team/api', 'b', 'main', 'hi')).toBe('https://github.com/team/api/compare/main...b?expand=1&body=hi');
+    expect(pullRequestUrl('https://gitlab.com/g/sub/api.git', 'b', 'dev')).toBe('https://gitlab.com/g/sub/api/-/merge_requests/new?merge_request[source_branch]=b&merge_request[target_branch]=dev');
+    expect(pullRequestUrl('git@bitbucket.org:team/api.git', 'b')).toBe('https://bitbucket.org/team/api/pull-requests/new?source=b&dest=main');
+    expect(pullRequestUrl('https://dev.azure.com/org/proj/_git/api', 'b')).toBe('https://dev.azure.com/org/proj/_git/api/pullrequestcreate?sourceRef=b&targetRef=main');
+    expect(pullRequestUrl('git@ssh.dev.azure.com:v3/org/proj/api', 'b')).toBe('https://dev.azure.com/org/proj/_git/api/pullrequestcreate?sourceRef=b&targetRef=main');
+    expect(pullRequestUrl('https://example.com/x.git', 'b')).toBeUndefined();
+  });
+});
+
+describe('git with the merge driver', () => {
+  let hasGit = false;
+  beforeAll(async () => {
+    hasGit = !!(await gitVersion());
+  });
+
+  it('two branches that change different requests merge without a conflict; the semantic diff between commits', async () => {
+    if (!hasGit) return;
+    const ws = join(root, 'ws');
+    const store = WorkspaceStore.create(ws, 'Merge');
+    await gitInit(ws);
+    await runGit(ws, ['config', 'user.name', 'T']);
+    await runGit(ws, ['config', 'user.email', 't@example.com']);
+    await runGit(ws, ['config', 'commit.gpgsign', 'false']);
+    // the CLI is the driver (as `testpion git setup` registers it)
+    const cli = resolve('packages/cli/bin/testpion.js').split('\\').join('/');
+    await gitSetupMergeDriver(ws, `"${process.execPath.split('\\').join('/')}" "${cli}" merge-driver`);
+    const save = (items: unknown[]) => store.saveCollection({ schemaVersion: '1.0', id: 'api', name: 'API', version: 0, updatedAt: '', items } as Collection);
+    save([req('a', 'A', 'https://x/a'), req('b', 'B', 'https://x/b')]);
+    await gitCommit(ws, 'base', { paths: ['.'] });
+    const base = (await runGit(ws, ['rev-parse', 'HEAD'])).trim();
+    await runGit(ws, ['switch', '-c', 'other']);
+    save([req('a', 'A', 'https://x/a'), req('b', 'B', 'https://x/b-theirs')]);
+    await gitCommit(ws, 'theirs', { paths: ['.'] });
+    await runGit(ws, ['switch', 'main']);
+    save([req('a', 'A', 'https://x/a-ours'), req('b', 'B', 'https://x/b')]);
+    await gitCommit(ws, 'ours', { paths: ['.'] });
+    // the lines next to each other would conflict in a line merge
+    await runGit(ws, ['merge', '--no-edit', 'other']);
+    expect((await gitStatus(ws)).conflicted).toBe(false);
+    const merged = JSON.parse(readFileSync(join(ws, 'collections', 'api.json'), 'utf8')) as { items: Array<{ request: { url: string } }> };
+    expect(merged.items.map((i) => i.request.url)).toEqual(['https://x/a-ours', 'https://x/b-theirs']);
+
+    const changes = await describeRevChanges(ws, base, 'HEAD');
+    expect(changes.map((c) => `${c.change} ${c.title} ${c.details.join(',')}`).sort()).toEqual(['changed API ▸ A URL', 'changed API ▸ B URL']);
+    expect(changesMarkdown(changes)).toContain('**API ▸ A**: URL');
+    // working-folder changes after a commit
+    writeFileSync(join(ws, 'notes.md'), 'x');
+    expect((await describeRevChanges(ws, 'HEAD')).map((c) => c.title)).toEqual([]); // untracked files are not in a diff
+    // the CLI prints the same
+    const md = execFileSync(process.execPath, [cli, 'diff', base, 'HEAD', '--markdown', '-w', ws], { encoding: 'utf8' });
+    expect(md).toContain('API ▸ B');
+    // a request's history: only the commits that changed it (the merge and "ours" left B as theirs made it)
+    save([req('a', 'A', 'https://x/a-ours'), req('b', 'B', 'https://x/b-theirs'), req('c', 'C', 'https://x/c')]);
+    await gitCommit(ws, 'add C', { paths: ['collections'] });
+    const hist = await gitItemHistory(ws, 'collections/api.json', 'b');
+    expect(hist.map((h) => h.commit.subject)).toEqual(['theirs', 'base']);
+    expect((hist[0]!.item as { request: { url: string } }).request.url).toBe('https://x/b-theirs');
+    expect((await gitItemHistory(ws, 'collections/api.json', 'c')).map((h) => h.commit.subject)).toEqual(['add C']);
+    store.close();
+  });
+});

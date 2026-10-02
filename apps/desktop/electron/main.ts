@@ -5,10 +5,23 @@ import { createRequire } from 'node:module';
 import { Backend } from '../backend/backend.js';
 import { canInstallInPlace, createUpdater } from './updater.js';
 import { installAppMenu, installTextContextMenu } from './app-menu.js';
-import { defaultAppDir, normalizeError } from '@testpion/core';
+import { defaultAppDir, normalizeError, runMergeDriver } from '@testpion/core';
 import { parseMcpMode, runMcpMode } from './mcp-mode.js';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+// `TestPion --merge-driver %O %A %B %P`: git merges a collection file request by request (GIT-301); no window
+const mergeAt = process.argv.indexOf('--merge-driver');
+if (mergeAt >= 0) {
+  const [base, ours, theirs] = process.argv.slice(mergeAt + 1);
+  let code = 2;
+  try {
+    code = runMergeDriver(base!, ours!, theirs!, (l) => process.stderr.write(`${l}\n`));
+  } catch (e) {
+    process.stderr.write(`TestPion merge driver: ${String(e)}\n`);
+  }
+  app.exit(code);
+}
 
 // pm.visualizer pages run on their own origin (tpviz://<id>/) with their own security policy, so their
 // scripts (charts) never share the app's origin, storage or IPC bridge
@@ -42,7 +55,7 @@ if (!capture && !existsSync(join(app.getPath('appData'), 'TestPion'))) {
 }
 
 // Single instance — a second launch focuses the existing window.
-if (!capture && !mcpMode && !app.requestSingleInstanceLock()) app.quit();
+if (mergeAt < 0 && !capture && !mcpMode && !app.requestSingleInstanceLock()) app.quit();
 // The taskbar identity: the installed app uses the installer's (its shortcuts carry it). Runs from source get their own,
 // or Windows ties the installed app's taskbar button to electron.exe and shows Electron's icon for it.
 const APP_ID = app.isPackaged ? 'dev.nasimuddin.protolens' : 'dev.nasimuddin.protolens.source';
@@ -154,6 +167,7 @@ function emit(channel: string, payload: unknown): void {
 const menu = (command: string) => emit('menu.command', { command });
 
 app.whenReady().then(() => {
+  if (mergeAt >= 0) return;
   if (mcpMode) return void runMcpMode(mcpMode, process.env.TESTPION_HOME || defaultAppDir()).then((code) => app.exit(code));
   try {
     start();

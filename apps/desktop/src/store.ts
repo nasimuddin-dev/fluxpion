@@ -23,6 +23,7 @@ export type ViewId =
   | 'collections'
   | 'history'
   | 'environments'
+  | 'git'
   | 'settings';
 
 export interface Toast {

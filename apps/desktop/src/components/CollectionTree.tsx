@@ -1,4 +1,4 @@
-import { Plus, AlarmClock, ChevronsDownUp, ChevronsUpDown, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2 } from 'lucide-react';
+import { Plus, AlarmClock, ChevronsDownUp, ChevronsUpDown, FolderInput, Workflow, Braces, ChevronDown, Undo2, Wand2, ChevronRight, Code2, CopyPlus, ExternalLink, FilePlus2, Folder, FolderCog, FolderPlus, Link2, MoreHorizontal, Pencil, Play, SquareTerminal, Star, Terminal, TerminalSquare, Trash2, Settings2, History } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Collection, CollectionFolder, CollectionNode, SavedHttpRequest } from '../types';
 import { asError, call, on } from '../api';
@@ -9,6 +9,9 @@ import { MoveDialog, subtreeIds } from './MoveDialog';
 import { closeTabsFor } from './EditorTabs';
 import { uid } from '../lib/format';
 import { FolderEditor } from './FolderEditor';
+import { ChangeMark } from './ChangeMark';
+import { GitItemHistory } from './GitItemHistory';
+import { useGit } from '../lib/git';
 import { countCategory, hasCategory, isEmptyFolder, matchesCollectionNode, requestCategory, type RequestCategory } from '../lib/collection-filter';
 
 export function mapNodes(nodes: CollectionNode[], fn: (n: CollectionNode) => CollectionNode | null): CollectionNode[] {
@@ -189,6 +192,8 @@ export function CollectionTree({
   };
   const health = useCollectionsHealth();
   const [moving, setMoving] = useState<{ c: Collection; n: CollectionNode }>();
+  const [historyFor, setHistoryFor] = useState<{ c: Collection; n: CollectionNode }>();
+  const git = useGit();
   /** Delete a request or folder, with Undo in the toast (puts the collection back as it was). */
   /** A copy of the collection with everything it holds (its gRPC calls and connections too). */
   const duplicateCollection = async (c: Collection) => {
@@ -550,6 +555,7 @@ export function CollectionTree({
             <span className={cx('mono method-badge text-[0.64rem] font-bold w-10 shrink-0', n.kind === 'http' ? `method-${method}` : 'text-[#e535ab]')}>{method.slice(0, 5)}</span>
             <span className="truncate">{n.name}</span>
             {n.favorite && <Star size={11} className="shrink-0 text-warn fill-current" aria-label="Favorite" data-favorite />}
+            {git.items.get(n.id) && <ChangeMark change={git.items.get(n.id)!} className="ml-auto" />}
           </button>
           )}
           <NodeMenu
@@ -563,6 +569,7 @@ export function CollectionTree({
             onMove={() => setMoving({ c, n })}
             onToggleFavorite={() => onChange({ ...c, items: mapNodes(c.items, (x) => (x.id === n.id && x.kind !== 'folder' ? { ...x, favorite: !x.favorite } : x)) })}
             favorite={!!n.favorite}
+            onHistory={git.status?.repository ? () => setHistoryFor({ c, n }) : undefined}
           />
         </div>
         {examplesOpen &&
@@ -767,6 +774,7 @@ export function CollectionTree({
           onSave={(folder) => onChange({ ...editing.c, items: mapNodes(editing.c.items, (x) => (x.id === folder.id && x.kind === 'folder' ? { ...folder, items: x.items } : x)) })}
         />
       )}
+      {historyFor && <GitItemHistory collectionId={historyFor.c.id} itemId={historyFor.n.id} name={historyFor.n.name} onClose={() => setHistoryFor(undefined)} />}
       {moving && <MoveDialog node={moving.n} from={moving.c} collections={collections} onClose={() => setMoving(undefined)} onMove={(to, folderId) => move(moving.c, moving.n, to, folderId)} />}
       {collections.map((c) => {
         // grouped by category, collections start folded: the workspace lists them, expanding shows the categories
@@ -890,6 +898,7 @@ function NodeMenu({
   onMove,
   onToggleFavorite,
   favorite,
+  onHistory,
   onRun,
   runLabel = 'Run',
   onMonitor,
@@ -921,6 +930,8 @@ function NodeMenu({
   onMove?(): void;
   onToggleFavorite?(): void;
   favorite?: boolean;
+  /** Its versions in git (when the workspace is in git). */
+  onHistory?(): void;
   onRun?(): void;
   runLabel?: string;
   /** Expand / collapse everything inside it (collections and folders). */
@@ -948,7 +959,7 @@ function NodeMenu({
   const group = (...g: Array<MenuItem | undefined>) => groups.push(g.filter((x): x is MenuItem => !!x));
   const item = (label: string, icon: React.ReactNode, fn?: () => void, extra: Partial<MenuItem> = {}): MenuItem | undefined => (fn ? { label, icon, onSelect: fn, ...extra } : undefined);
   group(item(newRequestLabel, <FilePlus2 size={14} />, onNewRequest), ...(otherNew ?? []), item('New folder', <FolderPlus size={14} />, onNewFolder));
-  group(item('Open in tab', <ExternalLink size={14} />, onOpen));
+  group(item('Open in tab', <ExternalLink size={14} />, onOpen), item('History in git…', <History size={14} />, onHistory));
   group(item('Expand all', <ChevronsUpDown size={14} />, onExpandAll), item('Collapse all', <ChevronsDownUp size={14} />, onCollapseAll));
   group(item(runLabel, <Play size={14} />, onRun), item('Monitor on a schedule…', <AlarmClock size={14} />, onMonitor), ...(runItems ?? []));
   group(item('Edit folder (scripts, variables, auth)', <FolderCog size={14} />, onEdit), ...(configItems ?? []));

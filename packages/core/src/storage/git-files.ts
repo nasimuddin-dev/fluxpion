@@ -19,7 +19,15 @@ export const GITIGNORE_LINES = [
   '.template-offered.json',
 ];
 
-export const GITATTRIBUTES_LINES = ['# TestPion: the same line endings on Windows, macOS and Linux', '* text=auto eol=lf', '*.png binary', '*.jpg binary', '*.sqlite binary'];
+export const GITATTRIBUTES_LINES = [
+  '# TestPion: the same line endings on Windows, macOS and Linux',
+  '* text=auto eol=lf',
+  '*.png binary',
+  '*.jpg binary',
+  '*.sqlite binary',
+  // merged request by request when the TestPion merge driver is set up (testpion git setup); else git's line merge
+  'collections/*.json merge=testpion',
+];
 
 export interface GitReadyResult {
   /** Files created or extended (.gitignore, .gitattributes). */

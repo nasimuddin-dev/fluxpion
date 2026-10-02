@@ -33,9 +33,11 @@ import {
   ChevronDown as NavChevron,
   Menu as MenuIcon,
   MessageSquare,
+  FolderGit2,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call, modKey, on } from '../api';
+import { useGit } from '../lib/git';
 import wordmarkUrl from '../../build/wordmark-nav.png';
 import markUrl from '../../build/icons/64x64.png';
 import { ConsolePanel } from './ConsolePanel';
@@ -64,6 +66,7 @@ export const NAV: Array<{ id: ViewId; label: string; icon: ReactNode; group: str
   { id: 'environments', label: 'Environments', icon: <KeyRound size={18} />, group: 'Workspace', hint: 'Environments and variables' },
   { id: 'history', label: 'History', icon: <History size={18} />, group: 'Workspace' },
   { id: 'traces', label: 'Traces', icon: <Activity size={18} />, group: 'Workspace', hint: 'Traces of every request and run' },
+  { id: 'git', label: 'Git', icon: <FolderGit2 size={18} />, group: 'Workspace', hint: 'Git: changes, commit, branches, pull and push' },
 ];
 
 /** The rail: the request editors are reached through Collections (explorer, New menu), not listed one by one. */
@@ -293,6 +296,7 @@ export function StatusBar() {
       <span className="flex items-center gap-1" title="Connected MCP servers">
         <Plug size={12} /> {mcp} MCP connected
       </span>
+      <GitSegment />
       <span className="flex items-center gap-1.5">
         {acts.length ? (
           <>
@@ -323,6 +327,26 @@ export function StatusBar() {
         <MessageSquare size={12} /> Feedback
       </button>
     </footer>
+  );
+}
+
+/** The branch, commits to push / pull and the number of changes (GIT-204); opens the Git view. Hidden outside git. */
+function GitSegment() {
+  const { status } = useGit();
+  if (!status?.repository) return null;
+  const n = status.files.length;
+  return (
+    <button
+      className="flex items-center gap-1 hover:text-fg"
+      title={`Git: branch ${status.branch ?? '(detached)'}${status.ahead ? `, ${status.ahead} to push` : ''}${status.behind ? `, ${status.behind} to pull` : ''}${n ? `, ${n} changed file${n === 1 ? '' : 's'}` : ', no changes'}`}
+      onClick={() => useApp.getState().setView('git')}
+    >
+      <GitBranch size={12} /> {status.branch ?? 'detached'}
+      {status.ahead > 0 && <span>↑{status.ahead}</span>}
+      {status.behind > 0 && <span>↓{status.behind}</span>}
+      {n > 0 && <span className="text-warn">• {n}</span>}
+      {status.conflicted && <span className="text-bad">conflicts</span>}
+    </button>
   );
 }
 

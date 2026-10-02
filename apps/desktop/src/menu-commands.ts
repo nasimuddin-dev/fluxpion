@@ -10,6 +10,7 @@ import { uid } from './lib/format';
  */
 export type MenuCommand =
   | 'git-ready'
+  | 'git-clone'
   | 'new-http'
   | 'new-graphql'
   | 'new-grpc'
@@ -88,6 +89,29 @@ export async function runMenuCommand(cmd: MenuCommand): Promise<void> {
         const did = [...r.files, ...(r.collections.length ? [`${r.collections.length} collection file${r.collections.length === 1 ? '' : 's'} tidied`] : [])];
         const repo = r.inRepository ? '' : ' It is not a git repository yet: run git init in its folder (Show in folder).';
         return s.toast(did.length ? `Ready for git: ${did.join(', ')}.${repo}` : `This workspace is already ready for git.${repo}`, 'success');
+      }
+      case 'git-clone': {
+        // GIT-202: clone a repository that holds a TestPion workspace, and open it
+        const url = await promptText('Clone from Git', { message: 'The repository URL (HTTPS or SSH). Sign-in uses your git setup: SSH keys or the credential manager.', placeholder: 'https://github.com/team/api-tests.git', okLabel: 'Next' });
+        if (!url) return;
+        let dest: string | undefined;
+        if (!hasNativeDialogs()) {
+          dest = (await promptText('Clone into', { message: 'A new or empty folder', placeholder: 'e.g. D:/work/api-tests', okLabel: 'Clone' })) ?? undefined;
+          if (!dest) return;
+        }
+        s.toast('Cloning…', 'info');
+        const r = await call<{ path: string; workspaces: string[]; opened?: string } | null>('git.clone', { url, dest });
+        if (!r) return;
+        if (r.opened) {
+          await s.refreshWorkspace();
+          return s.toast(`Cloned and opened ${r.opened}`, 'success');
+        }
+        if (!r.workspaces.length) return s.toast(`Cloned to ${r.path}, but it holds no TestPion workspace (no workspace.json). Create one there with New ▸ in a folder, or Make ready for git.`, 'warning');
+        const pick = await promptText('Open which workspace?', { message: `The repository holds ${r.workspaces.length} workspaces: ${r.workspaces.join(', ')}`, value: r.workspaces[0], okLabel: 'Open' });
+        if (!pick) return;
+        await call('git.openFolder', { path: pick });
+        await s.refreshWorkspace();
+        return s.toast(`Opened ${pick}`, 'success');
       }
       case 'open-examples': {
         await call('ws.openExamples', {});

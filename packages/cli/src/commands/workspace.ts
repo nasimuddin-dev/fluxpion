@@ -10,8 +10,14 @@ import {
   makeGitReady,
   findCommittableSecrets,
   installPreCommitHook,
+  gitSetupMergeDriver,
+  isInGitRepository,
 } from '@testpion/core';
 import { EXIT, green, dim, bold, CliError, openWorkspace } from '../shared.js';
+import { registerGitCommands } from './git.js';
+
+/** This very CLI as a command line (forward slashes: git runs it with sh), for git hooks and the merge driver. */
+const cliSelf = () => `"${process.execPath.split('\\').join('/')}" "${process.argv[1]!.split('\\').join('/')}"`;
 
 export function registerWorkspaceCommands(program: Command): void {
   const ws = program.command('workspace').description('manage workspaces');
@@ -71,11 +77,14 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('make a workspace git-ready: a .gitignore for results and local state, a .gitattributes for line endings, collection files in their git-friendly form; safe to run again')
     .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest)')
     .option('--json', 'print what changed as JSON')
-    .action((o) => {
+    .action(async (o) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         const r = makeGitReady(store);
-        if (o.json) return console.log(JSON.stringify(r, null, 2));
+        // in a repository: collection files merge request by request (this CLI is the merge driver)
+        const mergeDriver = isInGitRepository(store.root) ? await gitSetupMergeDriver(store.root, `${cliSelf()} merge-driver`).then(() => true, () => false) : false;
+        if (o.json) return console.log(JSON.stringify({ ...r, mergeDriver }, null, 2));
+        if (mergeDriver) console.log(`${green('set up')} merging collections request by request ${dim('(git config merge.testpion)')}`);
         if (!r.files.length && !r.collections.length) console.log(green('Already git-ready.'));
         for (const f of r.files) console.log(`${green('wrote')} ${f}`);
         for (const c of r.collections) console.log(`${green('tidied')} ${c} ${dim('(no save counter / time in the file)')}`);
@@ -115,14 +124,15 @@ export function registerWorkspaceCommands(program: Command): void {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
         // the hook can call this very CLI when `testpion` is not on the PATH (e.g. run from a checkout)
-        const self = `"${process.execPath.split('\\').join('/')}" "${process.argv[1]!.split('\\').join('/')}"`;
-        const r = installPreCommitHook(store.root, self);
+        const r = installPreCommitHook(store.root, cliSelf());
         console.log(r.installed ? `${green('installed')} ${r.path}` : r.message);
         if (!r.installed) process.exitCode = EXIT.TEST_FAILURE;
       } finally {
         store.close();
       }
     });
+
+  registerGitCommands(git, program);
 
   const trash = program.command('trash').description('recently deleted collections and environments (kept 30 days): list, restore, empty');
   trash

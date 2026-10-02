@@ -211,6 +211,11 @@ export class WorkspaceStore {
     return named;
   }
 
+  /** The collection's file, relative to the workspace (forward slashes): what git knows it by. */
+  collectionFileOf(id: string): string {
+    return relative(this.root, this.collectionFile(id)).split(sep).join('/');
+  }
+
   getCollection(id: string): Collection {
     const c = readJson<Collection>(this.collectionFile(id));
     // a de-duplicated id (see listCollections) is the file name: the copy says so too

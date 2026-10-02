@@ -128,6 +128,7 @@ import { monitorHandlers, runMonitorNow } from './handlers/monitors.js';
 import { grpcHandlers } from './handlers/grpc.js';
 import { agentHandlers } from './handlers/agents.js';
 import { feedbackHandlers } from './handlers/feedback.js';
+import { gitHandlers } from './handlers/git.js';
 
 /** RPC methods that change what the workspace lists (collections, saved items, environments, monitors, MCP servers). */
 const DATA_CHANGING = /^(col\.(save|delete|import\w*|move\w*|duplicate\w*)|lib\.save|env\.(save|delete|reorder|import\w*)|vars\.setInEnvironment|monitor\.(save|delete)|mcp\.(saveServers|connect|disconnect)|trash\.restore|ws\.(open|import\w*|openExamples))$/;
@@ -331,7 +332,8 @@ export class Backend {
   /** Stops watching the open workspace's folder (GIT-103). */
   private stopWatching?: () => void;
   /** When the app last changed workspace data itself (an RPC that saves): the watcher's events then are its own. */
-  private lastOwnChange = 0;
+  /** When TestPion itself last wrote the workspace (its own changes are not news); git operations set it too. */
+  lastOwnChange = 0;
 
   /** Notice changes made outside the app (git pull, a branch switch, another editor) and refresh the UI. */
   private watchStore(root: string): void {
@@ -629,7 +631,7 @@ export class Backend {
    */
   private buildHandlers(): Handlers {
     const all: Handlers = {};
-    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers, monitorHandlers, agentHandlers, feedbackHandlers]) {
+    for (const group of [appHandlers, workspaceHandlers, collectionsHandlers, requestsHandlers, grpcHandlers, mcpHandlers, aiHandlers, testingHandlers, monitorHandlers, agentHandlers, feedbackHandlers, gitHandlers]) {
       for (const [name, fn] of Object.entries(group(this))) {
         if (name in all) throw new Error(`RPC method ${name} is defined twice`);
         all[name] = fn;
@@ -1108,6 +1110,8 @@ export class Backend {
         'A scheduled monitor of an API is failing or slow. Here are its settings (schedule, response time and certificate limits), its latest results (status, failed requests, p95, reasons) and each request over the latest runs (median and p95 time, failures, latest failure). Say what is wrong in plain words, since when, which request is the cause, whether it looks like an outage, a slowdown, an expiring certificate, a changed API or a flaky check, and what to do (fix the API, adjust the check or the limit, renew the certificate). Be concise; use short headings: What is wrong, Likely cause, What to do.',
       'triage-attention':
         'These are the things that need attention in an API testing workspace (failing monitors, expiring TLS certificates, a failed latest run, saved requests whose latest response failed, flaky tests), with their severity. Say what to fix first and why (what users or CI it affects), group items that probably share a cause (e.g. one API outage behind several failures), and give one concrete next step for each group. Be concise; use a short ordered list.',
+      'write-commit-message':
+        'These are the changes of an API testing workspace about to be committed to git, said by what they mean (requests added, changed or removed and which parts, environments and their variables). Write a git commit message: a subject line under 72 characters in the imperative mood, then a blank line and a short list of the main changes when there is more than one. No secrets, no quotes around it. Output only the message.',
       free: 'Answer the developer question about their API/protocol/AI testing work.',
     };
     // request generation may use the names (never the values) of the variables in scope
