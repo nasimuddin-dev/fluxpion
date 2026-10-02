@@ -89,6 +89,8 @@ export function HomeView() {
   const ws = useApp((s) => s.workspace);
   const env = useApp((s) => s.environment);
   const [cols, setCols] = useState<Collection[]>([]);
+  // saved gRPC calls and connections belong to collections too (they are kept in the library)
+  const [saved, setSaved] = useState<Record<string, number>>({});
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [monitors, setMonitors] = useState<HomeMonitor[]>([]);
   const [runs, setRuns] = useState<HomeRun[]>([]);
@@ -121,6 +123,12 @@ export function HomeView() {
 
   const load = () => {
     void call<Collection[]>('col.list').then(setCols);
+    void Promise.all(['grpc', 'websocket'].map((kind) => call<{ items: Array<{ collectionId?: string }> }>('lib.get', { kind }).catch(() => ({ items: [] }))))
+      .then((libs) => {
+        const n: Record<string, number> = {};
+        for (const i of libs.flatMap((l) => l.items)) if (i.collectionId) n[i.collectionId] = (n[i.collectionId] ?? 0) + 1;
+        setSaved(n);
+      });
     void call<{ items: HistoryItem[] }>('history.list', { limit: 8 }).then((r) => setRecent(r.items));
     void call<HomeMonitor[]>('monitor.list').then(setMonitors, () => setMonitors([]));
     void call<{ items: HomeRun[] }>('runs.list', { limit: 6 }).then((r) => setRuns(r.items), () => setRuns([]));
@@ -241,7 +249,7 @@ export function HomeView() {
                 <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-hover group">
                   <button className="flex-1 text-left truncate" onClick={() => open('collections', { collectionId: c.id })}>
                     {c.name}
-                    <span className="text-xs text-muted ml-2">{plural(count(c.items), 'request')}</span>
+                    <span className="text-xs text-muted ml-2">{plural(count(c.items) + (saved[c.id] ?? 0), 'request')}</span>
                   </button>
                   {health[c.id]?.failing ? (
                     <Badge tone="bad" title={`${health[c.id]!.failing} of ${health[c.id]!.sent} sent requests: the latest response failed`}>

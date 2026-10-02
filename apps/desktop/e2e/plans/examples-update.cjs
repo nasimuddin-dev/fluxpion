@@ -32,6 +32,14 @@ const steps = [
       return 'playground: ' + rows.some((t) => t.startsWith('Public REST APIs (playground)')) + ' | context7: ' + rows.some((t) => t.startsWith('Context7')) + ' | renamed kept: ' + rows.some((t) => t.startsWith('My DeepWiki')) + ' | old name back: ' + rows.some((t) => /^DeepWiki/.test(t));
     })()`,
   ],
+  [
+    'home-counts',
+    `(async () => {
+      await __t.view('Home'); await __t.sleep(800);
+      const rows = [...document.querySelectorAll('main button')].map((b) => b.textContent.trim()).filter((t) => /^(gRPC \\(grpcb\\.in\\)|WebSocket & MQTT)\\d/.test(t));
+      return rows.join(' | ') || 'NO ROW';
+    })()`,
+  ],
 ];
 
 module.exports = withExpect(
@@ -39,6 +47,8 @@ module.exports = withExpect(
   {
     'told-once': /^toast: New in the TestPion Examples workspace: collection "Public REST APIs \(playground\)", MCP server "Context7 \(library docs\)".*Open \| asked again: 0$/,
     'added-and-kept': /^playground: true \| context7: true \| renamed kept: true \| old name back: false$/,
+    // saved gRPC calls and connections count as their collection's requests on Home
+    'home-counts': /^gRPC \(grpcb\.in\)9 requests \| WebSocket & MQTT6 requests$/,
   },
   { prepare: olderCopy },
 );
