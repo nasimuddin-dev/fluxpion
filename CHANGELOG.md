@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.41.0 — 2026-10-02
+
+### Variables
+- **Double-click any `{{variable}}`** (the URL bar, params, headers, auth fields, the body and other code editors, test files) to see its value and where it comes from, edit it in the active environment, or copy it. One popover for the whole app.
+- **See every variable at once:** the eye button next to the environment selector lists everything the request on screen can use: its collection's variables, the active environment's, the workspace's and the globals, in the order they win, with overridden ones marked and a filter for large collections.
+- A collection variable's popover now leads to the collection's variables (it went to Environments, which don't list them); **All** opens the full list.
+
+### Fixes
+- **Close all tabs** from a WebSocket tab's menu left the WebSocket tab open. The cause: a click inside any menu also reached the tab or row behind it (so choosing an item could also open the row, and Enter / Delete in a menu reached the row's keys). Fixed for every menu.
+- Closing several tabs moves once, to a tab that is still open; a just-closed tab can no longer come back.
+- AI assistant: New conversation during an answer no longer adds a stray "(stopped)", and on a task it runs the task again.
+- Tests view: deleting a folder with several open files no longer leaves a deleted file on screen.
+- **Insomnia imports:** pre-request and after-response scripts now run (Insomnia's `insomnia.*` API becomes `pm.*`); they used to come over as comments.
+
+### Quality
+- The UI regression suite (23 plans) now imports sample Postman, Insomnia and Bruno collections through the Import dialog and runs them, pre-request and post-response scripts included.
+
 ## 0.40.0 — 2026-10-01
 
 ### AI assistant
