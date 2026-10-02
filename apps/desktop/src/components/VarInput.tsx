@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import { asError, call } from '../api';
 import { useApp } from '../store';
 import { dynamicVariables } from '../editor-intel';
-import { clearVariablesCache, inspectVariables, type VarInfo } from '../lib/vars-cache';
+import { inspectVariables, type VarInfo } from '../lib/vars-cache';
+import { collectionOf, useVarPopover, VARS_CHANGED } from '../lib/var-popover';
 import { Button, cx, useDebounced } from './ui';
 
 
@@ -48,9 +49,17 @@ export function VarInput({
   const overlay = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  // the variable whose popover is open (clicked in the field), and where to show it
-  const [pop, setPop] = useState<{ name: string; x: number; y: number } | null>(null);
+  // the variable popover (one for the whole app) is open on one of this field's variables
+  const pop = useVarPopover((s) => !!s.open && s.open.owner === box.current && !!box.current);
+  const setPop = (p: { name: string; x: number; y: number } | null) =>
+    p ? useVarPopover.getState().show({ ...p, collectionId: collectionId ?? collectionOf(box.current), owner: box.current ?? undefined }) : pop && useVarPopover.getState().hide();
   const [refresh, setRefresh] = useState(0);
+  // a value saved from the popover: look again
+  useEffect(() => {
+    const again = () => setRefresh((n) => n + 1);
+    window.addEventListener(VARS_CHANGED, again);
+    return () => window.removeEventListener(VARS_CHANGED, again);
+  }, []);
 
   useEffect(() => {
     if (!/\{\{/.test(debounced)) return setVars({});
@@ -122,6 +131,7 @@ export function VarInput({
   return (
     <div
       ref={box}
+      data-var-input
       className={cx(cell ? 'relative flex items-center min-h-[26px] rounded focus-within:bg-field focus-within:shadow-[inset_0_0_0_1.5px_var(--accent)]' : 'relative field p-0 flex items-center', className)}
       title={suggest || pop ? undefined : tooltip ? `${tooltip}\n(click a variable to see or edit it)` : undefined}
     >
@@ -161,17 +171,6 @@ export function VarInput({
           if (e.key === 'Enter') onEnter?.();
         }}
       />
-      {pop && (
-        <VarPopover
-          name={pop.name}
-          info={vars[pop.name.split('.')[0]!]}
-          environment={env}
-          x={pop.x}
-          y={pop.y}
-          onClose={() => setPop(null)}
-          onSaved={() => (clearVariablesCache(), setRefresh((n) => n + 1))}
-        />
-      )}
       {suggest && matches.length > 0 && (
         <div role="listbox" className="absolute left-0 top-full mt-1 z-40 w-96 max-w-full rounded-md border border-line bg-bg shadow-xl py-1 text-sm">
           {matches.map((v, i) => (
@@ -194,7 +193,7 @@ export function VarInput({
 }
 
 /** What a {{variable}} holds and where it comes from; set it in the active environment, or add it there. */
-function VarPopover({ name, info, environment, x, y, onClose, onSaved }: { name: string; info?: VarInfo; environment?: string; x: number; y: number; onClose(): void; onSaved(): void }) {
+export function VarPopover({ name, info, environment, x, y, onClose, onSaved }: { name: string; info?: VarInfo; environment?: string; x: number; y: number; onClose(): void; onSaved(): void }) {
   const ref = useRef<HTMLDivElement>(null);
   const dynamic = name.startsWith('$');
   const defined = info?.scope !== undefined;

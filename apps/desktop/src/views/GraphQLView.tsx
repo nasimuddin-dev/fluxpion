@@ -351,7 +351,7 @@ export function GraphQLView() {
   const renameTabTo = (name: string) => setD((x) => ({ ...x, name }));
   useSingleEditorTab('graphql', { title: tabTitle(d.name, NEW_TAB_TITLE.graphql), badge: 'GQL', badgeClass: 'text-[#e535ab]', item: d.requestId, onRenameTo: renameTabTo, onSaveAsTest: saveTest });
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" data-collection-id={d.collectionId}>
       {/* narrow windows: the secondary buttons show icons only (their tooltips name them), so the endpoint keeps its room */}
       <RequestBreadcrumb collectionId={d.collectionId} requestId={d.requestId} name={tabTitle(d.name, NEW_TAB_TITLE.graphql)} onSave={() => void save()} />
       <div className="@container flex items-center gap-2 p-2 border-b border-line shrink-0">

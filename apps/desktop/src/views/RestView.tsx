@@ -630,7 +630,7 @@ export function RestView() {
           },
         ]}
       />
-      <div className="h-full flex flex-col min-w-0">
+      <div className="h-full flex flex-col min-w-0" data-collection-id={tab.collectionId}>
         {noTabs ? (
           <NoOpenTabs onDescribe={() => void describeRequest()} />
         ) : (

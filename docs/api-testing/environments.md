@@ -62,6 +62,10 @@ The values are made up: emails use `example.test` / `example.com`, phone numbers
 
 Mark a variable as **secret** (lock icon) and its value is encrypted in the OS credential store: Windows DPAPI, macOS Keychain or Linux Secret Service. The workspace file only records that the variable exists. In CI, supply the value as the environment variable `TESTPION_SECRET_ENV_<ENVID>_<KEY>`, for example `TESTPION_SECRET_ENV_STAGING_ACCESSTOKEN`.
 
+## See or change one variable
+
+Wherever a `{{variable}}` appears (the URL bar, params, headers, auth fields, the body and other code editors, test files), **double-click** it to see its value and where it comes from (environment, collection, workspace, dynamic). In the URL bar, params and headers a single click is enough. A variable of the active environment can be edited right there, and one that isn't defined yet can be added to it; **Copy** copies the value (secret values are never shown).
+
 ## Quick look
 
 Click the **eye** button next to the environment selector to see the active environment's and the global variables at a glance, like Postman's quick look. Each variable shows its initial value (what is saved) and its current value (what scripts set on this machine). *same* means no script has changed it. Secret and sensitive values are always shown as `••••••`. **Edit** opens the environment or the globals.

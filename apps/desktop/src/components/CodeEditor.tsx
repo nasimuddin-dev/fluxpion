@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../store';
 import { Spinner } from './ui';
 import { setEditorJsonSchema, setEditorLocalVariables } from '../editor-intel';
+import { collectionOf, useVarPopover, variableAt } from '../lib/var-popover';
 
 /**
  * Monaco (several MB with its language workers) loads the first time an editor is shown, not at
@@ -83,7 +84,19 @@ export function CodeEditor({
         theme={theme}
         loading={<Spinner />}
         onChange={(v) => onChange?.(v ?? '')}
-        onMount={onMount}
+        onMount={(editor, monaco) => {
+          // a double-click on a {{variable}} shows what it holds (the same popover as everywhere)
+          editor.onMouseDown((e) => {
+            const pos = e.target.position;
+            const model = editor.getModel();
+            if (e.event.detail !== 2 || !pos || !model) return;
+            const name = variableAt(model.getLineContent(pos.lineNumber), pos.column - 1);
+            if (!name) return;
+            const b = e.event.browserEvent;
+            useVarPopover.getState().show({ name, x: b.clientX - 40, y: b.clientY + 10, collectionId: collectionOf(editor.getDomNode()) });
+          });
+          onMount?.(editor, monaco);
+        }}
         options={{
           readOnly,
           minimap: { enabled: false },

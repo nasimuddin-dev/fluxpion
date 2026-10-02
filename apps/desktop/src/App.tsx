@@ -3,6 +3,7 @@ import { createElement, lazy, Suspense, useEffect, useMemo, useRef, useState, ty
 import { call, on } from './api';
 import { useApp, type ViewId } from './store';
 import { AssistantPanel } from './components/AssistantPanel';
+import { VarPopoverHost } from './components/VarPopoverHost';
 import { CommandPalette, DialogHost, LogsPanel, ProgressHost, SearchDialog, Sidebar, StatusBar, Toaster, TopBar, NAV, type PaletteCommand } from './components/Shell';
 import { checkForUpdates, scheduleUpdateCheck } from './updates';
 import { ViewBoundary } from './components/ViewBoundary';
@@ -456,6 +457,7 @@ export default function App() {
       )}
       <Toaster />
       <DialogHost />
+      <VarPopoverHost />
       <ProgressHost />
     </div>
     </TooltipProvider>
