@@ -51,7 +51,7 @@ Copied commands include the request's real header and token values, so they run 
 - WSDL 1.1 and 2.0 documents of SOAP services (a file, or a `?wsdl` link). See [SOAP](#soap-wsdl) below.
 - HAR files.
 
-From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Insomnia and Hoppscotch scripts use each tool's own script API, so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
+From Insomnia, Bruno and Hoppscotch, TestPion takes folders, requests, bodies, headers, parameters, auth and variables. `{{ _.name }}` and `<<name>>` become `{{name}}`. Insomnia's pre-request and after-response scripts run: its `insomnia.*` script API follows Postman's, so `insomnia.test`, `insomnia.expect`, `insomnia.environment` and `insomnia.response` become their `pm.*` twins. Bruno scripts and tests run as they are (`bru`, `req`, `res`). Hoppscotch scripts use their own API (`pw.*`), so they come over as comments to rewrite with `pm.*` / `tp.*`. An imported environment never replaces one you already have: a name that's taken gets *(imported)* added.
 - TestPion collections and workspace exports.
 - A single request copied as cURL (bash or cmd), fetch or PowerShell. It is saved to the **Imported** collection, named after its method and path. Secrets in it (tokens, API keys, cookies, passwords) are replaced by `{{variables}}`, and a message lists the ones to add as secret environment variables. To just try the request without saving it, paste it into the REST view instead (see [paste a request](/api-testing/rest#paste-a-request-from-the-browser)).
 

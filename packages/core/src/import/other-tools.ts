@@ -51,6 +51,18 @@ function commented(tool: string, script: unknown): string | undefined {
   return [`// ${tool} script (not converted: it uses ${tool}'s own script API). Rewrite it with pm.* / tp.* to run it.`, ...s.split('\n').map((l) => `// ${l}`)].join('\n');
 }
 
+/**
+ * An Insomnia script, kept runnable: Insomnia's scripting API (`insomnia.test`, `insomnia.expect`,
+ * `insomnia.environment`, `insomnia.response` …) follows Postman's, so `insomnia.` becomes `pm.`.
+ * A script that uses nothing of it stays as comments.
+ */
+export function insomniaScript(script: unknown): string | undefined {
+  const s = String(script ?? '').trim();
+  if (!s) return undefined;
+  if (!/\binsomnia\./.test(s)) return commented('Insomnia', s);
+  return `// Insomnia script: insomnia.* runs as pm.* (the same API)\n${s.replace(/\binsomnia\./g, 'pm.')}`;
+}
+
 function bodyFromMime(mime: string, text: string | undefined, params: Any[] | undefined): BodyConfig | undefined {
   const m = (mime ?? '').toLowerCase();
   if (m.includes('x-www-form-urlencoded')) return { type: 'form-urlencoded', fields: kv(params) };
@@ -114,8 +126,8 @@ function insomniaRequest(r: Any): SavedHttpRequest | SavedGraphQLRequest {
     return { kind: 'graphql', id: shortId('gql-'), name: r.name || url, request: { endpoint: url, query: normalizeTemplate(g.query ?? ''), variables: g.variables && Object.keys(g.variables).length ? g.variables : undefined, operationName: g.operationName || undefined, headers, auth } };
   }
   const pathParams = kv(r.pathParameters);
-  const testScript = commented('Insomnia', r.afterResponseScript);
-  const preRequestScript = commented('Insomnia', r.preRequestScript);
+  const testScript = insomniaScript(r.afterResponseScript);
+  const preRequestScript = insomniaScript(r.preRequestScript);
   return {
     kind: 'http',
     id: shortId('req-'),

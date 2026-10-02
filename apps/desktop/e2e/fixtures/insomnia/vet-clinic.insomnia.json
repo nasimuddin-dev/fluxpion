@@ -1,0 +1,68 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-10-01T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v10.0.0",
+  "resources": [
+    {
+      "_id": "wrk_vetclinic",
+      "parentId": null,
+      "_type": "workspace",
+      "name": "Vet clinic (Insomnia sample)",
+      "description": "Sample Insomnia export for TestPion's import tests: pre-request and after-response scripts (insomnia.* API), a token passed between requests, against the local demo server.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_base",
+      "parentId": "wrk_vetclinic",
+      "_type": "environment",
+      "name": "Base Environment",
+      "data": { "baseUrl": "http://127.0.0.1:4010" }
+    },
+    {
+      "_id": "fld_auth",
+      "parentId": "wrk_vetclinic",
+      "_type": "request_group",
+      "name": "Auth",
+      "metaSortKey": -3
+    },
+    {
+      "_id": "req_login",
+      "parentId": "fld_auth",
+      "_type": "request",
+      "name": "Log in",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/auth/token",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": { "mimeType": "application/json", "text": "{\n  \"username\": \"vet\",\n  \"password\": \"paws\"\n}" },
+      "preRequestScript": "insomnia.environment.set('loginAt', new Date().toISOString());",
+      "afterResponseScript": "insomnia.test('logged in', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst json = insomnia.response.json();\ninsomnia.environment.set('token', json.access_token);",
+      "metaSortKey": -3
+    },
+    {
+      "_id": "req_patients",
+      "parentId": "wrk_vetclinic",
+      "_type": "request",
+      "name": "List patients (uses the token)",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/patients",
+      "headers": [],
+      "authentication": { "type": "bearer", "token": "{{ _.token }}" },
+      "afterResponseScript": "insomnia.test('status 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\ninsomnia.test('a list of patients', () => insomnia.expect(insomnia.response.json().items).to.be.an('array'));",
+      "metaSortKey": -2
+    },
+    {
+      "_id": "req_echo",
+      "parentId": "wrk_vetclinic",
+      "_type": "request",
+      "name": "Echo a value set before sending",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/echo",
+      "parameters": [{ "name": "stamp", "value": "{{ _.stamp }}" }],
+      "headers": [],
+      "preRequestScript": "insomnia.environment.set('stamp', 'insomnia-' + Date.now());",
+      "afterResponseScript": "insomnia.test('the pre-request value was sent', () => insomnia.expect(insomnia.response.json().query.stamp).to.eql(insomnia.environment.get('stamp')));",
+      "metaSortKey": -1
+    }
+  ]
+}

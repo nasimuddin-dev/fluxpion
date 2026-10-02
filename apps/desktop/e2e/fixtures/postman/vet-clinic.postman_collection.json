@@ -1,0 +1,98 @@
+{
+  "info": {
+    "_postman_id": "6f1d2a0e-1c2b-4a7e-9a51-0e2f3b7c9d10",
+    "name": "Vet clinic (Postman sample)",
+    "description": "Sample Postman v2.1 collection for TestPion's import tests: pre-request and test scripts, a token passed between requests, against the local demo server (node examples/servers/demo-servers.mjs).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:4010" },
+    { "key": "token", "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "type": "text/javascript", "exec": ["// collection pre-request: every request says who sent it", "pm.request.headers.add({ key: 'X-Client', value: 'postman-sample' });"] }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Log in",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('loginAt', new Date().toISOString());"] }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('logged in', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('a bearer token', () => pm.expect(json.token_type).to.eql('Bearer'));",
+                  "pm.collectionVariables.set('token', json.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"vet\",\n  \"password\": \"paws\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/token", "host": ["{{baseUrl}}"], "path": ["auth", "token"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "List patients (uses the token)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('a list of patients', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/patients", "host": ["{{baseUrl}}"], "path": ["patients"] }
+      }
+    },
+    {
+      "name": "Echo a value set before sending",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('stamp', 'pm-' + Date.now());"] }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const echo = pm.response.json();",
+              "pm.test('the pre-request value was sent', () => pm.expect(echo.query.stamp).to.eql(pm.collectionVariables.get('stamp')));",
+              "pm.test('the collection pre-request header was sent', () => pm.expect(echo.headers['x-client']).to.eql('postman-sample'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/echo?stamp={{stamp}}", "host": ["{{baseUrl}}"], "path": ["echo"], "query": [{ "key": "stamp", "value": "{{stamp}}" }] }
+      }
+    }
+  ]
+}

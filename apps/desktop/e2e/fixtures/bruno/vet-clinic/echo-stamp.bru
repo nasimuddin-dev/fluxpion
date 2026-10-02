@@ -1,0 +1,24 @@
+meta {
+  name: Echo a value set before sending
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/echo?stamp={{stamp}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  bru.setVar("stamp", "bruno-" + Date.now());
+}
+
+tests {
+  test("the pre-request value was sent", function () {
+    expect(res.getBody().query.stamp).to.equal(bru.getVar("stamp"));
+  });
+  test("the collection pre-request header was sent", function () {
+    expect(res.getBody().headers["x-client"]).to.equal("bruno-sample");
+  });
+}

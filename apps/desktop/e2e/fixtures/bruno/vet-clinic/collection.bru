@@ -1,0 +1,8 @@
+vars:pre-request {
+  baseUrl: http://127.0.0.1:4010
+}
+
+script:pre-request {
+  // collection pre-request: every request says who sent it
+  req.setHeader("X-Client", "bruno-sample");
+}
