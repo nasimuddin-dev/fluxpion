@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.41.2 — 2026-10-02
+
+- **Favorites show:** a starred request gets a star in the tree and appears in a **Favorites** section at the top of the explorer, from where it opens (Add to favorites saved it, but nothing showed it).
+- **Expand all / Collapse all** in a collection's and a folder's menu.
+- **Tabs:** the active tab is always fully shown (after Open in tab it could be left half hidden at the left edge).
+
 ## 0.41.1 — 2026-10-02
 
 - **Collection variables in the Environments view:** a new tab lists every collection's variables (an imported Postman collection keeps its variables there) and edits them, next to Environments, Workspace and Global variables.
