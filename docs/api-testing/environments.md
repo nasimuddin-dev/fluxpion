@@ -66,9 +66,11 @@ Mark a variable as **secret** (lock icon) and its value is encrypted in the OS c
 
 Wherever a `{{variable}}` appears (the URL bar, params, headers, auth fields, the body and other code editors, test files), **double-click** it to see its value and where it comes from (environment, collection, workspace, dynamic). In the URL bar, params and headers a single click is enough. A variable of the active environment can be edited right there, and one that isn't defined yet can be added to it; **Copy** copies the value (secret values are never shown).
 
-## Quick look
+## Quick look: every variable at once
 
-Click the **eye** button next to the environment selector to see the active environment's and the global variables at a glance, like Postman's quick look. Each variable shows its initial value (what is saved) and its current value (what scripts set on this machine). *same* means no script has changed it. Secret and sensitive values are always shown as `••••••`. **Edit** opens the environment or the globals.
+Click the **eye** button next to the environment selector to see every variable the request on screen can use, in the order they win: its **collection's** variables, the active **environment's**, the **workspace's** and the **globals**. Each shows its initial value (what is saved) and its current value (what scripts set on this machine; *same* when no script changed it). A variable that a scope above also sets is shown faded as *(overridden)*. Type in the filter to find a variable by name or value in large collections; **Edit** opens that scope's variables. Secret and sensitive values are never shown.
+
+From a variable's popover, the button next to **Copy** goes to where that variable is set (**Collection variables**, **Workspace variables**, **Globals** or **Environments**), and **All** opens the quick look.
 
 ## Compare
 

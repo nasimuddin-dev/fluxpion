@@ -238,7 +238,8 @@ export function workspaceHandlers(be: Backend): Handlers {
     },
     'currentValues.reset': ({ scope, owner }: { scope?: 'environment' | 'globals' | 'collectionVariables'; owner?: string }) => be.currentValues?.reset(scope, owner),
     /** Postman's environment "quick look": initial and current values of the active environment and globals, secrets masked. */
-    'env.quickLook': ({ environment }: { environment?: string }) => {
+    /** Every variable a request can use, by scope: its collection's, the environment's, the workspace's and the globals (secrets masked). */
+    'env.quickLook': ({ environment, collectionId }: { environment?: string; collectionId?: string }) => {
       const mask = '••••••';
       const r = be.logger.redactor;
       const rows = (vars: Array<{ key: string; value: string; enabled?: boolean; secret?: boolean }>, current: Record<string, unknown>) => {
@@ -251,8 +252,17 @@ export function workspaceHandlers(be: Backend): Handlers {
         });
       };
       const env = environment ? be.ws.getEnvironment(environment) : undefined;
+      let collection: { id: string; name: string; variables: ReturnType<typeof rows> } | undefined;
+      try {
+        const c = collectionId ? be.ws.getCollection(collectionId) : undefined;
+        if (c) collection = { id: c.id, name: c.name, variables: rows(c.variables ?? [], be.currentValues?.get('collectionVariables', c.id) ?? {}) };
+      } catch {
+        /* a collection that no longer exists: no section */
+      }
       return {
+        collection,
         environment: env ? { id: env.id, name: env.name, isProduction: !!env.isProduction, variables: rows(env.variables, be.currentValues?.get('environment', env.name) ?? {}) } : undefined,
+        workspace: rows(be.ws.workspace.variables ?? [], {}),
         globals: rows(be.settings.globalVariables ?? [], be.currentValues?.get('globals', '') ?? {}),
       };
     },

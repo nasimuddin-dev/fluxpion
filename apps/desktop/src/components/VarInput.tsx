@@ -1,4 +1,4 @@
-import { Copy, KeyRound, Save, X } from 'lucide-react';
+import { Copy, Eye, KeyRound, Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { asError, call } from '../api';
@@ -193,7 +193,7 @@ export function VarInput({
 }
 
 /** What a {{variable}} holds and where it comes from; set it in the active environment, or add it there. */
-export function VarPopover({ name, info, environment, x, y, onClose, onSaved }: { name: string; info?: VarInfo; environment?: string; x: number; y: number; onClose(): void; onSaved(): void }) {
+export function VarPopover({ name, info, environment, collectionId, x, y, onClose, onSaved }: { name: string; info?: VarInfo; environment?: string; collectionId?: string; x: number; y: number; onClose(): void; onSaved(): void }) {
   const ref = useRef<HTMLDivElement>(null);
   const dynamic = name.startsWith('$');
   const defined = info?.scope !== undefined;
@@ -269,8 +269,34 @@ export function VarPopover({ name, info, environment, x, y, onClose, onSaved }: 
             Copy
           </Button>
         )}
-        <Button size="sm" variant="ghost" icon={<KeyRound size={12} />} onClick={() => (useApp.getState().setView('environments'), onClose())}>
-          Environments
+        {/* where this variable is set: its collection's settings, the workspace or global variables, or the environments */}
+        {(() => {
+          const open = (view: 'environments' | 'collections', payload: Record<string, unknown>) => (onClose(), useApp.getState().openIntent(view, payload));
+          const where =
+            info?.scope === 'collection' && collectionId
+              ? { label: 'Collection variables', go: () => open('collections', { collectionId, tab: 'variables' }) }
+              : info?.scope === 'workspace'
+              ? { label: 'Workspace variables', go: () => open('environments', { tab: 'workspace' }) }
+              : info?.scope === 'global'
+              ? { label: 'Globals', go: () => open('environments', { tab: 'globals' }) }
+              : { label: 'Environments', go: () => open('environments', {}) };
+          return (
+            <Button size="sm" variant="ghost" icon={<KeyRound size={12} />} onClick={where.go}>
+              {where.label}
+            </Button>
+          );
+        })()}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Eye size={12} />}
+          title="Every variable this request can use"
+          onClick={() => {
+            onClose();
+            document.querySelector<HTMLButtonElement>('[aria-label="Variables quick look"]')?.click();
+          }}
+        >
+          All
         </Button>
         {editable && (
           <Button size="sm" variant="primary" className="ml-auto" icon={<Save size={12} />} loading={busy} disabled={!changed || !environment} title={environment ? undefined : 'Choose an environment in the top bar first'} onClick={() => void save()}>

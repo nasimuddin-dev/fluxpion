@@ -36,3 +36,7 @@ export const collectionOf = (el: Element | null | undefined): string | undefined
 
 /** A variable's value changed (saved from the popover): fields that show variables look again. */
 export const VARS_CHANGED = 'testpion:vars-changed';
+
+/** The collection of the request on screen (the visible editor marked with data-collection-id), if any. */
+export const activeCollectionId = (): string | undefined =>
+  ([...document.querySelectorAll<HTMLElement>('main [data-collection-id]')].find((e) => e.offsetParent && e.dataset.collectionId)?.dataset.collectionId) || undefined;

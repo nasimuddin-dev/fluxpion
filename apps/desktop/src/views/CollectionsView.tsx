@@ -41,6 +41,8 @@ export function CollectionsView() {
   useEffect(() => setDraft(cols.find((c) => c.id === sel)), [sel, cols]);
   useIntent('collections', (p) => {
     if (p?.collectionId) setSel(p.collectionId);
+    // straight to a part of the collection's settings (e.g. its variables, from the variable popover or the quick look)
+    if (p?.tab === 'variables' || p?.tab === 'auth' || p?.tab === 'scripts' || p?.tab === 'docs' || p?.tab === 'overview') setTab(p.tab);
     if (p?.run) {
       setTab('run');
       setRunFolder(p.folderId);

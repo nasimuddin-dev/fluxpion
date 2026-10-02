@@ -46,6 +46,7 @@ export function VarPopoverHost() {
       name={open.name}
       info={info.info}
       environment={env}
+      collectionId={open.collectionId}
       x={open.x}
       y={open.y}
       onClose={() => useVarPopover.getState().hide()}

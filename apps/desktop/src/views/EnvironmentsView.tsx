@@ -126,6 +126,7 @@ export function EnvironmentsView() {
   useIntent('environments', (p) => {
     if (p?.environmentId) (setScope('environment'), setSel(p.environmentId));
     else if (p?.tab === 'globals') setScope('global');
+    else if (p?.tab === 'workspace') setScope('workspace');
   });
 
   const rows: KeyValue[] = (draft?.variables ?? []).map((v) => ({ ...v, value: v.secret ? secretValues[v.key] ?? '' : v.value }));
