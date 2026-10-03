@@ -34,6 +34,8 @@ export interface SendResult {
   visualizer?: { html?: string; error?: string; vizId?: string };
   historyId?: string;
   unresolved?: string[];
+  /** `{{$env.NAME}}` the app's allow-list kept out (Settings ▸ Privacy). */
+  blockedEnv?: string[];
   curl?: string;
   stream?: string;
 }

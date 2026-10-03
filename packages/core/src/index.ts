@@ -105,6 +105,7 @@ export * from './storage/git-guard.js';
 export * from './git/git.js';
 export * from './git/semantic.js';
 export * from './git/merge.js';
+export * from './storage/trust.js';
 export * from './storage/secrets.js';
 export * from './storage/metastore.js';
 export * from './storage/storage-usage.js';

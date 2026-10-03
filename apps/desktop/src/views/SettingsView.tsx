@@ -114,6 +114,12 @@ export function SettingsView() {
               <Field label="Always-redacted field names" hint="Matched case-insensitively (and as suffixes, e.g. accessToken) in logs, traces, history, reports and exports.">
                 <textarea className="field mono min-h-28" value={s.redactFields.join('\n')} onChange={(e) => set({ redactFields: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) })} />
               </Field>
+              <Field
+                label="OS environment variables requests may read"
+                hint="One name per line. {{$env.NAME}} works only for these: a collection someone shares with you, or one you import, could otherwise read any variable of this computer (cloud keys, tokens) and send it anywhere when run. The CLI reads all of them, as CI pipelines expect."
+              >
+                <textarea className="field mono min-h-20" placeholder={'e.g.\nAPI_BASE_URL\nSTAGING_TOKEN'} value={(s.envVariables ?? []).join('\n')} onChange={(e) => set({ envVariables: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) })} />
+              </Field>
               <div className="rounded-md border border-line p-3 text-sm flex flex-col gap-1">
                 <div className="font-medium">Telemetry</div>
                 <p className="text-muted">

@@ -99,7 +99,7 @@ export function installPreCommitHook(root: string, cli?: string): { installed: b
     // testpion on the PATH, else the CLI that installed this hook, else npx
     `if command -v testpion >/dev/null 2>&1; then T=testpion; ${cli ? `else T='${cli.split("'").join(`'"'"'`)}'; ` :'else T="npx --no-install testpion"; '}fi`,
     // eval: the remembered command is quoted (e.g. a path with spaces), which a plain $T would split
-    `eval "$T git check -w '${rel}'"`,
+    `eval "$T git check -w '${rel.split("'").join(`'"'"'`)}'"`,
     'code=$?',
     // 1: secrets found, the commit stops. Anything else: the check could not run; say so and let the commit through
     'if [ $code -eq 1 ]; then echo "TestPion: secrets are typed into the workspace (above). Use secret variables, then commit again."; exit 1; fi',

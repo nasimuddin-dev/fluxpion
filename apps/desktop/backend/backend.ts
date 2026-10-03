@@ -589,6 +589,7 @@ export class Backend {
       settings: this.settings,
       environment: opts.environment,
       collectionId: opts.collectionId,
+      envAccess: this.settings.envVariables ?? [],
       logger: this.logger,
       openExternal: this.host.openExternal?.bind(this.host),
       cookieJar: this.cookieStore?.jar,
@@ -824,7 +825,7 @@ export class Backend {
       const rendered = visual ? renderVisualizer(visual.template, visual.data) : undefined;
       // scripts (charts) run only on the isolated visualization origin; the id is its access key
       const visualizer = rendered && { ...rendered, vizId: rendered.html !== undefined ? this.publishVisualization(rendered.html, visual!.data) : undefined };
-      return { id, response, prepared, checks, scriptLogs, visualizer, unresolved: [...ctx.vars.unresolved], traceId: trace.traceId, historyId };
+      return { id, response, prepared, checks, scriptLogs, visualizer, unresolved: [...ctx.vars.unresolved], blockedEnv: [...ctx.vars.blockedEnv], traceId: trace.traceId, historyId };
     } catch (e) {
       const err = normalizeError(ctrl.signal.reason instanceof ApsError ? ctrl.signal.reason : e);
       root.fail(e);
@@ -842,7 +843,7 @@ export class Backend {
         logs: logsOf(),
         error: err.message,
       });
-      return { id, error: err, scriptLogs, unresolved: [...ctx.vars.unresolved], traceId: trace.traceId };
+      return { id, error: err, scriptLogs, unresolved: [...ctx.vars.unresolved], blockedEnv: [...ctx.vars.blockedEnv], traceId: trace.traceId };
     } finally {
       this.controllers.delete(id);
     }

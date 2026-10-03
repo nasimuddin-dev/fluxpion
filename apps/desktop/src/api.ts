@@ -59,7 +59,20 @@ function webBridge(): Bridge {
   };
 }
 
-export const bridge: Bridge = window.aps ?? webBridge();
+const electronBridge = (aps: Bridge & { rpc?(method: string, params?: unknown): Promise<{ ok: boolean; data?: unknown; error?: NormalizedError }> }): Bridge =>
+  aps.rpc
+    ? {
+        ...aps,
+        async invoke(method, params) {
+          const r = await aps.rpc!(method, params);
+          // thrown here, on the page's side of the context bridge, the error keeps its kind, suggestions and details
+          if (!r.ok) throw Object.assign(new Error(r.error?.message ?? 'Error'), r.error);
+          return r.data;
+        },
+      }
+    : aps;
+
+export const bridge: Bridge = window.aps ? electronBridge(window.aps) : webBridge();
 
 /** URL of an isolated pm.visualizer page (its own origin and security policy; see the backend). */
 export function visualizationUrl(id: string): string {

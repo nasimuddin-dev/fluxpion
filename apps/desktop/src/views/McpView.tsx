@@ -2,7 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, Braces, CircleDot, Copy, Download, FileTex
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAssistantContext } from '../lib/assistant-context';
 import { asError, call, on, type NormalizedError } from '../api';
-import { confirmAction, persisted, promptText, useApp } from '../store';
+import { ask, confirmAction, persisted, promptText, useApp } from '../store';
 import { useDoc, useDocs } from '../lib/docs';
 import { useIntent, useSendShortcut, useSaveShortcut } from '../hooks';
 import type { CheckConfig, CheckResult, KeyValue, McpServerConfig } from '../types';
@@ -141,12 +141,38 @@ export function McpView() {
   }, [current?.id, savedJson]);
   const dirty = !!draft || (!!form && JSON.stringify(form) !== savedJson);
 
+  /** Connect; a stdio server not yet allowed on this computer shows its command line first (Run once / Always). */
+  const connectWithTrust = async (id: string, env: string | undefined): Promise<{ discovery: Discovery; events: McpEvent[] }> => {
+    try {
+      return await call('mcp.connect', { serverId: id, environment: env });
+    } catch (e) {
+      const err = asError(e);
+      const d = err.details as { needsTrust?: boolean; line?: string } | undefined;
+      if (!d?.needsTrust) throw e;
+      const choice = await ask({
+        title: 'Run this program?',
+        message: `This workspace starts a program on your computer:`,
+        detail: `${d.line}
+
+It runs with your permissions. Allow it only if you know where this workspace comes from and what the program does.`,
+        tone: 'question',
+        buttons: [
+          { id: 'cancel', label: 'Cancel' },
+          { id: 'once', label: 'Run once' },
+          { id: 'always', label: 'Always for this workspace', variant: 'primary' },
+        ],
+        cancelId: 'cancel',
+      });
+      if (choice === 'cancel') throw new Error('Not connected: the program was not allowed to run.');
+      return await call('mcp.connect', { serverId: id, environment: env, trust: choice });
+    }
+  };
   const connect = async (id: string) => {
     setConnecting(id);
     setConnError(undefined);
     setEvents((e) => ({ ...e, [id]: [] }));
     try {
-      const r = await call<{ discovery: Discovery; events: McpEvent[] }>('mcp.connect', { serverId: id, environment: env });
+      const r = await connectWithTrust(id, env);
       setDiscovery((d) => ({ ...d, [id]: r.discovery }));
       setEvents((e) => ({ ...e, [id]: mergeEvents(e[id] ?? [], r.events) }));
       setTab('tools');

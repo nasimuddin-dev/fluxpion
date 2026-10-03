@@ -246,7 +246,12 @@ export function RestView() {
       });
       const curl = await call<string>('http.code', { request: toEngineRequest(tab.request), environment: env, collectionId: tab.collectionId, requestId: tab.requestId, language: 'curl' }).catch(() => undefined);
       setResults((rs) => ({ ...rs, [tabId]: { ...r, curl, stream: streams.current[id] || undefined } }));
-      if (r.unresolved?.length) useApp.getState().toast(`Unresolved variables: ${r.unresolved.join(', ')}`, 'error');
+      if (r.blockedEnv?.length)
+        useApp.getState().toast(`This request reads the OS environment variable${r.blockedEnv.length === 1 ? '' : 's'} ${r.blockedEnv.map((n) => `$env.${n}`).join(', ')}, which the app does not allow by default. Settings ▸ Privacy lists the ones requests may read.`, 'warning', {
+          label: 'Open Settings',
+          onClick: () => useApp.getState().openIntent('settings', { tab: 'privacy' }),
+        });
+      else if (r.unresolved?.length) useApp.getState().toast(`Unresolved variables: ${r.unresolved.join(', ')}`, 'error');
     } catch (e) {
       setResults((rs) => ({ ...rs, [tabId]: { error: asError(e) } }));
     } finally {

@@ -37,3 +37,17 @@ describe('dynamic variables', () => {
     expect([1, 2, 3]).toContain(body.n);
   });
 });
+
+describe('{{$env.NAME}} allow-list', () => {
+  it('reads only the allowed OS variables in the app, every one in the CLI', () => {
+    process.env.TP_TEST_ALLOWED = 'yes';
+    process.env.TP_TEST_SECRET = 'no';
+    const app = new VariableScope(undefined, undefined, { allowEnv: true, envAccess: ['tp_test_allowed'] });
+    expect(app.resolve('{{$env.TP_TEST_ALLOWED}}/{{$env.TP_TEST_SECRET}}')).toBe('yes/{{$env.TP_TEST_SECRET}}');
+    expect([...app.blockedEnv]).toEqual(['TP_TEST_SECRET']);
+    const cli = new VariableScope(undefined, undefined, { allowEnv: true, envAccess: 'all' });
+    expect(cli.resolve('{{$env.TP_TEST_SECRET}}')).toBe('no');
+    const none = new VariableScope(undefined, undefined, { allowEnv: true, envAccess: [] });
+    expect(none.resolve('{{$env.TP_TEST_SECRET}}')).toBe('{{$env.TP_TEST_SECRET}}');
+  });
+});

@@ -14,8 +14,13 @@ export interface SecretReader {
 }
 
 export interface ResolveOptions {
-  /** Allow `{{$env.NAME}}` lookups (enabled for CLI/CI; desktop enables it too). */
+  /** Allow `{{$env.NAME}}` lookups: every variable (the CLI, CI), or only the named ones (the app; see envAccess). */
   allowEnv?: boolean;
+  /**
+   * With allowEnv, which OS environment variables `{{$env.NAME}}` may read: 'all', or a list of names. A collection
+   * shared with you could otherwise send `{{$env.AWS_SECRET_ACCESS_KEY}}` anywhere the moment you run it.
+   */
+  envAccess?: 'all' | string[];
 }
 
 const TEMPLATE = /\{\{\s*([^{}]+?)\s*\}\}/g;
@@ -24,6 +29,8 @@ export class VariableScope {
   private scopes = new Map<ScopeName, Map<string, unknown>>();
   private secretKeys = new Set<string>();
   readonly unresolved = new Set<string>();
+  /** `{{$env.NAME}}` references that the env allow-list kept out (the UI says how to allow them). */
+  readonly blockedEnv = new Set<string>();
 
   constructor(
     private secrets?: SecretReader,
@@ -130,7 +137,13 @@ export class VariableScope {
     if (d !== undefined) return d;
     if (name.startsWith('$env.')) {
       if (!this.opts.allowEnv) return undefined;
-      const v = process.env[name.slice(5)];
+      const key = name.slice(5);
+      const access = this.opts.envAccess ?? 'all';
+      if (access !== 'all' && !access.some((a) => a.toLowerCase() === key.toLowerCase())) {
+        this.blockedEnv.add(key);
+        return undefined;
+      }
+      const v = process.env[key];
       if (v && /key|token|secret|password/i.test(name)) this.redactor?.addSecret(v);
       return v;
     }

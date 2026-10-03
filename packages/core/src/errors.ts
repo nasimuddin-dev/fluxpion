@@ -89,6 +89,10 @@ export function errorKindForStatus(status: number): ErrorKind | undefined {
 /** Convert any thrown value into a NormalizedError suitable for display or persistence. */
 export function normalizeError(err: unknown): NormalizedError {
   if (err instanceof ApsError) return err.toJSON();
+  // already normalized (the backend normalizes before the IPC layer does again): keep its kind, why, suggestions and details
+  const n = err as Partial<NormalizedError> | undefined;
+  if (n && typeof n === 'object' && typeof n.kind === 'string' && typeof n.message === 'string' && Array.isArray(n.suggestions))
+    return { kind: n.kind, message: n.message, what: n.what ?? n.message, why: n.why ?? '', suggestions: n.suggestions, ...(n.details ? { details: n.details } : {}) };
   const e = err as { name?: string; message?: string; code?: string; cause?: { code?: string; message?: string; errors?: Array<{ code?: string }> } };
   const message = e?.message ?? String(err);
   // undici wraps socket errors in `cause`; dual-stack connects report an AggregateError

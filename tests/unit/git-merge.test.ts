@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { WorkspaceStore, describeRevChanges, changesMarkdown, gitCommit, gitItemHistory, gitInit, gitResolve, gitSetupMergeDriver, gitStatus, gitVersion, mergeCollectionTexts, pullRequestUrl, runGit, type Collection } from '@testpion/core';
+import { WorkspaceStore, assertGitRef, assertGitRev, assertRemoteUrl, describeRevChanges, changesMarkdown, gitCommit, gitItemHistory, gitInit, gitResolve, gitSetupMergeDriver, gitStatus, gitVersion, mergeCollectionTexts, pullRequestUrl, runGit, type Collection } from '@testpion/core';
 
 // GIT-301 (merge by id), GIT-304 (pull request links), GIT-401 (semantic diff between commits).
 const root = mkdtempSync(join(tmpdir(), 'tp-merge-'));
@@ -126,5 +126,16 @@ describe('git with the merge driver', () => {
     expect(settled.items.map((i) => i.request.url)).toEqual(['https://x/a-2-theirs', 'https://x/b-theirs', 'https://x/c-ours']);
     expect((await gitStatus(ws)).files.find((f) => f.path === 'collections/api.json')).toMatchObject({ staged: true });
     store.close();
+  });
+});
+
+describe('git arguments from users and agents', () => {
+  it('refuses names and revisions git would read as options', () => {
+    for (const bad of ['--output=/tmp/x', '-d', '', 'a..b', 'a b', 'feature/', 'x.lock', 'a~{b}'.replace('~{', '@{')]) expect(() => assertGitRef(bad)).toThrow(/Not a valid git/);
+    for (const ok of ['main', 'feature/payments-2', 'origin/main', 'v1.0.0', 'release_2026']) expect(assertGitRef(ok)).toBe(ok);
+    for (const bad of ['--output=C:/evil', '-p', 'HEAD; rm -rf', 'a..b', '']) expect(() => assertGitRev(bad)).toThrow(/Not a valid git revision/);
+    for (const ok of ['HEAD', 'HEAD~2', 'main^', 'origin/main', 'a1b2c3d', 'v0.42.0']) expect(assertGitRev(ok)).toBe(ok);
+    expect(() => assertRemoteUrl('--upload-pack=evil')).toThrow();
+    expect(assertRemoteUrl('git@github.com:team/api.git')).toBe('git@github.com:team/api.git');
   });
 });

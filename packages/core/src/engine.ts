@@ -24,6 +24,11 @@ export interface ContextOptions {
   settings?: AppSettings;
   environment?: string;
   collectionId?: string;
+  /**
+   * Which OS environment variables `{{$env.NAME}}` may read: 'all' (the CLI and CI, where the pipeline decides what
+   * is in the environment) or a list of names (the app: Settings ▸ Privacy, empty unless the user adds some).
+   */
+  envAccess?: 'all' | string[];
   logger?: Logger;
   redactor?: Redactor;
   openExternal?: (url: string) => void | Promise<void>;
@@ -59,7 +64,8 @@ export function environmentVariables(env: Environment | undefined, secrets: Secr
 export function createEngineContext(opts: ContextOptions): EngineContext {
   const settings = opts.settings ?? defaultSettings();
   const redactor = opts.redactor ?? new Redactor(settings.redactFields);
-  const vars = new VariableScope(opts.secrets, redactor, { allowEnv: true });
+  // the caller's choice, else the user's list from Settings when there is one (the MCP server, runs), else every variable (the CLI)
+  const vars = new VariableScope(opts.secrets, redactor, { allowEnv: true, envAccess: opts.envAccess ?? settings.envVariables ?? 'all' });
   const { store } = opts;
 
   vars.setScope('global', settings.globalVariables ?? []);

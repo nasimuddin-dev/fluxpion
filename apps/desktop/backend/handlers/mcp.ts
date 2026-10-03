@@ -16,6 +16,7 @@ import {
   mcpToolUsage,
 } from '@testpion/core';
 import type { Backend, Handlers } from '../backend.js';
+import { commandLine, forgetTrustedCommands, isCommandTrusted, trustCommand, trustedCommands } from '@testpion/core';
 
 /** Requests an inspected server sent to the client (elicitation, sampling) that wait for the user. */
 interface PendingClientRequest {
@@ -66,12 +67,28 @@ export function mcpHandlers(be: Backend): Handlers {
       be.ws.saveMcpServers(servers);
       return servers;
     },
-    'mcp.connect': async ({ serverId, environment }: { serverId: string; environment?: string }) => {
+    /** Programs this workspace may start on this computer (stdio MCP servers the user allowed). */
+    'mcp.trusted': () => trustedCommands(be.ws),
+    'mcp.forgetTrusted': () => forgetTrustedCommands(be.ws),
+    'mcp.connect': async ({ serverId, environment, trust }: { serverId: string; environment?: string; trust?: 'once' | 'always' }) => {
       await be.mcpSessions.get(serverId)?.close();
       const cfg = be.ws.getMcpServers().find((s) => s.id === serverId);
       if (!cfg) throw new ApsError('ConfigurationError', `Unknown MCP server ${serverId}`);
       const ctx = be.context({ environment });
       const resolved = be.ws.resolveMcpServer(ctx.vars.resolveDeep(cfg));
+      // a stdio server is a program this workspace asks the computer to run: the user sees the command line first
+      // (a workspace comes from git, an import or a teammate), and may allow it for good on this computer
+      if (resolved.transport === 'stdio' && !isCommandTrusted(be.ws, resolved.command, resolved.args ?? [])) {
+        if (!trust) {
+          const line = commandLine(resolved.command, resolved.args ?? []);
+          throw new ApsError('ConfigurationError', `"${cfg.name}" starts a program on this computer: ${line}`, {
+            why: 'Programs a workspace starts run with your permissions. Check the command before you allow it.',
+            suggestions: ['Allow it once, or always for this workspace on this computer.'],
+            details: { needsTrust: true, command: resolved.command, args: resolved.args ?? [], line },
+          });
+        }
+        if (trust === 'always') trustCommand(be.ws, resolved.command, resolved.args ?? []);
+      }
       // the inspector offers roots (the workspace folder) and lets the user answer elicitation and sampling
       const session = new McpSession(resolved, ctx.redactor, {
         cookieJar: ctx.services.cookieJar,

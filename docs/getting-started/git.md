@@ -178,6 +178,15 @@ api-tests:
 
 Secret values come from the CI system's secrets as `TESTPION_SECRET_…` variables; see [CI/CD](/test-runner/ci-cd) for their names and for generating a pipeline file.
 
+## What a workspace from someone else can do
+
+A workspace is data, but two things in it reach outside the app, and both ask first:
+
+- **Programs:** a `stdio` MCP server is a command the workspace starts on your computer. The first **Connect** shows the command line and asks (Run once / Always for this workspace).
+- **Your environment:** `{{$env.NAME}}` reads only the OS environment variables you list in **Settings ▸ Privacy**; a request that reads another one says so instead of sending it.
+
+Requests themselves can call any URL, as in any API client: review a pull request's changes (the Git view lists them by meaning) as you would review code.
+
 ## Team workflow, in short
 
 1. One person makes the workspace ready for git, commits and pushes.

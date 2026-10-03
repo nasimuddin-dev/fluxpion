@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { Collection, CollectionNode, Environment } from '../model/types.js';
-import { gitLog, gitShow, runGit, type GitCommit, type GitFile } from './git.js';
+import { assertGitRev, gitLog, gitShow, runGit, type GitCommit, type GitFile } from './git.js';
 
 /**
  * Changes said by what they mean (GIT-205): "Payments ▸ Create invoice: URL and 2 headers changed" rather than
@@ -160,6 +160,8 @@ export function replaceCollectionItem<C extends Pick<Collection, 'items'>>(c: C,
  * defaults to the working folder when omitted.
  */
 export async function describeRevChanges(ws: string, from: string, to?: string): Promise<SemanticChange[]> {
+  assertGitRev(from);
+  if (to) assertGitRev(to);
   const out = await runGit(ws, ['diff', '--name-status', '-z', '-M', from, ...(to ? [to] : []), '--', '.']);
   const parts = out.split('\0').filter((p) => p !== '');
   const repo = (await runGit(ws, ['rev-parse', '--show-toplevel'])).trim();

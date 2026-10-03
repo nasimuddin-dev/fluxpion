@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('aps', {
     if (!r.ok) throw Object.assign(new Error(r.error?.message ?? 'Error'), r.error);
     return r.data;
   },
+  // the envelope itself: an error thrown across the context bridge keeps only its message, so the page throws
+  // (with the kind, suggestions and details) on its side
+  rpc: (method: string, params?: unknown) => ipcRenderer.invoke('aps:rpc', method, params),
   on: (channel: string, cb: Listener) => {
     const set = listeners.get(channel) ?? listeners.set(channel, new Set()).get(channel)!;
     set.add(cb);

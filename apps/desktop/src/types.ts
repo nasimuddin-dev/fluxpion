@@ -329,6 +329,8 @@ export interface AppSettings {
   reducedMotion: boolean;
   logLevel: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
   redactFields: string[];
+  /** OS environment variables `{{$env.NAME}}` may read in the app (none unless listed). */
+  envVariables?: string[];
   pricing: PriceEntry[];
   maxPreviewBytes: number;
   defaultTimeoutMs: number;

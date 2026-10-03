@@ -73,6 +73,30 @@ export function runGit(cwd: string, args: string[], opts: { input?: string; time
   });
 }
 
+/**
+ * A branch, tag or commit name that is safe as a git argument: what git itself allows in a ref, and never a dash
+ * first (an agent or a page could otherwise slip an option such as `--output=<file>` in as a "revision").
+ */
+export function assertGitRef(name: string, what = 'branch'): string {
+  const n = String(name ?? '').trim();
+  if (!n || n.startsWith('-') || /[\s~^:?*[\\\x00-\x1f]|\.\.|@\{|\/\/|\.lock$|\/$|^\/|^@$/.test(n)) throw new ApsError('ValidationError', `Not a valid git ${what}: ${n || '(empty)'}`);
+  return n;
+}
+
+/** A revision for diff / show / log: a ref, a commit hash, HEAD, or those with ~ and ^ suffixes (never an option). */
+export function assertGitRev(rev: string): string {
+  const r = String(rev ?? '').trim();
+  if (!r || r.startsWith('-') || !/^[\w./@^~-]+$/.test(r) || /\.\./.test(r)) throw new ApsError('ValidationError', `Not a valid git revision: ${r || '(empty)'}`);
+  return r;
+}
+
+/** A remote URL (https, ssh, git, or a local path): never something git would read as an option. */
+export function assertRemoteUrl(url: string): string {
+  const u = String(url ?? '').trim();
+  if (!u || u.startsWith('-') || /[\s\x00-\x1f]/.test(u)) throw new ApsError('ValidationError', `Not a valid repository URL: ${u || '(empty)'}`);
+  return u;
+}
+
 /** Plain-words next steps for git's usual complaints. */
 function gitHints(stderr: string): string[] {
   const s = stderr.toLowerCase();
@@ -157,7 +181,7 @@ export async function gitShow(ws: string, path: string, rev = 'HEAD'): Promise<s
   if (!repo) return undefined;
   const inRepo = relative(repo, resolve(ws, path)).split(sep).join('/');
   try {
-    return await runGit(ws, ['show', `${rev}:${inRepo}`]);
+    return await runGit(ws, ['show', `${assertGitRev(rev)}:${inRepo}`]);
   } catch {
     return undefined;
   }
@@ -233,6 +257,8 @@ export async function gitBranches(ws: string): Promise<GitBranches> {
 }
 
 export async function gitSwitch(ws: string, branch: string, opts: { create?: boolean; from?: string } = {}): Promise<void> {
+  assertGitRef(branch);
+  if (opts.from) assertGitRev(opts.from);
   // a remote branch ("origin/feature") is checked out as a local branch that tracks it
   const remote = !opts.create && branch.includes('/') ? branch : undefined;
   if (remote) await runGit(ws, ['switch', '--track', remote]);
@@ -240,7 +266,7 @@ export async function gitSwitch(ws: string, branch: string, opts: { create?: boo
 }
 
 export async function gitDeleteBranch(ws: string, branch: string, force = false): Promise<void> {
-  await runGit(ws, ['branch', force ? '-D' : '-d', branch]);
+  await runGit(ws, ['branch', force ? '-D' : '-d', assertGitRef(branch)]);
 }
 
 export async function gitFetch(ws: string): Promise<void> {
@@ -267,19 +293,19 @@ export async function gitPush(ws: string): Promise<void> {
 /** Make the workspace folder a repository (with a first branch name), optionally with a remote. */
 export async function gitInit(ws: string, opts: { remote?: string; branch?: string } = {}): Promise<void> {
   if (!(await repoRoot(ws))) {
-    await runGit(ws, ['init', '-b', opts.branch ?? 'main']);
+    await runGit(ws, ['init', '-b', assertGitRef(opts.branch ?? 'main')]);
     forgetRepoRoots();
   }
   if (opts.remote) {
     const remotes = (await runGit(ws, ['remote'])).split('\n').filter(Boolean);
-    await runGit(ws, ['remote', remotes.includes('origin') ? 'set-url' : 'add', 'origin', opts.remote]);
+    await runGit(ws, ['remote', remotes.includes('origin') ? 'set-url' : 'add', 'origin', assertRemoteUrl(opts.remote)]);
   }
 }
 
 /** Clone a repository into `dest` (which must not exist or be empty). */
 export async function gitClone(url: string, dest: string, opts: { branch?: string } = {}): Promise<void> {
   if (existsSync(dest) && (await import('node:fs')).readdirSync(dest).length) throw new ApsError('ValidationError', `The folder ${dest} is not empty`, { suggestions: ['Choose a new or empty folder to clone into.'] });
-  await runGit(process.cwd(), ['clone', ...(opts.branch ? ['--branch', opts.branch] : []), '--', url, dest], { timeoutMs: 600_000 });
+  await runGit(process.cwd(), ['clone', ...(opts.branch ? ['--branch', assertGitRef(opts.branch)] : []), '--', assertRemoteUrl(url), dest], { timeoutMs: 600_000 });
 }
 
 /** The remote's URL (origin), if any: a link to open pull requests with. */

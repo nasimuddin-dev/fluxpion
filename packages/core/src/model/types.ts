@@ -696,6 +696,11 @@ export interface AppSettings {
   logLevel: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
   /** Field names always redacted in logs, traces, reports and exports. */
   redactFields: string[];
+  /**
+   * OS environment variables that `{{$env.NAME}}` may read in the app (none unless added here): a shared or imported
+   * collection could otherwise read any of them and send it anywhere when run. The CLI reads all of them.
+   */
+  envVariables?: string[];
   pricing: PriceEntry[];
   maxPreviewBytes: number;
   defaultTimeoutMs: number;
