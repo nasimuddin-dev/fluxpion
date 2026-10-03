@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.43.0 — 2026-10-02
+
+### Faster with big workspaces
+Measured with a 2,817-request Postman import and a 500-request collection with every folder open:
+- **Opening a request:** 252 → 45 ms. **Switching tabs:** 103 → 33 ms. **Typing in the explorer's filter:** 57 → 17 ms per key (worst case 169 → 23 ms). Every row of the tree carried a whole menu; now a menu exists only while it is open, and a tab switch re-renders two rows instead of all of them.
+- Hidden GraphQL, gRPC, WebSocket and MCP tabs keep their state and connections but no live code editor, so many open tabs no longer slow every keystroke.
+- The response header fits any width: values never break mid-number, and the actions fold into a **⋯** menu when the panel is narrow.
+
+### What a shared workspace may do
+Workspaces now travel through git, imports and teammates, so two things that reach outside the app ask first:
+- A **stdio MCP server is a program** the workspace starts on your computer. The first **Connect** shows the exact command line: **Run once**, or **Always for this workspace** (remembered per computer, never committed). Mock and HTTP servers never ask.
+- `{{$env.NAME}}` reads only the OS environment variables you list in **Settings ▸ Privacy** (none by default): a request that reads another one says so, with a link to the setting. The CLI reads all of them, as CI expects.
+
+### Agents
+- New MCP tools: `update_request`, `move_request`, `delete_request`, `create_collection`, `create_folder`, `set_collection_variable` (secrets typed in become `{{variables}}`; secret-looking variable names are refused), and `list_mcp_servers`, `mcp_server_tools`, `mcp_call_tool` to test the workspace's own MCP servers.
+- `testpion mcp --server <name> -w . [--call <tool> --args '{…}'] [--json]`: a saved server from the terminal and CI.
+
+### Integration testing in CI/CD
+- `testpion ci … --start "<command>" --wait-for <health URL>`: the generated GitHub Actions, GitLab, Azure and Jenkins pipelines start the system under test and wait for it before the tests; `testpion wait-for <url>` for any pipeline.
+- The repository is a reusable **GitHub Action** (`uses: nasimuddin-dev/testpion@v0.43.0`): workspace, suite / collection / tests, environment, start, wait-for; reports as an artifact.
+- Example: `tests/rest/patient-lifecycle.yaml` (create, read, list, wrong token, delete, gone, delete again) and the **Integration** suite; a new guide, *Test Runner ▸ Integration testing*.
+
+### Fixes
+- Errors from the backend lost their kind, suggestions and details on the way to the desktop window; they arrive whole now.
+- Git: branch names, revisions and remote URLs from the app, the CLI and agents are validated before they reach git.
+
+### Under the hood
+- The code base's boundaries (engine, CLI, backend, renderer) and file-size ceilings are kept by a test; MCP tools live in modules by subject; a CPU-profiling plan for the UI (`npm run e2e -- --only _profile` after a `TESTPION_PROFILE=1` build).
+
 ## 0.42.1 — 2026-10-02
 
 - **No more false "changed outside TestPion" messages:** opening a file (a test file, for example) showed that message on Windows, because Windows reports a file being read as a change. The app now compares the files' content, so only a real change from outside (a `git pull`, another editor) is reported; a rewrite with the same content is not.
