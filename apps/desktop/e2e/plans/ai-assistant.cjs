@@ -107,8 +107,7 @@ const steps = [
     const tests = () => [...document.querySelectorAll('main [role=tab]')].find((t) => t.offsetParent && t.textContent.trim().startsWith('Tests'))?.textContent.trim();
     const before = tests();
     [...document.querySelectorAll('main button')].find((b) => b.offsetParent && b.textContent.trim() === 'Send')?.click(); await __t.sleep(2000);
-    const sug = [...document.querySelectorAll('main button')].find((b) => b.offsetParent && b.textContent.trim() === 'Suggest assertions'); if (!sug) return 'NO BUTTON Suggest assertions';
-    sug.click(); await __t.sleep(400);
+    if (!(await __t.responseAction('Suggest assertions'))) return 'NO BUTTON Suggest assertions';
     for (let i = 0; i < 60 && !${panel}?.querySelector('[data-answer-apply]'); i++) await __t.sleep(150);
     const apply = ${panel}?.querySelector('[data-answer-apply]'); if (!apply) return 'NO BUTTON apply';
     const label = apply.textContent.trim(); apply.click(); await __t.sleep(800);

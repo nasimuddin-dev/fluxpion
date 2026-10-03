@@ -10,7 +10,7 @@ import { ResponseHistory } from './ResponseHistory';
 import { JsonTree, RawView, type TreeAssertion, type TreeVariable } from './JsonView';
 import { TraceView } from './TraceView';
 import { finishSave, type SaveResult } from '../lib/files';
-import { Badge, Button, cx, Empty, statusTone, Tabs } from './ui';
+import { Badge, Button, cx, Empty, MoreMenu, statusTone, Tabs, type MenuItem } from './ui';
 import { useApp } from '../store';
 import { JsonTable, tableRowsOf } from './JsonTable';
 import { JwtView } from './JwtView';
@@ -82,21 +82,50 @@ export function ResponseViewer({
     if (tab === 'trace' && traceId && trace?.traceId !== traceId) void call<Trace>('traces.get', { id: traceId }).then(setTrace);
   }, [tab, traceId, trace]);
   const failed = checks?.filter((c) => !c.passed).length ?? 0;
+  /** What can be done with this response: buttons when the panel is wide, a ⋯ menu when it is not. */
+  const actions: Array<MenuItem & { title?: string }> = [
+    ...(onExplain && response.status >= 400 ? [{ label: 'Explain', icon: <Sparkles size={12} />, onSelect: onExplain, title: 'Ask the AI assistant what this error means and how to fix it' }] : []),
+    ...(onGenerateTests
+      ? [{ label: 'Generate tests', icon: <Sparkles size={12} />, onSelect: onGenerateTests, title: 'Write pm tests for this response with the AI assistant (added to the Post-response script)' }]
+      : []),
+    ...(onAddAssertion && isJson
+      ? [
+          {
+            label: 'Snapshot',
+            icon: <Camera size={12} />,
+            onSelect: () => onAddAssertion({ type: 'snapshot', path: '$', expected: response.json, mode: 'shape' }),
+            title: "Add a check that later responses keep this response's shape (fields and types); in the Tests tab it can compare values too and ignore fields",
+          },
+        ]
+      : []),
+    ...(onSuggestAssertions ? [{ label: 'Suggest assertions', icon: <Sparkles size={12} />, onSelect: onSuggestAssertions }] : []),
+    ...(onSaveExample ? [{ label: 'Save as example', icon: <BookmarkPlus size={12} />, onSelect: onSaveExample, title: 'Save this response as an example of the request' }] : []),
+    ...(response.payloadPath
+      ? [
+          {
+            label: 'Save response',
+            icon: <Download size={12} />,
+            onSelect: () => void call<SaveResult>('http.saveBody', { payloadPath: response.payloadPath, name: 'response' + (isJson ? '.json' : '.txt') }).then((r) => finishSave(r, 'Response')),
+          },
+        ]
+      : []),
+  ];
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex items-center gap-3 px-3 h-9 border-b border-line text-sm shrink-0">
+      {/* one line, whatever the width: the numbers never break, and the actions fold into a ⋯ menu when the panel is narrow */}
+      <div className="@container flex items-center gap-3 px-3 h-9 border-b border-line text-sm shrink-0 whitespace-nowrap overflow-hidden">
         <Badge tone={statusTone(response.status)}>
           {response.status} {response.statusText}
         </Badge>
-        <span className="text-muted">
-          Time <span className="text-fg tabular-nums">{formatMs(response.durationMs)}</span>
+        <span className="text-muted" title="Time to the last byte">
+          <span className="hidden @md:inline">Time </span>
+          <span className="text-fg tabular-nums">{formatMs(response.durationMs)}</span>
         </span>
-        <span className="text-muted">
-          Size <span className="text-fg tabular-nums">{formatBytes(response.size)}</span>
+        <span className="text-muted" title="Body size">
+          <span className="hidden @md:inline">Size </span>
+          <span className="text-fg tabular-nums">{formatBytes(response.size)}</span>
         </span>
-        {response.httpVersion === '2' && (
-          <Badge title="The response came over HTTP/2 (request Settings ▸ HTTP/1.1 only to turn it off)">HTTP/2</Badge>
-        )}
+        {response.httpVersion === '2' && <Badge title="The response came over HTTP/2 (request Settings ▸ HTTP/1.1 only to turn it off)">HTTP/2</Badge>}
         {!!response.attempts && response.attempts > 1 && (
           <Badge tone="warn" title="Earlier attempts failed and were retried (request Settings ▸ Retries)">
             {response.attempts} attempts
@@ -108,38 +137,14 @@ export function ResponseViewer({
           </Badge>
         )}
         {checks && checks.length > 0 && <Badge tone={failed ? 'bad' : 'ok'}>{failed ? `${failed} failed` : `${checks.length} passed`}</Badge>}
-        <div className="ml-auto flex items-center gap-1">
-          {onExplain && response.status >= 400 && (
-            <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onExplain} title="Ask the AI assistant what this error means and how to fix it">
-              Explain
+        <div className="ml-auto hidden @3xl:flex items-center gap-1">
+          {actions.map((a) => (
+            <Button key={a.label} size="sm" variant="ghost" icon={a.icon} onClick={a.onSelect} title={a.title}>
+              {a.label}
             </Button>
-          )}
-          {onGenerateTests && (
-            <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onGenerateTests} title="Write pm tests for this response with the AI assistant (added to the Post-response script)">
-              Generate tests
-            </Button>
-          )}
-          {onAddAssertion && isJson && (
-            <Button size="sm" variant="ghost" icon={<Camera size={12} />} title="Add a check that later responses keep this response's shape (fields and types); in the Tests tab it can compare values too and ignore fields" onClick={() => onAddAssertion({ type: 'snapshot', path: '$', expected: response.json, mode: 'shape' })}>
-              Snapshot
-            </Button>
-          )}
-          {onSuggestAssertions && (
-            <Button size="sm" variant="ghost" icon={<Sparkles size={12} />} onClick={onSuggestAssertions}>
-              Suggest assertions
-            </Button>
-          )}
-          {onSaveExample && (
-            <Button size="sm" variant="ghost" icon={<BookmarkPlus size={12} />} onClick={onSaveExample} title="Save this response as an example of the request">
-              Save as example
-            </Button>
-          )}
-          {response.payloadPath && (
-            <Button size="sm" variant="ghost" icon={<Download size={12} />} onClick={() => call<SaveResult>('http.saveBody', { payloadPath: response.payloadPath, name: 'response' + (isJson ? '.json' : '.txt') }).then((r) => finishSave(r, 'Response'))}>
-              Save response
-            </Button>
-          )}
+          ))}
         </div>
+        <div className="ml-auto @3xl:hidden">{actions.length > 0 && <MoreMenu label="Response actions" items={actions} />}</div>
       </div>
       <Tabs
         value={tab}
@@ -209,7 +214,11 @@ export function ResponseViewer({
                   <tr key={i} className="border-t border-line">
                     <td className="px-3 py-1 mono">{c.name}</td>
                     <td className="mono break-all">{c.value}</td>
-                    <td className="text-muted text-xs">{Object.entries(c.attributes).map(([k, v]) => (v === 'true' ? k : `${k}=${v}`)).join('; ')}</td>
+                    <td className="text-muted text-xs">
+                      {Object.entries(c.attributes)
+                        .map(([k, v]) => (v === 'true' ? k : `${k}=${v}`))
+                        .join('; ')}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -225,7 +234,13 @@ export function ResponseViewer({
               checks={checks ?? []}
               actions={(c) =>
                 onUpdateSnapshot && c.type === 'snapshot' && !c.passed ? (
-                  <Button size="sm" variant="ghost" icon={<Camera size={12} />} title="The API changed on purpose: keep this response as the new snapshot" onClick={() => onUpdateSnapshot(String((c.metadata as { path?: string } | undefined)?.path ?? '$'))}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Camera size={12} />}
+                    title="The API changed on purpose: keep this response as the new snapshot"
+                    onClick={() => onUpdateSnapshot(String((c.metadata as { path?: string } | undefined)?.path ?? '$'))}
+                  >
                     Update snapshot
                   </Button>
                 ) : null
@@ -273,7 +288,10 @@ function CertificateLine({ c }: { c: NonNullable<NonNullable<HttpResponseData['c
   const days = c.daysLeft;
   const tone = days === undefined ? 'text-muted' : days < 7 ? 'text-bad' : days < 30 ? 'text-warn' : 'text-ok';
   return (
-    <div className="text-xs text-muted flex flex-wrap gap-x-3 gap-y-1" title={[c.altNames?.length ? `Also valid for: ${c.altNames.join(', ')}` : '', c.fingerprint256 ? `SHA-256 ${c.fingerprint256}` : ''].filter(Boolean).join('\n')}>
+    <div
+      className="text-xs text-muted flex flex-wrap gap-x-3 gap-y-1"
+      title={[c.altNames?.length ? `Also valid for: ${c.altNames.join(', ')}` : '', c.fingerprint256 ? `SHA-256 ${c.fingerprint256}` : ''].filter(Boolean).join('\n')}
+    >
       <span>
         <b className="text-fg font-medium">Certificate</b> {c.subject}
         {c.issuer && <> · issued by {c.issuer}</>}
@@ -291,7 +309,9 @@ function CertificateLine({ c }: { c: NonNullable<NonNullable<HttpResponseData['c
 function Timeline({ phases, url, connection }: { phases: Array<{ name: string; startMs: number; durationMs: number }>; url: string; connection?: HttpResponseData['connection'] }) {
   const total = phases.find((p) => p.name === 'total')?.durationMs ?? 1;
   const connect = phases.filter((p) => CONNECT_PHASES.has(p.name)).reduce((n, p) => n + p.durationMs, 0);
-  const peer = connection?.remoteAddress ? `${connection.remoteAddress.includes(':') ? `[${connection.remoteAddress}]` : connection.remoteAddress}${connection.remotePort ? `:${connection.remotePort}` : ''}` : undefined;
+  const peer = connection?.remoteAddress
+    ? `${connection.remoteAddress.includes(':') ? `[${connection.remoteAddress}]` : connection.remoteAddress}${connection.remotePort ? `:${connection.remotePort}` : ''}`
+    : undefined;
   return (
     <div className="p-4 text-sm flex flex-col gap-2 max-w-3xl">
       <div className="text-muted text-xs mono break-all">{url}</div>
@@ -323,7 +343,10 @@ function Timeline({ phases, url, connection }: { phases: Array<{ name: string; s
         <div key={p.name} className="grid grid-cols-[140px_1fr_80px] items-center gap-3">
           <span className={cx(p.name === 'total' && 'font-semibold')}>{p.name}</span>
           <div className="h-3 bg-panel2 rounded relative overflow-hidden">
-            <div className={cx('absolute top-0 bottom-0 rounded', p.name === 'total' ? 'bg-muted/60' : CONNECT_PHASES.has(p.name) ? 'bg-accent/50' : 'bg-accent')} style={{ left: `${(p.startMs / total) * 100}%`, width: `${Math.max(0.5, (p.durationMs / total) * 100)}%` }} />
+            <div
+              className={cx('absolute top-0 bottom-0 rounded', p.name === 'total' ? 'bg-muted/60' : CONNECT_PHASES.has(p.name) ? 'bg-accent/50' : 'bg-accent')}
+              style={{ left: `${(p.startMs / total) * 100}%`, width: `${Math.max(0.5, (p.durationMs / total) * 100)}%` }}
+            />
           </div>
           <span className="text-right tabular-nums">{formatMs(p.durationMs)}</span>
         </div>
@@ -338,7 +361,19 @@ function Timeline({ phases, url, connection }: { phases: Array<{ name: string; s
               assistant: {
                 task: 'explain-timing',
                 title: 'Where the time went',
-                context: { url, phases, connection: connection && { ...connection, certificate: connection.certificate && { subject: connection.certificate.subject, issuer: connection.certificate.issuer, validTo: connection.certificate.validTo, daysLeft: connection.certificate.daysLeft } } },
+                context: {
+                  url,
+                  phases,
+                  connection: connection && {
+                    ...connection,
+                    certificate: connection.certificate && {
+                      subject: connection.certificate.subject,
+                      issuer: connection.certificate.issuer,
+                      validTo: connection.certificate.validTo,
+                      daysLeft: connection.certificate.daysLeft,
+                    },
+                  },
+                },
               },
             })
           }

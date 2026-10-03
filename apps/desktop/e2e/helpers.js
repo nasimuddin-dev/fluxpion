@@ -43,6 +43,18 @@ window.__t = (() => {
     },
     header: async (label) => { await esc(); aside()?.querySelector(`button[aria-label^="${label}"]`)?.click(); await sleep(1000); return (document.querySelector('[role=dialog]')?.innerText ?? document.querySelector('[role=menu]')?.innerText ?? 'NOTHING').slice(0, 80); },
     tab: async (label) => { const all = [...document.querySelectorAll('main [role=tab]')].filter((x) => x.textContent.trim().startsWith(label)); const t = all.find((x) => x.offsetParent !== null) ?? all[0]; t?.click(); await sleep(900); return !!t; },
+    // a response action: a button when the panel is wide, else an item of its ⋯ menu ("Response actions")
+    responseAction: async (label) => {
+      let b = [...document.querySelectorAll('main button')].find((x) => x.offsetParent && x.textContent.trim() === label);
+      if (!b) {
+        const more = [...document.querySelectorAll('main button[aria-label="Response actions"]')].find((x) => x.offsetParent);
+        if (!more) return false;
+        more.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); more.click();
+        b = await waitFor(() => [...document.querySelectorAll('[role=menuitem]')].find((m) => m.textContent.trim() === label), 1500);
+        if (!b) return false;
+      }
+      b.click(); await sleep(1200); return true;
+    },
     button: async (label) => { const b = [...document.querySelectorAll('main button')].find((x) => x.offsetParent && (x.textContent.trim() === label || x.getAttribute('aria-label') === label)); b?.click(); await sleep(1200); return !!b; },
     key: async (k, mods = {}) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, ...mods })); await sleep(900); return (document.querySelector('[role=dialog]')?.innerText ?? 'NONE').slice(0, 60); },
     tabMenu: async () => { await esc(); const t = document.querySelector('[role=tablist][aria-label="Open requests"] [role=tab][aria-selected="true"]'); const open = () => t?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 400, clientY: 60 })); open(); if (!(await waitFor(() => document.querySelector('[role=menuitem]'), 1200))) { open(); await waitFor(() => document.querySelector('[role=menuitem]'), 1500); } await sleep(150); return [...document.querySelectorAll('[role=menuitem]')].map((m) => m.textContent.trim()).join(' | ') || 'NO MENU'; },

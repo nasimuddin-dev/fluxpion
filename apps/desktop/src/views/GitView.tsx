@@ -69,16 +69,15 @@ export function GitView() {
 
   const load = useCallback(async () => {
     try {
-      const st = await call<GitStatusInfo>('git.status');
+      const { changes: ch, ...st } = await call<GitStatusInfo & { changes: SemanticChange[] }>('git.changes');
       setStatus(st);
       if (!st.repository) return;
-      const [ch, br, lg, pr] = await Promise.all([
-        call<{ changes: SemanticChange[] }>('git.changes'),
+      const [br, lg, pr] = await Promise.all([
         call<typeof branches>('git.branches'),
         call<typeof log>('git.log', { limit: 30 }),
         call<{ url?: string }>('git.pullRequestUrl').catch(() => ({ url: undefined })),
       ]);
-      setChanges(ch.changes);
+      setChanges(ch);
       // a commit an AI agent proposed: its message, for the user to review
       const proposal = await call<{ message: string } | null>('git.proposal').catch(() => null);
       if (proposal?.message) setMessage((m) => m || proposal.message);

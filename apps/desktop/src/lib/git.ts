@@ -22,15 +22,13 @@ let offs: Array<() => void> = [];
 
 async function refresh() {
   try {
-    const status = await call<GitStatusInfo>('git.status');
+    // one round trip: the status and, when something changed, what it means
+    const { changes, ...status } = await call<GitStatusInfo & { changes: SemanticChange[] }>('git.changes');
     const items = new Map<string, SemanticChange['change']>();
     const collections = new Set<string>();
-    if (status.repository && status.files.length) {
-      const { changes } = await call<{ changes: SemanticChange[] }>('git.changes');
-      for (const c of changes) {
-        if (c.itemId) items.set(c.itemId, c.change);
-        if (c.collectionId) collections.add(c.collectionId);
-      }
+    for (const c of changes) {
+      if (c.itemId) items.set(c.itemId, c.change);
+      if (c.collectionId) collections.add(c.collectionId);
     }
     state = { status, items, collections };
   } catch {

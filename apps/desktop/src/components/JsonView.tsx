@@ -58,9 +58,17 @@ function assertionItems(r: { path: string; value: unknown; expandable: boolean }
   const items: MenuItem[] = [];
   if (!r.expandable) items.push({ label: `Equals ${short(r.value)}`, icon: <Equal size={14} />, onSelect: () => onAssert({ type: 'equals', path: r.path, expected: r.value }) });
   items.push({ label: 'Exists', icon: <CircleCheck size={14} />, onSelect: () => onAssert({ type: 'exists', path: r.path }) });
-  items.push({ label: `Is ${typeName(r.value) === 'object' ? 'an object' : typeName(r.value) === 'array' ? 'an array' : `a ${typeName(r.value)}`}`, icon: <Shapes size={14} />, onSelect: () => onAssert({ type: 'type', path: r.path, expected: typeName(r.value) }) });
+  items.push({
+    label: `Is ${typeName(r.value) === 'object' ? 'an object' : typeName(r.value) === 'array' ? 'an array' : `a ${typeName(r.value)}`}`,
+    icon: <Shapes size={14} />,
+    onSelect: () => onAssert({ type: 'type', path: r.path, expected: typeName(r.value) }),
+  });
   if (Array.isArray(r.value)) {
-    items.push({ label: `Has ${r.value.length} item${r.value.length === 1 ? '' : 's'}`, icon: <ListOrdered size={14} />, onSelect: () => onAssert({ type: 'length', path: r.path, expected: (r.value as unknown[]).length }) });
+    items.push({
+      label: `Has ${r.value.length} item${r.value.length === 1 ? '' : 's'}`,
+      icon: <ListOrdered size={14} />,
+      onSelect: () => onAssert({ type: 'length', path: r.path, expected: (r.value as unknown[]).length }),
+    });
     items.push({ label: 'Is not empty', icon: <ListChecks size={14} />, onSelect: () => onAssert({ type: 'length', path: r.path, min: 1 }) });
   }
   if (r.expandable) items.push({ label: 'Keeps this shape (snapshot)', icon: <Camera size={14} />, onSelect: () => onAssert({ type: 'snapshot', path: r.path, expected: r.value, mode: 'shape' }) });
@@ -99,7 +107,11 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull, onSaveVari
       if (expandable && expanded.has(path)) {
         const entries = Array.isArray(v) ? v.map((x, i) => [String(i), x] as const) : Object.entries(v as object);
         const limit = 5000;
-        entries.slice(0, limit).forEach(([k, x]) => walk(x, k, Array.isArray(v) ? `${path}[${k}]` : `${path}.${k}`, depth + 1, `${access}${Array.isArray(v) ? `[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `.${k}` : `[${JSON.stringify(k)}]`}`));
+        entries
+          .slice(0, limit)
+          .forEach(([k, x]) =>
+            walk(x, k, Array.isArray(v) ? `${path}[${k}]` : `${path}.${k}`, depth + 1, `${access}${Array.isArray(v) ? `[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `.${k}` : `[${JSON.stringify(k)}]`}`),
+          );
         if (entries.length > limit) out.push({ depth: depth + 1, path: `${path}#more`, value: `… ${entries.length - limit} more items (use Raw view / Save response)`, expandable: false });
         out.push({ depth, path: `${path}#close`, value: undefined, expandable: false, closing: Array.isArray(v) ? ']' : '}' });
       }
@@ -130,7 +142,7 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull, onSaveVari
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted shrink-0">
+      <div className="@container flex items-center gap-2 px-2 py-1 text-xs text-muted shrink-0 whitespace-nowrap">
         <button className="hover:text-fg" onClick={expandAll}>
           Expand all
         </button>
@@ -138,22 +150,37 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull, onSaveVari
           Collapse all
         </button>
         <input
-          className="field h-6 text-xs mono w-72 max-w-[45%] ml-2"
+          className="field h-6 text-xs mono flex-1 min-w-24 max-w-72 ml-2"
           placeholder="Filter with JSONPath, e.g. $.items[*].name"
           aria-label="Filter with JSONPath"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           spellCheck={false}
         />
-        {filtered && <span className={filtered.error ? 'text-bad' : ''}>{filtered.error ? 'Not a valid JSONPath' : `${(filtered.data ?? []).length} match${(filtered.data ?? []).length === 1 ? '' : 'es'}`}</span>}
-        <span className="ml-auto">{filtered ? 'Showing the matches as a list' : onAssert ? onSaveVariable ? 'Click a key to copy its JSONPath, save it to a variable or check it' : 'Click a key to copy its JSONPath or turn it into an assertion' : 'Click a key to copy its JSONPath'}</span>
+        {filtered && (
+          <span className={filtered.error ? 'text-bad' : ''}>{filtered.error ? 'Not a valid JSONPath' : `${(filtered.data ?? []).length} match${(filtered.data ?? []).length === 1 ? '' : 'es'}`}</span>
+        )}
+        <span className="ml-auto hidden @2xl:inline truncate">
+          {filtered
+            ? 'Showing the matches as a list'
+            : onAssert
+              ? onSaveVariable
+                ? 'Click a key to copy its JSONPath, save it to a variable or check it'
+                : 'Click a key to copy its JSONPath or turn it into an assertion'
+              : 'Click a key to copy its JSONPath'}
+        </span>
       </div>
       <VirtualList
         className="flex-1 mono text-[0.9em]"
         items={rows}
         rowHeight={ROW}
         render={(r) => {
-          if (r.closing) return <div style={{ paddingLeft: r.depth * 14 + 18 }} className="text-muted leading-5">{r.closing}</div>;
+          if (r.closing)
+            return (
+              <div style={{ paddingLeft: r.depth * 14 + 18 }} className="text-muted leading-5">
+                {r.closing}
+              </div>
+            );
           const isHit = q && ((r.key ?? '').toLowerCase().includes(q) || (!r.expandable && String(r.value).toLowerCase().includes(q)));
           return (
             <div className={cx('flex items-center leading-5 whitespace-nowrap hover:bg-hover', isHit && 'search-hit')} style={{ paddingLeft: r.depth * 14 + 4 }}>
@@ -191,7 +218,12 @@ export function JsonTree({ data: full, query, onAssert: assertOnFull, onSaveVari
               {r.expandable ? (
                 <span className="text-muted cursor-pointer" onClick={() => toggle(r.path)}>
                   {Array.isArray(r.value) ? '[' : '{'}
-                  {!expanded.has(r.path) && <span> {summary(r.value)} {Array.isArray(r.value) ? ']' : '}'}</span>}
+                  {!expanded.has(r.path) && (
+                    <span>
+                      {' '}
+                      {summary(r.value)} {Array.isArray(r.value) ? ']' : '}'}
+                    </span>
+                  )}
                 </span>
               ) : (
                 <Scalar v={r.value} />
@@ -208,7 +240,11 @@ function Scalar({ v }: { v: unknown }) {
   if (v === null) return <span className="text-muted">null</span>;
   if (typeof v === 'string') {
     const s = v.length > 500 ? v.slice(0, 500) + '…' : v;
-    return <span className="text-[#0a3069] dark:text-[#a5d6ff]" title={v.length > 500 ? `${v.length} chars` : undefined}>"{s}"</span>;
+    return (
+      <span className="text-[#0a3069] dark:text-[#a5d6ff]" title={v.length > 500 ? `${v.length} chars` : undefined}>
+        "{s}"
+      </span>
+    );
   }
   if (typeof v === 'number') return <span className="text-[#0550ae] dark:text-[#79c0ff]">{v}</span>;
   if (typeof v === 'boolean') return <span className="text-[#cf222e] dark:text-[#ff7b72]">{String(v)}</span>;

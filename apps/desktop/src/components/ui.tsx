@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { cloneElement, forwardRef, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement, type ReactNode, type SelectHTMLAttributes } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as MenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
@@ -346,9 +346,58 @@ export function Menu({
   // an item that opens a dialog (Import, Rename …) must keep the focus there: giving it back to the menu's
   // button as the menu closes would count as a click outside the dialog, which then closes at once
   const picked = useRef(false);
+  const [own, setOwn] = useState(false);
+  const isOpen = open ?? own;
+  const setOpen = (v: boolean) => {
+    setOwn(v);
+    onOpenChange?.(v);
+  };
+  const buttonRef = useRef<HTMLElement>(null);
+  // Closed, the menu is its button and nothing else. The menu machinery (portal, positioning, focus handling) is
+  // mounted only while it is open: a tree of 500 requests has 500 of these menus, and mounting all of them made
+  // every tab switch and every keystroke in the filter re-render them all.
+  if (!isOpen && isValidElement(trigger)) {
+    const t = trigger as ReactElement<Record<string, unknown>>;
+    const props = t.props;
+    const openIt = (e: ReactMouseEvent | ReactPointerEvent | ReactKeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      // the same gestures as the menu itself: a main-button press, Enter, Space, or the down arrow
+      if ('button' in e && (e.button !== 0 || (e as ReactPointerEvent).ctrlKey)) return;
+      if ('key' in e && !['Enter', ' ', 'ArrowDown'].includes(e.key)) return;
+      e.preventDefault();
+      setOpen(true);
+    };
+    return cloneElement(t, {
+      ref: buttonRef,
+      'aria-haspopup': 'menu',
+      'aria-expanded': false,
+      'data-state': 'closed',
+      onPointerDown: (e: ReactPointerEvent) => {
+        (props.onPointerDown as ((e: ReactPointerEvent) => void) | undefined)?.(e);
+        if (e.pointerType !== 'touch') openIt(e);
+      },
+      onClick: (e: ReactMouseEvent) => {
+        (props.onClick as ((e: ReactMouseEvent) => void) | undefined)?.(e);
+        // touch (and a synthetic click, as in tests): open on the click
+        if (e.detail === 0 || (e.nativeEvent as PointerEvent).pointerType === 'touch') openIt(e);
+      },
+      onKeyDown: (e: ReactKeyboardEvent) => {
+        (props.onKeyDown as ((e: ReactKeyboardEvent) => void) | undefined)?.(e);
+        openIt(e);
+      },
+    } as Record<string, unknown>);
+  }
   return (
-    <MenuPrimitive.Root modal={false} open={open} onOpenChange={onOpenChange}>
-      <MenuPrimitive.Trigger asChild>{trigger}</MenuPrimitive.Trigger>
+    <MenuPrimitive.Root
+      modal={false}
+      open={isOpen}
+      onOpenChange={(v) => {
+        setOpen(v);
+        // the menu's own button is a new element after closing: give it the focus back (unless an item took it)
+        if (!v && !picked.current) requestAnimationFrame(() => buttonRef.current?.focus({ preventScroll: true }));
+      }}
+    >
+      <MenuPrimitive.Trigger asChild>{isValidElement(trigger) ? cloneElement(trigger as ReactElement<Record<string, unknown>>, { ref: buttonRef } as Record<string, unknown>) : trigger}</MenuPrimitive.Trigger>
       <MenuPrimitive.Portal>
         <MenuPrimitive.Content
           onCloseAutoFocus={(e) => {

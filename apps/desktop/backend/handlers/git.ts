@@ -102,8 +102,9 @@ export function gitHandlers(be: Backend): Handlers {
     },
     /** The changes said by what they mean (requests, environments …), for the Git panel and the commit message. */
     'git.changes': async () => {
-      const st = await gitStatus(ws());
-      return { files: st.files, changes: await describeGitChanges(ws(), st.files) };
+      const st = await be.handlers['git.status']!({});
+      const files = (st as { files: GitFile[] }).files;
+      return { ...(st as object), files, changes: files.length ? await describeGitChanges(ws(), files) : [] };
     },
     'git.diff': ({ path, staged }: { path: string; staged?: boolean }) => gitDiff(ws(), path, staged),
     /** A file as it is in a commit (default HEAD). */

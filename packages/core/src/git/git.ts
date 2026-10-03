@@ -92,14 +92,27 @@ export async function gitVersion(): Promise<string | undefined> {
   }
 }
 
-/** The repository root that holds `dir`, or undefined. */
+/**
+ * The repository root that holds `dir`, or undefined. Remembered for a few seconds: every operation asks, and
+ * spawning git for it each time cost more than the operation itself. A `git init` (or deleting .git) is seen on
+ * the next ask after that.
+ */
+const roots = new Map<string, { root: string | undefined; at: number }>();
 export async function repoRoot(dir: string): Promise<string | undefined> {
+  const known = roots.get(dir);
+  if (known && Date.now() - known.at < 3000) return known.root;
+  let root: string | undefined;
   try {
-    return resolve((await runGit(dir, ['rev-parse', '--show-toplevel'])).trim());
+    root = resolve((await runGit(dir, ['rev-parse', '--show-toplevel'])).trim());
   } catch {
-    return undefined;
+    root = undefined;
   }
+  roots.set(dir, { root, at: Date.now() });
+  return root;
 }
+
+/** Forget the remembered repository roots (after `git init`, a clone into the folder …). */
+export const forgetRepoRoots = () => roots.clear();
 
 /** Paths in git output are relative to the repository root: make them relative to the workspace. */
 const toWorkspacePath = (repo: string, ws: string, p: string) => relative(ws, resolve(repo, p)).split(sep).join('/');
@@ -253,7 +266,10 @@ export async function gitPush(ws: string): Promise<void> {
 
 /** Make the workspace folder a repository (with a first branch name), optionally with a remote. */
 export async function gitInit(ws: string, opts: { remote?: string; branch?: string } = {}): Promise<void> {
-  if (!(await repoRoot(ws))) await runGit(ws, ['init', '-b', opts.branch ?? 'main']);
+  if (!(await repoRoot(ws))) {
+    await runGit(ws, ['init', '-b', opts.branch ?? 'main']);
+    forgetRepoRoots();
+  }
   if (opts.remote) {
     const remotes = (await runGit(ws, ['remote'])).split('\n').filter(Boolean);
     await runGit(ws, ['remote', remotes.includes('origin') ? 'set-url' : 'add', 'origin', opts.remote]);

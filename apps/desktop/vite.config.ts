@@ -26,6 +26,8 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 8000,
     target: 'chrome130',
+    // TESTPION_PROFILE=1: readable function names in a CPU profile (e2e "profile:" steps)
+    minify: process.env.TESTPION_PROFILE ? false : 'esbuild',
   },
   worker: { format: 'es' },
 });

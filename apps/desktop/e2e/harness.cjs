@@ -38,6 +38,39 @@ module.exports = async function run(win) {
   win.show();
   await sleep(6000);
   const js = (code) => win.webContents.executeJavaScript(code).catch((e) => `ERR ${e.message}`);
+  // React / scheduler internals, which every profile is full of; what matters is which app function sits above them
+  const REACT = /^(reconcile|commit|update|begin|complete|perform|render|flush|schedule|dispatch|mount|use[A-Z]|work|prepare|finish|markUpdate|get[A-Z]|is[A-Z]|create|push|pop|set|track|read|resolve|throw|handle|bailout|attempt|run|ensure|process|enqueue|clone|reuse|append|insert|remove|prop|diff|safely|recursively|cancel|request|detach|retry|jsx|Fragment|Component|Element|Portal|Provider|Consumer|Lazy|Memo|ForwardRef|Suspense|Offscreen|Profiler|Mode|Fiber|Root|Hook|Context|Ref|Effect|Transition|Priority|Lane|Sync|Idle|Passive|Layout|Host|Text|Native|Dom|Event|listen|batched|discrete|continuous|default|unstable|scheduler|invoke|call|apply|bind|map|forEach|filter|reduce|find|some|every|slice|concat|join|split|indexOf|includes|Object|Array|String|Number|Boolean|Symbol|Map|Set|WeakMap|Promise|JSON|Math|Date|RegExp|Error|Function|Reflect|Proxy|console|window|document|performance|requestAnimationFrame|setTimeout|clearTimeout|queueMicrotask|MessageChannel|anonymous)/;
+  const profile = async (name, code) => {
+    const dbg = win.webContents.debugger;
+    await dbg.sendCommand('Profiler.enable');
+    await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 200 });
+    await dbg.sendCommand('Profiler.start');
+    const result = await js(`(async () => ${code})()`);
+    const { profile: prof } = await dbg.sendCommand('Profiler.stop');
+    writeFileSync(join(OUT, `${name}.cpuprofile`), JSON.stringify(prof));
+    // inclusive time per app function (React internals left out): a sample counts once for each function on its stack
+    const byId = new Map(prof.nodes.map((n) => [n.id, n]));
+    const parent = new Map();
+    for (const n of prof.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
+    const counts = new Map();
+    for (const id of prof.samples) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const total = prof.samples.length;
+    const incl = new Map();
+    for (const [id, c] of counts) {
+      const seen = new Set();
+      for (let cur = id; cur !== undefined; cur = parent.get(cur)) {
+        const f = byId.get(cur).callFrame;
+        const file = (f.url || '').split('/').pop();
+        if (!f.functionName || !file || REACT.test(f.functionName)) continue; // app code only (React's own functions left out)
+        const key = `${f.functionName} ${file.replace(/-[\w-]+\.js$/, '')}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        incl.set(key, (incl.get(key) ?? 0) + c);
+      }
+    }
+    const top = [...incl].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, c]) => `${((c / total) * 100).toFixed(0)}% ${k}`);
+    return `${result} | profile (${total} samples): ${top.join(' · ')}`;
+  };
   await js(readFileSync(join(__dirname, 'helpers.js'), 'utf8'));
   const plan = require(process.env.E2E_PLAN);
   let n = 0;
@@ -47,12 +80,16 @@ module.exports = async function run(win) {
     const started = Date.now();
     // "main:" steps run here, in the main process, outside the app's own code: like another editor or `git pull`
     // changing files (they get `require` and `home`, the test's TESTPION_HOME)
+    // "profile:" steps run the renderer code under the CPU profiler and write <step>.cpuprofile (open it in
+    // DevTools ▸ Performance) plus the top self-time functions into the result
     const result = code.startsWith('main:')
       ? await new (Object.getPrototypeOf(async () => {}).constructor)('require', 'home', code.slice(5))(require, process.env.TESTPION_HOME).then(
           (r) => (r === undefined ? 'done' : r),
           (e) => `ERR ${e.message}`,
         )
-      : await js(`(async () => ${code})()`);
+      : code.startsWith('profile:')
+        ? await profile(name, code.slice(8))
+        : await js(`(async () => ${code})()`);
     const entry = { name, result: typeof result === 'string' ? result : JSON.stringify(result), ms: Date.now() - started, errors: errors.slice(errorsBefore) };
     if (shot !== false) {
       await sleep(700);

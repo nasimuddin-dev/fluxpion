@@ -1,6 +1,7 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import { useApp } from '../store';
+import { useDoc } from '../lib/docs';
 import { Spinner } from './ui';
 import { setEditorJsonSchema, setEditorLocalVariables } from '../editor-intel';
 import { collectionOf, useVarPopover, variableAt } from '../lib/var-popover';
@@ -57,6 +58,30 @@ export function CodeEditor({
   const theme = useEditorTheme();
   const fontSize = useApp((s) => s.settings?.fontSize ?? 14);
   const ready = useMonaco();
+  const doc = useDoc();
+  // one options object per setting: the wrapper re-applies options to the editor whenever this is a new object,
+  // which with every render of a view (and many open tabs) kept Monaco busy with nothing
+  const options = useMemo<NonNullable<ComponentProps<typeof Editor>['options']>>(
+    () => ({
+    readOnly,
+    minimap: { enabled: false },
+    fontSize,
+    fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
+    scrollBeyondLastLine: false,
+    wordWrap: 'on',
+    tabSize: 2,
+    lineNumbers: minimal ? 'off' : 'on',
+    glyphMargin: false,
+    folding: !minimal,
+    lineDecorationsWidth: minimal ? 4 : 8,
+    renderLineHighlight: minimal ? 'none' : 'line',
+    automaticLayout: true,
+    fixedOverflowWidgets: true,
+    quickSuggestions: language === 'graphql' ? { other: true, strings: false, comments: false } : undefined,
+    scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+    }),
+    [readOnly, fontSize, minimal, language],
+  );
   useEffect(() => {
     if (!path || !jsonSchema) return;
     setEditorJsonSchema(path, jsonSchema);
@@ -69,6 +94,10 @@ export function CodeEditor({
     return () => setEditorLocalVariables(path, undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, localKey]);
+  // A hidden tab (a GraphQL, gRPC, WebSocket or MCP document that is open but not shown) keeps its state and its
+  // connection, but not a live editor: every open tab's editors took part in every layout and every keystroke
+  // (kept mounted while hidden: the tab comes back as it was, cursor and scroll included)
+  if (!doc.active) return <div style={{ height }} />;
   if (!ready) return <div className="h-full w-full grid place-items-center"><Spinner /></div>;
   // Monaco only accepts text: a value that arrives as an object (e.g. GraphQL variables saved as JSON) would
   // throw inside createModel and take the whole window down, so show it as formatted JSON instead
@@ -97,24 +126,7 @@ export function CodeEditor({
           });
           onMount?.(editor, monaco);
         }}
-        options={{
-          readOnly,
-          minimap: { enabled: false },
-          fontSize,
-          fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
-          scrollBeyondLastLine: false,
-          wordWrap: 'on',
-          tabSize: 2,
-          lineNumbers: minimal ? 'off' : 'on',
-          glyphMargin: false,
-          folding: !minimal,
-          lineDecorationsWidth: minimal ? 4 : 8,
-          renderLineHighlight: minimal ? 'none' : 'line',
-          automaticLayout: true,
-          fixedOverflowWidgets: true,
-          quickSuggestions: language === 'graphql' ? { other: true, strings: false, comments: false } : undefined,
-          scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
-        }}
+        options={options}
       />
     </div>
   );
