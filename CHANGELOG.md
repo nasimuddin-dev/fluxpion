@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.42.1 — 2026-10-02
+
+- **No more false "changed outside TestPion" messages:** opening a file (a test file, for example) showed that message on Windows, because Windows reports a file being read as a change. The app now compares the files' content, so only a real change from outside (a `git pull`, another editor) is reported; a rewrite with the same content is not.
+- `testpion git resolve <file> --ours|--theirs` and the Git view's **Keep mine** / **Take theirs** keep every other change from both sides of a collection (in 0.42.0 already; now in the CLI reference too).
+
 ## 0.42.0 — 2026-10-02
 
 ### Git
