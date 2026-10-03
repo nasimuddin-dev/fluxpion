@@ -2,10 +2,37 @@
 // app by themselves, with a message; the app's own saves don't trigger it.
 // Part of the end-to-end UI regression suite (see e2e/run-e2e.mjs and .claude/skills/ui-regression).
 const { withExpect } = require('../lib.cjs');
+const { readdirSync, statSync, utimesSync } = require('node:fs');
+const { join } = require('node:path');
+
+/** Files last read days ago, like an installed workspace's: Windows updates a file's access time on a read only when it is old. */
+function ageAccessTimes(ws) {
+  const old = new Date(Date.now() - 3 * 86400_000);
+  const walk = (d) =>
+    readdirSync(d, { withFileTypes: true }).forEach((e) => {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else utimesSync(p, old, statSync(p).mtime);
+    });
+  walk(join(ws, 'tests'));
+}
 
 const toasts = `[...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.textContent.trim()).filter((t) => /outside TestPion/.test(t))`;
 const steps = [
   ['before', `(async () => { await __t.requests(); await __t.sleep(800); return 'collections: ' + [...document.querySelectorAll('aside [data-tree-row]')].filter((b) => b.offsetParent && b.getAttribute('aria-expanded') !== null && !/\\d$/.test(b.textContent.trim())).length + ' | messages: ' + ${toasts}.length; })()`, false],
+  // opening files only reads them (Windows reports the read as a change): no message
+  [
+    'opening-files-is-quiet',
+    `(async () => {
+      await __t.view('Tests'); await __t.sleep(800);
+      const files = [...document.querySelectorAll('[data-tree-row]')].filter((b) => b.offsetParent && /\\.ya?ml$/.test(b.textContent.trim())).slice(0, 4);
+      for (const f of files) { f.click(); await __t.sleep(700); }
+      await __t.sleep(2500);
+      const n = ${toasts}.length;
+      await __t.requests();
+      return 'opened: ' + files.length + ' | messages: ' + n;
+    })()`,
+  ],
   // another program renames a collection and adds a test file
   [
     'change-files-outside',
@@ -45,7 +72,8 @@ const steps = [
 ];
 
 module.exports = withExpect(steps, {
+  'opening-files-is-quiet': /^opened: 4 \| messages: 0$/,
   'change-files-outside': /^written$/,
   'app-shows-it': /^tree updated: true \| test file listed: true \| message: .*1 collection, 1 test file changed outside TestPion/,
   'own-save-is-quiet': /^new messages after own save: 0$/,
-});
+}, { prepare: ageAccessTimes });

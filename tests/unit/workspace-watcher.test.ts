@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { atomicWrite, changeKind, describeChanges, watchWorkspace, type WorkspaceChange } from '@testpion/core';
@@ -45,6 +45,27 @@ describe('workspace watcher', () => {
       expect(paths).toContain('collections/pulled.json');
       expect(paths.filter((p) => p === 'collections/pulled.json')).toHaveLength(1); // one entry per batch
       expect(paths.some((p) => p.startsWith('runs/'))).toBe(false);
+    } finally {
+      stop();
+    }
+  });
+
+  it('does not report a file that was only read (Windows reports the access time as a change)', async () => {
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    const file = join(root, 'tests', 'rag.yaml');
+    writeFileSync(file, 'name: x\n');
+    const batches: WorkspaceChange[][] = [];
+    const stop = watchWorkspace(root, (b) => batches.push(b), { debounceMs: 150 });
+    try {
+      await sleep(200);
+      readFileSync(file, 'utf8');
+      const st = statSync(file);
+      utimesSync(file, new Date(), st.mtime); // only the access time moves
+      await sleep(600);
+      expect(batches.flat().map((c) => c.path)).toEqual([]);
+      writeFileSync(file, 'name: changed\n');
+      await sleep(600);
+      expect(batches.flat().map((c) => c.path)).toEqual(['tests/rag.yaml']);
     } finally {
       stop();
     }

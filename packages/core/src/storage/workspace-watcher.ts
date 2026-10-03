@@ -1,4 +1,5 @@
-import { watch, type FSWatcher } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, statSync, watch, type FSWatcher } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { writtenByUs } from './fsutil.js';
 
@@ -40,12 +41,51 @@ export function watchWorkspace(root: string, onChange: (changes: WorkspaceChange
   const pending = new Map<string, WorkspaceChange>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watcher: FSWatcher | undefined;
+  /**
+   * What each file was when last seen: its size and last write. Windows reports a file being read (its access time)
+   * as a change, so an event only counts when the file itself is different (or appeared, or is gone).
+   */
+  const seen = new Map<string, string>();
+  const fingerprint = (path: string) => {
+    try {
+      const full = join(root, path);
+      const st = statSync(full);
+      if (st.isDirectory()) return 'dir';
+      // the content, not the times: a rewrite with the same bytes (git restoring a file) is no change either
+      return st.size > 8 * 1024 * 1024 ? `${st.size}:${st.mtimeMs}` : `${st.size}:${createHash('sha1').update(readFileSync(full)).digest('hex')}`;
+    } catch {
+      return 'gone';
+    }
+  };
+  const snapshot = (dir: string, depth = 0) => {
+    if (depth > 8) return;
+    let entries: import('node:fs').Dirent[] = [];
+    try {
+      entries = readdirSync(join(root, dir), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const path = dir ? `${dir}/${e.name}` : e.name;
+      if (!changeKind(path)) continue;
+      if (e.isDirectory()) snapshot(path, depth + 1);
+      else seen.set(path, fingerprint(path));
+    }
+  };
+  snapshot('');
   const flush = () => {
     timer = undefined;
     if (!pending.size) return;
-    const batch = [...pending.values()];
+    const batch = [...pending.values()].filter((c) => {
+      const now = fingerprint(c.path);
+      const before = seen.get(c.path) ?? 'gone';
+      if (now === 'gone') seen.delete(c.path);
+      else seen.set(c.path, now);
+      // a folder event says nothing by itself: its files report their own changes
+      return now !== 'dir' && now !== before;
+    });
     pending.clear();
-    onChange(batch);
+    if (batch.length) onChange(batch);
   };
   try {
     watcher = watch(root, { recursive: true, persistent: false }, (_event, name) => {
@@ -53,7 +93,13 @@ export function watchWorkspace(root: string, onChange: (changes: WorkspaceChange
       const path = String(name).split(sep).join('/');
       const kind = changeKind(path);
       if (!kind) return;
-      if (writtenByUs(join(root, path)) || opts.isOwnChange?.()) return;
+      if (writtenByUs(join(root, path)) || opts.isOwnChange?.()) {
+        // the app's own write: the file's new state is the known one
+        const f = fingerprint(path);
+        if (f === 'gone') seen.delete(path);
+        else seen.set(path, f);
+        return;
+      }
       // a just-written temp file renamed into place reports the final name too: one entry per path
       pending.set(path, { path, kind });
       if (timer) clearTimeout(timer);
