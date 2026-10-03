@@ -76,7 +76,7 @@ describe('example workspace (end-to-end)', () => {
       });
       const failures = results.filter((r) => r.status !== 'passed').map((r) => `${r.name}: ${r.error?.message ?? r.checks.filter((c) => !c.passed).map((c) => c.message).join('; ')}`);
       expect(failures).toEqual([]);
-      expect(summary.total).toBe(22);
+      expect(summary.total).toBe(29); // 22 + the 7 steps of the patient lifecycle
       const types = new Set(results.map((r) => r.type));
       expect([...types].sort()).toEqual(['agent', 'graphql', 'http', 'llm', 'mcp', 'rag']);
       // AI-judge / heuristic results are labelled distinctly from deterministic ones
@@ -84,7 +84,7 @@ describe('example workspace (end-to-end)', () => {
       expect(rag.checks.find((c) => c.type === 'groundedness')!.source).toBe('heuristic');
       expect(rag.metadata?.rag).toMatchObject({ documentIds: ['doc-1', 'doc-2'] });
       // traces were persisted and indexed
-      expect(ws.meta.listTraces().total).toBe(22);
+      expect(ws.meta.listTraces().total).toBe(29);
       const agent = results.find((r) => r.type === 'agent')!;
       const trace = ws.loadTrace(agent.traceId!)!;
       expect(trace.spans.map((s) => s.kind)).toEqual(expect.arrayContaining(['test', 'llm', 'mcp', 'evaluation']));

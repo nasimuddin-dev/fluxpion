@@ -6,6 +6,7 @@ import { shortId } from '../util/ids.js';
 import type { WorkspaceStore } from '../storage/workspace.js';
 import { commandLine, isCommandTrusted } from '../storage/trust.js';
 import { McpSession } from '../protocols/mcp/client.js';
+import { str, type Tool } from './tool.js';
 
 /**
  * MCP tools that let an agent change a workspace the way a person does in the app: edit, move and delete requests,
@@ -14,7 +15,6 @@ import { McpSession } from '../protocols/mcp/client.js';
  */
 
 type Flat = { node: CollectionNode; folder: string };
-const str = (description: string) => ({ type: 'string', description });
 
 export interface EditToolsDeps {
   store: WorkspaceStore;
@@ -26,13 +26,6 @@ export interface EditToolsDeps {
   mcpSession(ref: string): Promise<McpSession>;
 }
 
-interface Tool {
-  name: string;
-  description: string;
-  inputSchema: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
-  write?: boolean;
-  run(args: Record<string, unknown>): Promise<unknown> | unknown;
-}
 
 /** The folder a path such as "Auth / Tokens" names, created when missing; '' or undefined is the collection itself. */
 function folderItems(c: Collection, path: string | undefined): CollectionNode[] {
