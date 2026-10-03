@@ -12,6 +12,7 @@ import {
   gitLog,
   gitPull,
   gitPush,
+  gitResolve,
   gitStatus,
   gitSwitch,
   runMergeDriver,
@@ -130,10 +131,25 @@ export function registerGitCommands(git: Command, program: Command): void {
   wsOpt(git.command('pull').description('bring in the remote’s commits; exit 1 when it stopped on conflicts').option('--rebase', 'rebase instead of merge')).action((o) =>
     withStore(o.workspace, async (s) => {
       const r = await gitPull(s.root, { rebase: !!o.rebase });
-      out(o.json, r, () => console.log(r.conflicted ? red('Conflicts: settle them in TestPion (Git) or with git, then commit.') : green('Up to date with the remote.')));
+      out(o.json, r, () => console.log(r.conflicted ? red('Conflicts: settle them in TestPion (Git view) or with  testpion git resolve <file> --ours|--theirs, then commit.') : green('Pulled: up to date with the remote.')));
       if (r.conflicted) process.exitCode = EXIT.TEST_FAILURE;
     }),
   );
+
+  git
+    .command('resolve')
+    .description('settle a conflicted file: a collection keeps both sides\' changes and takes yours (--ours) or theirs (--theirs) only for requests changed on both; then commit')
+    .argument('<file>', 'path inside the workspace, e.g. collections/payments.json')
+    .option('--ours', 'keep your version of what conflicts')
+    .option('--theirs', 'take their version of what conflicts')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest)')
+    .action((file: string, o) =>
+      withStore(o.workspace, async (s) => {
+        if (!!o.ours === !!o.theirs) throw new CliError('Choose --ours or --theirs', EXIT.CONFIG_ERROR);
+        await gitResolve(s.root, file, o.ours ? 'ours' : 'theirs');
+        console.log(green(`Resolved ${file} (${o.ours ? 'yours' : 'theirs'} where both changed)`));
+      }),
+    );
 
   wsOpt(git.command('push').description('send your commits to the remote (the first push of a branch sets its upstream)')).action((o) =>
     withStore(o.workspace, async (s) => {

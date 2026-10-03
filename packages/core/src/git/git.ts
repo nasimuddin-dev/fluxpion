@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
+import { mergeCollectionTexts } from './merge.js';
 import { relative, resolve, sep } from 'node:path';
 import { ApsError } from '../errors.js';
 
@@ -308,9 +309,23 @@ export async function gitDefaultBranch(ws: string): Promise<string> {
   }
 }
 
-/** Settle one conflicted file with one side's version (GIT-302), and mark it resolved. */
+/**
+ * Settle one conflicted file (GIT-302), and mark it resolved. A collection file is merged again request by request,
+ * taking `side` only for the requests changed on both sides (every other change of both sides stays); any other file
+ * is taken whole from that side.
+ */
 export async function gitResolve(ws: string, path: string, side: 'ours' | 'theirs'): Promise<void> {
-  await runGit(ws, ['checkout', `--${side}`, '--', path]);
+  const repo = await repoRoot(ws);
+  const inRepo = repo ? relative(repo, resolve(ws, path)).split(sep).join('/') : path;
+  const stage = (n: 1 | 2 | 3) => runGit(ws, ['show', `:${n}:${inRepo}`]).catch(() => '');
+  const merged = /^collections\/[^/]+\.json$/.test(path)
+    ? await Promise.all([stage(1), stage(2), stage(3)]).then(([base, ours, theirs]) =>
+        // the side kept on a conflict is the merge's "ours": swap the sides to prefer theirs
+        side === 'ours' ? mergeCollectionTexts(base, ours, theirs) : mergeCollectionTexts(base, theirs, ours),
+      )
+    : undefined;
+  if (merged) writeFileSync(resolve(ws, path), merged.text);
+  else await runGit(ws, ['checkout', `--${side}`, '--', path]);
   await runGit(ws, ['add', '--', path]);
 }
 

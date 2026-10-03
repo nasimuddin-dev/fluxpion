@@ -410,7 +410,7 @@ function ConflictPanel({ files, onDone }: { files: GitFile[]; onDone(): void }) 
         <Button size="sm" variant="ghost" onClick={() => void call('git.abortMerge').then(onDone, fail)}>
           Cancel the pull
         </Button>
-        <span className="text-xs text-muted">When every file is resolved, commit to finish the pull.</span>
+        <span className="text-xs text-muted">In a collection, only the requests changed on both sides take the side you choose; every other change of both sides stays. When every file is resolved, commit to finish the pull.</span>
       </div>
     </section>
   );

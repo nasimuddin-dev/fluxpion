@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { WorkspaceStore, describeRevChanges, changesMarkdown, gitCommit, gitItemHistory, gitInit, gitSetupMergeDriver, gitStatus, gitVersion, mergeCollectionTexts, pullRequestUrl, runGit, type Collection } from '@testpion/core';
+import { WorkspaceStore, describeRevChanges, changesMarkdown, gitCommit, gitItemHistory, gitInit, gitResolve, gitSetupMergeDriver, gitStatus, gitVersion, mergeCollectionTexts, pullRequestUrl, runGit, type Collection } from '@testpion/core';
 
 // GIT-301 (merge by id), GIT-304 (pull request links), GIT-401 (semantic diff between commits).
 const root = mkdtempSync(join(tmpdir(), 'tp-merge-'));
@@ -111,6 +111,20 @@ describe('git with the merge driver', () => {
     expect(hist.map((h) => h.commit.subject)).toEqual(['theirs', 'base']);
     expect((hist[0]!.item as { request: { url: string } }).request.url).toBe('https://x/b-theirs');
     expect((await gitItemHistory(ws, 'collections/api.json', 'c')).map((h) => h.commit.subject)).toEqual(['add C']);
+
+    // a real conflict: A changed on both sides; "theirs" wins only A, our change to C stays
+    await runGit(ws, ['switch', '-c', 'other2']);
+    save([req('a', 'A', 'https://x/a-2-theirs'), req('b', 'B', 'https://x/b-theirs'), req('c', 'C', 'https://x/c')]);
+    await gitCommit(ws, 'theirs 2', { paths: ['collections'] });
+    await runGit(ws, ['switch', 'main']);
+    save([req('a', 'A', 'https://x/a-2-ours'), req('b', 'B', 'https://x/b-theirs'), req('c', 'C', 'https://x/c-ours')]);
+    await gitCommit(ws, 'ours 2', { paths: ['collections'] });
+    await runGit(ws, ['merge', '--no-edit', 'other2']).catch(() => undefined);
+    expect((await gitStatus(ws)).conflicted).toBe(true);
+    await gitResolve(ws, 'collections/api.json', 'theirs');
+    const settled = JSON.parse(readFileSync(join(ws, 'collections', 'api.json'), 'utf8')) as { items: Array<{ request: { url: string } }> };
+    expect(settled.items.map((i) => i.request.url)).toEqual(['https://x/a-2-theirs', 'https://x/b-theirs', 'https://x/c-ours']);
+    expect((await gitStatus(ws)).files.find((f) => f.path === 'collections/api.json')).toMatchObject({ staged: true });
     store.close();
   });
 });

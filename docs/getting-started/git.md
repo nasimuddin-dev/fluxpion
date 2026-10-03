@@ -82,7 +82,7 @@ This is a git **merge driver**. `.gitattributes` has `collections/*.json merge=t
 
 A **real conflict** is the same request (or the same collection setting) changed differently on both sides. The file then keeps your version with every other change merged in, and the Git view lists the file under **Conflicts**:
 
-- **Keep mine** / **Take theirs** settles the file with one side.
+- **Keep mine** / **Take theirs** settles the file. In a collection file only the requests changed on both sides take the side you choose; every other change from both sides stays. Other files are taken whole from that side. In a terminal: `testpion git resolve collections/payments.json --theirs` (or `--ours`).
 - **Cancel the pull** goes back to before the pull.
 - When every file is settled, **Commit** finishes the merge.
 
@@ -105,6 +105,7 @@ testpion git log --file collections/payments.json
 testpion git branch
 testpion git switch -c feature/payments
 testpion git pull               # exit 1 when it stopped on conflicts
+testpion git resolve collections/payments.json --theirs   # settle a conflict (or --ours)
 testpion git push
 testpion diff origin/main HEAD --markdown       # the changes between two commits, as Markdown
 ```

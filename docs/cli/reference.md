@@ -37,7 +37,7 @@ testpion trash list|restore|empty -w  Recently deleted collections and environme
 testpion history list|stats|diff|test|export-har -w  Response history of saved requests; response times; compare two responses; a test across runs; HAR export
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)
 testpion git setup|check|hook install -w   Make a workspace git-ready; find secrets before a commit; a pre-commit hook
-testpion git status|changes|diff|commit|log|branch|switch|pull|push -w   Git for the workspace (see Keep your workspace in git)
+testpion git status|changes|diff|commit|log|branch|switch|pull|push|resolve -w   Git for the workspace (see Keep your workspace in git)
 testpion diff <from> [to] -w  What changed between two commits, by meaning (--markdown for a pull-request comment)
 testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
 testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
