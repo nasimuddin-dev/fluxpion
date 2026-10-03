@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.42.0 — 2026-10-02
+
+### Git
+Keep a workspace in a git repository and work with your team on it, from the app, the CLI or an AI agent. See **Keep your workspace in git** in the docs.
+
+- **Git view** (the rail, or the status bar): what changed **by meaning** (*Payments ▸ Create invoice: URL, headers (0 → 1)*, *environment Staging: added baseUrl*), the line diff per file, stage, discard, **commit**, history, **branches**, **fetch / pull / push**.
+- **Initialize repository**, **Connect to a remote…**, and **Clone** in the workspace switcher (a workspace in a sub-folder of the repository is found). Sign-in is your git's: SSH keys or the credential manager.
+- **Write message:** the AI assistant writes the commit message from the changes (never from secret values).
+- **Secret guard:** a commit with a token, password or key typed into the workspace is stopped with the list of where; `testpion git check` and a pre-commit hook (`testpion git hook install`) do the same for plain git.
+- **No conflicts for different requests:** collection files merge request by request (a git merge driver, set up for you; it works for `git pull` in a terminal too). The same request changed on both sides: **Keep mine** / **Take theirs** decides only those requests; every other change from both sides stays (`testpion git resolve` in a terminal). Tested against a real GitHub repository.
+- **History in git…** on a request: the commits that changed it, and **Restore this version**.
+- **Status bar** shows the branch, commits to push / pull and changed files; changed requests carry **M / A / D** marks in the explorer.
+- **Pull request** button: opens GitHub, GitLab, Bitbucket or Azure DevOps with the branch, and the changes as the description.
+- **Git-friendly files:** collection files no longer hold a save counter and time, keys keep a fixed order, and new workspaces get a `.gitignore` (results, traces, the local database stay out) and `.gitattributes`. **Make ready for git** in the workspace menu does it for an existing one.
+- **Changes from outside** (a `git pull` in a terminal, a branch switch, another editor) show up in the app by themselves, with a message.
+- **CLI:** `testpion git setup|status|changes|diff|commit|log|branch|switch|pull|push` (all with `--json`) and `testpion diff <from> [to] --markdown` for a pull-request comment in CI; recipes for GitHub Actions and GitLab CI in the docs.
+- **MCP tools for agents:** `git_status`, `git_diff`, `git_log`, `git_propose_commit` (stages and proposes a message; a person commits it in the Git view).
+
+### Fixes
+- MCP server settings: a value typed before its name no longer vanishes; `{{` suggestions there say where the variables come from, and Environments ▸ Collection variables gets **Copy to environment**.
+- Opening a favorite (or a request from a tab) no longer unfolds and scrolls the tree.
+- **Collapse all** on a folder now collapses it.
+
+### Quality
+- The UI regression suite (31 plans) covers git end to end against a local remote: initialize, the secret guard, commit, push, a change by meaning with its marks, a teammate's change pulled in, and a request's history.
+
 ## 0.41.2 — 2026-10-02
 
 - **Favorites show:** a starred request gets a star in the tree and appears in a **Favorites** section at the top of the explorer, from where it opens (Add to favorites saved it, but nothing showed it).
