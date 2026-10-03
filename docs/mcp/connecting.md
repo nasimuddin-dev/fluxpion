@@ -28,6 +28,6 @@ Servers are saved in `mcp-servers.json` in the workspace:
 - **Folders:** group servers in folders with the folder button above the list, the server's `⋯` / right-click menu (*Move to folder…*), the *Folder* field of the server editor, or by dragging a server onto a folder. A server's folder is its `folder` field; empty folders are kept in `library/mcp.json`.
 - On Windows, use `npx.cmd` or the full path to `node.exe` for stdio servers.
 - Anything the server writes to stderr is captured in the trace, which helps diagnose startup failures.
-- From the terminal, `testpion mcp -- node server.js` lists a server's tools, resources and prompts.
+- From the terminal, `testpion mcp -- node server.js` lists a server's tools, resources and prompts; `testpion mcp --server "My server" -w . --call get_forecast --args '{"city":"Paris"}'` calls a tool of a server saved in the workspace (`--json` for scripts and CI). AI agents do the same through the `mcp_server_tools` and `mcp_call_tool` tools of the workspace's MCP server.
 
 :::

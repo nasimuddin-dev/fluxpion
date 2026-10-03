@@ -49,6 +49,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { gitLog, gitStage, gitStatus } from '../git/git.js';
 import { changesMarkdown, describeGitChanges, describeRevChanges } from '../git/semantic.js';
 import { findCommittableSecrets } from '../storage/git-guard.js';
+import { workspaceEditTools } from './workspace-edit-tools.js';
+import { commandLine, isCommandTrusted } from '../storage/trust.js';
+import { McpSession } from '../protocols/mcp/client.js';
 import { runCollection } from '../runner/collection-run.js';
 import { listWorkspaceDatasets, readDataset, type DatasetRecord } from '../runner/datasets.js';
 import { collectionVariableFlow, referencedVariableNames } from '../runner/variable-flow.js';
@@ -1397,6 +1400,37 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
         return { proposed: true, ...proposal, changes: await describeGitChanges(store.root, (await gitStatus(store.root)).files), next: 'Ask the user to review and commit it in TestPion (Git view).' };
       },
     },
+    ...workspaceEditTools({
+      store,
+      redactor,
+      collections,
+      findCollection,
+      findRequest,
+      // the workspace's MCP servers, with the environment's variables; a stdio server only when the user allowed its command
+      mcpSession: async (ref) => {
+        const ctx = createEngineContext({ store, secrets, settings });
+        const r = ref.toLowerCase();
+        const cfg = ctx.services.mcpServers.find((x) => x.id.toLowerCase() === r) ?? ctx.services.mcpServers.find((x) => x.name.toLowerCase() === r);
+        if (!cfg) {
+          await ctx.dispose();
+          throw new ApsError('ConfigurationError', `No MCP server "${ref}" in the workspace. Available: ${ctx.services.mcpServers.map((x) => x.name).join(', ') || 'none'}`);
+        }
+        if (cfg.transport === 'stdio' && !isCommandTrusted(store, cfg.command, cfg.args ?? [])) {
+          await ctx.dispose();
+          throw new ApsError('ConfigurationError', `"${cfg.name}" is a program (${commandLine(cfg.command, cfg.args ?? [])}) the user has not allowed to run from here`, {
+            suggestions: ['Ask the user to open the server in TestPion (MCP view), press Connect and choose "Always for this workspace"; then try again.'],
+          });
+        }
+        const session = new McpSession(cfg, ctx.redactor, { cookieJar: ctx.services.cookieJar });
+        await session.connect(30_000);
+        const close = session.close.bind(session);
+        session.close = async () => {
+          await close();
+          await ctx.dispose();
+        };
+        return session;
+      },
+    }),
   ];
   const tools = all.filter((t) => !(opts.readOnly && t.write));
 

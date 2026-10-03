@@ -39,7 +39,7 @@ testpion workspace list|create|rename|delete|export   Manage workspaces (see Wor
 testpion git setup|check|hook install -w   Make a workspace git-ready; find secrets before a commit; a pre-commit hook
 testpion git status|changes|diff|commit|log|branch|switch|pull|push|resolve -w   Git for the workspace (see Keep your workspace in git)
 testpion diff <from> [to] -w  What changed between two commits, by meaning (--markdown for a pull-request comment)
-testpion mcp [--url|--sse] [-- command...]   Inspect an MCP server
+testpion mcp [--url|--sse|--server <name> -w] [--call <tool> --args <json>] [--json]   Inspect an MCP server (a saved one with --server), or call one of its tools
 testpion ws <url> [-m msg] [-e event=json]    Talk to a WebSocket or Socket.IO server and print the replies
 testpion mqtt <url> [-s topic] [-p topic=msg] Subscribe and publish on an MQTT broker and print what arrives
 testpion grpc <target> [method] [-p protos]   Call a gRPC method, or list the methods (.proto files or server reflection)

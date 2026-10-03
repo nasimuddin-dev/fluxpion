@@ -263,7 +263,7 @@ describe('example workspace (end-to-end)', () => {
     await s.connect(20_000);
     try {
       const names = (await s.listTools()).map((t) => t.name).sort();
-      expect(names).toEqual(['api_coverage', 'check_certificate', 'ci_config', 'collection_docs', 'collection_health', 'collection_openapi', 'collection_timing', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'compare_runs', 'decode_jwt', 'environment_matrix', 'export_traces', 'flaky_tests', 'get_request', 'git_diff', 'git_log', 'git_propose_commit', 'git_status', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_certificates', 'list_collections', 'list_datasets', 'list_environments', 'list_evaluations', 'list_monitors', 'list_requests', 'list_tests', 'llm_usage', 'load_history', 'load_test', 'mcp_tool_usage', 'monitor_requests', 'monitor_results', 'monitor_uptime', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'recent_failures', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_breakdown', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'score_trend', 'security_review', 'send_request', 'set_environment_variable', 'set_request_checks', 'test_history', 'testpion_guide', 'unused_variables', 'variable_flow', 'variable_usages', 'what_needs_attention', 'workspace_activity', 'write_test_file']);
+      expect(names).toEqual(['api_coverage', 'check_certificate', 'ci_config', 'collection_docs', 'collection_health', 'collection_openapi', 'collection_timing', 'compare_environments', 'compare_request_across_environments', 'compare_responses', 'compare_runs', 'create_collection', 'create_folder', 'decode_jwt', 'delete_request', 'environment_matrix', 'export_traces', 'flaky_tests', 'get_request', 'git_diff', 'git_log', 'git_propose_commit', 'git_status', 'graphql_operation', 'graphql_subscribe', 'grpc_call', 'import_definition', 'list_certificates', 'list_collections', 'list_datasets', 'list_environments', 'list_evaluations', 'list_mcp_servers', 'list_monitors', 'list_requests', 'list_tests', 'llm_usage', 'load_history', 'load_test', 'mcp_call_tool', 'mcp_server_tools', 'mcp_tool_usage', 'monitor_requests', 'monitor_results', 'monitor_uptime', 'move_request', 'openapi_diff', 'parse_request_snippet', 'realtime_exchange', 'recent_failures', 'rename_variable', 'reorder_environments', 'request_history', 'response_time_stats', 'run_breakdown', 'run_collection', 'run_evaluation', 'run_monitor', 'run_tests', 'save_request', 'save_test', 'score_trend', 'security_review', 'send_request', 'set_collection_variable', 'set_environment_variable', 'set_request_checks', 'test_history', 'testpion_guide', 'unused_variables', 'update_request', 'variable_flow', 'variable_usages', 'what_needs_attention', 'workspace_activity', 'write_test_file']);
       const text = async (tool: string, args: Record<string, unknown> = {}) => {
         const r = await s.callTool(tool, args);
         return { isError: r.isError, text: mcpResultBody(r).text };
@@ -346,6 +346,39 @@ describe('example workspace (end-to-end)', () => {
       const list = pats.results.find((r: { name: string }) => r.name.endsWith('List patients'));
       if (!list) throw new Error(JSON.stringify(pats.results.map((r: { name: string }) => r.name)));
       expect(list.visualization.html).toContain('<table>');
+      // an agent changes the workspace the way a person does: create, edit (secrets become variables), move, delete
+      const made = JSON.parse((await text('create_collection', { name: 'Agent sandbox', variables: { base: 'https://example.test' } })).text) as { id: string };
+      expect(made.id).toBeTruthy();
+      await text('save_request', { collection: 'Agent sandbox', name: 'Ping', method: 'GET', url: '{{base}}/ping' });
+      const upd = JSON.parse((await text('update_request', { collection: 'Agent sandbox', request: 'Ping', url: '{{base}}/pong', headers: { Authorization: 'Bearer abc123', Accept: 'application/json' }, body: '{"a":1}' })).text) as { url: string; headers: number; placeholders: Array<{ variable: string }> };
+      expect(upd.url).toBe('{{base}}/pong');
+      expect(upd.headers).toBe(2);
+      expect(upd.placeholders.map((p) => p.variable)).toContain('authorization');
+      expect((await text('get_request', { collection: 'Agent sandbox', request: 'Ping' })).text).not.toContain('abc123');
+      await text('create_folder', { collection: 'Agent sandbox', folder: 'Health / Deep' });
+      expect(JSON.parse((await text('move_request', { collection: 'Agent sandbox', request: 'Ping', folder: 'Health / Deep' })).text)).toMatchObject({ folder: 'Health / Deep' });
+      expect((await text('set_collection_variable', { collection: 'Agent sandbox', name: 'apiKey', value: 'k' })).isError).toBe(true); // a secret: refused
+      expect(JSON.parse((await text('set_collection_variable', { collection: 'Agent sandbox', name: 'page', value: 2 })).text).variables).toEqual(['base', 'page']);
+      expect(JSON.parse((await text('delete_request', { collection: 'Agent sandbox', request: 'Ping' })).text)).toMatchObject({ deleted: 'Ping', kind: 'http' });
+      expect((await text('list_requests', { collection: 'Agent sandbox' })).text).not.toContain('Ping');
+      // the workspace's MCP servers: a mock one works from here; a stdio one only after the user allowed it in the app
+      mkdirSync(join(ws.root, 'mocks'), { recursive: true });
+      writeFileSync(join(ws.root, 'mocks', 'ping.mcp-mock.yaml'), ['name: ping-mock', 'tools:', '  - name: ping', '    description: Answers pong.', '    inputSchema: { type: object, properties: {} }', '    responses:', '      - json: { pong: true }', ''].join('\n'));
+      const mcpFile = join(ws.root, 'mcp-servers.json');
+      const mcpList = JSON.parse(readFileSync(mcpFile, 'utf8')) as { servers: unknown[] };
+      mcpList.servers.push({ id: 'ping-mock', name: 'Ping mock', transport: 'mock', mockFile: 'mocks/ping.mcp-mock.yaml' });
+      writeFileSync(mcpFile, JSON.stringify(mcpList, null, 2));
+      const servers = JSON.parse((await text('list_mcp_servers')).text) as Array<{ name: string; transport: string; allowed?: boolean }>;
+      expect(servers.map((x) => x.transport).sort()).toEqual(['mock', 'stdio']);
+      const offered = JSON.parse((await text('mcp_server_tools', { server: 'Ping mock' })).text) as { tools: Array<{ name: string }> };
+      expect(offered.tools.map((t) => t.name)).toEqual(['ping']);
+      const called = JSON.parse((await text('mcp_call_tool', { server: 'Ping mock', tool: 'ping', arguments: {} })).text) as { isError: boolean; structuredContent?: unknown; content: Array<{ text?: string }> };
+      expect(called.isError).toBe(false);
+      expect(JSON.stringify(called)).toContain('pong');
+      // a stdio server is a program: from here only after the user allowed it in the app
+      const stdio = servers.find((x) => x.transport === 'stdio')!;
+      expect(stdio.allowed).toBe(false);
+      expect((await text('mcp_server_tools', { server: stdio.name })).text).toMatch(/not allowed to run/);
     } finally {
       await s.close();
     }

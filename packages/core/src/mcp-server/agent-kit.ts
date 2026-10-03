@@ -27,6 +27,11 @@ const OPEN_WORLD = new Set([
 
 /** Tools that change or remove what is already there (variable values everywhere, files), or send requests that may change the API's data. */
 const DESTRUCTIVE = new Set([
+  'delete_request',
+  'update_request',
+  'move_request',
+  'set_collection_variable',
+  'mcp_call_tool',
   'rename_variable',
   'set_environment_variable',
   'write_test_file',
@@ -93,6 +98,8 @@ Workspace: **${o.workspace}**. TestPion is an API client and test runner (REST, 
 | Performance | \`response_time_stats\`, \`collection_timing\`, \`load_test\` (local APIs only), \`load_history\` |
 | Contracts | \`import_definition\`, \`api_coverage\`, \`openapi_diff\`, \`collection_openapi\` |
 | Git | \`git_status\`, \`git_diff\` (changes by meaning, or between two commits), \`git_log\`, \`git_propose_commit\` (stages and proposes; a person commits) |
+| Change the workspace | \`update_request\` (URL, headers, body, scripts of a saved request), \`move_request\`, \`delete_request\`, \`create_collection\`, \`create_folder\`, \`set_collection_variable\` |
+| Test an MCP server | \`list_mcp_servers\`, \`mcp_server_tools\` (what it offers), \`mcp_call_tool\` (call a tool and read the result) |
 
 Names or ids work wherever a collection, request, environment or monitor is asked for. Errors say what is available, so read them and retry.
 

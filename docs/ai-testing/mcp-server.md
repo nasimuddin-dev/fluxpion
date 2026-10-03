@@ -75,6 +75,14 @@ For Claude Code: `claude mcp add testpion -- testpion mcp-server -w /path/to/my-
 | `compare_runs` | What changed between two runs: new failures, fixed tests, slower tests, new and removed tests and the change of totals; `passed` is false when something regressed. |
 | `list_datasets` | Data files in the workspace's `datasets/` folder (path, format, size; tables of SQLite databases), to pass to `run_collection` as `data`. |
 | `load_history` | Earlier load tests (from the app and `load_test`), newest first: target, virtual users, throughput, error rate, p50 / p95 / p99 and pass rules. |
+| `update_request` | Change a saved REST request: name, method, URL, headers, body, description, scripts. Secrets typed in become `{{variables}}` (listed in `placeholders`), never written. |
+| `move_request` | Move a request or folder to a folder (created when missing) of the same or another collection. |
+| `delete_request` | Delete a request or folder; the deleted item is returned so it can be put back. |
+| `create_collection`, `create_folder` | A new empty collection (with plain variables); a folder path such as `Auth / Tokens`. |
+| `set_collection_variable` | Set or remove a plain collection variable (names that look like secrets are refused: those belong in secret environment variables). |
+| `list_mcp_servers` | The workspace's MCP servers (id, name, transport, target; whether a stdio command was allowed). |
+| `mcp_server_tools` | Connect to one of them and list its tools (with schemas), resources and prompts. |
+| `mcp_call_tool` | Call a tool of one of the workspace's MCP servers and return the result: the way to test an MCP server. A stdio server runs only after the user allowed its command in the app (Connect ▸ Always for this workspace). |
 | `git_status` | Git state of the workspace: branch, ahead / behind the remote, changed files. |
 | `git_diff` | The workspace's changes by meaning (requests, folders, environment variables, test files); with `from` / `to`, between two commits; `markdown: true` for a pull-request comment. |
 | `git_log` | Commits of the workspace, of a file or of a collection. |

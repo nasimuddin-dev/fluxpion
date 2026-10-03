@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Command } from 'commander';
 import {
   ChainSecretStore,
+  createEngineContext,
   EnvSecretStore,
   McpSession,
   recordingToCollection,
@@ -272,33 +273,75 @@ ${cyan(r.url)}`);
     });
   program
     .command('mcp')
-    .description('connect to an MCP server and print its tools, resources and prompts')
+    .description('connect to an MCP server and print its tools, resources and prompts; with --call, call one tool and print the result')
     .option('--url <url>', 'Streamable HTTP endpoint')
     .option('--sse <url>', 'legacy SSE endpoint')
+    .option('-s, --server <nameOrId>', 'a server saved in the workspace (mcp-servers.json), with the environment\'s variables')
+    .option('-w, --workspace <nameOrPath>', 'workspace name or directory (default: nearest)')
+    .option('-e, --environment <name>', 'environment for {{variables}} in the server settings')
+    .option('--call <tool>', 'call this tool instead of listing')
+    .option('--args <json>', 'arguments of the tool as JSON', '{}')
+    .option('--json', 'print as JSON (for scripts and AI agents)')
     .argument('[command...]', 'stdio command, e.g. -- node server.js')
     .action(async (command: string[], o) => {
-      const cfg: McpServerConfig = o.url
-        ? { id: 'cli', name: o.url, transport: 'streamable-http', url: o.url }
-        : o.sse
-          ? { id: 'cli', name: o.sse, transport: 'sse', url: o.sse }
-          : command.length
-            ? { id: 'cli', name: command.join(' '), transport: 'stdio', command: command[0]!, args: command.slice(1) }
-            : (() => {
-                throw new CliError('Provide --url, --sse or a stdio command', EXIT.CONFIG_ERROR);
-              })();
+      let cfg: McpServerConfig;
+      let dispose: (() => Promise<void>) | undefined;
+      if (o.server) {
+        const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
+        const ctx = createEngineContext({ store, secrets: new ChainSecretStore([new EnvSecretStore()]), settings: new WorkspaceManager().loadSettings(), environment: o.environment });
+        const r = String(o.server).toLowerCase();
+        const found = ctx.services.mcpServers.find((x) => x.id.toLowerCase() === r) ?? ctx.services.mcpServers.find((x) => x.name.toLowerCase() === r);
+        if (!found) throw new CliError(`No MCP server "${o.server}" in the workspace. Available: ${ctx.services.mcpServers.map((x) => x.name).join(', ') || 'none'}`, EXIT.CONFIG_ERROR);
+        cfg = found;
+        dispose = async () => {
+          await ctx.dispose();
+          store.close();
+        };
+      } else
+        cfg = o.url
+          ? { id: 'cli', name: o.url, transport: 'streamable-http', url: o.url }
+          : o.sse
+            ? { id: 'cli', name: o.sse, transport: 'sse', url: o.sse }
+            : command.length
+              ? { id: 'cli', name: command.join(' '), transport: 'stdio', command: command[0]!, args: command.slice(1) }
+              : (() => {
+                  throw new CliError('Provide --url, --sse, --server or a stdio command', EXIT.CONFIG_ERROR);
+                })();
       const s = new McpSession(cfg);
       await s.connect();
-      const d = await s.discover();
-      console.log(bold(`${d.serverInfo?.name ?? 'server'} ${d.serverInfo?.version ?? ''}`), dim(JSON.stringify(d.capabilities)));
-      if (d.instructions) console.log(dim(d.instructions));
-      console.log(cyan(`\nTools (${d.tools.length})`));
-      for (const t of d.tools) console.log(`  ${t.name} ${dim(t.description ?? '')}\n    ${dim(JSON.stringify(t.inputSchema))}`);
-      console.log(cyan(`\nResources (${d.resources.length})`));
-      for (const r of d.resources) console.log(`  ${r.uri} ${dim(r.name)}`);
-      for (const r of d.resourceTemplates) console.log(`  ${r.uriTemplate} ${dim(`${r.name} (template)`)}`);
-      console.log(cyan(`\nPrompts (${d.prompts.length})`));
-      for (const p of d.prompts) console.log(`  ${p.name} ${dim(p.description ?? '')}`);
-      await s.close();
+      try {
+        if (o.call) {
+          let args: Record<string, unknown>;
+          try {
+            args = JSON.parse(String(o.args)) as Record<string, unknown>;
+          } catch {
+            throw new CliError(`--args is not valid JSON: ${String(o.args)}`, EXIT.CONFIG_ERROR);
+          }
+          const r = await s.callTool(String(o.call), args);
+          if (o.json) console.log(JSON.stringify({ tool: o.call, isError: r.isError, durationMs: r.durationMs, content: r.content, structuredContent: r.structuredContent }, null, 2));
+          else {
+            console.log(`${r.isError ? red('error') : green('ok')} ${dim(`${r.durationMs} ms`)}`);
+            for (const c of r.content as Array<{ type: string; text?: string }>) console.log(c.type === 'text' ? c.text : dim(`[${c.type}]`));
+            if (r.structuredContent !== undefined) console.log(JSON.stringify(r.structuredContent, null, 2));
+          }
+          if (r.isError) process.exitCode = EXIT.TEST_FAILURE;
+          return;
+        }
+        const d = await s.discover();
+        if (o.json) return console.log(JSON.stringify({ serverInfo: d.serverInfo, instructions: d.instructions, capabilities: d.capabilities, tools: d.tools, resources: d.resources, resourceTemplates: d.resourceTemplates, prompts: d.prompts }, null, 2));
+        console.log(bold(`${d.serverInfo?.name ?? 'server'} ${d.serverInfo?.version ?? ''}`), dim(JSON.stringify(d.capabilities)));
+        if (d.instructions) console.log(dim(d.instructions));
+        console.log(cyan(`\nTools (${d.tools.length})`));
+        for (const t of d.tools) console.log(`  ${t.name} ${dim(t.description ?? '')}\n    ${dim(JSON.stringify(t.inputSchema))}`);
+        console.log(cyan(`\nResources (${d.resources.length})`));
+        for (const r of d.resources) console.log(`  ${r.uri} ${dim(r.name)}`);
+        for (const r of d.resourceTemplates) console.log(`  ${r.uriTemplate} ${dim(`${r.name} (template)`)}`);
+        console.log(cyan(`\nPrompts (${d.prompts.length})`));
+        for (const p of d.prompts) console.log(`  ${p.name} ${dim(p.description ?? '')}`);
+      } finally {
+        await s.close();
+        await dispose?.();
+      }
     });
 
   program
