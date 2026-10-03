@@ -32,7 +32,8 @@ testpion load <url>           Safeguarded load test (--threshold "p95<500" "erro
 testpion import <file|-> -w   Import OpenAPI/Swagger, Postman, Insomnia, Bruno (a collection folder too), WSDL (SOAP), HAR, collections, or a copied cURL / fetch / PowerShell request
 testpion env list|order|diff -w  List environments; set their order; compare two
 testpion monitor list|add|remove|run|results|uptime|start -w  Collections on a schedule (monitors)
-testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests
+testpion ci <github|gitlab|azure|jenkins> -w  A CI pipeline file for a suite, collection or tests (--start, --wait-for: start the system under test first)
+testpion wait-for <url>       Wait until a URL answers (the health check before integration tests); exit 3 when it never does
 testpion trash list|restore|empty -w  Recently deleted collections and environments (30 days)
 testpion history list|stats|diff|test|export-har -w  Response history of saved requests; response times; compare two responses; a test across runs; HAR export
 testpion workspace list|create|rename|delete|export   Manage workspaces (see Workspaces)

@@ -55,6 +55,17 @@ describe('CI pipeline generation', () => {
     expect(ciConfig(store, { provider: 'github', openapi: 'openapi.yaml' }).content).toContain("if: github.event_name == 'pull_request'");
   });
 
+  it('starts the system under test and waits for its health URL before integration tests', () => {
+    for (const provider of ['github', 'gitlab', 'azure', 'jenkins'] as CiProvider[]) {
+      const c = ciConfig(store, { provider, suite: 'regression', start: 'npm start', waitFor: 'http://127.0.0.1:3000/health', waitSeconds: 120 });
+      expect(c.content, provider).toContain('(npm start) &');
+      expect(c.content, provider).toContain('wait-for http://127.0.0.1:3000/health --timeout 120');
+      // the system starts before the tests run
+      expect(c.content.indexOf('npm start'), provider).toBeLessThan(c.content.indexOf('--suite regression'));
+      expect(ciConfig(store, { provider, suite: 'regression' }).content, provider).not.toContain('wait-for');
+    }
+  });
+
   it('rejects unknown providers, suites, collections and environments', () => {
     expect(() => ciConfig(store, { provider: 'travis' as CiProvider })).toThrow(/github, gitlab, azure, jenkins/);
     expect(() => ciConfig(store, { provider: 'github', suite: 'nope' })).toThrow(/No suite "nope"/);

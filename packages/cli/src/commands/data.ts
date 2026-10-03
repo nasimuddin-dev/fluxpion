@@ -951,12 +951,27 @@ export function registerDataCommands(program: Command): void {
     .option('-e, --environment <name>', 'environment to run with')
     .option('--workspace-dir <path>', 'the workspace folder relative to the repository root', '.')
     .option('--openapi <file>', 'OpenAPI document in the repository: pull requests fail on breaking changes against the target branch')
+    .option('--start <command>', 'integration tests: start the system under test first, in the background (e.g. "npm start", "docker compose up -d")')
+    .option('--wait-for <url>', 'with --start: wait until this URL answers (the health check) before the tests')
+    .option('--wait-seconds <n>', 'how long to wait for it (default 90)')
     .option('-o, --out <file>', 'write the file here (default: print it)')
     .option('--json', 'print { path, content, secrets, command } as JSON')
     .action((provider: string, o) => {
       const { store } = openWorkspace(o.workspace, undefined, new WorkspaceManager());
       try {
-        const c = ciConfig(store, { provider: provider as CiProvider, suite: o.suite, collection: o.collection, folders: o.folder, tests: o.tests, environment: o.environment, workspaceDir: o.workspaceDir, openapi: o.openapi });
+        const c = ciConfig(store, {
+          provider: provider as CiProvider,
+          suite: o.suite,
+          collection: o.collection,
+          folders: o.folder,
+          tests: o.tests,
+          environment: o.environment,
+          workspaceDir: o.workspaceDir,
+          openapi: o.openapi,
+          start: o.start,
+          waitFor: o.waitFor,
+          waitSeconds: o.waitSeconds ? Number(o.waitSeconds) : undefined,
+        });
         if (o.json) return console.log(JSON.stringify(c, null, 2));
         if (o.out) {
           writeFileSync(resolve(o.out), c.content);
@@ -966,6 +981,38 @@ export function registerDataCommands(program: Command): void {
       } finally {
         store.close();
       }
+    });
+  program
+    .command('wait-for')
+    .description('wait until a URL answers (2xx or 3xx): the health check before integration tests, after starting the system under test; exit 3 when it never does')
+    .argument('<url>', 'e.g. http://127.0.0.1:4010/health')
+    .option('--timeout <seconds>', 'give up after this long', '90')
+    .option('--interval <ms>', 'time between tries', '1000')
+    .option('--json', 'print { ready, url, status, afterMs, attempts } as JSON')
+    .action(async (url: string, o) => {
+      const timeout = Math.max(1, Number(o.timeout) || 90) * 1000;
+      const interval = Math.max(100, Number(o.interval) || 1000);
+      const t0 = Date.now();
+      let attempts = 0;
+      let last = '';
+      while (Date.now() - t0 < timeout) {
+        attempts++;
+        try {
+          const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(Math.min(interval * 5, 10_000)) });
+          if (res.status < 400) {
+            const r = { ready: true, url, status: res.status, afterMs: Date.now() - t0, attempts };
+            console.log(o.json ? JSON.stringify(r) : green(`${url} answered ${res.status} after ${r.afterMs} ms (${attempts} ${attempts === 1 ? 'try' : 'tries'})`));
+            return;
+          }
+          last = `status ${res.status}`;
+        } catch (e) {
+          last = (e as Error).message;
+        }
+        await new Promise((r) => setTimeout(r, interval));
+      }
+      const r = { ready: false, url, afterMs: Date.now() - t0, attempts, last };
+      console.log(o.json ? JSON.stringify(r) : red(`${url} did not answer within ${timeout / 1000} s (${attempts} tries; last: ${last})`));
+      process.exitCode = EXIT.EXECUTION_ERROR;
     });
   const envCmd = program.command('env').description('list environments, set plain variables, and set their order');
   envCmd

@@ -1,0 +1,89 @@
+# An integration test: one record's whole life through the API, each step depending on the one before it, with the
+# clean-up at the end so the test leaves nothing behind and can run again. Values flow between steps through
+# `extract` (a JSON path of the response saved as a variable) and `{{variables}}`.
+#
+# Run it:   testpion test tests/rest/patient-lifecycle.yaml -w . -e Development      (the demo API: node examples/servers/demo-servers.mjs)
+# In CI:    testpion ci github --suite integration --start "<your start command>" --wait-for http://127.0.0.1:4010/health
+defaults:
+  type: http
+  dependsOn: auth-token
+tests:
+  - id: lifecycle-create
+    name: Create a patient
+    method: POST
+    url: "{{baseUrl}}/patients"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    body: { name: "Lifecycle {{$randomFirstName}}", species: cat, ownerId: "owner-{{$randomInt}}" }
+    extract:
+      patientId: $.id
+      patientName: $.name
+    assertions:
+      - { type: status, expected: 201 }
+      - { type: header, header: location, expected: /patients/ }
+      - { type: exists, path: $.id }
+      - { type: equals, path: $.species, expected: cat }
+
+  - id: lifecycle-read
+    name: Read it back
+    dependsOn: lifecycle-create
+    method: GET
+    url: "{{baseUrl}}/patients/{{patientId}}"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    assertions:
+      - { type: status, expected: 200 }
+      - { type: equals, path: $.id, expected: "{{patientId}}" }
+      - { type: equals, path: $.name, expected: "{{patientName}}" }
+      - { type: latency, max: 1000 }
+
+  - id: lifecycle-listed
+    name: It is in the list
+    dependsOn: lifecycle-create
+    method: GET
+    url: "{{baseUrl}}/patients"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    assertions:
+      - { type: status, expected: 200 }
+    testScript: |
+      const body = pm.response.json();
+      pm.test('the new patient is listed', () => {
+        pm.expect(body.items.map((p) => p.id)).to.include(pm.variables.get('patientId'));
+      });
+      pm.test('total counts it', () => pm.expect(body.total).to.be.at.least(1));
+
+  - id: lifecycle-wrong-token
+    name: A wrong token is refused
+    dependsOn: lifecycle-create
+    method: GET
+    url: "{{baseUrl}}/patients/{{patientId}}"
+    auth: { type: bearer, token: not-a-real-token }
+    assertions:
+      - { type: status, expected: 403 }
+      - { type: equals, path: $.error, expected: forbidden }
+
+  - id: lifecycle-delete
+    name: Delete it (clean-up)
+    dependsOn: [lifecycle-read, lifecycle-listed, lifecycle-wrong-token]
+    method: DELETE
+    url: "{{baseUrl}}/patients/{{patientId}}"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    assertions:
+      - { type: status, expected: 204 }
+
+  - id: lifecycle-gone
+    name: It is gone afterwards
+    dependsOn: lifecycle-delete
+    method: GET
+    url: "{{baseUrl}}/patients/{{patientId}}"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    assertions:
+      - { type: status, expected: 404 }
+      - { type: equals, path: $.error, expected: not_found }
+
+  - id: lifecycle-delete-twice
+    name: Deleting it again is a 404, not an error
+    dependsOn: lifecycle-delete
+    method: DELETE
+    url: "{{baseUrl}}/patients/{{patientId}}"
+    auth: { type: bearer, token: "{{accessToken}}" }
+    assertions:
+      - { type: status, expected: 404 }

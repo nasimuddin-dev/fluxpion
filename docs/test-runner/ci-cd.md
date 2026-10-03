@@ -61,6 +61,10 @@ With an **OpenAPI document** (`--openapi`, or the field in the dialog), pull req
 
 A failing test fails the build. The file never contains secret values. Instead, TestPion lists the **CI secrets to create**, such as `TESTPION_SECRET_ENV_STAGING_APIKEY` for the *Staging* environment's secret `apiKey`, and the pipeline passes them to the CLI.
 
+## Integration tests: start the system first
+
+`--start "<command>"` and `--wait-for <health URL>` make the pipeline start the system under test in the background and wait until it answers before the tests run; `testpion wait-for <url>` does the waiting in any pipeline. See [Integration testing](/test-runner/integration-testing) for the flow pattern, the suite and the reusable GitHub Action.
+
 ## By hand
 
 The CLI isn't published to npm yet, so a pipeline installs it from the repository (this is what the generated files do):

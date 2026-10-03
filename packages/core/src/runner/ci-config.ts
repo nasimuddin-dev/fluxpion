@@ -32,6 +32,11 @@ export interface CiConfigOptions extends CiTarget {
   version?: string;
   /** An OpenAPI document in the repository: pull requests fail when it has breaking changes against the target branch. */
   openapi?: string;
+  /** Integration tests: a command that starts the system under test in the background before the tests (e.g. `npm start`, `docker compose up -d`). */
+  start?: string;
+  /** With `start`: a URL polled until it answers 2xx/3xx (the health check), with a time limit in seconds (default 90). */
+  waitFor?: string;
+  waitSeconds?: number;
 }
 
 export interface CiSecret {
@@ -91,6 +96,10 @@ export function ciConfig(store: WorkspaceStore, o: CiConfigOptions): CiConfig {
   const command = ciCommand(o, 'node "$TESTPION_CLI"');
   const install = `git clone --depth 1 --branch ${tag} ${REPO} "$TESTPION_HOME_DIR" && cd "$TESTPION_HOME_DIR" && npm ci --no-audit --no-fund && npm run build -w @testpion/core -w @testpion/cli`;
   const name = o.suite ? `suite ${o.suite}` : o.collection ? `collection ${o.collection}` : 'tests';
+  // integration tests: start the system under test, wait until it answers, then run; it is stopped when the job ends
+  const start = o.start?.trim() ? `(${o.start.trim()}) &` : undefined;
+  const wait = o.waitFor?.trim() ? `node "$TESTPION_CLI" wait-for ${q(o.waitFor.trim())} --timeout ${Math.max(5, Math.round(o.waitSeconds ?? 90))}` : undefined;
+  const startLines = [start, wait].filter((x): x is string => !!x);
   // pull requests: compare the OpenAPI document with the target branch's (skipped when the branch doesn't have it yet)
   const spec = o.openapi?.trim() ? q(o.openapi.trim().replace(/^\.\//, '')) : undefined;
   const diffAgainst = (ref: string, tmp: string) =>
@@ -130,6 +139,13 @@ ${
         run: ${diffAgainst('${{ github.base_ref }}', '"$RUNNER_TEMP/openapi.base"')}
 `
     : ''
+}${
+  startLines.length
+    ? `      - name: Start the system under test
+        run: |
+${startLines.map((l) => `          ${l}`).join('\n')}
+`
+    : ''
 }      - name: Run ${name}
         run: ${command}
       - name: Upload reports
@@ -155,7 +171,7 @@ api-tests:
     TESTPION_CLI: /tmp/testpion/packages/cli/bin/testpion.js
   script:
     - (${install})
-${spec ? `    - if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then ${diffAgainst('"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"', '/tmp/openapi.base')}; fi\n` : ''}    - ${command}
+${spec ? `    - if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then ${diffAgainst('"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"', '/tmp/openapi.base')}; fi\n` : ''}${startLines.map((l) => `    - ${l}\n`).join('')}    - ${command}
   artifacts:
     when: always
     paths: [test-results]
@@ -194,6 +210,13 @@ ${
     condition: eq(variables['Build.Reason'], 'PullRequest')
 `
     : ''
+}${
+  startLines.length
+    ? `  - script: |
+${startLines.map((l) => `      ${l}`).join('\n')}
+    displayName: Start the system under test
+`
+    : ''
 }  - script: ${command}
     displayName: Run ${name}
 ${secrets.length ? `    env:\n${secrets.map((s) => `      ${s.name}: $(${s.name})`).join('\n')}\n` : ''}  - task: PublishTestResults@2
@@ -229,6 +252,13 @@ ${
     ? `    stage('Breaking API changes') {
       when { changeRequest() }
       steps { sh '${diffAgainst('"$CHANGE_TARGET"', '"$WORKSPACE/.openapi.base"').replace(/'/g, "\\'")}' }
+    }
+`
+    : ''
+}${
+  startLines.length
+    ? `    stage('Start the system under test') {
+      steps { sh '${startLines.join(' && ').replace(/'/g, "\\'")}' }
     }
 `
     : ''

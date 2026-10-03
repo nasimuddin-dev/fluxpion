@@ -1,0 +1,13 @@
+name: Integration
+description: >-
+  Whole flows against a running API (started first; see the CI recipe): sign-in, a record's lifecycle with clean-up, the
+  GraphQL and MCP services. One worker and no retries: a flow should pass as written.
+tests:
+  - rest/auth.yaml
+  - rest/patient-lifecycle.yaml
+  - rest/patients.yaml
+  - graphql
+  - mcp
+concurrency: 1
+retries: 0
+environment: Development

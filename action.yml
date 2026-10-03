@@ -1,0 +1,99 @@
+# Run a TestPion workspace's tests in GitHub Actions:
+#
+#   - uses: nasimuddin-dev/testpion@v0.43.0
+#     with:
+#       workspace: api-tests          # the folder with workspace.json (default: the repository root)
+#       suite: integration            # or collection: "My API" / tests: rest
+#       environment: Staging
+#       start: npm start              # integration tests: start the system under test first (optional)
+#       wait-for: http://127.0.0.1:3000/health
+#     env:
+#       TESTPION_SECRET_ENV_STAGING_APIKEY: ${{ secrets.STAGING_API_KEY }}   # secret variables, named by `testpion ci`
+#
+# Reports (JUnit, HTML, console) land in `test-results/` and are uploaded as an artifact; a failing test fails the job.
+name: TestPion tests
+description: Run a TestPion workspace's tests (REST, GraphQL, gRPC, WebSocket, MCP, AI) and publish the reports.
+author: TestPion
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  workspace:
+    description: The workspace folder, relative to the repository root (the folder with workspace.json).
+    default: '.'
+  suite:
+    description: 'A suite to run: tests/<suite>.suite.yaml.'
+    default: ''
+  collection:
+    description: A collection to run (name or id), instead of a suite.
+    default: ''
+  folder:
+    description: With collection, only this folder or request.
+    default: ''
+  tests:
+    description: 'Test files or folders under tests/ to run (space separated), instead of a suite; default: all.'
+    default: ''
+  environment:
+    description: The environment to run with.
+    default: ''
+  start:
+    description: 'Integration tests: a command that starts the system under test, run in the background before the tests.'
+    default: ''
+  wait-for:
+    description: 'With start: a URL polled until it answers (the health check).'
+    default: ''
+  wait-seconds:
+    description: How long to wait for it.
+    default: '90'
+  out:
+    description: Where the reports go.
+    default: test-results
+  upload:
+    description: Upload the reports as an artifact (true/false).
+    default: 'true'
+  node-version:
+    description: Node.js version for the CLI.
+    default: '24'
+outputs:
+  results:
+    description: The folder with the reports (junit.xml, report.html, results.jsonl).
+    value: ${{ inputs.out }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: Install the TestPion CLI
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        npm ci --no-audit --no-fund --ignore-scripts
+        npm run build -w @testpion/core -w @testpion/cli
+    - name: Start the system under test
+      if: inputs.start != ''
+      shell: bash
+      run: |
+        (${{ inputs.start }}) &
+        if [ -n "${{ inputs.wait-for }}" ]; then node "${{ github.action_path }}/packages/cli/bin/testpion.js" wait-for "${{ inputs.wait-for }}" --timeout "${{ inputs.wait-seconds }}"; fi
+    - name: Run the tests
+      shell: bash
+      run: |
+        CLI="${{ github.action_path }}/packages/cli/bin/testpion.js"
+        ENV=""; [ -n "${{ inputs.environment }}" ] && ENV="-e ${{ inputs.environment }}"
+        if [ -n "${{ inputs.collection }}" ]; then
+          FOLDER=""; [ -n "${{ inputs.folder }}" ] && FOLDER="--folder ${{ inputs.folder }}"
+          node "$CLI" run-collection "${{ inputs.collection }}" -w "${{ inputs.workspace }}" $ENV $FOLDER -r console junit html -o "${{ inputs.out }}"
+        elif [ -n "${{ inputs.suite }}" ]; then
+          node "$CLI" run -w "${{ inputs.workspace }}" --suite "${{ inputs.suite }}" $ENV -r console junit html -o "${{ inputs.out }}"
+        else
+          PATHS=""; for t in ${{ inputs.tests }}; do PATHS="$PATHS ${{ inputs.workspace }}/tests/$t"; done
+          [ -z "$PATHS" ] && PATHS="${{ inputs.workspace }}/tests"
+          node "$CLI" test $PATHS -w "${{ inputs.workspace }}" $ENV -r console junit html -o "${{ inputs.out }}"
+        fi
+    - name: Upload the reports
+      if: always() && inputs.upload == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: testpion-results
+        path: ${{ inputs.out }}

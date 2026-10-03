@@ -22,11 +22,12 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
-      - name: Example workspace through the CLI
+      - name: Example workspace through the CLI (integration tests against the demo API)
         shell: bash
         run: |
           node examples/servers/demo-servers.mjs &
-          sleep 2
+          node packages/cli/bin/testpion.js wait-for http://127.0.0.1:4010/health --timeout 60
+          node packages/cli/bin/testpion.js run -w examples/veterinary-workspace --suite integration -r console junit -o test-results/integration
           node packages/cli/bin/testpion.js run -w examples/veterinary-workspace --suite regression -r console junit -o test-results
       - uses: actions/upload-artifact@v4
         if: always()

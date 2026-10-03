@@ -874,7 +874,7 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
     {
       name: 'ci_config',
       description:
-        "A CI pipeline file that runs this workspace's tests on every push: GitHub Actions, GitLab CI, Azure Pipelines or Jenkins. Give one of suite, collection (+ folders) or tests. Returns { path, content, secrets, command }: write content to path in the repository and create the listed CI secrets (values are never included).",
+        "A CI pipeline file that runs this workspace's tests on every push: GitHub Actions, GitLab CI, Azure Pipelines or Jenkins. Give one of suite, collection (+ folders) or tests; for integration tests, `start` (the command that starts the system under test) and `waitFor` (its health URL). Returns { path, content, secrets, command }: write content to path in the repository and create the listed CI secrets (values are never included).",
       inputSchema: {
         type: 'object',
         properties: {
@@ -886,6 +886,9 @@ export function createTestPionMcpServer(opts: TestPionMcpOptions): Server {
           environment: str('Environment name'),
           workspaceDir: str('The workspace folder relative to the repository root (default ".")'),
           openapi: str('OpenAPI document in the repository (e.g. openapi.yaml): pull requests fail on breaking changes against the target branch'),
+          start: str('Integration tests: a command that starts the system under test in the background first (e.g. "npm start", "docker compose up -d")'),
+          waitFor: str('With start: a URL polled until it answers before the tests run (the health check)'),
+          waitSeconds: { type: 'number', description: 'How long to wait for it (default 90)' },
         },
         required: ['provider'],
       },
